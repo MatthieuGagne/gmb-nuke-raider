@@ -46,4 +46,6 @@ static inline void move_sprite(uint8_t nb, uint8_t x, uint8_t y) {
     (void)nb; (void)x; (void)y;
 }
 
+static inline void move_bkg(uint8_t x, uint8_t y) { (void)x; (void)y; }
+
 #endif /* MOCK_GB_H */
