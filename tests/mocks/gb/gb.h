@@ -30,4 +30,20 @@ static inline void wait_vbl_done(void) {}
 /* Joypad — returns 0 (no buttons pressed) in tests */
 static inline uint8_t joypad(void) { return 0; }
 
+/* Sprite mode / display control */
+#define SPRITES_8x8  ((void)0)
+#define SHOW_SPRITES ((void)0)
+
+/* Sprite functions */
+static inline void set_sprite_tile_data(uint8_t first_tile, uint8_t nb_tiles,
+                                         const uint8_t *data) {
+    (void)first_tile; (void)nb_tiles; (void)data;
+}
+static inline void set_sprite_tile(uint8_t nb, uint8_t tile) {
+    (void)nb; (void)tile;
+}
+static inline void move_sprite(uint8_t nb, uint8_t x, uint8_t y) {
+    (void)nb; (void)x; (void)y;
+}
+
 #endif /* MOCK_GB_H */
