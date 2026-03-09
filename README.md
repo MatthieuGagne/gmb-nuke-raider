@@ -4,23 +4,17 @@ A Game Boy Color (GBC) game built with [GBDK-2020](https://github.com/gbdk-2020/
 
 ## Requirements
 
-- [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020/releases) installed at `/opt/gbdk`
-  (or override `GBDK_HOME` — see below)
+- [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020/releases) installed at `~/gbdk`
+  (or override with `GBDK_HOME=/path/to/gbdk make`)
 - GNU `make`
 
 ## Build
 
 ```sh
-make
+GBDK_HOME=~/gbdk make
 ```
 
 Output: `build/wasteland-racer.gb`
-
-### Override GBDK path
-
-```sh
-GBDK_HOME=~/tools/gbdk make
-```
 
 ### Clean
 
@@ -30,22 +24,27 @@ make clean
 
 ## Running
 
-Load `build/wasteland-racer.gb` in any GB/GBC emulator:
+```sh
+mgba-qt build/wasteland-racer.gb
+```
 
-- [SameBoy](https://sameboy.github.io/)
-- [Emulicious](https://emulicious.net/)
-- [BGB](https://bgb.bircd.org/)
+Or load `build/wasteland-racer.gb` in any GB/GBC emulator ([SameBoy](https://sameboy.github.io/), [Emulicious](https://emulicious.net/), [BGB](https://bgb.bircd.org/)).
 
 ## Project Structure
 
 ```
 gmb-wasteland-racer/
 ├── src/
-│   └── main.c          # Entry point, main loop, game state machine
+│   ├── main.c          # Entry point, main loop, game state machine
+│   ├── player.c/.h     # Player module
+│   └── config.h        # Capacity constants (MAX_ENEMIES, etc.)
 ├── assets/
 │   ├── sprites/        # Raw sprite source files (.png, .gbr, etc.)
 │   ├── tiles/          # Background tile source files
 │   └── music/          # Music / sound data
+├── tests/              # Unity unit tests (gcc, no hardware needed)
+├── docs/plans/         # Design docs and implementation plans
+├── .claude/            # Claude Code skills and agent configs
 ├── build/              # Compiler output (gitignored)
 ├── Makefile
 └── README.md
