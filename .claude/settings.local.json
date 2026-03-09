@@ -22,7 +22,8 @@
       "Bash(cat:*)",
       "Bash(python3:*)",
       "Bash(bash:*)",
-      "Bash(gh push:*)"
+      "Bash(gh push:*)",
+      "Bash(make test:*)"
     ]
   }
 }
