@@ -23,7 +23,9 @@
       "Bash(python3:*)",
       "Bash(bash:*)",
       "Bash(gh push:*)",
-      "Bash(make test:*)"
+      "Bash(make test:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh pr:*)"
     ]
   }
 }
