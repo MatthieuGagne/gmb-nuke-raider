@@ -28,7 +28,7 @@ static uint8_t stream_buf_len = 0u;
 /* Clamp signed v to [0, max]. */
 static uint16_t clamp_cam(int16_t v, uint16_t max) {
     if (v < 0) return 0u;
-    if ((uint16_t)v > max) return max;
+    if ((uint16_t)v > max) return max;  /* safe: v >= 0 guaranteed by prior guard */
     return (uint16_t)v;
 }
 
