@@ -49,3 +49,13 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, MBC banking, compilation errors.
 - **`gb-c-optimizer`** — C code review for GBC performance/ROM size, anti-pattern detection, SDCC optimization.
+
+## Workflow
+
+This project uses [Superpowers](https://github.com/obra/superpowers) (installed globally in `~/.claude/`).
+
+**Outer loop:** brainstorming → writing-plans → subagent-driven-development
+**TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill)
+**Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
+**PRDs:** saved to `docs/prd/YYYY-MM-DD-<topic>.md`
+**Design docs & plans:** saved to `docs/plans/YYYY-MM-DD-<topic>-design.md`
