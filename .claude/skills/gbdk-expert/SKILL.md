@@ -11,6 +11,19 @@ At the start of any GBDK-related task, read:
 
 After completing the task, append any new bugs, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
 
+## Reference Documentation
+**Pan Docs** (authoritative Game Boy hardware reference): https://gbdev.io/pandocs/
+
+Use `WebFetch` to look up Pan Docs pages when you need precise hardware register details, timing values, memory map addresses, or behavior not covered in this skill. Key sections:
+- Memory map: https://gbdev.io/pandocs/Memory_Map.html
+- LCD / VRAM timing: https://gbdev.io/pandocs/STAT.html
+- OAM / sprites: https://gbdev.io/pandocs/OAM.html
+- CGB registers: https://gbdev.io/pandocs/CGB_Registers.html
+- Interrupts: https://gbdev.io/pandocs/Interrupts.html
+- MBC1 banking: https://gbdev.io/pandocs/MBC1.html
+
+When Pan Docs contradicts your cached knowledge, trust Pan Docs and update memory.
+
 ## Hardware Constraints
 - Screen: 160×144 pixels
 - WRAM: 8KB | VRAM: 8KB (CGB: 2 banks via `VBK_REG`)

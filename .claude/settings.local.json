@@ -25,7 +25,8 @@
       "Bash(gh push:*)",
       "Bash(make test:*)",
       "Bash(gh issue:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(grep:*)"
     ]
   }
 }
