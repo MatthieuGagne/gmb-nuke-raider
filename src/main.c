@@ -3,6 +3,8 @@
 #include <gbdk/console.h>
 #include <stdio.h>
 #include "player.h"
+#include "track.h"
+#include "camera.h"
 
 typedef enum {
     STATE_INIT,
@@ -14,10 +16,10 @@ typedef enum {
 static GameState state = STATE_INIT;
 
 static const uint16_t bkg_pal[] = {
-    RGB(31, 31, 31),  /* white  */
-    RGB(20, 20, 20),  /* light  */
-    RGB(10, 10, 10),  /* dark   */
-    RGB(0,  0,  0)    /* black  */
+    RGB(31, 31, 31),
+    RGB(20, 20, 20),
+    RGB(10, 10, 10),
+    RGB(0,  0,  0)
 };
 static const uint16_t spr_pal[] = {
     RGB(31, 31, 31),
@@ -58,18 +60,19 @@ void main(void) {
         switch (state) {
             case STATE_TITLE:
                 if (joypad() & J_START) {
-                    cls();
+                    track_init();
+                    camera_init(player_get_x(), player_get_y());
                     state = STATE_PLAYING;
                 }
                 break;
 
             case STATE_PLAYING:
                 player_update(joypad());
-                player_render(); /* must be after wait_vbl_done() — already at top of loop */
+                camera_update(player_get_x(), player_get_y());
+                player_render();
                 break;
 
             case STATE_GAME_OVER:
-                /* TODO: game over screen */
                 break;
 
             default:
