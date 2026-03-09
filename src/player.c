@@ -55,36 +55,11 @@ void player_update(uint8_t input) {
     }
 }
 
-/* Debug: write world coords to window layer bottom row.
- * Window tile indices use ASCII — GBDK font lives at slots 32-127,
- * track tiles at 0-1, so they don't collide. */
-/* GBDK font: tile index = ASCII code - 0x20 */
-#define T(c) ((uint8_t)((c) - 0x20u))
-
-static void debug_show_coords(void) {
-    static uint8_t buf[12]; /* "X:DDD Y:DDD" */
-    uint16_t v;
-    buf[0] = T('X'); buf[1] = T(':');
-    v = (uint16_t)px;
-    buf[4] = T('0') + (uint8_t)(v % 10u); v /= 10u;
-    buf[3] = T('0') + (uint8_t)(v % 10u); v /= 10u;
-    buf[2] = T('0') + (uint8_t)(v % 10u);
-    buf[5] = T(' ');
-    buf[6] = T('Y'); buf[7] = T(':');
-    v = (uint16_t)py;
-    buf[11] = T('0') + (uint8_t)(v % 10u); v /= 10u;
-    buf[10] = T('0') + (uint8_t)(v % 10u); v /= 10u;
-    buf[9]  = T('0') + (uint8_t)(v % 10u); v /= 10u;
-    buf[8]  = T('0') + (uint8_t)(v % 10u);
-    set_win_tiles(0, 0, 12, 1, buf);
-}
-
 void player_render(void) {
     /* hw coords = world coords - camera scroll + GB sprite hardware offsets */
     uint8_t hw_x = (uint8_t)(px - (int16_t)cam_x + 8);
     uint8_t hw_y = (uint8_t)(py - (int16_t)cam_y + 16);
     move_sprite(0, hw_x, hw_y);
-    debug_show_coords();
 }
 
 void player_set_pos(int16_t x, int16_t y) {
