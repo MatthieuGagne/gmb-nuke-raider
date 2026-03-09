@@ -52,18 +52,23 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) {
     (void)player_world_x;
 
     ncy = clamp_cam(player_world_y - 72, CAM_MAX_Y);
-    if (ncy <= cam_y) return;  /* monotonic: never scroll backward */
+    if (ncy == cam_y) return;
 
-    /* Buffer bottom row when bottom viewport edge crosses a tile boundary */
-    {
+    if (ncy > cam_y) {
+        /* Scrolling down: buffer bottom row when viewport bottom crosses tile boundary */
         uint8_t old_bot = (uint8_t)((cam_y + 143u) >> 3u);
         uint8_t new_bot = (uint8_t)((ncy  + 143u) >> 3u);
-        /* Invariant: flush runs every frame, so buffer never fills in normal play.
-         * If it overflows (e.g. paused frames), the row is silently skipped — the
-         * stale tile will be overwritten on the next flush that has capacity. */
         if (new_bot != old_bot && new_bot < MAP_TILES_H
                 && stream_buf_len < STREAM_BUF_SIZE) {
             stream_buf[stream_buf_len] = new_bot;
+            stream_buf_len++;
+        }
+    } else {
+        /* Scrolling up: buffer top row when viewport top crosses tile boundary */
+        uint8_t old_top = (uint8_t)(cam_y >> 3u);
+        uint8_t new_top = (uint8_t)(ncy >> 3u);
+        if (new_top != old_top && stream_buf_len < STREAM_BUF_SIZE) {
+            stream_buf[stream_buf_len] = new_top;
             stream_buf_len++;
         }
     }
