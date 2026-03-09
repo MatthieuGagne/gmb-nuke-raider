@@ -46,4 +46,17 @@ static inline void move_sprite(uint8_t nb, uint8_t x, uint8_t y) {
     (void)nb; (void)x; (void)y;
 }
 
+/* Background tile functions */
+#define SHOW_BKG ((void)0)
+#define HIDE_BKG ((void)0)
+
+static inline void set_bkg_data(uint8_t first_tile, uint8_t nb_tiles,
+                                 const uint8_t *data) {
+    (void)first_tile; (void)nb_tiles; (void)data;
+}
+static inline void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
+                                  const uint8_t *tiles) {
+    (void)x; (void)y; (void)w; (void)h; (void)tiles;
+}
+
 #endif /* MOCK_GB_H */

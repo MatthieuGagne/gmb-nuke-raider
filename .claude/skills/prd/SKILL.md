@@ -1,25 +1,43 @@
 ---
 name: prd
-description: Use when creating a new PRD for a feature — creates the doc file and GitHub issue together and links them.
+description: Use when creating a new PRD for a feature — creates a GitHub issue with the PRD content. No local file is created.
 ---
 
-Create a new PRD and its linked GitHub issue.
+Create a new PRD as a GitHub issue.
 
 ## Steps
 
-1. **Create the PRD file** at `docs/prd/YYYY-MM-DD-<feature-slug>-prd.md`.
-   - Copy structure from `docs/prd/TEMPLATE.md`.
-   - Fill in Goal, Requirements, and Acceptance Criteria from the user's description.
-   - Leave `**Issue:**` blank for now.
-   - Slug: lowercase, hyphens only, short (e.g. `enemy-spawning`, `hud-health-bar`).
+1. **Draft the PRD content** from the brainstorming session. Use this structure:
 
-2. **Create a GitHub issue**:
+```
+## Goal
+One sentence: what this feature does and why it matters for the game.
+
+## Requirements
+- R1: ...
+
+## Acceptance Criteria
+- [ ] AC1: ...
+
+## Out of Scope
+- ...
+
+## Files Impacted
+- `src/foo.c` — ...
+
+## Notes
+<!-- Design decisions, open questions, references -->
+```
+
+2. **Create a GitHub issue** with the full PRD content as the body:
    ```sh
-   gh issue create --title "feat: <feature name>" \
-     --body "PRD: docs/prd/YYYY-MM-DD-<feature-slug>-prd.md"
+   gh issue create --title "feat: <feature name>" --body "<PRD content>"
    ```
    Capture the issue number from the URL in the output.
 
-3. **Update the PRD** — set `**Issue:** #N` with the captured number.
+3. Report the issue URL to the user.
 
-4. Report the PRD path and issue URL to the user.
+## Important
+
+- **No local file is created.** The GitHub issue is the single source of truth for the PRD.
+- Do NOT invoke `writing-plans` after this. The implementation plan is written in a separate session when the user is ready to build.
