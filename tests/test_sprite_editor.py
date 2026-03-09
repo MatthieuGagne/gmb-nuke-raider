@@ -39,6 +39,30 @@ class TestPalette(unittest.TestCase):
         self.assertEqual(g, (10 * 255) // 31)
         self.assertEqual(b, (5 * 255) // 31)
 
+    def test_palette_save_creates_file(self):
+        p = Palette()
+        p.set_color(1, 20, 10, 5)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'test.pal')
+            p.save(path)
+            self.assertTrue(os.path.exists(path))
+
+    def test_palette_roundtrip(self):
+        p = Palette()
+        p.set_color(0, 1, 2, 3)
+        p.set_color(1, 20, 10, 5)
+        p.set_color(2, 0, 31, 15)
+        p.set_color(3, 31, 31, 31)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'test.pal')
+            p.save(path)
+            p2 = Palette()
+            p2.load(path)
+        self.assertEqual(p2.colors[0], (1, 2, 3))
+        self.assertEqual(p2.colors[1], (20, 10, 5))
+        self.assertEqual(p2.colors[2], (0, 31, 15))
+        self.assertEqual(p2.colors[3], (31, 31, 31))
+
 
 class TestTileSheet(unittest.TestCase):
 

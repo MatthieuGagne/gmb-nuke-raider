@@ -149,6 +149,20 @@ class PalettePanel(Gtk.Box):
         self._load_sliders()
         self._highlight_active()
 
+        # ── Palette file buttons ─────────────────────────────────────────────
+        self.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
+            False, False, 4)
+
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        load_pal_btn = Gtk.Button(label='Load Pal…')
+        load_pal_btn.connect('clicked', self._on_load_pal)
+        save_pal_btn = Gtk.Button(label='Save Pal…')
+        save_pal_btn.connect('clicked', self._on_save_pal)
+        btn_row.pack_start(load_pal_btn, True, True, 0)
+        btn_row.pack_start(save_pal_btn, True, True, 0)
+        self.pack_start(btn_row, False, False, 0)
+
     # ── Preset ────────────────────────────────────────────────────────────────
 
     def _apply_preset(self, btn, name):
@@ -208,6 +222,50 @@ class PalettePanel(Gtk.Box):
                 ctx.add_class('suggested-action')
             else:
                 ctx.remove_class('suggested-action')
+
+    def _on_load_pal(self, btn):
+        dialog = Gtk.FileChooserDialog(
+            title='Load Palette',
+            parent=self.get_toplevel(),
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                     Gtk.STOCK_OPEN, Gtk.ResponseType.OK),
+        )
+        f = Gtk.FileFilter()
+        f.set_name('Palette files')
+        f.add_pattern('*.pal')
+        dialog.add_filter(f)
+        dialog.set_current_folder('assets/sprites')
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK and path:
+            self.model.palette.load(path)
+            self._load_sliders()
+            for i in range(4):
+                self._refresh_button(i)
+            self.canvas.queue_draw()
+
+    def _on_save_pal(self, btn):
+        dialog = Gtk.FileChooserDialog(
+            title='Save Palette',
+            parent=self.get_toplevel(),
+            action=Gtk.FileChooserAction.SAVE,
+            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                     Gtk.STOCK_SAVE, Gtk.ResponseType.OK),
+        )
+        dialog.set_do_overwrite_confirmation(True)
+        f = Gtk.FileFilter()
+        f.set_name('Palette files')
+        f.add_pattern('*.pal')
+        dialog.add_filter(f)
+        dialog.set_current_folder('assets/sprites')
+        dialog.set_current_name('palette.pal')
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK and path:
+            self.model.palette.save(path)
 
 
 class MainWindow(Gtk.Window):

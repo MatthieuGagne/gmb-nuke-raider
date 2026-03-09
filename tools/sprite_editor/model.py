@@ -33,6 +33,21 @@ class Palette:
             (b5 * 255) // 31,
         )
 
+    def save(self, path):
+        """Write palette to a plain-text .pal file (4 lines of 'r5 g5 b5')."""
+        with open(path, 'w') as f:
+            for r5, g5, b5 in self.colors:
+                f.write(f'{r5} {g5} {b5}\n')
+
+    def load(self, path):
+        """Load palette from a plain-text .pal file."""
+        with open(path, 'r') as f:
+            for i, line in enumerate(f):
+                if i >= 4:
+                    break
+                r5, g5, b5 = (int(v) for v in line.split())
+                self.set_color(i, r5, g5, b5)
+
 
 class TileSheet:
     """4×4 grid of 8×8 tiles — 32×32 pixels total, 4-color indexed."""
