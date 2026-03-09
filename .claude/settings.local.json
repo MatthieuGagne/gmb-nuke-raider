@@ -17,7 +17,12 @@
       "Bash(gh repo:*)",
       "Bash(code:*)",
       "WebSearch",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(gh api:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(bash:*)",
+      "Bash(gh push:*)"
     ]
   }
 }
