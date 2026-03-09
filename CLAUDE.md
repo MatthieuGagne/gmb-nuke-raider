@@ -12,7 +12,7 @@ GBDK_HOME=/home/mathdaman/gbdk make
 make clean
 
 # Run in emulator
-java -jar /home/mathdaman/dev-tools/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
 ```
 
 Output ROM: `build/wasteland-racer.gb`
@@ -85,5 +85,5 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
 
-**Smoketest gate:** NEVER commit or create a PR before the user has confirmed a smoketest in the emulator (`java -jar /home/mathdaman/dev-tools/emulicious/Emulicious.jar build/wasteland-racer.gb`). Always ask and wait for confirmation.
+**Smoketest gate:** NEVER commit or create a PR before the user has confirmed a smoketest in the emulator (`java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`). Always ask and wait for confirmation.
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.

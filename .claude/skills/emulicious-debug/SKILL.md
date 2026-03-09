@@ -9,7 +9,7 @@ description: Use when debugging the Wasteland Racer ROM in Emulicious — EMU_pr
 
 ```sh
 # Run ROM in Emulicious
-java -jar /home/mathdaman/dev-tools/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
 ```
 
 **Further reading:**
@@ -53,7 +53,7 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 
 1. Install "Emulicious Debugger" extension in VS Code (Ctrl+Shift+X → search "Emulicious Debugger")
 2. In VS Code preferences, set the Emulicious executable path to:
-   `/home/mathdaman/dev-tools/emulicious/Emulicious.jar`
+   `/home/mathdaman/.local/share/emulicious/Emulicious.jar`
 3. Create `.vscode/launch.json`:
 
 ```json
@@ -150,7 +150,7 @@ romusage build/wasteland-racer.cdb -a
 ## Workflow: Debugging a Bug
 
 1. Add `EMU_printf` at the suspect location, rebuild (`/build`)
-2. Launch: `java -jar /home/mathdaman/dev-tools/emulicious/Emulicious.jar build/wasteland-racer.gb`
+2. Launch: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`
 3. Observe console output; narrow the problem
 4. Set VS Code breakpoints at suspect line; use Step Over/Into to inspect variables
 5. Use Tilemap/Sprite Viewers to confirm visual state matches logic
