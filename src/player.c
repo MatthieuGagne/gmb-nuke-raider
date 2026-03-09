@@ -27,7 +27,6 @@ static uint8_t py;
 
 void player_init(void) {
     SPRITES_8x8;
-    wait_vbl_done();
     set_sprite_data(0, 1, player_tile_data);
     set_sprite_tile(0, 0);
     px = PLAYER_START_X;
