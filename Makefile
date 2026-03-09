@@ -16,7 +16,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Wall -Wextra
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test
+.PHONY: all clean test test-tools
 
 all: $(TARGET)
 
@@ -49,6 +49,9 @@ test: $(TEST_SRCS) | build
 		echo "  RUN build/$$name"; \
 		./build/$$name || exit 1; \
 	done
+
+test-tools:
+	PYTHONPATH=. python3 -m unittest tests.test_sprite_editor -v
 
 clean:
 	rm -rf build/
