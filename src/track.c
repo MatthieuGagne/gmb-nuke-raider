@@ -1,21 +1,12 @@
 #include <gb/gb.h>
 #include "track.h"
 
-/*
- * Tile 0: off-track (color index 2)  — 2bpp: low=0x00, high=0xFF
- * Tile 1: road surface (color index 1) — 2bpp: low=0xFF, high=0x00
- */
-static const uint8_t track_tile_data[] = {
-    /* Tile 0: off-track */
-    0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,
-    0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,
-    /* Tile 1: road */
-    0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
-    0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00
-};
+/* Tile data generated from assets/maps/tileset.png — see src/track_tiles.c */
+extern const uint8_t track_tile_data[];
+extern const uint8_t track_tile_data_count;
 
 void track_init(void) {
-    set_bkg_data(0, 2, track_tile_data);
+    set_bkg_data(0, track_tile_data_count, track_tile_data);
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
 }

@@ -29,6 +29,14 @@ src/track_map.c: assets/maps/track.tmx tools/tmx_to_c.py
 # Ensure regeneration happens before ROM link if TMX is newer
 $(TARGET): src/track_map.c
 
+# src/track_tiles.c is checked into git so CI works without Python.
+# Running `make src/track_tiles.c` (or plain `make`) regenerates it when needed.
+src/track_tiles.c: assets/maps/tileset.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py assets/maps/tileset.png src/track_tiles.c track_tile_data
+
+# Ensure regeneration happens before ROM link if PNG is newer
+$(TARGET): src/track_tiles.c
+
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
@@ -51,7 +59,7 @@ test: $(TEST_SRCS) | build
 	done
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_sprite_editor -v
+	PYTHONPATH=. python3 -m unittest tests.test_sprite_editor tests.test_png_to_tiles -v
 
 clean:
 	rm -rf build/
