@@ -3,6 +3,7 @@
 #include <gbdk/console.h>
 #include <stdio.h>
 #include "player.h"
+#include "track.h"
 
 typedef enum {
     STATE_INIT,
@@ -58,7 +59,7 @@ void main(void) {
         switch (state) {
             case STATE_TITLE:
                 if (joypad() & J_START) {
-                    cls();
+                    track_init();   /* load BG tiles + tile map (VRAM write, safe after wait_vbl_done) */
                     state = STATE_PLAYING;
                 }
                 break;
