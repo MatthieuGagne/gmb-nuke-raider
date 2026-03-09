@@ -89,6 +89,54 @@ void test_camera_vertical_move_at_left_does_not_corrupt_vram_col0(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[27u * 32u + 0u]);
 }
 
+/* --- camera_update: buffers streams, does NOT write VRAM immediately ---- */
+
+/* When camera_update() crosses a tile boundary, it must queue the stream in
+ * the pending buffer — NOT call set_bkg_tiles directly. The call count must
+ * not change between camera_init and camera_update. */
+void test_camera_update_does_not_write_vram_directly(void) {
+    int count_after_init;
+    camera_init(160, 144); /* cam_x=80, cam_y=72; preloads VRAM */
+    count_after_init = mock_set_bkg_tiles_call_count;
+    /* Move right to cross right tile boundary: cam_x 80→88, triggers stream_column(30) */
+    camera_update(168, 144);
+    TEST_ASSERT_EQUAL_INT(count_after_init, mock_set_bkg_tiles_call_count);
+}
+
+/* --- camera_flush_vram: drains buffer and writes VRAM ------------------- */
+
+void test_camera_flush_vram_writes_pending_streams(void) {
+    int count_after_update;
+    camera_init(160, 144);
+    camera_update(168, 144); /* buffers stream_column(30) */
+    count_after_update = mock_set_bkg_tiles_call_count;
+    camera_flush_vram();
+    /* At least one set_bkg_tiles call must have occurred during flush */
+    TEST_ASSERT_GREATER_THAN_INT(count_after_update, mock_set_bkg_tiles_call_count);
+}
+
+/* --- camera_flush_vram: clears buffer so second flush is a no-op -------- */
+
+void test_camera_flush_vram_clears_buffer(void) {
+    int count_after_first_flush;
+    camera_init(160, 144);
+    camera_update(168, 144); /* buffers stream_column(30) */
+    camera_flush_vram();
+    count_after_first_flush = mock_set_bkg_tiles_call_count;
+    camera_flush_vram(); /* second flush — buffer must be empty */
+    TEST_ASSERT_EQUAL_INT(count_after_first_flush, mock_set_bkg_tiles_call_count);
+}
+
+/* --- camera_flush_vram: no-op when no streams are pending --------------- */
+
+void test_camera_flush_vram_noop_on_empty_buffer(void) {
+    camera_init(160, 144);
+    /* No camera_update call — no pending streams */
+    mock_set_bkg_tiles_call_count = 0; /* baseline after init */
+    camera_flush_vram();
+    TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tiles_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_centers_on_player);
@@ -101,5 +149,9 @@ int main(void) {
     RUN_TEST(test_camera_update_clamp_exact_max_y);
     RUN_TEST(test_camera_init_left_edge_vram_col0_shows_world_col0);
     RUN_TEST(test_camera_vertical_move_at_left_does_not_corrupt_vram_col0);
+    RUN_TEST(test_camera_update_does_not_write_vram_directly);
+    RUN_TEST(test_camera_flush_vram_writes_pending_streams);
+    RUN_TEST(test_camera_flush_vram_clears_buffer);
+    RUN_TEST(test_camera_flush_vram_noop_on_empty_buffer);
     return UNITY_END();
 }
