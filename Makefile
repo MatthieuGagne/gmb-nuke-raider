@@ -51,7 +51,7 @@ test: $(TEST_SRCS) | build
 	done
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_sprite_editor -v
+	PYTHONPATH=. python3 -m unittest tests.test_sprite_editor tests.test_png_to_tiles -v
 
 clean:
 	rm -rf build/
