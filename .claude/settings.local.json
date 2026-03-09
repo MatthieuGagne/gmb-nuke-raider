@@ -35,7 +35,10 @@
       "Bash(cp *025740*:*)",
       "Bash(cp *030450*:*)",
       "Bash(cp *031146*:*)",
-      "Bash(nm:*)"
+      "Bash(nm:*)",
+      "Bash(chmod +x:*)",
+      "Bash(~/gbdk/bin/png2asset:*)",
+      "Bash(pip3 list:*)"
     ]
   }
 }
