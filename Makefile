@@ -20,6 +20,15 @@ MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
 all: $(TARGET)
 
+# ── Generated sources ─────────────────────────────────────────────────────────
+# src/track_map.c is checked into git so CI works without Python/Tiled.
+# Running `make src/track_map.c` (or plain `make`) regenerates it when needed.
+src/track_map.c: assets/maps/track.tmx tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c
+
+# Ensure regeneration happens before ROM link if TMX is newer
+$(TARGET): src/track_map.c
+
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
