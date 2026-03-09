@@ -70,9 +70,13 @@ void main(void) {
                 break;
 
             case STATE_PLAYING:
+                /* VBlank phase: all VRAM writes immediately after wait_vbl_done() */
+                player_render();
+                camera_flush_vram();
+                move_bkg(cam_x, cam_y);
+                /* Game logic phase: runs during active display */
                 player_update(joypad());
                 camera_update(player_get_x(), player_get_y());
-                player_render();
                 break;
 
             case STATE_GAME_OVER:
