@@ -21,9 +21,14 @@ static void stream_column(uint8_t world_tx) {
     }
     /* Write rows 0..31. Only write the wrapping rows 32..35 into VRAM rows 0..3
      * when the bottom of the viewport actually wraps (cam_y >= 113). */
-    set_bkg_tiles(vram_x, 0u, 1u, 32u, col_buf);
     if (cam_y >= 113u) {
+        /* Viewport wraps: VRAM rows 0-3 must hold world rows 32-35.
+         * Write rows 4-31 first (skipping 0-3), then write 0-3 with
+         * the wrap data — each VRAM slot written exactly once. */
+        set_bkg_tiles(vram_x, 4u, 1u, 28u, &col_buf[4]);
         set_bkg_tiles(vram_x, 0u, 1u, (uint8_t)(MAP_TILES_H - 32u), &col_buf[32]);
+    } else {
+        set_bkg_tiles(vram_x, 0u, 1u, 32u, col_buf);
     }
 }
 
@@ -39,9 +44,14 @@ static void stream_row(uint8_t world_ty) {
     }
     /* Write cols 0..31. Only write the wrapping cols 32..39 into VRAM cols 0..7
      * when the right edge of the viewport actually wraps (cam_x >= 97). */
-    set_bkg_tiles(0u, vram_y, 32u, 1u, row_buf);
     if (cam_x >= 97u) {
+        /* Viewport wraps: VRAM cols 0-7 must hold world cols 32-39.
+         * Write cols 8-31 first (skipping 0-7), then write 0-7 with
+         * the wrap data — each VRAM slot written exactly once. */
+        set_bkg_tiles(8u, vram_y, 24u, 1u, &row_buf[8]);
         set_bkg_tiles(0u, vram_y, (uint8_t)(MAP_TILES_W - 32u), 1u, &row_buf[32]);
+    } else {
+        set_bkg_tiles(0u, vram_y, 32u, 1u, row_buf);
     }
 }
 
