@@ -46,3 +46,8 @@ After each review, append confirmed anti-patterns and their fixes to that file. 
 - Check sizes with: `ls -la build/wasteland-racer.gb`
 - Object map via `-Wl-m` flag (already in CFLAGS) — check `build/*.map`
 - Strip debug: ensure no `-debug` flag in LCC invocation for release builds
+
+## Verification Commands
+After making changes, verify with:
+- `/test` skill — run `make test` (host-side unit tests, gcc only)
+- `/build` skill — run `GBDK_HOME=/home/mathdaman/gbdk make` (full ROM build)

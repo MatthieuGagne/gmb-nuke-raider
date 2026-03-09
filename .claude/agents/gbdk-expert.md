@@ -46,3 +46,8 @@ After completing a task, append any new bugs found, API gotchas, or confirmed pa
 - Forgetting `SPRITES_8x8` / `SPRITES_8x16` mode before using sprites
 - MBC1 bank 0 is always mapped; bank switching only affects 0x4000–0x7FFF
 - `set_sprite_tile()` index is absolute tile number in OBJ tile data, not relative
+
+## Verification Commands
+After making changes, verify with:
+- `/test` skill — run `make test` (host-side unit tests, gcc only)
+- `/build` skill — run `GBDK_HOME=/home/mathdaman/gbdk make` (full ROM build)
