@@ -99,3 +99,51 @@ class TileSheet:
         with open(path, 'wb') as f:
             f.write(_PNG_SIGNATURE + ihdr + plte + trns + idat + iend)
         self.dirty = False
+
+    def load_png(self, path):
+        """Load a 2-bit indexed PNG from `path`, restoring pixels and palette."""
+        with open(path, 'rb') as f:
+            data = f.read()
+
+        pos = 8  # skip PNG signature
+        plte_colors = None
+        idat_raw = b''
+
+        while pos < len(data):
+            length = struct.unpack('>I', data[pos:pos + 4])[0]
+            chunk_type = data[pos + 4:pos + 8]
+            chunk_data = data[pos + 8:pos + 8 + length]
+            pos += 12 + length  # length(4) + type(4) + data(N) + crc(4)
+
+            if chunk_type == b'PLTE':
+                plte_colors = []
+                for i in range(0, len(chunk_data), 3):
+                    r8, g8, b8 = chunk_data[i], chunk_data[i + 1], chunk_data[i + 2]
+                    # Convert RGB888 → 5-bit (round-trip inverse of save)
+                    r5 = (r8 * 31 + 127) // 255
+                    g5 = (g8 * 31 + 127) // 255
+                    b5 = (b8 * 31 + 127) // 255
+                    plte_colors.append((r5, g5, b5))
+            elif chunk_type == b'IDAT':
+                idat_raw += chunk_data
+            elif chunk_type == b'IEND':
+                break
+
+        if plte_colors:
+            for i, (r5, g5, b5) in enumerate(plte_colors[:4]):
+                self.palette.set_color(i, r5, g5, b5)
+
+        # Decompress and unpack 2-bpp pixels
+        raw = zlib.decompress(idat_raw)
+        row_bytes = 1 + self.WIDTH // 4  # filter byte + 8 data bytes
+        for y in range(self.HEIGHT):
+            row_start = y * row_bytes + 1  # +1 to skip filter byte
+            for bx in range(self.WIDTH // 4):
+                byte = raw[row_start + bx]
+                x = bx * 4
+                self.pixels[y][x]     = (byte >> 6) & 3
+                self.pixels[y][x + 1] = (byte >> 4) & 3
+                self.pixels[y][x + 2] = (byte >> 2) & 3
+                self.pixels[y][x + 3] =  byte        & 3
+
+        self.dirty = False

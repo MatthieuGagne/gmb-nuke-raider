@@ -116,5 +116,44 @@ class TestTileSheet(unittest.TestCase):
         self.assertEqual(color_type, 3)
 
 
+    def test_png_roundtrip_pixels(self):
+        ts = TileSheet()
+        ts.set_pixel(0, 0, 1)
+        ts.set_pixel(31, 31, 3)
+        ts.set_pixel(15, 8, 2)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'rt.png')
+            ts.save_png(path)
+            ts2 = TileSheet()
+            ts2.load_png(path)
+        self.assertEqual(ts2.get_pixel(0, 0), 1)
+        self.assertEqual(ts2.get_pixel(31, 31), 3)
+        self.assertEqual(ts2.get_pixel(15, 8), 2)
+        self.assertEqual(ts2.get_pixel(1, 0), 0)  # unset pixel stays 0
+
+    def test_png_roundtrip_palette(self):
+        ts = TileSheet()
+        ts.palette.set_color(1, 20, 10, 5)
+        ts.palette.set_color(3, 31, 31, 31)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'rt.png')
+            ts.save_png(path)
+            ts2 = TileSheet()
+            ts2.load_png(path)
+        self.assertEqual(ts2.palette.colors[1], (20, 10, 5))
+        self.assertEqual(ts2.palette.colors[3], (31, 31, 31))
+
+    def test_load_clears_dirty_flag(self):
+        ts = TileSheet()
+        ts.set_pixel(0, 0, 2)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'rt.png')
+            ts.save_png(path)
+            ts2 = TileSheet()
+            ts2.set_pixel(0, 0, 1)  # make ts2 dirty
+            ts2.load_png(path)
+        self.assertFalse(ts2.dirty)
+
+
 if __name__ == '__main__':
     unittest.main()
