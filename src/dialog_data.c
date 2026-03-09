@@ -1,0 +1,47 @@
+#include <stddef.h>
+#include "dialog_data.h"
+
+/* --- NPC 0: Mechanic — 3-level branching conversation ------------------- */
+/*
+ * Node graph:
+ *   0 (narration)  -> 1
+ *   1 (2 choices)  -> 2 "The races" | 3 "Supplies"
+ *   2 (2 choices)  -> 4 "Thanks"    | 5 "Tell me more"
+ *   3 (narration)  -> 6
+ *   4 (narration)  -> END
+ *   5 (narration)  -> END
+ *   6 (narration)  -> END
+ */
+static const char m0[] = "Greetings, racer. Ready to talk?";
+static const char m1[] = "What's on your mind?";
+static const char m2[] = "The circuit is brutal. Stay sharp.";
+static const char m3[] = "I've got parts if you've got caps.";
+static const char m4[] = "Good luck out there.";
+static const char m5[] = "Watch the east corner. It bites.";
+static const char m6[] = "Come back with caps.";
+
+static const char mc1_0[] = "The races";
+static const char mc1_1[] = "Supplies";
+static const char mc2_0[] = "Thanks";
+static const char mc2_1[] = "Tell me more";
+
+static const DialogNode mechanic_nodes[] = {
+    /* 0 */ { m0, 0, {NULL,   NULL,   NULL}, {1,          0xFFu, 0xFFu} },
+    /* 1 */ { m1, 2, {mc1_0,  mc1_1,  NULL}, {2,          3,     0xFFu} },
+    /* 2 */ { m2, 2, {mc2_0,  mc2_1,  NULL}, {4,          5,     0xFFu} },
+    /* 3 */ { m3, 0, {NULL,   NULL,   NULL}, {6,          0xFFu, 0xFFu} },
+    /* 4 */ { m4, 0, {NULL,   NULL,   NULL}, {DIALOG_END, 0xFFu, 0xFFu} },
+    /* 5 */ { m5, 0, {NULL,   NULL,   NULL}, {DIALOG_END, 0xFFu, 0xFFu} },
+    /* 6 */ { m6, 0, {NULL,   NULL,   NULL}, {DIALOG_END, 0xFFu, 0xFFu} },
+};
+
+/* --- NPC dialog table (indexed by npc_id) ------------------------------- */
+/* Slots 1-5 are placeholders pointing at mechanic until more NPCs are added */
+const NpcDialog npc_dialogs[] = {
+    { mechanic_nodes, 7 }, /* NPC 0: mechanic */
+    { mechanic_nodes, 7 }, /* NPC 1: placeholder */
+    { mechanic_nodes, 7 }, /* NPC 2: placeholder */
+    { mechanic_nodes, 7 }, /* NPC 3: placeholder */
+    { mechanic_nodes, 7 }, /* NPC 4: placeholder */
+    { mechanic_nodes, 7 }, /* NPC 5: placeholder */
+};
