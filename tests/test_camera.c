@@ -83,9 +83,10 @@ void test_camera_init_left_edge_vram_col0_shows_world_col0(void) {
  * rows must still show world col 0 data at VRAM col 0 (not world col 32). */
 void test_camera_vertical_move_at_left_does_not_corrupt_vram_col0(void) {
     camera_init(40, 144); /* cam_x=0, cam_y=72 */
-    /* Move down 8px crossing a tile boundary → stream_row(27) fires.
+    /* Move down 8px crossing a tile boundary → stream_row(27) buffered.
      * Row 27 (D-row): world col 0 = 0 (off-track), world col 32 = 1 (road). */
     camera_update(40, 152); /* new cam_y=80, new_bot=27 != old_bot=26 */
+    camera_flush_vram();    /* flush pending streams to VRAM */
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[27u * 32u + 0u]);
 }
 
