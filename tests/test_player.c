@@ -64,6 +64,24 @@ void test_player_blocked_by_track_bottom(void) {
     TEST_ASSERT_EQUAL_INT16(264, player_get_y());
 }
 
+/* corner connectivity ------------------------------------------------ */
+
+/* Outer-left D-row (col 4, x=32) must connect to top strip.
+ * Old C-row stopped at col 6; rectangular fix extends strip to col 4. */
+void test_player_outer_left_connects_to_top_strip(void) {
+    player_set_pos(32, 48); /* outer-left D-row 6, col 4 */
+    player_update(J_UP);    /* enter what was C-row 5 */
+    TEST_ASSERT_EQUAL_INT16(47, player_get_y());
+}
+
+/* Outer-right D-row (col 35, x=280+7=287) must connect to bottom strip.
+ * Old C-row stopped at col 33; rectangular fix extends strip to col 35. */
+void test_player_outer_right_connects_to_bottom_strip(void) {
+    player_set_pos(272, 232); /* outer-right D-row 29, col 34 */
+    player_update(J_DOWN);    /* enter what was C-row 30 */
+    TEST_ASSERT_EQUAL_INT16(233, player_get_y());
+}
+
 /* runner ------------------------------------------------------------- */
 
 int main(void) {
@@ -77,5 +95,7 @@ int main(void) {
     RUN_TEST(test_player_blocked_by_track_right);
     RUN_TEST(test_player_blocked_by_track_top);
     RUN_TEST(test_player_blocked_by_track_bottom);
+    RUN_TEST(test_player_outer_left_connects_to_top_strip);
+    RUN_TEST(test_player_outer_right_connects_to_bottom_strip);
     return UNITY_END();
 }

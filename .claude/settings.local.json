@@ -26,7 +26,15 @@
       "Bash(make test:*)",
       "Bash(gh issue:*)",
       "Bash(gh pr:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:gbdev.io)",
+      "Bash(gcc:*)",
+      "Bash(gh run:*)",
+      "Bash(apt-cache show:*)",
+      "Bash(sudo apt:*)",
+      "Bash(cp *025740*:*)",
+      "Bash(cp *030450*:*)",
+      "Bash(cp *031146*:*)"
     ]
   }
 }

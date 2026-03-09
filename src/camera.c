@@ -19,9 +19,12 @@ static void stream_column(uint8_t world_tx) {
     for (ty = 0u; ty < MAP_TILES_H; ty++) {
         col_buf[ty] = track_map[(uint16_t)ty * MAP_TILES_W + world_tx];
     }
-    /* Write rows 0..31 in one call, then rows 32..35 wrap to VRAM rows 0..3 */
+    /* Write rows 0..31. Only write the wrapping rows 32..35 into VRAM rows 0..3
+     * when the bottom of the viewport actually wraps (cam_y >= 113). */
     set_bkg_tiles(vram_x, 0u, 1u, 32u, col_buf);
-    set_bkg_tiles(vram_x, 0u, 1u, (uint8_t)(MAP_TILES_H - 32u), &col_buf[32]);
+    if (cam_y >= 113u) {
+        set_bkg_tiles(vram_x, 0u, 1u, (uint8_t)(MAP_TILES_H - 32u), &col_buf[32]);
+    }
 }
 
 /* Write one full world row to VRAM ring buffer.
@@ -34,9 +37,12 @@ static void stream_row(uint8_t world_ty) {
     for (tx = 0u; tx < MAP_TILES_W; tx++) {
         row_buf[tx] = track_map[(uint16_t)world_ty * MAP_TILES_W + tx];
     }
-    /* Write cols 0..31 in one call, then cols 32..39 wrap to VRAM cols 0..7 */
+    /* Write cols 0..31. Only write the wrapping cols 32..39 into VRAM cols 0..7
+     * when the right edge of the viewport actually wraps (cam_x >= 97). */
     set_bkg_tiles(0u, vram_y, 32u, 1u, row_buf);
-    set_bkg_tiles(0u, vram_y, (uint8_t)(MAP_TILES_W - 32u), 1u, &row_buf[32]);
+    if (cam_x >= 97u) {
+        set_bkg_tiles(0u, vram_y, (uint8_t)(MAP_TILES_W - 32u), 1u, &row_buf[32]);
+    }
 }
 
 /* Clamp a signed camera candidate to [0, max]. Returns uint8_t. */
@@ -49,14 +55,15 @@ static uint8_t clamp_cam(int16_t v, uint8_t max) {
 void camera_init(int16_t player_world_x, int16_t player_world_y) {
     uint8_t ty;
 
+    /* Set scroll first so stream_row/stream_column use the correct cam position */
+    cam_x = clamp_cam(player_world_x - 80, CAM_MAX_X);
+    cam_y = clamp_cam(player_world_y - 72, CAM_MAX_Y);
+
     /* Preload all 36 world rows into VRAM ring buffer */
     for (ty = 0u; ty < MAP_TILES_H; ty++) {
         stream_row(ty);
     }
 
-    /* Set initial scroll centered on player */
-    cam_x = clamp_cam(player_world_x - 80, CAM_MAX_X);
-    cam_y = clamp_cam(player_world_y - 72, CAM_MAX_Y);
     move_bkg(cam_x, cam_y);
 }
 

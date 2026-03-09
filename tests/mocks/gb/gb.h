@@ -54,10 +54,21 @@ static inline void set_bkg_data(uint8_t first_tile, uint8_t nb_tiles,
                                  const uint8_t *data) {
     (void)first_tile; (void)nb_tiles; (void)data;
 }
-static inline void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
+static inline void move_bkg(uint8_t x, uint8_t y) { (void)x; (void)y; }
+
+/* Window layer stubs */
+#define SHOW_WIN    ((void)0)
+#define HIDE_WIN    ((void)0)
+static inline void move_win(uint8_t x, uint8_t y) { (void)x; (void)y; }
+static inline void set_win_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                                   const uint8_t *tiles) {
     (void)x; (void)y; (void)w; (void)h; (void)tiles;
 }
-static inline void move_bkg(uint8_t x, uint8_t y) { (void)x; (void)y; }
+
+/* Mock VRAM: 32x32 tile BG map, shared across TUs via mock_bkg.c */
+extern uint8_t mock_vram[32u * 32u];
+void mock_vram_clear(void);
+void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
+                   const uint8_t *tiles);
 
 #endif /* MOCK_GB_H */

@@ -62,6 +62,9 @@ void main(void) {
                 if (joypad() & J_START) {
                     track_init();
                     camera_init(player_get_x(), player_get_y());
+                    /* Debug coord overlay at bottom of screen */
+                    move_win(7, 136);
+                    SHOW_WIN;
                     state = STATE_PLAYING;
                 }
                 break;
