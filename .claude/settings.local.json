@@ -16,7 +16,8 @@
       "Bash(GBDK_HOME=/home/mathdaman/gbdk make:*)",
       "Bash(gh repo:*)",
       "Bash(code:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(pkill:*)"
     ]
   }
 }
