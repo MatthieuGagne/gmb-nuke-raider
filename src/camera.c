@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 #include "camera.h"
 #include "track.h"
+#include "debug.h"
 
 uint8_t cam_x;
 uint8_t cam_y;
@@ -136,6 +137,9 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) {
         }
     }
 
+    if (stream_buf_len > 0u) {
+        DBG_INT("stream_enq", stream_buf_len);
+    }
     cam_x = ncx;
     cam_y = ncy;
     /* move_bkg() removed — called from main.c VBlank phase after camera_flush_vram() */
@@ -143,6 +147,9 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) {
 
 void camera_flush_vram(void) {
     uint8_t i;
+    if (stream_buf_len > 0u) {
+        DBG_INT("stream_flush", stream_buf_len);
+    }
     for (i = 0u; i < stream_buf_len; i++) {
         if (stream_buf[i].is_row) {
             stream_row(stream_buf[i].index);

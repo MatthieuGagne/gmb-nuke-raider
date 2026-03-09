@@ -2,6 +2,7 @@
 #include "player.h"
 #include "track.h"
 #include "camera.h"
+#include "debug.h"
 
 /* Solid 8x8 sprite: all pixels color index 3 */
 static const uint8_t player_tile_data[] = {
@@ -60,6 +61,11 @@ void player_render(void) {
     uint8_t hw_x = (uint8_t)(px - (int16_t)cam_x + 8);
     uint8_t hw_y = (uint8_t)(py - (int16_t)cam_y + 16);
     move_sprite(0, hw_x, hw_y);
+    /* Log when sprite is near or outside visible bounds (x<8 or x>167, y<16 or y>159) */
+    if (hw_x < 8u || hw_x > 167u || hw_y < 16u || hw_y > 159u) {
+        DBG_INT("hw_x_oob", hw_x);
+        DBG_INT("hw_y_oob", hw_y);
+    }
 }
 
 void player_set_pos(int16_t x, int16_t y) {

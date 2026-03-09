@@ -5,6 +5,7 @@
 #include "player.h"
 #include "track.h"
 #include "camera.h"
+#include "debug.h"
 
 typedef enum {
     STATE_INIT,
@@ -54,6 +55,10 @@ void main(void) {
 
     show_title();
 
+#ifdef DEBUG
+    static uint16_t frame_count = 0u;
+#endif
+
     while (1) {
         wait_vbl_done();
 
@@ -67,6 +72,14 @@ void main(void) {
                 break;
 
             case STATE_PLAYING:
+#ifdef DEBUG
+                frame_count++;
+                if (frame_count % 60u == 0u) {
+                    DBG_INT("frame", (int)frame_count);
+                    DBG_INT("px", (int)player_get_x());
+                    DBG_INT("py", (int)player_get_y());
+                }
+#endif
                 /* VBlank phase: all VRAM writes immediately after wait_vbl_done() */
                 player_render();
                 camera_flush_vram();
