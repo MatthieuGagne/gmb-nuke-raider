@@ -2,6 +2,9 @@ GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
 CFLAGS    := -Wa-l -Wl-m -Wl-j
+ifeq ($(DEBUG),1)
+CFLAGS += -DDEBUG
+endif
 ROMFLAGS  := -Wm-yc -Wm-yt1 -Wm-yn"WSTLND RACER"
 
 TARGET    := build/wasteland-racer.gb
