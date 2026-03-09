@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <gbdk/console.h>
+#include <stdio.h>
 
 typedef enum {
     STATE_INIT,
@@ -11,21 +12,23 @@ typedef enum {
 
 static GameState state = STATE_INIT;
 
+static const uint16_t bkg_pal[] = {
+    RGB(31, 31, 31),  /* white  */
+    RGB(20, 20, 20),  /* light  */
+    RGB(10, 10, 10),  /* dark   */
+    RGB(0,  0,  0)    /* black  */
+};
+static const uint16_t spr_pal[] = {
+    RGB(31, 31, 31),
+    RGB(20, 20, 20),
+    RGB(10, 10, 10),
+    RGB(0,  0,  0)
+};
+
 static void init_palettes(void) {
     if (_cpu == CGB_TYPE) {
-        /* Default 4-shade greyscale palette for GBC mode */
-        set_bkg_palette(0, 1, (const uint16_t[]){
-            RGB(31, 31, 31),  /* white  */
-            RGB(20, 20, 20),  /* light  */
-            RGB(10, 10, 10),  /* dark   */
-            RGB(0,  0,  0)    /* black  */
-        });
-        set_sprite_palette(0, 1, (const uint16_t[]){
-            RGB(31, 31, 31),
-            RGB(20, 20, 20),
-            RGB(10, 10, 10),
-            RGB(0,  0,  0)
-        });
+        set_bkg_palette(0, 1, bkg_pal);
+        set_sprite_palette(0, 1, spr_pal);
     }
 }
 
