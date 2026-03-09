@@ -2,6 +2,15 @@ import struct
 import zlib
 
 
+_PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+
+
+def _make_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    length = struct.pack('>I', len(data))
+    crc = struct.pack('>I', zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+    return length + chunk_type + data + crc
+
+
 class Palette:
     """4-color CGB palette stored as 5-bit RGB tuples."""
 
@@ -50,4 +59,43 @@ class TileSheet:
     def clear(self):
         """Reset all pixels to index 0 and clear dirty flag."""
         self.pixels = [[0] * self.WIDTH for _ in range(self.HEIGHT)]
+        self.dirty = False
+
+    def save_png(self, path):
+        """Write a 2-bit indexed PNG (color type 3) to `path`."""
+        # IHDR: width=32, height=32, bit_depth=2, color_type=3
+        ihdr_data = struct.pack('>IIBBBBB', 32, 32, 2, 3, 0, 0, 0)
+        ihdr = _make_chunk(b'IHDR', ihdr_data)
+
+        # PLTE: 4 × RGB888
+        plte_data = b''
+        for r5, g5, b5 in self.palette.colors:
+            plte_data += bytes([
+                (r5 * 255) // 31,
+                (g5 * 255) // 31,
+                (b5 * 255) // 31,
+            ])
+        plte = _make_chunk(b'PLTE', plte_data)
+
+        # tRNS: index 0 transparent, rest opaque
+        trns = _make_chunk(b'tRNS', bytes([0, 255, 255, 255]))
+
+        # IDAT: pack 4 pixels per byte (2 bpp), prepend filter byte 0 per row
+        raw = b''
+        for y in range(self.HEIGHT):
+            raw += b'\x00'  # filter type None
+            for x in range(0, self.WIDTH, 4):
+                byte = (
+                    (self.pixels[y][x]     << 6) |
+                    (self.pixels[y][x + 1] << 4) |
+                    (self.pixels[y][x + 2] << 2) |
+                     self.pixels[y][x + 3]
+                )
+                raw += bytes([byte])
+        idat = _make_chunk(b'IDAT', zlib.compress(raw))
+
+        iend = _make_chunk(b'IEND', b'')
+
+        with open(path, 'wb') as f:
+            f.write(_PNG_SIGNATURE + ihdr + plte + trns + idat + iend)
         self.dirty = False

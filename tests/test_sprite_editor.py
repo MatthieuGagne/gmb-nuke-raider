@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import os
+import struct
 
 from tools.sprite_editor.model import Palette, TileSheet
 
@@ -73,6 +74,46 @@ class TestTileSheet(unittest.TestCase):
     def test_dimensions(self):
         self.assertEqual(TileSheet.WIDTH, 32)
         self.assertEqual(TileSheet.HEIGHT, 32)
+
+    def test_save_creates_file(self):
+        ts = TileSheet()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'out.png')
+            ts.save_png(path)
+            self.assertTrue(os.path.exists(path))
+
+    def test_save_writes_png_signature(self):
+        ts = TileSheet()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'out.png')
+            ts.save_png(path)
+            with open(path, 'rb') as f:
+                sig = f.read(8)
+        self.assertEqual(sig, b'\x89PNG\r\n\x1a\n')
+
+    def test_save_clears_dirty_flag(self):
+        ts = TileSheet()
+        ts.set_pixel(0, 0, 1)
+        self.assertTrue(ts.dirty)
+        with tempfile.TemporaryDirectory() as d:
+            ts.save_png(os.path.join(d, 'out.png'))
+        self.assertFalse(ts.dirty)
+
+    def test_save_png_is_valid_indexed_png(self):
+        """Verify IHDR declares color type 3 (indexed), bit depth 2."""
+        ts = TileSheet()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'out.png')
+            ts.save_png(path)
+            with open(path, 'rb') as f:
+                data = f.read()
+        # Skip signature (8) + IHDR length (4) + type (4)
+        ihdr_data = data[16:29]  # 13 bytes of IHDR
+        width, height, bit_depth, color_type = struct.unpack('>IIBB', ihdr_data[:10])
+        self.assertEqual(width, 32)
+        self.assertEqual(height, 32)
+        self.assertEqual(bit_depth, 2)
+        self.assertEqual(color_type, 3)
 
 
 if __name__ == '__main__':
