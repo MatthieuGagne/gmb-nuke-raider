@@ -2,6 +2,7 @@
 #include <gb/cgb.h>
 #include <gbdk/console.h>
 #include <stdio.h>
+#include "player.h"
 
 typedef enum {
     STATE_INIT,
@@ -45,6 +46,7 @@ void main(void) {
     DISPLAY_OFF;
 
     init_palettes();
+    player_init();
 
     DISPLAY_ON;
 
@@ -57,14 +59,13 @@ void main(void) {
             case STATE_TITLE:
                 if (joypad() & J_START) {
                     cls();
-                    gotoxy(4, 9);
-                    printf("PLAYING...");
                     state = STATE_PLAYING;
                 }
                 break;
 
             case STATE_PLAYING:
-                /* TODO: game logic */
+                player_update(joypad());
+                player_render(); /* must be after wait_vbl_done() — already at top of loop */
                 break;
 
             case STATE_GAME_OVER:
