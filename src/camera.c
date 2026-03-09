@@ -45,7 +45,6 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) {
         stream_row(ty);
     }
 
-    move_bkg(0u, (uint8_t)cam_y);
 }
 
 void camera_update(int16_t player_world_x, int16_t player_world_y) {
@@ -59,6 +58,9 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) {
     {
         uint8_t old_bot = (uint8_t)((cam_y + 143u) >> 3u);
         uint8_t new_bot = (uint8_t)((ncy  + 143u) >> 3u);
+        /* Invariant: flush runs every frame, so buffer never fills in normal play.
+         * If it overflows (e.g. paused frames), the row is silently skipped — the
+         * stale tile will be overwritten on the next flush that has capacity. */
         if (new_bot != old_bot && new_bot < MAP_TILES_H
                 && stream_buf_len < STREAM_BUF_SIZE) {
             stream_buf[stream_buf_len] = new_bot;
