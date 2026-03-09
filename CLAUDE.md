@@ -59,3 +59,6 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **PRDs:** saved to `docs/prd/YYYY-MM-DD-<topic>.md`
 **Design docs & plans:** saved to `docs/plans/YYYY-MM-DD-<topic>-design.md`
+
+**Smoketest gate:** NEVER commit or create a PR before the user has confirmed a smoketest in the emulator (`mgba-qt build/wasteland-racer.gb`). Always ask and wait for confirmation.
+**Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
