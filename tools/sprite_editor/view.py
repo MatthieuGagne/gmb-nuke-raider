@@ -151,3 +151,126 @@ class PalettePanel(Gtk.Box):
         for i, btn in enumerate(self.color_buttons):
             relief = Gtk.ReliefStyle.NONE if i == self.active_index else Gtk.ReliefStyle.NORMAL
             btn.set_relief(relief)
+
+
+class MainWindow(Gtk.Window):
+    """Top-level window: HeaderBar with New/Open/Save + canvas + palette."""
+
+    def __init__(self, model):
+        super().__init__(title='Sprite Editor')
+        self.model = model
+        self.current_path = None
+
+        # Header bar
+        hb = Gtk.HeaderBar()
+        hb.set_show_close_button(True)
+        hb.set_title('Sprite Editor')
+        self.set_titlebar(hb)
+
+        new_btn = Gtk.Button(label='New')
+        new_btn.connect('clicked', self._on_new)
+        open_btn = Gtk.Button(label='Open')
+        open_btn.connect('clicked', self._on_open)
+        save_btn = Gtk.Button(label='Save')
+        save_btn.connect('clicked', self._on_save)
+        hb.pack_start(new_btn)
+        hb.pack_start(open_btn)
+        hb.pack_end(save_btn)
+
+        # Layout
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        hbox.set_border_width(8)
+        self.canvas = TileCanvas(model)
+        self.palette = PalettePanel(model, self.canvas)
+        hbox.pack_start(self.canvas, False, False, 0)
+        hbox.pack_start(self.palette, False, False, 0)
+        self.add(hbox)
+
+        self.connect('delete-event', self._on_quit)
+
+    # ── Dirty-state guard ────────────────────────────────────────────────────
+
+    def _confirm_discard(self):
+        """Return True if safe to discard; prompt user if dirty."""
+        if not self.model.dirty:
+            return True
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text='Unsaved changes \u2014 discard?',
+        )
+        response = dialog.run()
+        dialog.destroy()
+        return response == Gtk.ResponseType.YES
+
+    # ── Actions ──────────────────────────────────────────────────────────────
+
+    def _on_new(self, btn):
+        if self._confirm_discard():
+            self.model.clear()
+            self.current_path = None
+            self.canvas.queue_draw()
+            self.palette._load_sliders()
+
+    def _on_open(self, btn):
+        if not self._confirm_discard():
+            return
+        dialog = Gtk.FileChooserDialog(
+            title='Open PNG',
+            parent=self,
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN,   Gtk.ResponseType.OK,
+            ),
+        )
+        f = Gtk.FileFilter()
+        f.set_name('PNG files')
+        f.add_pattern('*.png')
+        dialog.add_filter(f)
+        dialog.set_current_folder('assets/sprites')
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK and path:
+            self.model.load_png(path)
+            self.current_path = path
+            self.canvas.queue_draw()
+            self.palette._load_sliders()
+            for i in range(4):
+                self.palette._refresh_button(i)
+
+    def _on_save(self, btn):
+        if self.current_path:
+            self.model.save_png(self.current_path)
+            return
+        dialog = Gtk.FileChooserDialog(
+            title='Save PNG',
+            parent=self,
+            action=Gtk.FileChooserAction.SAVE,
+            buttons=(
+                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_SAVE,   Gtk.ResponseType.OK,
+            ),
+        )
+        dialog.set_do_overwrite_confirmation(True)
+        f = Gtk.FileFilter()
+        f.set_name('PNG files')
+        f.add_pattern('*.png')
+        dialog.add_filter(f)
+        dialog.set_current_folder('assets/sprites')
+        dialog.set_current_name('sprites.png')
+        response = dialog.run()
+        path = dialog.get_filename()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK and path:
+            self.current_path = path
+            self.model.save_png(path)
+
+    def _on_quit(self, widget, event):
+        if self._confirm_discard():
+            Gtk.main_quit()
+            return False
+        return True  # block window close
