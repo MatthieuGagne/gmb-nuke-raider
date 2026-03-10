@@ -13,6 +13,12 @@
 #define PLAYER_FRICTION   1
 #define PLAYER_MAX_SPEED  6
 
+/* Player vehicle stats — reserved for future systems; values are tunable placeholders */
+#define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
+#define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
+#define PLAYER_HP        10  /* Damage system: raw health pool (hp -= damage - armor) */
+#define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
+
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
