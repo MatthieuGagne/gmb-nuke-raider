@@ -60,9 +60,7 @@ void player_update(void) {
 
     /* Apply Y velocity — zero on wall/edge collision */
     new_py = (int16_t)(py + (int16_t)vy);
-    if (new_py >= (int16_t)cam_y &&
-        new_py <= (int16_t)(cam_y + 143u) &&
-        corners_passable(px, new_py)) {
+    if (new_py >= (int16_t)cam_y && new_py <= (int16_t)(cam_y + (HUD_SCANLINE - 16u)) && corners_passable(px, new_py)) {
         py = new_py;
     } else {
         vy = 0;
