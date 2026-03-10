@@ -6,153 +6,125 @@
 void setUp(void)    { mock_vram_clear(); }
 void tearDown(void) {}
 
-/* --- camera_init centering ------------------------------------------ */
+/* --- camera_init: cam_y from player world Y ----------------------------- */
 
-/* Player at world center (160, 144): cam should center on player.
- * cam_x = 160 - 80 = 80, cam_y = 144 - 72 = 72 */
-void test_camera_init_centers_on_player(void) {
-    camera_init(160, 144);
-    TEST_ASSERT_EQUAL_UINT8(80, cam_x);
-    TEST_ASSERT_EQUAL_UINT8(72, cam_y);
+/* Player at world y=80: cam_y = max(80-72, 0) = 8 */
+void test_camera_init_sets_cam_y(void) {
+    camera_init(80, 80);
+    TEST_ASSERT_EQUAL_UINT16(8, cam_y);
 }
 
-/* --- camera_update centering ---------------------------------------- */
+/* --- camera_init: clamp at edges ---------------------------------------- */
 
-void test_camera_update_centers_on_player(void) {
-    camera_init(160, 144);
-    camera_update(200, 180);
-    /* cam_x = 200-80=120, cam_y = 180-72=108 */
-    TEST_ASSERT_EQUAL_UINT8(120, cam_x);
-    TEST_ASSERT_EQUAL_UINT8(108, cam_y);
+/* Player near top: cam_y cannot go negative */
+void test_camera_init_clamps_cam_y_to_zero(void) {
+    camera_init(80, 40);  /* 40-72 = -32 -> 0 */
+    TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
-/* --- Camera clamp: left / top edge ---------------------------------- */
-
-/* Player so far left that cam would go negative: clamp to 0 */
-void test_camera_clamp_left_edge(void) {
-    camera_init(40, 144);
-    /* cam_x = 40-80 = -40 -> clamped to 0 */
-    TEST_ASSERT_EQUAL_UINT8(0, cam_x);
+/* Player past bottom: cam_y capped at CAM_MAX_Y = 656 */
+void test_camera_init_clamps_cam_y_to_max(void) {
+    camera_init(80, 800);  /* 800-72=728 > 656 -> 656 */
+    TEST_ASSERT_EQUAL_UINT16(656, cam_y);
 }
 
-void test_camera_clamp_top_edge(void) {
-    camera_init(160, 40);
-    /* cam_y = 40-72 = -32 -> clamped to 0 */
-    TEST_ASSERT_EQUAL_UINT8(0, cam_y);
+/* --- camera_init: preloads exactly 18 rows, not all 100 ----------------- */
+
+void test_camera_init_preloads_18_rows(void) {
+    /* cam_y=8 -> first_row=1; preloads rows 1-18 = 18 set_bkg_tiles calls */
+    camera_init(80, 80);
+    TEST_ASSERT_EQUAL_INT(18, mock_set_bkg_tiles_call_count);
 }
 
-/* --- Camera clamp: right / bottom edge ------------------------------ */
+/* --- camera_update: bidirectional centering camera --------------------- */
 
-/* MAP_PX_W=320, CAM_MAX_X=160. Player at x=280: cam=280-80=200 -> clamp to 160 */
-void test_camera_clamp_right_edge(void) {
-    camera_init(280, 144);
-    TEST_ASSERT_EQUAL_UINT8(160, cam_x);
+/* Moving player up decreases cam_y to follow */
+void test_camera_update_cam_y_follows_player_up(void) {
+    camera_init(80, 80);    /* cam_y = 8 */
+    camera_update(80, 40);  /* 40-72=-32 -> clamp 0; cam_y = 0 */
+    TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
-/* MAP_PX_H=288, CAM_MAX_Y=144. Player at y=260: cam=260-72=188 -> clamp to 144 */
-void test_camera_clamp_bottom_edge(void) {
-    camera_init(160, 260);
-    TEST_ASSERT_EQUAL_UINT8(144, cam_y);
+/* Moving player down advances cam_y */
+void test_camera_update_cam_y_advances(void) {
+    camera_init(80, 80);     /* cam_y = 8 */
+    camera_update(80, 200);  /* 200-72=128 > 8 -> cam_y = 128 */
+    TEST_ASSERT_EQUAL_UINT16(128, cam_y);
 }
 
-/* --- Exact clamp boundaries ----------------------------------------- */
-
-void test_camera_update_clamp_exact_max_x(void) {
-    camera_init(160, 144);
-    camera_update(240, 144);   /* cam_x = 240-80 = 160 = CAM_MAX_X exactly */
-    TEST_ASSERT_EQUAL_UINT8(160, cam_x);
+/* cam_y never exceeds CAM_MAX_Y */
+void test_camera_update_cam_y_clamped_at_max(void) {
+    camera_init(80, 80);
+    camera_update(80, 9999);  /* clamped to 656 */
+    TEST_ASSERT_EQUAL_UINT16(656, cam_y);
 }
 
-void test_camera_update_clamp_exact_max_y(void) {
-    camera_init(160, 144);
-    camera_update(160, 216);   /* cam_y = 216-72 = 144 = CAM_MAX_Y exactly */
-    TEST_ASSERT_EQUAL_UINT8(144, cam_y);
-}
+/* --- camera_update: buffers rows, does NOT write VRAM directly ---------- */
 
-/* --- VRAM alignment: left-edge camera must show world col 0, not col 32 --- */
-
-/* D-row 10: world col 0 = 0 (off-track), world col 32 = 1 (road).
- * When cam_x=0, stream_row must NOT overwrite VRAM col 0 with world col 32. */
-void test_camera_init_left_edge_vram_col0_shows_world_col0(void) {
-    camera_init(40, 144); /* cam_x = clamp(40-80,160) = 0 */
-    /* Bug: stream_row second call puts world(col=32,row=10)=1 at VRAM(0,10) */
-    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[10u * 32u + 0u]);
-}
-
-/* When camera is at left edge and player moves vertically, newly streamed
- * rows must still show world col 0 data at VRAM col 0 (not world col 32). */
-void test_camera_vertical_move_at_left_does_not_corrupt_vram_col0(void) {
-    camera_init(40, 144); /* cam_x=0, cam_y=72 */
-    /* Move down 8px crossing a tile boundary → stream_row(27) buffered.
-     * Row 27 (D-row): world col 0 = 0 (off-track), world col 32 = 1 (road). */
-    camera_update(40, 152); /* new cam_y=80, new_bot=27 != old_bot=26 */
-    camera_flush_vram();    /* flush pending streams to VRAM */
-    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[27u * 32u + 0u]);
-}
-
-/* --- camera_update: buffers streams, does NOT write VRAM immediately ---- */
-
-/* When camera_update() crosses a tile boundary, it must queue the stream in
- * the pending buffer — NOT call set_bkg_tiles directly. The call count must
- * not change between camera_init and camera_update. */
-void test_camera_update_does_not_write_vram_directly(void) {
+void test_camera_update_does_not_write_vram(void) {
     int count_after_init;
-    camera_init(160, 144); /* cam_x=80, cam_y=72; preloads VRAM */
+    camera_init(80, 80);
     count_after_init = mock_set_bkg_tiles_call_count;
-    /* Move right to cross right tile boundary: cam_x 80→88, triggers stream_column(30) */
-    camera_update(168, 144);
+    camera_update(80, 200);  /* buffers new rows */
     TEST_ASSERT_EQUAL_INT(count_after_init, mock_set_bkg_tiles_call_count);
 }
 
-/* --- camera_flush_vram: drains buffer and writes VRAM ------------------- */
+/* --- camera_flush_vram: drains pending row streams --------------------- */
 
-void test_camera_flush_vram_writes_pending_streams(void) {
+/* Crossing tile boundary downward -> flush writes exactly one new bottom row */
+void test_camera_flush_streams_new_bottom_row(void) {
     int count_after_update;
-    camera_init(160, 144);
-    camera_update(168, 144); /* buffers stream_column(30) */
+    /* cam_y=8, old_bot=(8+143)/8=18; advance to cam_y=16, new_bot=(16+143)/8=19 */
+    camera_init(80, 80);
+    camera_update(80, 88);  /* cam_y->16, buffers row 19 */
     count_after_update = mock_set_bkg_tiles_call_count;
     camera_flush_vram();
-    /* At least one set_bkg_tiles call must have occurred during flush */
     TEST_ASSERT_GREATER_THAN_INT(count_after_update, mock_set_bkg_tiles_call_count);
 }
 
-/* --- camera_flush_vram: clears buffer so second flush is a no-op -------- */
-
-void test_camera_flush_vram_clears_buffer(void) {
-    int count_after_first_flush;
-    camera_init(160, 144);
-    camera_update(168, 144); /* buffers stream_column(30) */
+/* Crossing tile boundary upward -> flush writes exactly one new top row */
+void test_camera_flush_streams_new_top_row(void) {
+    int count_after_update;
+    /* cam_y=8 -> first_row=1; move up: cam_y=0, old_top=1, new_top=0 */
+    camera_init(80, 80);
+    camera_update(80, 72);  /* 72-72=0; cam_y->0, buffers row 0 */
+    count_after_update = mock_set_bkg_tiles_call_count;
     camera_flush_vram();
-    count_after_first_flush = mock_set_bkg_tiles_call_count;
-    camera_flush_vram(); /* second flush — buffer must be empty */
-    TEST_ASSERT_EQUAL_INT(count_after_first_flush, mock_set_bkg_tiles_call_count);
+    TEST_ASSERT_GREATER_THAN_INT(count_after_update, mock_set_bkg_tiles_call_count);
 }
 
-/* --- camera_flush_vram: no-op when no streams are pending --------------- */
+/* Second flush must be a no-op */
+void test_camera_flush_clears_buffer(void) {
+    int count_after_first;
+    camera_init(80, 80);
+    camera_update(80, 88);
+    camera_flush_vram();
+    count_after_first = mock_set_bkg_tiles_call_count;
+    camera_flush_vram();
+    TEST_ASSERT_EQUAL_INT(count_after_first, mock_set_bkg_tiles_call_count);
+}
 
-void test_camera_flush_vram_noop_on_empty_buffer(void) {
-    camera_init(160, 144);
-    /* No camera_update call — no pending streams */
-    mock_set_bkg_tiles_call_count = 0; /* baseline after init */
+/* No-op when buffer is empty */
+void test_camera_flush_noop_on_empty_buffer(void) {
+    camera_init(80, 80);
+    mock_set_bkg_tiles_call_count = 0;
     camera_flush_vram();
     TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tiles_call_count);
 }
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_camera_init_centers_on_player);
-    RUN_TEST(test_camera_update_centers_on_player);
-    RUN_TEST(test_camera_clamp_left_edge);
-    RUN_TEST(test_camera_clamp_top_edge);
-    RUN_TEST(test_camera_clamp_right_edge);
-    RUN_TEST(test_camera_clamp_bottom_edge);
-    RUN_TEST(test_camera_update_clamp_exact_max_x);
-    RUN_TEST(test_camera_update_clamp_exact_max_y);
-    RUN_TEST(test_camera_init_left_edge_vram_col0_shows_world_col0);
-    RUN_TEST(test_camera_vertical_move_at_left_does_not_corrupt_vram_col0);
-    RUN_TEST(test_camera_update_does_not_write_vram_directly);
-    RUN_TEST(test_camera_flush_vram_writes_pending_streams);
-    RUN_TEST(test_camera_flush_vram_clears_buffer);
-    RUN_TEST(test_camera_flush_vram_noop_on_empty_buffer);
+    RUN_TEST(test_camera_init_sets_cam_y);
+    RUN_TEST(test_camera_init_clamps_cam_y_to_zero);
+    RUN_TEST(test_camera_init_clamps_cam_y_to_max);
+    RUN_TEST(test_camera_init_preloads_18_rows);
+    RUN_TEST(test_camera_update_cam_y_follows_player_up);
+    RUN_TEST(test_camera_update_cam_y_advances);
+    RUN_TEST(test_camera_update_cam_y_clamped_at_max);
+    RUN_TEST(test_camera_update_does_not_write_vram);
+    RUN_TEST(test_camera_flush_streams_new_bottom_row);
+    RUN_TEST(test_camera_flush_streams_new_top_row);
+    RUN_TEST(test_camera_flush_clears_buffer);
+    RUN_TEST(test_camera_flush_noop_on_empty_buffer);
     return UNITY_END();
 }

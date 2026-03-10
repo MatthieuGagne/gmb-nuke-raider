@@ -10,9 +10,9 @@ static const uint8_t player_tile_data[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
-/* Player start: bottom straight center — world (160, 256) = tile (20, 32) */
-#define PLAYER_START_X  160
-#define PLAYER_START_Y  256
+/* Player start: center of initial viewport, on road (tile col 10, row 10) */
+#define PLAYER_START_X  80
+#define PLAYER_START_Y  80
 
 static int16_t px;
 static int16_t py;
@@ -40,26 +40,26 @@ void player_update(uint8_t input) {
     int16_t new_py;
     if (input & J_LEFT) {
         new_px = px - 1;
-        if (corners_passable(new_px, py)) px = new_px;
+        if (new_px >= 0 && corners_passable(new_px, py)) px = new_px;
     }
     if (input & J_RIGHT) {
         new_px = px + 1;
-        if (corners_passable(new_px, py)) px = new_px;
+        if (new_px <= 159 && corners_passable(new_px, py)) px = new_px;
     }
     if (input & J_UP) {
         new_py = py - 1;
-        if (corners_passable(px, new_py)) py = new_py;
+        if (new_py >= (int16_t)cam_y && corners_passable(px, new_py)) py = new_py;
     }
     if (input & J_DOWN) {
         new_py = py + 1;
-        if (corners_passable(px, new_py)) py = new_py;
+        if (new_py <= (int16_t)(cam_y + 143u) && corners_passable(px, new_py)) py = new_py;
     }
 }
 
 void player_render(void) {
-    /* hw coords = world coords - camera scroll + GB sprite hardware offsets */
-    uint8_t hw_x = (uint8_t)(px - (int16_t)cam_x + 8);
-    uint8_t hw_y = (uint8_t)(py - (int16_t)cam_y + 16);
+    /* cam_x is always 0; cam_y is uint16_t but py >= cam_y is enforced so offset fits uint8_t */
+    uint8_t hw_x = (uint8_t)(px + 8);
+    uint8_t hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
     move_sprite(0, hw_x, hw_y);
     /* Log when sprite is near or outside visible bounds (x<8 or x>167, y<16 or y>159) */
     if (hw_x < 8u || hw_x > 167u || hw_y < 16u || hw_y > 159u) {

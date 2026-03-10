@@ -1,88 +1,91 @@
 #include "unity.h"
+#include <gb/gb.h>
 #include "player.h"
+#include "camera.h"
 
-void setUp(void)    { player_init(); }
+void setUp(void) {
+    mock_vram_clear();
+    camera_init(80, 80);  /* cam_y = 8 */
+    player_init();
+}
 void tearDown(void) {}
 
-/* player_init -------------------------------------------------------- */
+/* --- start position ---------------------------------------------------- */
 
-/* Start position: world (160, 256) = tile (20,32), bottom straight center */
 void test_player_init_sets_start_position(void) {
-    TEST_ASSERT_EQUAL_INT16(160, player_get_x());
-    TEST_ASSERT_EQUAL_INT16(256, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(80, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(80, player_get_y());
 }
 
-/* player_update movement --------------------------------------------- */
+/* --- basic movement from start (80,80) on road (cols 4-15, row 10) ----- */
 
 void test_player_update_moves_left(void) {
     player_update(J_LEFT);
-    TEST_ASSERT_EQUAL_INT16(159, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(79, player_get_x());
 }
 
 void test_player_update_moves_right(void) {
     player_update(J_RIGHT);
-    TEST_ASSERT_EQUAL_INT16(161, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(81, player_get_x());
 }
 
 void test_player_update_moves_up(void) {
     player_update(J_UP);
-    TEST_ASSERT_EQUAL_INT16(255, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(79, player_get_y());
 }
 
 void test_player_update_moves_down(void) {
     player_update(J_DOWN);
-    TEST_ASSERT_EQUAL_INT16(257, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(81, player_get_y());
 }
 
-/* player_update track collision -------------------------------------- */
+/* --- track collision (new map geometry) -------------------------------- */
 
-/* Left outer wall: tile col 3 (D-row) is off-track */
-void test_player_blocked_by_track_left(void) {
-    player_set_pos(32, 120);
-    player_update(J_LEFT);
+/* Left wall: tile col 3 (x=24-31) is off-track for rows 0-49 */
+void test_player_blocked_by_left_wall(void) {
+    player_set_pos(32, 80);   /* leftmost road tile (col 4, x=32) */
+    player_update(J_LEFT);    /* new_px=31 -> col 3 -> off-track -> blocked */
     TEST_ASSERT_EQUAL_INT16(32, player_get_x());
 }
 
-/* Right outer wall: tile col 36 (D-row) is off-track */
-void test_player_blocked_by_track_right(void) {
-    player_set_pos(280, 120);
-    player_update(J_RIGHT);
-    TEST_ASSERT_EQUAL_INT16(280, player_get_x());
+/* Right wall: corner px+7=128 -> tile col 16 -> off-track */
+void test_player_blocked_by_right_wall(void) {
+    player_set_pos(120, 80);  /* rightmost safe: corner at 127 (col 15, road) */
+    player_update(J_RIGHT);   /* new_px=121 -> corner at 128 (col 16) -> off-track */
+    TEST_ASSERT_EQUAL_INT16(120, player_get_x());
 }
 
-/* Top outer wall: tile row 1 (A-row) is off-track */
-void test_player_blocked_by_track_top(void) {
-    player_set_pos(160, 16);
-    player_update(J_UP);
-    TEST_ASSERT_EQUAL_INT16(16, player_get_y());
+/* --- screen X clamp [0, 159] ------------------------------------------- */
+
+void test_player_clamped_at_screen_left(void) {
+    player_set_pos(0, 80);
+    player_update(J_LEFT);    /* new_px=-1 < 0 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(0, player_get_x());
 }
 
-/* Bottom outer wall: tile row 34 (A-row) is off-track */
-void test_player_blocked_by_track_bottom(void) {
-    player_set_pos(160, 264);
-    player_update(J_DOWN);
-    TEST_ASSERT_EQUAL_INT16(264, player_get_y());
+void test_player_clamped_at_screen_right(void) {
+    player_set_pos(159, 80);
+    player_update(J_RIGHT);   /* new_px=160 > 159 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(159, player_get_x());
 }
 
-/* corner connectivity ------------------------------------------------ */
+/* --- screen Y clamp [cam_y, cam_y+143] ---------------------------------- */
 
-/* Outer-left D-row (col 4, x=32) must connect to top strip.
- * Old C-row stopped at col 6; rectangular fix extends strip to col 4. */
-void test_player_outer_left_connects_to_top_strip(void) {
-    player_set_pos(32, 48); /* outer-left D-row 6, col 4 */
-    player_update(J_UP);    /* enter what was C-row 5 */
-    TEST_ASSERT_EQUAL_INT16(47, player_get_y());
+/* cam_y=8. Player at py=8 (top of screen). Track at (80,7) IS passable
+ * (col 10, row 0 = road), so ONLY screen clamp prevents upward movement. */
+void test_player_clamped_at_screen_top(void) {
+    player_set_pos(80, 8);    /* py == cam_y: at top of viewport */
+    player_update(J_UP);      /* new_py=7 < cam_y=8 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(8, player_get_y());
 }
 
-/* Outer-right D-row (col 35, x=280+7=287) must connect to bottom strip.
- * Old C-row stopped at col 33; rectangular fix extends strip to col 35. */
-void test_player_outer_right_connects_to_bottom_strip(void) {
-    player_set_pos(272, 232); /* outer-right D-row 29, col 34 */
-    player_update(J_DOWN);    /* enter what was C-row 30 */
-    TEST_ASSERT_EQUAL_INT16(233, player_get_y());
+/* cam_y=8, cam_y+143=151. Track at (80,152) IS passable (col 10, row 19 = road),
+ * so ONLY screen clamp prevents downward movement past screen bottom. */
+void test_player_clamped_at_screen_bottom(void) {
+    player_set_pos(80, 151); /* py == cam_y+143: at bottom of viewport */
+    player_update(J_DOWN);   /* new_py=152 > cam_y+143=151 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(151, player_get_y());
 }
-
-/* runner ------------------------------------------------------------- */
 
 int main(void) {
     UNITY_BEGIN();
@@ -91,11 +94,11 @@ int main(void) {
     RUN_TEST(test_player_update_moves_right);
     RUN_TEST(test_player_update_moves_up);
     RUN_TEST(test_player_update_moves_down);
-    RUN_TEST(test_player_blocked_by_track_left);
-    RUN_TEST(test_player_blocked_by_track_right);
-    RUN_TEST(test_player_blocked_by_track_top);
-    RUN_TEST(test_player_blocked_by_track_bottom);
-    RUN_TEST(test_player_outer_left_connects_to_top_strip);
-    RUN_TEST(test_player_outer_right_connects_to_bottom_strip);
+    RUN_TEST(test_player_blocked_by_left_wall);
+    RUN_TEST(test_player_blocked_by_right_wall);
+    RUN_TEST(test_player_clamped_at_screen_left);
+    RUN_TEST(test_player_clamped_at_screen_right);
+    RUN_TEST(test_player_clamped_at_screen_top);
+    RUN_TEST(test_player_clamped_at_screen_bottom);
     return UNITY_END();
 }

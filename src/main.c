@@ -65,8 +65,10 @@ void main(void) {
         switch (state) {
             case STATE_TITLE:
                 if (joypad() & J_START) {
+                    DISPLAY_OFF;
                     track_init();
                     camera_init(player_get_x(), player_get_y());
+                    DISPLAY_ON;
                     state = STATE_PLAYING;
                 }
                 break;
@@ -83,7 +85,10 @@ void main(void) {
                 /* VBlank phase: all VRAM writes immediately after wait_vbl_done() */
                 player_render();
                 camera_flush_vram();
-                move_bkg(cam_x, cam_y);
+                /* SCY is 8-bit and wraps at 256. Truncation is correct: stream_row() places
+                 * world row ty at VRAM row (ty & 31), so (uint8_t)cam_y correctly indexes
+                 * the ring buffer. */
+                move_bkg(0u, (uint8_t)cam_y);
                 /* Game logic phase: runs during active display */
                 player_update(joypad());
                 camera_update(player_get_x(), player_get_y());
