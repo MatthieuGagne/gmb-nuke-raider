@@ -47,10 +47,8 @@ void main(void) {
     init_palettes();
     player_init();
     add_VBL(vbl_isr);
-    add_LCD(lcd_isr);
-    LYC_REG  = HUD_SCANLINE;
-    STAT_REG |= STATF_LYC;
-    set_interrupts(VBL_IFLAG | LCD_IFLAG);
+    set_interrupts(VBL_IFLAG);
+    /* LCD ISR (lcd_isr / LYC_REG / STATF_LYC) enabled when HUD is implemented */
 
     DISPLAY_ON;
 
