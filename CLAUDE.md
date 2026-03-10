@@ -63,6 +63,44 @@ These apply to every feature, no matter how small.
 Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt1` (MBC1), `-Wm-yn"WSTLND RACER"`.
 To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
 
+## ROM Banking — Autobanking Conventions
+
+The ROM uses GBDK's `-autobank` linker flag. Every new file **must** follow this pattern:
+
+**Source files (`src/*.c`):**
+```c
+#pragma bank 255          /* tells autobanker to assign this file a bank */
+#include <gb/gb.h>
+#include "banking.h"      /* SET_BANK / RESTORE_BANK macros */
+
+BANKREF(my_asset)         /* one per exported data symbol in this file */
+const uint8_t my_asset[] = { ... };
+```
+
+**Header files (`src/*.h`) — public API declarations:**
+```c
+#include <gb/gb.h>        /* required so BANKED resolves without gb.h first */
+#include "banking.h"
+
+BANKREF_EXTERN(my_asset)  /* one per data symbol declared here */
+void my_func(void) BANKED;/* mark all public functions BANKED */
+```
+
+**Calling across banks (data reads):**
+```c
+{ SET_BANK(my_asset);     /* wraps in { } to scope _saved_bank */
+  use_data(my_asset);
+  RESTORE_BANK(); }
+```
+If two `SET_BANK` calls are needed in one function, wrap each in its own `{ }` block — both declare `uint8_t _saved_bank` and would conflict otherwise.
+
+**CRITICAL — BANKED function pointers in structs are BROKEN on SDCC/SM83:**
+`void (*fn)(void) BANKED` in a struct field generates double-dereference code — it loads the address stored in the field, then reads 2 bytes *from* that address (the function's machine code), then jumps there → garbage. Use plain `void (*fn)(void)` for all struct callback fields. The static functions assigned to those fields must also be non-BANKED (even inside a `#pragma bank 255` file, do not add `BANKED` to static state callbacks). Named cross-bank calls via `BANKED` + trampolines work correctly; only function *pointer* struct fields are broken.
+
+**Generated asset files** (`tools/png_to_tiles.py`, `tools/tmx_to_c.py`) already emit the correct banking boilerplate — do not strip it.
+
+**Mock header** (`tests/mocks/gb/gb.h`) defines `BANKREF`, `BANKREF_EXTERN`, `BANK()`, `SET_BANK`, `RESTORE_BANK` as no-ops so tests compile without hardware.
+
 ## GBDK / SDCC Constraints
 
 - **No compound literals**: SDCC rejects `(const uint16_t[]){...}` — use named `static const` arrays.
