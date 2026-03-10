@@ -10,6 +10,7 @@ void setUp(void) {
     input = 0;
     prev_input = 0;
     mock_vram_clear();
+    mock_move_sprite_reset();
     camera_init(88, 720);  /* cam_y = 648 */
     player_init();
 }
@@ -102,6 +103,31 @@ void test_player_clamped_at_screen_bottom(void) {
     TEST_ASSERT_EQUAL_INT16(791, player_get_y());
 }
 
+/* --- sprite slot count -------------------------------------------------- */
+
+void test_player_init_claims_two_sprite_slots(void) {
+    /* setUp called player_init(); it should have claimed slots 0 and 1.
+     * The next free slot must be 2. */
+    uint8_t next = get_sprite();
+    TEST_ASSERT_EQUAL_UINT8(2u, next);
+}
+
+/* --- two-sprite render -------------------------------------------------- */
+
+void test_player_render_calls_move_sprite_twice(void) {
+    mock_move_sprite_reset();
+    player_render();
+    TEST_ASSERT_EQUAL_INT(2, mock_move_sprite_call_count);
+}
+
+void test_player_render_both_halves_aligned(void) {
+    /* Both halves must share the same X; bottom half must be exactly 8px lower. */
+    mock_move_sprite_reset();
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_x[0], mock_sprite_x[1]);
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_y[0] + 8u, mock_sprite_y[1]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -115,5 +141,8 @@ int main(void) {
     RUN_TEST(test_player_clamped_at_screen_right);
     RUN_TEST(test_player_clamped_at_screen_top);
     RUN_TEST(test_player_clamped_at_screen_bottom);
+    RUN_TEST(test_player_init_claims_two_sprite_slots);
+    RUN_TEST(test_player_render_calls_move_sprite_twice);
+    RUN_TEST(test_player_render_both_halves_aligned);
     return UNITY_END();
 }
