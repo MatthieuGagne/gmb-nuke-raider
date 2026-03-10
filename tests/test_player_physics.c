@@ -92,6 +92,17 @@ void test_independent_axes_accumulate(void) {
     TEST_ASSERT_EQUAL_INT8(-PLAYER_MAX_SPEED, player_get_vy());
 }
 
+/* Player cannot move into the HUD band (bottom 16px reserved for Window layer).
+ * cam_y=0, player at screen Y 112 (world py=112): bottom of 16px car = pixel 127.
+ * Moving down one more pixel (py=113, screen Y 113, bottom=128) must be blocked. */
+void test_y_clamped_above_hud(void) {
+    camera_init(88, 0);       /* cam_y = 0 */
+    player_set_pos(88, 112);  /* screen Y = 112, car bottom = 127 — just inside play area */
+    input = J_DOWN;
+    player_update();           /* would push py to 113 — bottom pixel = 128 = HUD */
+    TEST_ASSERT_TRUE(player_get_y() <= 112);  /* must not cross into HUD */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_accel_reaches_max_speed);
@@ -100,5 +111,6 @@ int main(void) {
     RUN_TEST(test_wall_zeros_vx_not_vy);
     RUN_TEST(test_wall_zeros_vy_not_vx);
     RUN_TEST(test_independent_axes_accumulate);
+    RUN_TEST(test_y_clamped_above_hud);
     return UNITY_END();
 }
