@@ -45,18 +45,18 @@ void test_camera_update_cam_y_follows_player_up(void) {
     TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
-/* Moving player down advances cam_y */
-void test_camera_update_cam_y_advances(void) {
+/* Upward-only: moving player down must NOT advance cam_y */
+void test_camera_update_cam_y_does_not_advance_downward(void) {
     camera_init(80, 80);     /* cam_y = 8 */
-    camera_update(80, 200);  /* 200-72=128 > 8 -> cam_y = 128 */
-    TEST_ASSERT_EQUAL_UINT16(128, cam_y);
+    camera_update(80, 200);  /* ncy=128 >= cam_y=8 -> no-op */
+    TEST_ASSERT_EQUAL_UINT16(8, cam_y);
 }
 
-/* cam_y never exceeds CAM_MAX_Y */
-void test_camera_update_cam_y_clamped_at_max(void) {
-    camera_init(80, 80);
-    camera_update(80, 9999);  /* clamped to 656 */
-    TEST_ASSERT_EQUAL_UINT16(656, cam_y);
+/* cam_y never goes below 0 even when player is far above top of map */
+void test_camera_update_cam_y_clamped_at_zero(void) {
+    camera_init(80, 80);    /* cam_y = 8 */
+    camera_update(80, 0);   /* ncy=clamp(-72, 656)=0 < cam_y=8 -> cam_y=0 */
+    TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
 /* --- camera_update: buffers rows, does NOT write VRAM directly ---------- */
@@ -71,15 +71,14 @@ void test_camera_update_does_not_write_vram(void) {
 
 /* --- camera_flush_vram: drains pending row streams --------------------- */
 
-/* Crossing tile boundary downward -> flush writes exactly one new bottom row */
-void test_camera_flush_streams_new_bottom_row(void) {
-    int count_after_update;
-    /* cam_y=8, old_bot=(8+143)/8=18; advance to cam_y=16, new_bot=(16+143)/8=19 */
+/* Downward player movement must NOT buffer any rows (upward-only scroll) */
+void test_camera_update_downward_does_not_buffer_rows(void) {
+    int count_after_init;
     camera_init(80, 80);
-    camera_update(80, 88);  /* cam_y->16, buffers row 19 */
-    count_after_update = mock_set_bkg_tiles_call_count;
+    count_after_init = mock_set_bkg_tiles_call_count;
+    camera_update(80, 88);   /* ncy=16 >= cam_y=8 -> no-op */
     camera_flush_vram();
-    TEST_ASSERT_GREATER_THAN_INT(count_after_update, mock_set_bkg_tiles_call_count);
+    TEST_ASSERT_EQUAL_INT(count_after_init, mock_set_bkg_tiles_call_count);
 }
 
 /* Crossing tile boundary upward -> flush writes exactly one new top row */
@@ -119,10 +118,10 @@ int main(void) {
     RUN_TEST(test_camera_init_clamps_cam_y_to_max);
     RUN_TEST(test_camera_init_preloads_18_rows);
     RUN_TEST(test_camera_update_cam_y_follows_player_up);
-    RUN_TEST(test_camera_update_cam_y_advances);
-    RUN_TEST(test_camera_update_cam_y_clamped_at_max);
+    RUN_TEST(test_camera_update_cam_y_does_not_advance_downward);
+    RUN_TEST(test_camera_update_cam_y_clamped_at_zero);
     RUN_TEST(test_camera_update_does_not_write_vram);
-    RUN_TEST(test_camera_flush_streams_new_bottom_row);
+    RUN_TEST(test_camera_update_downward_does_not_buffer_rows);
     RUN_TEST(test_camera_flush_streams_new_top_row);
     RUN_TEST(test_camera_flush_clears_buffer);
     RUN_TEST(test_camera_flush_noop_on_empty_buffer);

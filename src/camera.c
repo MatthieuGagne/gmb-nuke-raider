@@ -38,6 +38,7 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) {
     uint8_t first_row;
     (void)player_world_x;  /* cam_x is always 0; no horizontal scroll */
 
+    stream_buf_len = 0u;
     cam_y = clamp_cam(player_world_y - 72, CAM_MAX_Y);
     first_row = (uint8_t)(cam_y >> 3u);
 
@@ -50,28 +51,19 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) {
 
 void camera_update(int16_t player_world_x, int16_t player_world_y) {
     uint16_t ncy;
+    uint8_t old_top;
+    uint8_t new_top;
     (void)player_world_x;
 
     ncy = clamp_cam(player_world_y - 72, CAM_MAX_Y);
-    if (ncy == cam_y) return;
+    if (ncy >= cam_y) return;   /* camera never scrolls down */
 
-    if (ncy > cam_y) {
-        /* Scrolling down: buffer bottom row when viewport bottom crosses tile boundary */
-        uint8_t old_bot = (uint8_t)((cam_y + 143u) >> 3u);
-        uint8_t new_bot = (uint8_t)((ncy  + 143u) >> 3u);
-        if (new_bot != old_bot && new_bot < MAP_TILES_H
-                && stream_buf_len < STREAM_BUF_SIZE) {
-            stream_buf[stream_buf_len] = new_bot;
-            stream_buf_len++;
-        }
-    } else {
-        /* Scrolling up: buffer top row when viewport top crosses tile boundary */
-        uint8_t old_top = (uint8_t)(cam_y >> 3u);
-        uint8_t new_top = (uint8_t)(ncy >> 3u);
-        if (new_top != old_top && stream_buf_len < STREAM_BUF_SIZE) {
-            stream_buf[stream_buf_len] = new_top;
-            stream_buf_len++;
-        }
+    /* Scrolling up: buffer top row when viewport top crosses tile boundary */
+    old_top = (uint8_t)(cam_y >> 3u);
+    new_top = (uint8_t)(ncy >> 3u);
+    if (new_top != old_top && stream_buf_len < STREAM_BUF_SIZE) {
+        stream_buf[stream_buf_len] = new_top;
+        stream_buf_len++;
     }
 
     if (stream_buf_len > 0u) {

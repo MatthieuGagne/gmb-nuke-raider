@@ -7,6 +7,8 @@
 #define MAP_PX_W  160u   /* MAP_TILES_W * 8 */
 #define MAP_PX_H  800u   /* MAP_TILES_H * 8 */
 
+extern const int16_t track_start_x;
+extern const int16_t track_start_y;
 extern const uint8_t track_map[];
 
 void    track_init(void);
