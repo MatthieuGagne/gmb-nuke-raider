@@ -92,8 +92,9 @@ void player_render(void) {
     /* cam_x is always 0; cam_y is uint16_t but py >= cam_y is enforced so offset fits uint8_t */
     uint8_t hw_x = (uint8_t)(px + 8);
     uint8_t hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
-    move_sprite(player_sprite_slot, hw_x, hw_y);
-    /* Log when sprite is near or outside visible bounds (x<8 or x>167, y<16 or y>159) */
+    move_sprite(player_sprite_slot,     hw_x, hw_y);
+    move_sprite(player_sprite_slot_bot, hw_x, (uint8_t)(hw_y + 8u));
+    /* Log when sprite is near or outside visible bounds */
     if (hw_x < 8u || hw_x > 167u || hw_y < 16u || hw_y > 159u) {
         DBG_INT("hw_x_oob", hw_x);
         DBG_INT("hw_y_oob", hw_y);
