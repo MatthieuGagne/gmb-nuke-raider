@@ -5,6 +5,7 @@
 #include "camera.h"
 #include "debug.h"
 #include "sprite_pool.h"
+#include "config.h"
 
 /* Solid 8x8 sprite: all pixels color index 3 */
 static const uint8_t player_tile_data[] = {
@@ -14,6 +15,8 @@ static const uint8_t player_tile_data[] = {
 
 static int16_t px;
 static int16_t py;
+static int8_t  vx;
+static int8_t  vy;
 static uint8_t player_sprite_slot = 0;
 
 /* Returns 1 if all 4 corners of a player at world (wx, wy) are on track. */
@@ -33,27 +36,55 @@ void player_init(void) {
     set_sprite_tile(player_sprite_slot, 0);
     px = track_start_x;
     py = track_start_y;
+    vx = 0;
+    vy = 0;
     SHOW_SPRITES;
 }
 
 void player_update(void) {
     int16_t new_px;
     int16_t new_py;
-    if (KEY_PRESSED(J_LEFT)) {
-        new_px = px - 1;
-        if (new_px >= 0 && corners_passable(new_px, py)) px = new_px;
-    }
+
+    /* --- X axis: accelerate, decelerate, or apply friction --- */
     if (KEY_PRESSED(J_RIGHT)) {
-        new_px = px + 1;
-        if (new_px <= 159 && corners_passable(new_px, py)) px = new_px;
+        vx = (vx + PLAYER_ACCEL > PLAYER_MAX_SPEED) ? PLAYER_MAX_SPEED : (int8_t)(vx + PLAYER_ACCEL);
+    } else if (KEY_PRESSED(J_LEFT)) {
+        vx = (vx - PLAYER_ACCEL < -PLAYER_MAX_SPEED) ? -PLAYER_MAX_SPEED : (int8_t)(vx - PLAYER_ACCEL);
+    } else if (vx > 0) {
+        vx = (int8_t)(vx - PLAYER_FRICTION);
+        if (vx < 0) vx = 0;
+    } else if (vx < 0) {
+        vx = (int8_t)(vx + PLAYER_FRICTION);
+        if (vx > 0) vx = 0;
     }
-    if (KEY_PRESSED(J_UP)) {
-        new_py = py - 1;
-        if (new_py >= (int16_t)cam_y && corners_passable(px, new_py)) py = new_py;
-    }
+
+    /* --- Y axis: accelerate, decelerate, or apply friction --- */
     if (KEY_PRESSED(J_DOWN)) {
-        new_py = py + 1;
-        if (new_py <= (int16_t)(cam_y + 143u) && corners_passable(px, new_py)) py = new_py;
+        vy = (vy + PLAYER_ACCEL > PLAYER_MAX_SPEED) ? PLAYER_MAX_SPEED : (int8_t)(vy + PLAYER_ACCEL);
+    } else if (KEY_PRESSED(J_UP)) {
+        vy = (vy - PLAYER_ACCEL < -PLAYER_MAX_SPEED) ? -PLAYER_MAX_SPEED : (int8_t)(vy - PLAYER_ACCEL);
+    } else if (vy > 0) {
+        vy = (int8_t)(vy - PLAYER_FRICTION);
+        if (vy < 0) vy = 0;
+    } else if (vy < 0) {
+        vy = (int8_t)(vy + PLAYER_FRICTION);
+        if (vy > 0) vy = 0;
+    }
+
+    /* --- Apply X velocity; zero on wall or screen-edge collision --- */
+    new_px = px + vx;
+    if (new_px >= 0 && new_px <= 159 && corners_passable(new_px, py)) {
+        px = new_px;
+    } else {
+        vx = 0;
+    }
+
+    /* --- Apply Y velocity; zero on wall or screen-edge collision --- */
+    new_py = py + vy;
+    if (new_py >= (int16_t)cam_y && new_py <= (int16_t)(cam_y + 143u) && corners_passable(px, new_py)) {
+        py = new_py;
+    } else {
+        vy = 0;
     }
 }
 
@@ -74,5 +105,7 @@ void player_set_pos(int16_t x, int16_t y) {
     py = y;
 }
 
-int16_t player_get_x(void) { return px; }
-int16_t player_get_y(void) { return py; }
+int16_t player_get_x(void)  { return px; }
+int16_t player_get_y(void)  { return py; }
+int8_t  player_get_vx(void) { return vx; }
+int8_t  player_get_vy(void) { return vy; }

@@ -10,5 +10,7 @@ void     player_render(void);
 void     player_set_pos(int16_t x, int16_t y);
 int16_t  player_get_x(void);
 int16_t  player_get_y(void);
+int8_t   player_get_vx(void);
+int8_t   player_get_vy(void);
 
 #endif /* PLAYER_H */
