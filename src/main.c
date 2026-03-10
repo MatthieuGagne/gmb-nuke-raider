@@ -1,5 +1,7 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
+#include "camera.h"
+#include "config.h"
 #include "input.h"
 #include "player.h"
 #include "state_manager.h"
@@ -28,11 +30,25 @@ static void init_palettes(void) {
     }
 }
 
+static volatile uint8_t frame_ready = 0;
+
+static void vbl_isr(void) {
+    frame_ready = 1;
+    move_bkg(0, (uint8_t)cam_y);
+}
+
+static void lcd_isr(void) {
+    move_bkg(0, 0);
+}
+
 void main(void) {
     DISPLAY_OFF;
 
     init_palettes();
     player_init();
+    add_VBL(vbl_isr);
+    set_interrupts(VBL_IFLAG);
+    /* LCD ISR (lcd_isr / LYC_REG / STATF_LYC) enabled when HUD is implemented */
 
     DISPLAY_ON;
 
@@ -40,7 +56,8 @@ void main(void) {
     state_push(&state_title);
 
     while (1) {
-        wait_vbl_done();
+        while (!frame_ready);
+        frame_ready = 0;
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();   /* no longer passes raw joypad byte */
     }

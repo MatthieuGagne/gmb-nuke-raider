@@ -14,9 +14,14 @@ void test_max_sprites_sane(void) {
     TEST_ASSERT_GREATER_OR_EQUAL(40, MAX_SPRITES);
 }
 
+void test_hud_scanline_is_128(void) {
+    TEST_ASSERT_EQUAL(128, HUD_SCANLINE);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_max_npcs_sane);
     RUN_TEST(test_max_sprites_sane);
+    RUN_TEST(test_hud_scanline_is_128);
     return UNITY_END();
 }

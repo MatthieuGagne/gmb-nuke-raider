@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Current camera scroll Y in world pixels. Range [0, 656] — requires uint16_t. */
-extern uint16_t cam_y;
+extern volatile uint16_t cam_y;
 
 /* Call once when entering STATE_PLAYING (after track_init).
  * Preloads the 18 initially visible rows and sets cam_y. */

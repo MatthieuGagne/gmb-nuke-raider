@@ -3,7 +3,7 @@
 #include "track.h"
 #include "debug.h"
 
-uint16_t cam_y;
+volatile uint16_t cam_y;
 
 /* CAM_MAX_Y = (MAP_TILES_H * 8) - 144 = (100*8) - 144 = 656 */
 #define CAM_MAX_Y  656u

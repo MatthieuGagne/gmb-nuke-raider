@@ -76,4 +76,18 @@ void mock_vram_clear(void);
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles);
 
+/* ISR infrastructure mocks */
+#define NONBANKED
+typedef void (*int_handler)(void);
+#define VBL_IFLAG 0x01U
+#define LCD_IFLAG 0x02U
+static inline void add_VBL(int_handler h) { (void)h; }
+static inline void add_LCD(int_handler h) { (void)h; }
+static inline void set_interrupts(uint8_t flags) { (void)flags; }
+
+/* STAT/LYC register mocks (writable by tests if needed) */
+static uint8_t STAT_REG = 0;
+static uint8_t LYC_REG  = 0;
+#define STATF_LYC 0b01000000U
+
 #endif /* MOCK_GB_H */

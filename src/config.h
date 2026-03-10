@@ -10,4 +10,6 @@
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
+#define HUD_SCANLINE 128  /* LYC fires here: 2-tile HUD = 16px at bottom, scanline 128 is first HUD line */
+
 #endif /* CONFIG_H */
