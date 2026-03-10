@@ -87,6 +87,16 @@ void test_one_minute(void) {
     TEST_ASSERT_EQUAL_UINT16(60u, hud_get_seconds());
 }
 
+/* --- hud_set_hp sets dirty flag --- */
+
+void test_set_hp_sets_dirty(void) {
+    /* After init, dirty is clear */
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+    /* hud_set_hp must set dirty */
+    hud_set_hp(50u);
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_seconds_zero);
@@ -99,5 +109,6 @@ int main(void) {
     RUN_TEST(test_second_frame_after_render);
     RUN_TEST(test_three_seconds);
     RUN_TEST(test_one_minute);
+    RUN_TEST(test_set_hp_sets_dirty);
     return UNITY_END();
 }

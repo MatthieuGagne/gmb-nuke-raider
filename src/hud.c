@@ -57,6 +57,8 @@ static uint8_t  hud_hp;           /* current HP value */
 static uint8_t  hud_frame_tick;   /* 0-59, resets each second */
 static uint16_t hud_seconds;      /* total elapsed seconds */
 static uint8_t  hud_dirty;        /* 1 = timer tiles need rewrite */
+static uint8_t  hud_mm;           /* cached minutes for display */
+static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
 
 /* --- Public API --- */
 
@@ -69,6 +71,8 @@ void hud_init(void) {
     hud_frame_tick = 0u;
     hud_seconds    = 0u;
     hud_dirty      = 0u;
+    hud_mm         = 0u;
+    hud_ss         = 0u;
 
     /* Load font tile patterns into BG/Win tile data starting at tile 128 */
     set_bkg_data(HUD_FONT_BASE, HUD_FONT_COUNT, hud_font_tiles);
@@ -78,9 +82,9 @@ void hud_init(void) {
     row0[0]  = HUD_FONT_BASE + HUD_TILE_H;
     row0[1]  = HUD_FONT_BASE + HUD_TILE_P;
     row0[2]  = HUD_FONT_BASE + HUD_TILE_COLON;
-    row0[3]  = HUD_FONT_BASE + 1u;             /* digit '1' */
-    row0[4]  = HUD_FONT_BASE + 0u;             /* digit '0' */
-    row0[5]  = HUD_FONT_BASE + 0u;             /* digit '0' */
+    row0[3]  = HUD_FONT_BASE + (uint8_t)(PLAYER_HP_MAX / 100u);
+    row0[4]  = HUD_FONT_BASE + (uint8_t)((PLAYER_HP_MAX / 10u) % 10u);
+    row0[5]  = HUD_FONT_BASE + (uint8_t)(PLAYER_HP_MAX % 10u);
     row0[15] = HUD_FONT_BASE + 0u;             /* MM tens */
     row0[16] = HUD_FONT_BASE + 0u;             /* MM units */
     row0[17] = HUD_FONT_BASE + HUD_TILE_COLON;
@@ -107,25 +111,24 @@ void hud_update(void) {
     if (hud_frame_tick >= 60u) {
         hud_frame_tick = 0u;
         hud_seconds++;
+        hud_mm = (uint8_t)(hud_seconds / 60u);
+        hud_ss = (uint8_t)(hud_seconds % 60u);
         hud_dirty = 1u;
     }
 }
 
 void hud_render(void) {
-    uint8_t mm, ss;
     uint8_t timer[5];
     uint8_t hp_digits[3];
 
     if (!hud_dirty) return;
 
     /* Update timer tiles (cols 15-19) */
-    mm = (uint8_t)(hud_seconds / 60u);
-    ss = (uint8_t)(hud_seconds % 60u);
-    timer[0] = HUD_FONT_BASE + (uint8_t)(mm / 10u);
-    timer[1] = HUD_FONT_BASE + (uint8_t)(mm % 10u);
+    timer[0] = HUD_FONT_BASE + (uint8_t)(hud_mm / 10u);
+    timer[1] = HUD_FONT_BASE + (uint8_t)(hud_mm % 10u);
     timer[2] = HUD_FONT_BASE + HUD_TILE_COLON;
-    timer[3] = HUD_FONT_BASE + (uint8_t)(ss / 10u);
-    timer[4] = HUD_FONT_BASE + (uint8_t)(ss % 10u);
+    timer[3] = HUD_FONT_BASE + (uint8_t)(hud_ss / 10u);
+    timer[4] = HUD_FONT_BASE + (uint8_t)(hud_ss % 10u);
     set_win_tiles(15u, 0u, 5u, 1u, timer);
 
     /* Update HP digit tiles (cols 3-5) */
