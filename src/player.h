@@ -13,4 +13,9 @@ int16_t  player_get_y(void);
 int8_t   player_get_vx(void);
 int8_t   player_get_vy(void);
 
+#include "track.h"
+
+void player_reset_vel(void);
+void player_apply_physics(uint8_t buttons, TileType terrain);
+
 #endif /* PLAYER_H */

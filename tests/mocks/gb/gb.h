@@ -5,6 +5,11 @@
 
 #include <stdint.h>
 
+/* SDCC ROM-placement qualifier — noop on gcc */
+#ifndef __code
+#define __code
+#endif
+
 typedef uint8_t  UBYTE;
 typedef int8_t   BYTE;
 typedef uint16_t UWORD;

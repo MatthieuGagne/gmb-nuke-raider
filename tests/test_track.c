@@ -67,6 +67,63 @@ void test_track_impassable_negative_y(void) {
     TEST_ASSERT_EQUAL_UINT8(0, track_passable(80, -1));
 }
 
+/* --- TileType: track_tile_type_from_index -------------------------------- */
+
+void test_tile_type_from_index_wall(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type_from_index(0));
+}
+void test_tile_type_from_index_road(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(1));
+}
+void test_tile_type_from_index_dashes_is_road(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(2));
+}
+void test_tile_type_from_index_sand(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type_from_index(3));
+}
+void test_tile_type_from_index_oil(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type_from_index(4));
+}
+void test_tile_type_from_index_boost(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
+}
+void test_tile_type_from_index_unknown_defaults_to_road(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
+}
+
+/* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
+
+void test_track_tile_type_road(void) {
+    /* tile (10,10) = tile_id 1 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type(80, 80));
+}
+void test_track_tile_type_wall(void) {
+    /* tile (3,10) = tile_id 0 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(24, 80));
+}
+void test_track_tile_type_dashes_is_road(void) {
+    /* tile (9,0) = tile_id 2 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type(72, 0));
+}
+void test_track_tile_type_sand(void) {
+    /* tile (6,10) = tile_id 3 — placed in Task 4 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type(48, 80));
+}
+void test_track_tile_type_oil(void) {
+    /* tile (11,20) = tile_id 4 — placed in Task 4 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type(88, 160));
+}
+void test_track_tile_type_boost(void) {
+    /* tile (11,30) = tile_id 5 — placed in Task 4 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type(88, 240));
+}
+void test_track_tile_type_oob_x_is_wall(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(160, 80));
+}
+void test_track_tile_type_negative_is_wall(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(-1, 80));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -80,5 +137,20 @@ int main(void) {
     RUN_TEST(test_track_impassable_out_of_bounds_y);
     RUN_TEST(test_track_impassable_negative_x);
     RUN_TEST(test_track_impassable_negative_y);
+    RUN_TEST(test_tile_type_from_index_wall);
+    RUN_TEST(test_tile_type_from_index_road);
+    RUN_TEST(test_tile_type_from_index_dashes_is_road);
+    RUN_TEST(test_tile_type_from_index_sand);
+    RUN_TEST(test_tile_type_from_index_oil);
+    RUN_TEST(test_tile_type_from_index_boost);
+    RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
+    RUN_TEST(test_track_tile_type_road);
+    RUN_TEST(test_track_tile_type_wall);
+    RUN_TEST(test_track_tile_type_dashes_is_road);
+    RUN_TEST(test_track_tile_type_sand);
+    RUN_TEST(test_track_tile_type_oil);
+    RUN_TEST(test_track_tile_type_boost);
+    RUN_TEST(test_track_tile_type_oob_x_is_wall);
+    RUN_TEST(test_track_tile_type_negative_is_wall);
     return UNITY_END();
 }

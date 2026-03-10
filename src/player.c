@@ -44,43 +44,22 @@ void player_init(void) {
 void player_update(void) {
     int16_t new_px;
     int16_t new_py;
+    TileType terrain;
 
-    /* --- X axis: accelerate, decelerate, or apply friction --- */
-    if (KEY_PRESSED(J_RIGHT)) {
-        vx = (vx + PLAYER_ACCEL > PLAYER_MAX_SPEED) ? PLAYER_MAX_SPEED : (int8_t)(vx + PLAYER_ACCEL);
-    } else if (KEY_PRESSED(J_LEFT)) {
-        vx = (vx - PLAYER_ACCEL < -PLAYER_MAX_SPEED) ? -PLAYER_MAX_SPEED : (int8_t)(vx - PLAYER_ACCEL);
-    } else if (vx > 0) {
-        vx = (int8_t)(vx - PLAYER_FRICTION);
-        if (vx < 0) vx = 0;
-    } else if (vx < 0) {
-        vx = (int8_t)(vx + PLAYER_FRICTION);
-        if (vx > 0) vx = 0;
-    }
+    /* Query terrain at player centre (4px = centre of 8-wide hitbox) */
+    terrain = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
+    player_apply_physics(input, terrain);
 
-    /* --- Y axis: accelerate, decelerate, or apply friction --- */
-    if (KEY_PRESSED(J_DOWN)) {
-        vy = (vy + PLAYER_ACCEL > PLAYER_MAX_SPEED) ? PLAYER_MAX_SPEED : (int8_t)(vy + PLAYER_ACCEL);
-    } else if (KEY_PRESSED(J_UP)) {
-        vy = (vy - PLAYER_ACCEL < -PLAYER_MAX_SPEED) ? -PLAYER_MAX_SPEED : (int8_t)(vy - PLAYER_ACCEL);
-    } else if (vy > 0) {
-        vy = (int8_t)(vy - PLAYER_FRICTION);
-        if (vy < 0) vy = 0;
-    } else if (vy < 0) {
-        vy = (int8_t)(vy + PLAYER_FRICTION);
-        if (vy > 0) vy = 0;
-    }
-
-    /* --- Apply X velocity; zero on wall or screen-edge collision --- */
-    new_px = px + vx;
+    /* Apply X velocity — zero on wall/edge collision */
+    new_px = (int16_t)(px + (int16_t)vx);
     if (new_px >= 0 && new_px <= 159 && corners_passable(new_px, py)) {
         px = new_px;
     } else {
         vx = 0;
     }
 
-    /* --- Apply Y velocity; zero on wall or screen-edge collision --- */
-    new_py = py + vy;
+    /* Apply Y velocity — zero on wall/edge collision */
+    new_py = (int16_t)(py + (int16_t)vy);
     if (new_py >= (int16_t)cam_y && new_py <= (int16_t)(cam_y + (HUD_SCANLINE - 16u)) && corners_passable(px, new_py)) {
         py = new_py;
     } else {
@@ -110,3 +89,61 @@ int16_t player_get_x(void)  { return px; }
 int16_t player_get_y(void)  { return py; }
 int8_t  player_get_vx(void) { return vx; }
 int8_t  player_get_vy(void) { return vy; }
+
+void player_reset_vel(void) {
+    vx = 0;
+    vy = 0;
+}
+
+void player_apply_physics(uint8_t buttons, TileType terrain) {
+    uint8_t i;
+    uint8_t fric_x;
+    uint8_t fric_y;
+
+    /* Step 1: determine friction */
+    if (terrain == TILE_SAND) {
+        fric_x = (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+        fric_y = fric_x;
+    } else if (terrain == TILE_OIL) {
+        fric_x = 0;
+        fric_y = 0;
+    } else {
+        /* Road / Boost: friction only on unpressed axis */
+        fric_x = (buttons & (J_LEFT | J_RIGHT)) ? 0u : (uint8_t)PLAYER_FRICTION;
+        fric_y = (buttons & (J_UP   | J_DOWN))  ? 0u : (uint8_t)PLAYER_FRICTION;
+    }
+
+    /* Step 2: apply X friction */
+    for (i = 0; i < fric_x; i++) {
+        if      (vx > 0) vx = (int8_t)(vx - 1);
+        else if (vx < 0) vx = (int8_t)(vx + 1);
+    }
+
+    /* Step 3: apply Y friction */
+    for (i = 0; i < fric_y; i++) {
+        if      (vy > 0) vy = (int8_t)(vy - 1);
+        else if (vy < 0) vy = (int8_t)(vy + 1);
+    }
+
+    /* Step 4: input acceleration (disabled on oil) */
+    if (terrain != TILE_OIL) {
+        if (buttons & J_LEFT)  vx = (int8_t)(vx - (int8_t)PLAYER_ACCEL);
+        if (buttons & J_RIGHT) vx = (int8_t)(vx + (int8_t)PLAYER_ACCEL);
+        if (buttons & J_UP)    vy = (int8_t)(vy - (int8_t)PLAYER_ACCEL);
+        if (buttons & J_DOWN)  vy = (int8_t)(vy + (int8_t)PLAYER_ACCEL);
+    }
+
+    /* Step 5: boost kick (upward = negative vy) */
+    if (terrain == TILE_BOOST) {
+        vy = (int8_t)(vy - (int8_t)TERRAIN_BOOST_DELTA);
+    }
+
+    /* Step 6: clamp vx; clamp vy with boost-aware cap */
+    {
+        uint8_t max_vy = (terrain == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : PLAYER_MAX_SPEED;
+        if (vx >  (int8_t)PLAYER_MAX_SPEED) vx =  (int8_t)PLAYER_MAX_SPEED;
+        if (vx < -(int8_t)PLAYER_MAX_SPEED) vx = -(int8_t)PLAYER_MAX_SPEED;
+        if (vy >  (int8_t)max_vy) vy =  (int8_t)max_vy;
+        if (vy < -(int8_t)max_vy) vy = -(int8_t)max_vy;
+    }
+}
