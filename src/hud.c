@@ -114,9 +114,11 @@ void hud_update(void) {
 void hud_render(void) {
     uint8_t mm, ss;
     uint8_t timer[5];
+    uint8_t hp_digits[3];
 
     if (!hud_dirty) return;
 
+    /* Update timer tiles (cols 15-19) */
     mm = (uint8_t)(hud_seconds / 60u);
     ss = (uint8_t)(hud_seconds % 60u);
     timer[0] = HUD_FONT_BASE + (uint8_t)(mm / 10u);
@@ -125,6 +127,13 @@ void hud_render(void) {
     timer[3] = HUD_FONT_BASE + (uint8_t)(ss / 10u);
     timer[4] = HUD_FONT_BASE + (uint8_t)(ss % 10u);
     set_win_tiles(15u, 0u, 5u, 1u, timer);
+
+    /* Update HP digit tiles (cols 3-5) */
+    hp_digits[0] = HUD_FONT_BASE + (uint8_t)(hud_hp / 100u);
+    hp_digits[1] = HUD_FONT_BASE + (uint8_t)((hud_hp / 10u) % 10u);
+    hp_digits[2] = HUD_FONT_BASE + (uint8_t)(hud_hp % 10u);
+    set_win_tiles(3u, 0u, 3u, 1u, hp_digits);
+
     hud_dirty = 0u;
 }
 
