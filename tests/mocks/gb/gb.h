@@ -85,6 +85,16 @@ void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
 
 /* ISR infrastructure mocks */
 #define NONBANKED
+
+/* Banking macros — no-ops for host-side GCC compilation */
+#ifndef BANKED
+#define BANKED
+#endif
+#define BANKREF(x)
+#define BANKREF_EXTERN(x)
+#define BANK(x)          0u
+#define CURRENT_BANK     0u
+#define SWITCH_ROM(b)    ((void)(b))
 typedef void (*int_handler)(void);
 #define VBL_IFLAG 0x01U
 #define LCD_IFLAG 0x02U

@@ -1,7 +1,7 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
