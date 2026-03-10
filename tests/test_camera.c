@@ -111,6 +111,20 @@ void test_camera_flush_noop_on_empty_buffer(void) {
     TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tiles_call_count);
 }
 
+/* Game restart safety: stale buffer from previous session must not be flushed */
+void test_camera_init_clears_stale_stream_buffer(void) {
+    int count_after_reinit;
+    /* First session: update buffers a row but never flush */
+    camera_init(80, 80);   /* cam_y=8, rows 1-18 preloaded */
+    camera_update(80, 88); /* cam_y->16, row 19 buffered but NOT flushed */
+    /* Second session (game restart) */
+    camera_init(80, 80);
+    count_after_reinit = mock_set_bkg_tiles_call_count;
+    /* Flush must be a no-op — stale row 19 from first session must be gone */
+    camera_flush_vram();
+    TEST_ASSERT_EQUAL_INT(count_after_reinit, mock_set_bkg_tiles_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -125,5 +139,6 @@ int main(void) {
     RUN_TEST(test_camera_flush_streams_new_top_row);
     RUN_TEST(test_camera_flush_clears_buffer);
     RUN_TEST(test_camera_flush_noop_on_empty_buffer);
+    RUN_TEST(test_camera_init_clears_stale_stream_buffer);
     return UNITY_END();
 }
