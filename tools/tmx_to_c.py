@@ -83,10 +83,17 @@ def tmx_to_c(tmx_path, out_path):
                 " Source: assets/maps/track.tmx */\n")
         f.write("/* Regenerate: python3 tools/tmx_to_c.py"
                 " assets/maps/track.tmx src/track_map.c */\n")
-        f.write('#include "track.h"\n\n')
+        f.write("#pragma bank 255\n")
+        f.write('#include <gb/gb.h>\n')
+        f.write('#include "track.h"\n')
+        f.write('#include "banking.h"\n\n')
+        f.write(f"BANKREF(track_start_x)\n")
         f.write(f"const int16_t track_start_x = {spawn_x};\n")
+        f.write(f"BANKREF(track_start_y)\n")
         f.write(f"const int16_t track_start_y = {spawn_y};\n\n")
+        f.write(f"BANKREF(track_finish_line_y)\n")
         f.write(f"const uint8_t track_finish_line_y = {finish_tile_y};\n\n")
+        f.write("BANKREF(track_map)\n")
         f.write("const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {\n")
         for row in range(height):
             start = row * width
