@@ -10,6 +10,21 @@ tile values (0=off-track, 1=road, etc.).
 import sys
 import xml.etree.ElementTree as ET
 
+# Top 4 bits of a 32-bit GID encode H/V/D flip and hex rotation — never tile data.
+GID_CLEAR_FLAGS = 0x0FFFFFFF
+
+
+def gid_to_tile_id(gid: int, firstgid: int) -> int:
+    """Convert a Tiled GID to a 0-indexed GB tile ID.
+
+    GID 0 (empty cell) maps to 0, matching track.c's `!= 0u` on-track check.
+    Flip flags (bits 28-31) are stripped before subtracting firstgid.
+    """
+    if gid == 0:
+        return 0
+    gid &= GID_CLEAR_FLAGS
+    return gid - firstgid
+
 
 def tmx_to_c(tmx_path, out_path):
     tree = ET.parse(tmx_path)
@@ -25,9 +40,11 @@ def tmx_to_c(tmx_path, out_path):
     if encoding != 'csv':
         raise ValueError(f"Only CSV encoding supported, got: {encoding}")
 
-    # Tiled uses 1-based tile IDs; subtract 1 for 0-indexed GB tile values.
+    tileset_el = root.find('tileset')
+    firstgid = int(tileset_el.get('firstgid', '1')) if tileset_el is not None else 1
+
     raw      = data_el.text.strip()
-    tile_ids = [int(x) - 1 for x in raw.split(',')]
+    tile_ids = [gid_to_tile_id(int(x), firstgid) for x in raw.split(',') if x.strip()]
 
     if len(tile_ids) != width * height:
         raise ValueError(

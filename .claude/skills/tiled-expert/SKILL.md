@@ -316,3 +316,78 @@ layer.type == "objectgroup"  → objects; read layer.objects[]
 layer.type == "imagelayer"   → background image; read layer.image
 layer.type == "group"        → container; recurse layer.layers[]
 ```
+
+---
+
+## Map Conversion for Game Code
+
+### Project Scripts (Wasteland Racer)
+
+| Script | Purpose | Run |
+|--------|---------|-----|
+| `tools/tmx_to_c.py` | Converts `track.tmx` → `src/track_map.c` | `python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c` |
+| `assets/maps/create_assets.py` | Generates `tileset.png`, `track.tsx`, `track.tmx` from hardcoded shape | `python3 assets/maps/create_assets.py` |
+| `tests/test_tmx_to_c.py` | Unit tests for the converter | `python3 -m unittest discover -s tests -p "test_tmx_to_c.py" -v` |
+
+**Permissions:** You may read, run, edit, and create Python scripts in `tools/` and `assets/maps/`. Run tests after any change.
+
+---
+
+### How `tmx_to_c.py` Works
+
+The project uses **TMX (XML)** with **CSV encoding** — not JSON. GIDs must be decoded carefully: flip flags live in the top 4 bits, `firstgid` is read from `<tileset>`, and GID 0 is an empty cell (maps to 0).
+
+```python
+import xml.etree.ElementTree as ET
+
+GID_CLEAR_FLAGS = 0x0FFFFFFF
+
+def gid_to_tile_id(gid: int, firstgid: int) -> int:
+    if gid == 0:
+        return 0           # empty cell → 0 (matches track.c != 0u check)
+    gid &= GID_CLEAR_FLAGS  # strip H/V/D flip bits
+    return gid - firstgid
+
+tileset_el = root.find('tileset')
+firstgid = int(tileset_el.get('firstgid', '1')) if tileset_el is not None else 1
+raw      = data_el.text.strip()
+tile_ids = [gid_to_tile_id(int(x), firstgid) for x in raw.split(',') if x.strip()]
+```
+
+Output format (`src/track_map.c`):
+```c
+/* GENERATED — do not edit by hand. Source: assets/maps/track.tmx */
+#include "track.h"
+const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {
+    /* row  0 */ 0,0,0,...,
+    ...
+};
+```
+
+---
+
+### Adding a New Converter
+
+When adding support for new map types (e.g. multi-layer, JSON export, object layers):
+
+1. Create `tools/<name>_to_c.py` following the same pattern
+2. Write `tests/test_<name>_to_c.py` first (TDD)
+3. Run `python3 -m unittest discover -s tests -p "test_<name>_to_c.py" -v`
+4. Emit a `/* GENERATED */` header and `#include` in all output `.c` files
+
+**CSV in TMX is a plain comma-separated text string** inside the `<data>` element — not a JSON array. Split on `','` after stripping whitespace.
+
+---
+
+### Common Conversion Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Using Tiled IDs directly as tile indices | Tiled is 1-based; subtract 1 for 0-indexed GB tiles |
+| Parsing base64 TMX data as text | Decode base64 → zlib decompress → uint32 LE array |
+| Using map `width` as row stride | Use `layer` `width` attribute, not map-level `width` |
+| Editing `src/track_map.c` by hand | It's generated — edit `assets/maps/track.tmx` and re-run the converter |
+| Forgetting to run tests after converter changes | `python3 -m unittest discover -s tests -p "test_tmx_to_c.py" -v` |
+| Ignoring GID flip flags | Mask with `& 0x0FFFFFFF` before subtracting `firstgid`; raw H/V/D flip bits corrupt the tile index |
+| Hardcoding `- 1` as tile offset | Read `firstgid` from `<tileset firstgid="...">` element; maps may use any firstgid |
+| GID 0 underflows to 255 (uint8) | Check `gid == 0` before subtracting; return 0 (empty sentinel matches `track.c`'s `!= 0u`) |
