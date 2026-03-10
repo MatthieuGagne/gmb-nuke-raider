@@ -5,11 +5,13 @@ void setUp(void) {}
 void tearDown(void) {}
 
 void test_max_npcs_sane(void) {
-    TEST_ASSERT_GREATER_THAN(0, MAX_NPCS);
+    /* At least 6 NPCs required by current design; see src/config.h */
+    TEST_ASSERT_GREATER_OR_EQUAL(6, MAX_NPCS);
 }
 
 void test_max_sprites_sane(void) {
-    TEST_ASSERT_GREATER_THAN(0, MAX_SPRITES);
+    /* OAM hardware limit is 40; pool must cover full OAM budget */
+    TEST_ASSERT_GREATER_OR_EQUAL(40, MAX_SPRITES);
 }
 
 int main(void) {
