@@ -10,12 +10,12 @@ import tmx_to_c as conv
 from tmx_to_c import gid_to_tile_id
 
 # 3×2 map: Tiled IDs 1,2,1 / 2,1,2  →  GB values 0,1,0 / 1,0,1
-# Includes a "start" object at pixel (88, 720).
+# Includes a "start" object at pixel (88, 720) and a "finish" object at pixel y=8 (row 1).
 MINIMAL_TMX = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
      width="3" height="2" tilewidth="8" tileheight="8"
-     nextlayerid="3" nextobjectid="2">
+     nextlayerid="4" nextobjectid="3">
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="3" height="2">
   <data encoding="csv">
@@ -27,6 +27,9 @@ MINIMAL_TMX = """\
   <object id="1" x="88" y="720">
    <point/>
   </object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="8" width="24" height="8"/>
  </objectgroup>
 </map>
 """
@@ -102,6 +105,12 @@ HFLIP_TMX = """\
 2147483649
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 
@@ -117,6 +126,12 @@ EMPTY_CELL_TMX = """\
 0,1
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 
@@ -131,6 +146,12 @@ FIRSTGID_2_TMX = """\
 2,3
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 
@@ -197,6 +218,83 @@ class TestGidIntegration(unittest.TestCase):
         # GID 2 → 0, GID 3 → 1
         result = self._convert(FIRSTGID_2_TMX)
         self.assertIn('/* row  0 */ 0,1,', result)
+
+
+class TestFinishLineParsing(unittest.TestCase):
+    def _make_tmx_with_finish(self, finish_y_px, finish_name='finish'):
+        """Return a minimal TMX string with configurable objectgroup name."""
+        tile_row = ','.join(['1'] * 20)
+        csv_data = ('\n' + tile_row + ',') * 100
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.0"
+     orientation="orthogonal" renderorder="right-down"
+     width="20" height="100" tilewidth="8" tileheight="8"
+     infinite="0" nextlayerid="4" nextobjectid="3">
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="20" height="100">
+  <data encoding="csv">
+{csv_data}
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="88" y="720" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup id="3" name="{finish_name}">
+  <object id="2" x="0" y="{finish_y_px}" width="160" height="8"/>
+ </objectgroup>
+</map>"""
+
+    def test_finish_line_y_parsed_correctly(self):
+        import tempfile, os
+        tmx_content = self._make_tmx_with_finish(40)  # row 5 = 40/8
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmx', delete=False) as f:
+            f.write(tmx_content)
+            tmx_path = f.name
+        out_path = tmx_path.replace('.tmx', '_out.c')
+        try:
+            from tools.tmx_to_c import tmx_to_c
+            tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                content = f.read()
+            self.assertIn('track_finish_line_y = 5', content)
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_finish_line_y_row_zero(self):
+        import tempfile, os
+        tmx_content = self._make_tmx_with_finish(0)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmx', delete=False) as f:
+            f.write(tmx_content)
+            tmx_path = f.name
+        out_path = tmx_path.replace('.tmx', '_out.c')
+        try:
+            from tools.tmx_to_c import tmx_to_c
+            tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                content = f.read()
+            self.assertIn('track_finish_line_y = 0', content)
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_missing_finish_raises(self):
+        import tempfile, os
+        tmx_content = self._make_tmx_with_finish(40, finish_name='notfinish')
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmx', delete=False) as f:
+            f.write(tmx_content)
+            tmx_path = f.name
+        out_path = tmx_path.replace('.tmx', '_out.c')
+        try:
+            from tools.tmx_to_c import tmx_to_c
+            with self.assertRaises(ValueError):
+                tmx_to_c(tmx_path, out_path)
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 #include "track.h"
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
-#define TILE_LUT_LEN 6u
+#define TILE_LUT_LEN 7u
 static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_WALL,   /* 0: off-road */
     TILE_ROAD,   /* 1: road */
@@ -10,6 +10,7 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_SAND,   /* 3: sand */
     TILE_OIL,    /* 4: oil puddle */
     TILE_BOOST,  /* 5: boost pad */
+    TILE_ROAD,   /* 6: finish line visual — passable */
 };
 
 TileType track_tile_type_from_index(uint8_t tile_idx) {
@@ -33,6 +34,12 @@ extern const uint8_t track_tile_data_count;
 
 void track_init(void) {
     set_bkg_data(0, track_tile_data_count, track_tile_data);
+    /* Finish line tile — horizontal alternating stripes; color 1/3 */
+    static const uint8_t finish_tile_data[16] = {
+        0xFF,0xFF, 0xFF,0x00, 0xFF,0xFF, 0xFF,0x00,
+        0xFF,0xFF, 0xFF,0x00, 0xFF,0xFF, 0xFF,0x00,
+    };
+    set_bkg_data(6, 1u, finish_tile_data);
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
 }

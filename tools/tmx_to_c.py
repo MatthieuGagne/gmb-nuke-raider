@@ -65,6 +65,19 @@ def tmx_to_c(tmx_path, out_path):
     spawn_x = int(float(start_obj.get('x')))
     spawn_y = int(float(start_obj.get('y')))
 
+    # Parse "finish" objectgroup for finish line tile row.
+    finish_group = next(
+        (og for og in root.findall('objectgroup')
+         if og.get('name') == 'finish'),
+        None
+    )
+    if finish_group is None:
+        raise ValueError("TMX is missing an objectgroup named 'finish'")
+    finish_obj = finish_group.find('object')
+    if finish_obj is None:
+        raise ValueError("'finish' objectgroup has no objects")
+    finish_tile_y = int(float(finish_obj.get('y'))) // 8
+
     with open(out_path, 'w') as f:
         f.write("/* GENERATED — do not edit by hand."
                 " Source: assets/maps/track.tmx */\n")
@@ -73,6 +86,7 @@ def tmx_to_c(tmx_path, out_path):
         f.write('#include "track.h"\n\n')
         f.write(f"const int16_t track_start_x = {spawn_x};\n")
         f.write(f"const int16_t track_start_y = {spawn_y};\n\n")
+        f.write(f"const uint8_t track_finish_line_y = {finish_tile_y};\n\n")
         f.write("const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {\n")
         for row in range(height):
             start = row * width

@@ -90,6 +90,10 @@ void test_tile_type_from_index_boost(void) {
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
 }
+void test_finish_tile_is_road(void) {
+    /* tile index 6 (finish visual) must be classified as road — passable */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(6));
+}
 
 /* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
 
@@ -144,6 +148,7 @@ int main(void) {
     RUN_TEST(test_tile_type_from_index_oil);
     RUN_TEST(test_tile_type_from_index_boost);
     RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
+    RUN_TEST(test_finish_tile_is_road);
     RUN_TEST(test_track_tile_type_road);
     RUN_TEST(test_track_tile_type_wall);
     RUN_TEST(test_track_tile_type_dashes_is_road);

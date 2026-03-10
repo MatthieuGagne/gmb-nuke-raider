@@ -30,4 +30,18 @@
 #define TERRAIN_BOOST_DELTA        2u   /* vy kick per frame on boost pad */
 #define TERRAIN_BOOST_MAX_SPEED    8u   /* vy cap on boost pad — exceeds PLAYER_MAX_SPEED */
 
+/* Overmap layout constants */
+#define OVERMAP_W            20u
+#define OVERMAP_H            18u
+#define OVERMAP_HUB_TX        9u
+#define OVERMAP_HUB_TY        8u
+#define OVERMAP_DEST_LEFT_TX  2u
+#define OVERMAP_DEST_RIGHT_TX 17u
+
+/* Overmap tile type indices (BKG tile data slots 0-3) */
+#define OVERMAP_TILE_BLANK  0u
+#define OVERMAP_TILE_ROAD   1u
+#define OVERMAP_TILE_HUB    2u
+#define OVERMAP_TILE_DEST   3u
+
 #endif /* CONFIG_H */

@@ -4,7 +4,7 @@
 #include "input.h"
 #include "state_manager.h"
 #include "state_title.h"
-#include "state_playing.h"
+#include "state_overmap.h"
 
 static void enter(void) {
     cls();
@@ -16,7 +16,7 @@ static void enter(void) {
 
 static void update(void) {
     if (KEY_TICKED(J_START)) {
-        state_replace(&state_playing);
+        state_replace(&state_overmap);
     }
 }
 

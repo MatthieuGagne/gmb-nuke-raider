@@ -66,7 +66,14 @@
       "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | tail -10)",
       "Bash(GBDK_HOME=/home/mathdaman/gbdk make clean && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep -E \"error:|Error\" | grep -v EVELYN && ls -lh build/wasteland-racer.gb)",
       "Bash(GBDK_HOME=/home/mathdaman/gbdk make clean && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep -vE \"warning|EVELYN\" | tail -20)",
-      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep \"error:\" | grep -v EVELYN)"
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep \"error:\" | grep -v EVELYN)",
+      "Bash(wc -l /home/mathdaman/code/gmb-wasteland-racer/src/*.c | sort -rn | head -15)",
+      "WebFetch(domain:gbdk-2020.github.io)",
+      "WebFetch(domain:gbdk.org)",
+      "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/.worktrees/feat-autobanking/src/*.h)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v 2>&1 | tail -30)",
+      "Bash(git stash:*)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v 2>&1 | tail -20)"
     ]
   }
 }

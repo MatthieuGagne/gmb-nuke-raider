@@ -21,6 +21,7 @@ TileType track_tile_type(int16_t world_x, int16_t world_y);
 extern const int16_t track_start_x;
 extern const int16_t track_start_y;
 extern const uint8_t track_map[];
+extern const uint8_t track_finish_line_y;
 
 void    track_init(void);
 uint8_t track_passable(int16_t world_x, int16_t world_y);
