@@ -1,8 +1,12 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
+#include "input.h"
 #include "player.h"
 #include "state_manager.h"
 #include "state_title.h"
+
+uint8_t input     = 0;
+uint8_t prev_input = 0;
 
 static const uint16_t bkg_pal[] = {
     RGB(31, 31, 31),
@@ -37,6 +41,7 @@ void main(void) {
 
     while (1) {
         wait_vbl_done();
-        state_manager_update(joypad());
+        input_update();           /* saves prev frame, reads joypad() */
+        state_manager_update();   /* no longer passes raw joypad byte */
     }
 }
