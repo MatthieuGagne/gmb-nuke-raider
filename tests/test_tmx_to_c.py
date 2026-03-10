@@ -66,6 +66,51 @@ class TestTmxToC(unittest.TestCase):
             self._convert(bad)
 
 
+# 1×1 map: tile 1 with H-flip (GID = 0x80000001 = 2147483649)
+# After stripping flags: GID 1, firstgid=1 → tile index 0
+HFLIP_TMX = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="1" height="1" tilewidth="8" tileheight="8">
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="1" height="1">
+  <data encoding="csv">
+2147483649
+  </data>
+ </layer>
+</map>
+"""
+
+# 2×1 map: empty cell (GID 0) then tile 1 (GID 1)
+# Expected: tile values 0, 0
+EMPTY_CELL_TMX = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="2" height="1" tilewidth="8" tileheight="8">
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="2" height="1">
+  <data encoding="csv">
+0,1
+  </data>
+ </layer>
+</map>
+"""
+
+# 2×1 map: firstgid=2 — GIDs 2 and 3 → tile indices 0 and 1
+FIRSTGID_2_TMX = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="2" height="1" tilewidth="8" tileheight="8">
+ <tileset firstgid="2" source="track.tsx"/>
+ <layer id="1" name="Track" width="2" height="1">
+  <data encoding="csv">
+2,3
+  </data>
+ </layer>
+</map>
+"""
+
+
 class TestGidToTileId(unittest.TestCase):
 
     def test_normal_tile_firstgid_1(self):
@@ -92,6 +137,42 @@ class TestGidToTileId(unittest.TestCase):
     def test_all_flags_stripped(self):
         # GID with all flip bits set (0xF0000003) and firstgid=1 → tile 2
         self.assertEqual(gid_to_tile_id(0xF0000003, 1), 2)
+
+
+class TestGidIntegration(unittest.TestCase):
+
+    def _convert(self, tmx_text):
+        # Re-use the same _convert helper — extract to module level if preferred,
+        # but for now duplicate since unittest doesn't share helpers across classes cleanly.
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(tmx_text)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                return f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_hflip_tile_produces_correct_index(self):
+        # Flipped tile 1 (GID 0x80000001) with firstgid=1 → tile value 0 in output
+        result = self._convert(HFLIP_TMX)
+        self.assertIn('/* row  0 */ 0,', result)
+
+    def test_empty_cell_produces_zero_not_underflow(self):
+        # GID 0 → 0; must NOT produce -1 or 255
+        result = self._convert(EMPTY_CELL_TMX)
+        self.assertIn('0,0', result)
+        self.assertNotIn('-1', result)
+        self.assertNotIn('255', result)
+
+    def test_firstgid_2_offsets_correctly(self):
+        # GID 2 → 0, GID 3 → 1
+        result = self._convert(FIRSTGID_2_TMX)
+        self.assertIn('/* row  0 */ 0,1,', result)
 
 
 if __name__ == '__main__':
