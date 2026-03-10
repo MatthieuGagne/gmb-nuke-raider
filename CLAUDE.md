@@ -27,7 +27,7 @@ Each game system lives in `src/<system>.c` + `src/<system>.h`. Asset source file
 
 ## Scalability Conventions
 
-These apply to every feature, no matter how small. Full rationale in `docs/plans/2026-03-09-scalability-design.md`.
+These apply to every feature, no matter how small.
 
 **Module structure:**
 - Each system gets its own `.c`/`.h` pair; new module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review before merge (catches AoS entity pools as an anti-pattern).
@@ -49,7 +49,7 @@ These apply to every feature, no matter how small. Full rationale in `docs/plans
   ```
 
 **Memory budgets:**
-- OAM: 40 sprites total (player = 1; budget the rest for enemies/projectiles/HUD)
+- OAM: 40 sprites total (player = 2; budget the rest for enemies/projectiles/HUD)
 - VRAM: 192 tiles (DMG bank 0) + 192 (CGB bank 1 for color variants)
 - WRAM: 8 KB — large arrays must be global or `static`, never local
 - ROM: MBC1 up to 1 MB — assets tagged for banking, code stays in bank 0

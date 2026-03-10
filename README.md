@@ -34,20 +34,25 @@ make test
 ## Running
 
 ```sh
-mgba-qt build/wasteland-racer.gb
+java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
 ```
 
-Or load `build/wasteland-racer.gb` in any GB/GBC emulator ([SameBoy](https://sameboy.github.io/), [Emulicious](https://emulicious.net/), [BGB](https://bgb.bircd.org/)).
+Or load `build/wasteland-racer.gb` in any GB/GBC emulator ([Emulicious](https://emulicious.net/), [SameBoy](https://sameboy.github.io/), [BGB](https://bgb.bircd.org/)).
 
 ## Game Modules
 
 | Module | Files | Responsibility |
 |---|---|---|
 | Main loop | `src/main.c` | Frame timing, input polling, state machine dispatch |
-| Player | `src/player.c/.h` | Player movement, boundary checks, sprite rendering |
-| Track | `src/track.c/.h`, `src/track_map.c` | Tile map data, passability queries |
+| State manager | `src/state_manager.c/.h` | Game state transitions |
+| Title state | `src/state_title.c/.h` | Title screen |
+| Playing state | `src/state_playing.c/.h` | In-game state handler |
+| Player | `src/player.c/.h`, `src/player_sprite.c` | Player movement, boundary checks, sprite rendering |
+| Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries |
 | Camera | `src/camera.c/.h` | Scrolling ring-buffer VRAM streaming, `move_bkg()` |
+| Sprite pool | `src/sprite_pool.c/.h` | OAM slot management |
 | Dialog | `src/dialog.c/.h`, `src/dialog_data.c/.h` | NPC conversation trees, branching choices, per-NPC flags |
+| Input | `src/input.h` | Key tick/press/release/debounce helpers |
 | Config | `src/config.h` | Capacity constants (`MAX_NPCS`, etc.) |
 
 ### Game States
@@ -88,14 +93,21 @@ python3 tools/run_sprite_editor.py
 ```
 gmb-wasteland-racer/
 ├── src/
-│   ├── main.c            # Entry point, main loop, game state machine
-│   ├── player.c/.h       # Player movement and sprite rendering
-│   ├── track.c/.h        # Track tile data and passability
-│   ├── track_map.c       # Generated tile map array (from Tiled)
-│   ├── camera.c/.h       # Scrolling camera with VRAM ring buffer
-│   ├── dialog.c/.h       # NPC dialog engine
-│   ├── dialog_data.c/.h  # NPC dialog content
-│   └── config.h          # Capacity constants (MAX_NPCS, etc.)
+│   ├── main.c              # Entry point, main loop, game state machine
+│   ├── state_manager.c/.h  # Game state transitions
+│   ├── state_title.c/.h    # Title screen state
+│   ├── state_playing.c/.h  # In-game state handler
+│   ├── player.c/.h         # Player movement and boundary checks
+│   ├── player_sprite.c     # Player OAM rendering (8×16 two-tile sprite)
+│   ├── sprite_pool.c/.h    # OAM slot management
+│   ├── track.c/.h          # Track tile data and passability
+│   ├── track_map.c         # Generated tile map array (from Tiled)
+│   ├── track_tiles.c       # Generated tile pixel data (from tileset.png)
+│   ├── camera.c/.h         # Scrolling camera with VRAM ring buffer
+│   ├── dialog.c/.h         # NPC dialog engine
+│   ├── dialog_data.c/.h    # NPC dialog content
+│   ├── input.h             # Key tick/press/release helpers
+│   └── config.h            # Capacity constants (MAX_NPCS, etc.)
 ├── assets/
 │   ├── maps/             # Tiled map files (.tmx, .tsx, tileset.png)
 │   ├── sprites/          # Raw sprite source files
@@ -107,13 +119,18 @@ gmb-wasteland-racer/
 │   └── sprite_editor/    # Cairo-based sprite editor source
 ├── tests/                # Unity unit tests (gcc, no hardware needed)
 │   ├── test_player.c
+│   ├── test_player_physics.c
 │   ├── test_track.c
 │   ├── test_camera.c
 │   ├── test_dialog.c
 │   ├── test_gamestate.c
+│   ├── test_input.c
+│   ├── test_sprite_pool.c
+│   ├── test_state_manager.c
+│   ├── test_soa_convention.c
 │   ├── mocks/            # Stub GBDK headers for host-side compilation
-│   └── unity/            # Unity test framework (submodule)
-├── docs/plans/           # Design docs and implementation plans
+│   └── unity/            # Unity test framework (vendored)
+├── docs/                 # Design documents
 ├── .claude/              # Claude Code skills and agent configs
 ├── build/                # Compiler output (gitignored)
 ├── Makefile
@@ -135,7 +152,7 @@ To target GBC-only (for extra VRAM, 8 palettes, etc.) swap `-Wm-yc` for `-Wm-yC`
 
 | Resource | Total | Notes |
 |---|---|---|
-| OAM | 40 sprites | Player = 1; rest for NPCs/projectiles/HUD |
+| OAM | 40 sprites | Player = 2; rest for NPCs/projectiles/HUD |
 | VRAM BG tiles | 192 (DMG bank 0) + 192 (CGB bank 1) | Bank 1 for color variants |
 | WRAM | 8 KB | Large arrays must be global or `static` |
 | ROM | Up to 1 MB (MBC1) | Code in bank 0; assets banked |
