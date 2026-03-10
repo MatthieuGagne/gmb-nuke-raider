@@ -105,6 +105,12 @@ HFLIP_TMX = """\
 2147483649
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 
@@ -120,6 +126,12 @@ EMPTY_CELL_TMX = """\
 0,1
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 
@@ -134,6 +146,12 @@ FIRSTGID_2_TMX = """\
 2,3
   </data>
  </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
 </map>
 """
 

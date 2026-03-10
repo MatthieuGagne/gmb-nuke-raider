@@ -73,7 +73,7 @@ uint8_t overmap_get_car_ty(void) { return car_ty; }
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 static uint8_t overmap_walkable(uint8_t tx, uint8_t ty) {
-    return overmap_map[(uint8_t)(ty * OVERMAP_W) + tx] != OVERMAP_TILE_BLANK;
+    return overmap_map[(uint16_t)ty * OVERMAP_W + tx] != OVERMAP_TILE_BLANK;
 }
 
 static void overmap_move_sprite(void) {
@@ -116,7 +116,7 @@ static void update(void) {
     car_ty = new_ty;
     overmap_move_sprite();
 
-    if (overmap_map[(uint8_t)(car_ty * OVERMAP_W) + car_tx] == OVERMAP_TILE_DEST) {
+    if (overmap_map[(uint16_t)car_ty * OVERMAP_W + car_tx] == OVERMAP_TILE_DEST) {
         current_race_id = (car_tx < OVERMAP_HUB_TX) ? 0u : 1u;
         player_set_pos(track_start_x, track_start_y);
         player_reset_vel();
