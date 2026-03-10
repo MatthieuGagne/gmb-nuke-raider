@@ -1,4 +1,5 @@
 #include <gb/gb.h>
+#include "input.h"
 #include "state_manager.h"
 #include "state_playing.h"
 #include "player.h"
@@ -17,7 +18,7 @@ static void enter(void) {
     DISPLAY_ON;
 }
 
-static void update(uint8_t input) {
+static void update(void) {
 #ifdef DEBUG
     frame_count++;
     if (frame_count % 60u == 0u) {
@@ -34,7 +35,7 @@ static void update(uint8_t input) {
      * the ring buffer. */
     move_bkg(0u, (uint8_t)cam_y);
     /* Game logic phase: runs during active display */
-    player_update(input);
+    player_update();
     camera_update(player_get_x(), player_get_y());
 }
 

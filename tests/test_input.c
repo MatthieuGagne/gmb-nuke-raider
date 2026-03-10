@@ -2,10 +2,7 @@
 #include <gb/gb.h>
 #include "../src/input.h"
 
-/* Define the globals here — main.c owns them in the ROM build,
- * but each test binary is standalone. */
-uint8_t input     = 0;
-uint8_t prev_input = 0;
+/* input/prev_input globals defined in tests/mocks/input_globals.c */
 
 void setUp(void)    { input = 0; prev_input = 0; }
 void tearDown(void) {}

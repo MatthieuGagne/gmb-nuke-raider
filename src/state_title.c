@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 #include <gbdk/console.h>
 #include <stdio.h>
+#include "input.h"
 #include "state_manager.h"
 #include "state_title.h"
 #include "state_playing.h"
@@ -13,8 +14,8 @@ static void enter(void) {
     printf("Press START");
 }
 
-static void update(uint8_t input) {
-    if (input & J_START) {
+static void update(void) {
+    if (KEY_TICKED(J_START)) {
         state_replace(&state_playing);
     }
 }

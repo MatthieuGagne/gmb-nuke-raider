@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 void     player_init(void);
-void     player_update(uint8_t input);
+void     player_update(void);
 void     player_render(void);
 void     player_set_pos(int16_t x, int16_t y);
 int16_t  player_get_x(void);

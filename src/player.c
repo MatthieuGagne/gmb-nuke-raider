@@ -1,4 +1,5 @@
 #include <gb/gb.h>
+#include "input.h"
 #include "player.h"
 #include "track.h"
 #include "camera.h"
@@ -35,22 +36,22 @@ void player_init(void) {
     SHOW_SPRITES;
 }
 
-void player_update(uint8_t input) {
+void player_update(void) {
     int16_t new_px;
     int16_t new_py;
-    if (input & J_LEFT) {
+    if (KEY_PRESSED(J_LEFT)) {
         new_px = px - 1;
         if (new_px >= 0 && corners_passable(new_px, py)) px = new_px;
     }
-    if (input & J_RIGHT) {
+    if (KEY_PRESSED(J_RIGHT)) {
         new_px = px + 1;
         if (new_px <= 159 && corners_passable(new_px, py)) px = new_px;
     }
-    if (input & J_UP) {
+    if (KEY_PRESSED(J_UP)) {
         new_py = py - 1;
         if (new_py >= (int16_t)cam_y && corners_passable(px, new_py)) py = new_py;
     }
-    if (input & J_DOWN) {
+    if (KEY_PRESSED(J_DOWN)) {
         new_py = py + 1;
         if (new_py <= (int16_t)(cam_y + 143u) && corners_passable(px, new_py)) py = new_py;
     }
