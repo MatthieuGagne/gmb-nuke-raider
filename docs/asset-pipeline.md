@@ -66,7 +66,7 @@ Each 8×8 tile is encoded as 16 bytes of GB 2bpp:
 2. Run `make` to regenerate `src/track_tiles.c`.
 3. In Tiled, add the new tile index to `assets/maps/track.tsx` and use it in `track.tmx`.
 4. Run `make` again to regenerate `src/track_map.c`.
-5. Verify the ROM renders correctly: `mgba-qt build/wasteland-racer.gb`.
+5. Verify the ROM renders correctly in Emulicious: `java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`.
 
 ---
 
@@ -105,7 +105,7 @@ The editor saves a 2-bit indexed PNG (32×32 pixels = 4×4 tiles) via
 1. Save the sprite sheet from the editor.
 2. Use `tools/png_to_tiles.py` to convert the PNG to a C array:
    ```bash
-   python3 tools/png_to_tiles.py assets/sprites/player.png src/player_tiles.c player_tile_data
+   python3 tools/png_to_tiles.py assets/sprites/player.png src/player_sprite.c player_tile_data
    ```
 3. `#include` or `extern` the symbol in the relevant module.
 

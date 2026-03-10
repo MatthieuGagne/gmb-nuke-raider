@@ -4,6 +4,17 @@
 #include <stdint.h>
 #include "config.h"
 
+/* Terrain tile types — uint8_t, NOT typedef enum (SDCC makes enums 16-bit) */
+typedef uint8_t TileType;
+#define TILE_WALL   0u
+#define TILE_ROAD   1u
+#define TILE_SAND   2u
+#define TILE_OIL    3u
+#define TILE_BOOST  4u
+
+TileType track_tile_type_from_index(uint8_t tile_idx);
+TileType track_tile_type(int16_t world_x, int16_t world_y);
+
 #define MAP_PX_W  160u   /* MAP_TILES_W * 8 */
 #define MAP_PX_H  800u   /* MAP_TILES_H * 8 */
 

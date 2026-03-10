@@ -5,6 +5,11 @@
 
 #include <stdint.h>
 
+/* SDCC ROM-placement qualifier — noop on gcc */
+#ifndef __code
+#define __code
+#endif
+
 typedef uint8_t  UBYTE;
 typedef int8_t   BYTE;
 typedef uint16_t UWORD;
@@ -91,5 +96,9 @@ static inline void set_interrupts(uint8_t flags) { (void)flags; }
 static uint8_t STAT_REG = 0;
 static uint8_t LYC_REG  = 0;
 #define STATF_LYC 0b01000000U
+
+/* LCDC register — hud.c writes bit 6 (window tile map select) */
+static uint8_t LCDC_REG = 0x91U; /* realistic boot value: LCD on, BG on, tile data at 0x8000 */
+#define LCDCF_WIN9C00 0x40U       /* LCDC bit 6: window tile map at 0x9C00 */
 
 #endif /* MOCK_GB_H */
