@@ -3,6 +3,7 @@
 #include "track.h"
 #include "camera.h"
 #include "debug.h"
+#include "sprite_pool.h"
 
 /* Solid 8x8 sprite: all pixels color index 3 */
 static const uint8_t player_tile_data[] = {
@@ -12,6 +13,7 @@ static const uint8_t player_tile_data[] = {
 
 static int16_t px;
 static int16_t py;
+static uint8_t player_sprite_slot = 0;
 
 /* Returns 1 if all 4 corners of a player at world (wx, wy) are on track. */
 static uint8_t corners_passable(int16_t wx, int16_t wy) {
@@ -24,10 +26,12 @@ static uint8_t corners_passable(int16_t wx, int16_t wy) {
 
 void player_init(void) {
     SPRITES_8x8;
+    sprite_pool_init();
+    player_sprite_slot = get_sprite();  /* claims slot 0 */
     set_sprite_data(0, 1, player_tile_data);
-    set_sprite_tile(0, 0);
-    px = track_start_x;
-    py = track_start_y;
+    set_sprite_tile(player_sprite_slot, 0);
+    px = PLAYER_START_X;
+    py = PLAYER_START_Y;
     SHOW_SPRITES;
 }
 
@@ -56,7 +60,7 @@ void player_render(void) {
     /* cam_x is always 0; cam_y is uint16_t but py >= cam_y is enforced so offset fits uint8_t */
     uint8_t hw_x = (uint8_t)(px + 8);
     uint8_t hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
-    move_sprite(0, hw_x, hw_y);
+    move_sprite(player_sprite_slot, hw_x, hw_y);
     /* Log when sprite is near or outside visible bounds (x<8 or x>167, y<16 or y>159) */
     if (hw_x < 8u || hw_x > 167u || hw_y < 16u || hw_y > 159u) {
         DBG_INT("hw_x_oob", hw_x);

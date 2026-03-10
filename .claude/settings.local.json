@@ -40,7 +40,18 @@
       "Bash(~/gbdk/bin/png2asset:*)",
       "Bash(pip3 list:*)",
       "WebFetch(domain:laroldsretrogameyard.com)",
-      "WebFetch(domain:emulicious.net)"
+      "WebFetch(domain:emulicious.net)",
+      "WebFetch(domain:doc.mapeditor.org)",
+      "Read(/home/mathdaman/code/gmb-wasteland-racer/.claude/**)",
+      "Write(/home/mathdaman/code/gmb-wasteland-racer/.claude/**)",
+      "Edit(/home/mathdaman/code/gmb-wasteland-racer/.claude/**)",
+      "Read(/home/mathdaman/code/gmb-wasteland-racer/CLAUDE.md)",
+      "Write(/home/mathdaman/code/gmb-wasteland-racer/CLAUDE.md)",
+      "Edit(/home/mathdaman/code/gmb-wasteland-racer/CLAUDE.md)",
+      "Read(/home/mathdaman/.claude/skills/**)",
+      "Write(/home/mathdaman/.claude/skills/**)",
+      "Edit(/home/mathdaman/.claude/skills/**)",
+      "Bash(java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar:*)"
     ]
   }
 }
