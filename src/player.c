@@ -30,8 +30,8 @@ void player_init(void) {
     player_sprite_slot = get_sprite();  /* claims slot 0 */
     set_sprite_data(0, 1, player_tile_data);
     set_sprite_tile(player_sprite_slot, 0);
-    px = PLAYER_START_X;
-    py = PLAYER_START_Y;
+    px = track_start_x;
+    py = track_start_y;
     SHOW_SPRITES;
 }
 
