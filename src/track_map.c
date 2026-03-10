@@ -2,6 +2,9 @@
 /* Regenerate: python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c */
 #include "track.h"
 
+const int16_t track_start_x = 88;
+const int16_t track_start_y = 720;
+
 const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {
     /* row  0 */ 0,0,0,0,1,1,1,1,1,2,2,1,1,1,1,1,0,0,0,0,
     /* row  1 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,

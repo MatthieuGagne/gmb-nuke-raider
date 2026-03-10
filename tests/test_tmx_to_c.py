@@ -9,10 +9,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import tmx_to_c as conv
 
 # 3×2 map: Tiled IDs 1,2,1 / 2,1,2  →  GB values 0,1,0 / 1,0,1
+# Includes a "start" object at pixel (88, 720).
 MINIMAL_TMX = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
-     width="3" height="2" tilewidth="8" tileheight="8">
+     width="3" height="2" tilewidth="8" tileheight="8"
+     nextlayerid="3" nextobjectid="2">
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="3" height="2">
   <data encoding="csv">
@@ -20,6 +22,11 @@ MINIMAL_TMX = """\
 2,1,2
   </data>
  </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="88" y="720">
+   <point/>
+  </object>
+ </objectgroup>
 </map>
 """
 
@@ -63,6 +70,23 @@ class TestTmxToC(unittest.TestCase):
         bad = MINIMAL_TMX.replace('encoding="csv"', 'encoding="base64"')
         with self.assertRaises(ValueError):
             self._convert(bad)
+
+    def test_start_layer_emits_track_start_x(self):
+        result = self._convert(MINIMAL_TMX)
+        self.assertIn('track_start_x = 88', result)
+
+    def test_start_layer_emits_track_start_y(self):
+        result = self._convert(MINIMAL_TMX)
+        self.assertIn('track_start_y = 720', result)
+
+    def test_missing_start_layer_raises(self):
+        import re
+        no_start = re.sub(
+            r'\s*<objectgroup[^>]*name="start".*?</objectgroup>',
+            '', MINIMAL_TMX, flags=re.DOTALL
+        )
+        with self.assertRaises(ValueError):
+            self._convert(no_start)
 
 
 if __name__ == '__main__':

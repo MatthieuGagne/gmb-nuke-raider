@@ -10,8 +10,9 @@ extern uint16_t cam_y;
  * Preloads the 18 initially visible rows and sets cam_y. */
 void camera_init(int16_t player_world_x, int16_t player_world_y);
 
-/* Call every frame in game-logic phase. Advances cam_y monotonically and
- * buffers any new bottom-row streams. Does NOT write VRAM directly. */
+/* Call every frame in game-logic phase. Decreases cam_y as player moves up
+ * (upward-only — cam_y never increases). Buffers new top-row streams.
+ * Does NOT write VRAM directly. */
 void camera_update(int16_t player_world_x, int16_t player_world_y);
 
 /* Call in VBlank phase after wait_vbl_done(). Drains buffered row streams. */

@@ -34,12 +34,28 @@ def tmx_to_c(tmx_path, out_path):
             f"Expected {width * height} tiles, got {len(tile_ids)}"
         )
 
+    # Parse "start" objectgroup for spawn coordinates.
+    start_group = next(
+        (og for og in root.findall('objectgroup')
+         if og.get('name') == 'start'),
+        None
+    )
+    if start_group is None:
+        raise ValueError("TMX is missing an objectgroup named 'start'")
+    start_obj = start_group.find('object')
+    if start_obj is None:
+        raise ValueError("'start' objectgroup has no objects")
+    spawn_x = int(float(start_obj.get('x')))
+    spawn_y = int(float(start_obj.get('y')))
+
     with open(out_path, 'w') as f:
         f.write("/* GENERATED — do not edit by hand."
                 " Source: assets/maps/track.tmx */\n")
         f.write("/* Regenerate: python3 tools/tmx_to_c.py"
                 " assets/maps/track.tmx src/track_map.c */\n")
         f.write('#include "track.h"\n\n')
+        f.write(f"const int16_t track_start_x = {spawn_x};\n")
+        f.write(f"const int16_t track_start_y = {spawn_y};\n\n")
         f.write("const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {\n")
         for row in range(height):
             start = row * width

@@ -5,7 +5,7 @@
 
 void setUp(void) {
     mock_vram_clear();
-    camera_init(80, 80);  /* cam_y = 8 */
+    camera_init(88, 720);  /* cam_y = 648 */
     player_init();
 }
 void tearDown(void) {}
@@ -13,30 +13,30 @@ void tearDown(void) {}
 /* --- start position ---------------------------------------------------- */
 
 void test_player_init_sets_start_position(void) {
-    TEST_ASSERT_EQUAL_INT16(80, player_get_x());
-    TEST_ASSERT_EQUAL_INT16(80, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(88, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(720, player_get_y());
 }
 
-/* --- basic movement from start (80,80) on road (cols 4-15, row 10) ----- */
+/* --- basic movement from track spawn (88,720) on road (cols 6-17, row 90) */
 
 void test_player_update_moves_left(void) {
     player_update(J_LEFT);
-    TEST_ASSERT_EQUAL_INT16(79, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(87, player_get_x());
 }
 
 void test_player_update_moves_right(void) {
     player_update(J_RIGHT);
-    TEST_ASSERT_EQUAL_INT16(81, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(89, player_get_x());
 }
 
 void test_player_update_moves_up(void) {
     player_update(J_UP);
-    TEST_ASSERT_EQUAL_INT16(79, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(719, player_get_y());
 }
 
 void test_player_update_moves_down(void) {
     player_update(J_DOWN);
-    TEST_ASSERT_EQUAL_INT16(81, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(721, player_get_y());
 }
 
 /* --- track collision (new map geometry) -------------------------------- */
@@ -71,20 +71,20 @@ void test_player_clamped_at_screen_right(void) {
 
 /* --- screen Y clamp [cam_y, cam_y+143] ---------------------------------- */
 
-/* cam_y=8. Player at py=8 (top of screen). Track at (80,7) IS passable
- * (col 10, row 0 = road), so ONLY screen clamp prevents upward movement. */
+/* cam_y=648. Player at py=648 (top of screen). Track at (80,647) IS passable
+ * (col 10, row 80 = road), so ONLY screen clamp prevents upward movement. */
 void test_player_clamped_at_screen_top(void) {
-    player_set_pos(80, 8);    /* py == cam_y: at top of viewport */
-    player_update(J_UP);      /* new_py=7 < cam_y=8 -> blocked */
-    TEST_ASSERT_EQUAL_INT16(8, player_get_y());
+    player_set_pos(80, 648);  /* py == cam_y: at top of viewport */
+    player_update(J_UP);      /* new_py=647 < cam_y=648 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(648, player_get_y());
 }
 
-/* cam_y=8, cam_y+143=151. Track at (80,152) IS passable (col 10, row 19 = road),
+/* cam_y=648, cam_y+143=791. Track at (80,792) IS passable (col 10, row 99 = road),
  * so ONLY screen clamp prevents downward movement past screen bottom. */
 void test_player_clamped_at_screen_bottom(void) {
-    player_set_pos(80, 151); /* py == cam_y+143: at bottom of viewport */
-    player_update(J_DOWN);   /* new_py=152 > cam_y+143=151 -> blocked */
-    TEST_ASSERT_EQUAL_INT16(151, player_get_y());
+    player_set_pos(80, 791);  /* py == cam_y+143: at bottom of viewport */
+    player_update(J_DOWN);    /* new_py=792 > cam_y+143=791 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(791, player_get_y());
 }
 
 int main(void) {

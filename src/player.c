@@ -10,10 +10,6 @@ static const uint8_t player_tile_data[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
-/* Player start: center of initial viewport, on road (tile col 10, row 10) */
-#define PLAYER_START_X  80
-#define PLAYER_START_Y  80
-
 static int16_t px;
 static int16_t py;
 
@@ -30,8 +26,8 @@ void player_init(void) {
     SPRITES_8x8;
     set_sprite_data(0, 1, player_tile_data);
     set_sprite_tile(0, 0);
-    px = PLAYER_START_X;
-    py = PLAYER_START_Y;
+    px = track_start_x;
+    py = track_start_y;
     SHOW_SPRITES;
 }
 
