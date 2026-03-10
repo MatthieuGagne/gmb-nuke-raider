@@ -5,6 +5,7 @@
 #include "player.h"
 #include "track.h"
 #include "camera.h"
+#include "hud.h"
 #include "debug.h"
 
 #ifdef DEBUG
@@ -15,6 +16,7 @@ static void enter(void) {
     DISPLAY_OFF;
     track_init();
     camera_init(player_get_x(), player_get_y());
+    hud_init();
     DISPLAY_ON;
 }
 
@@ -29,10 +31,12 @@ static void update(void) {
 #endif
     /* VBlank phase: all VRAM writes immediately after frame_ready */
     player_render();
+    hud_render();
     camera_flush_vram();
     /* Game logic phase: runs during active display */
     player_update();
     camera_update(player_get_x(), player_get_y());
+    hud_update();
 }
 
 static void sp_exit(void) {
