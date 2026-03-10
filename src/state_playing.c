@@ -9,6 +9,7 @@
 
 #ifdef DEBUG
 static uint16_t frame_count = 0u;
+static const char * const terrain_names[] = { "WALL", "ROAD", "SAND", "OIL", "BOOST" };
 #endif
 
 static void enter(void) {
@@ -21,10 +22,12 @@ static void enter(void) {
 static void update(void) {
 #ifdef DEBUG
     frame_count++;
-    if (frame_count % 60u == 0u) {
-        DBG_INT("frame", (int)frame_count);
-        DBG_INT("px", (int)player_get_x());
-        DBG_INT("py", (int)player_get_y());
+    if (frame_count % 30u == 0u) {
+        TileType t = track_tile_type((int16_t)(player_get_x() + 4),
+                                     (int16_t)(player_get_y() + 4));
+        DBG_STR(terrain_names[t < 5u ? t : 1u]);
+        DBG_INT("vx", (int)player_get_vx());
+        DBG_INT("vy", (int)player_get_vy());
     }
 #endif
     /* VBlank phase: all VRAM writes immediately after frame_ready */

@@ -76,14 +76,23 @@ void test_boost_increases_vy_upward(void) {
     TEST_ASSERT_LESS_THAN_INT8(0, player_get_vy());
 }
 
-/* AC4: Boost cannot exceed max speed */
-void test_boost_capped_at_max_speed(void) {
+/* AC4: Boost is capped at TERRAIN_BOOST_MAX_SPEED, not PLAYER_MAX_SPEED */
+void test_boost_capped_at_boost_max_speed(void) {
     uint8_t i;
-    /* Pressing J_UP + boost each frame maximises upward velocity */
-    for (i = 0; i < 10u; i++) {
+    for (i = 0; i < 20u; i++) {
         player_apply_physics(J_UP, TILE_BOOST);
     }
-    TEST_ASSERT_EQUAL_INT8(-(int8_t)PLAYER_MAX_SPEED, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(-(int8_t)TERRAIN_BOOST_MAX_SPEED, player_get_vy());
+}
+
+/* AC4: Boost allows exceeding normal max speed */
+void test_boost_exceeds_normal_max_speed(void) {
+    uint8_t i;
+    for (i = 0; i < 20u; i++) {
+        player_apply_physics(J_UP, TILE_BOOST);
+    }
+    /* vy should be more negative than -PLAYER_MAX_SPEED */
+    TEST_ASSERT_LESS_THAN_INT8(-(int8_t)PLAYER_MAX_SPEED, player_get_vy());
 }
 
 int main(void) {
@@ -92,6 +101,7 @@ int main(void) {
     RUN_TEST(test_oil_does_not_increase_vx);
     RUN_TEST(test_oil_preserves_velocity_without_input);
     RUN_TEST(test_boost_increases_vy_upward);
-    RUN_TEST(test_boost_capped_at_max_speed);
+    RUN_TEST(test_boost_capped_at_boost_max_speed);
+    RUN_TEST(test_boost_exceeds_normal_max_speed);
     return UNITY_END();
 }

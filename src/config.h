@@ -11,7 +11,7 @@
 /* Player physics — these will become per-gear values when gears are added */
 #define PLAYER_ACCEL      1
 #define PLAYER_FRICTION   1
-#define PLAYER_MAX_SPEED  6
+#define PLAYER_MAX_SPEED  3
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
@@ -27,5 +27,6 @@
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
 #define TERRAIN_BOOST_DELTA        2u   /* vy kick per frame on boost pad */
+#define TERRAIN_BOOST_MAX_SPEED    8u   /* vy cap on boost pad — exceeds PLAYER_MAX_SPEED */
 
 #endif /* CONFIG_H */

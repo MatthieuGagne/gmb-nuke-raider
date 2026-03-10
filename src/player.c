@@ -140,9 +140,12 @@ void player_apply_physics(uint8_t buttons, TileType terrain) {
         vy = (int8_t)(vy - (int8_t)TERRAIN_BOOST_DELTA);
     }
 
-    /* Step 6: clamp to ±PLAYER_MAX_SPEED */
-    if (vx >  (int8_t)PLAYER_MAX_SPEED) vx =  (int8_t)PLAYER_MAX_SPEED;
-    if (vx < -(int8_t)PLAYER_MAX_SPEED) vx = -(int8_t)PLAYER_MAX_SPEED;
-    if (vy >  (int8_t)PLAYER_MAX_SPEED) vy =  (int8_t)PLAYER_MAX_SPEED;
-    if (vy < -(int8_t)PLAYER_MAX_SPEED) vy = -(int8_t)PLAYER_MAX_SPEED;
+    /* Step 6: clamp vx; clamp vy with boost-aware cap */
+    {
+        uint8_t max_vy = (terrain == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : PLAYER_MAX_SPEED;
+        if (vx >  (int8_t)PLAYER_MAX_SPEED) vx =  (int8_t)PLAYER_MAX_SPEED;
+        if (vx < -(int8_t)PLAYER_MAX_SPEED) vx = -(int8_t)PLAYER_MAX_SPEED;
+        if (vy >  (int8_t)max_vy) vy =  (int8_t)max_vy;
+        if (vy < -(int8_t)max_vy) vy = -(int8_t)max_vy;
+    }
 }

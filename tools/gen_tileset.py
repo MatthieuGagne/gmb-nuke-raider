@@ -21,7 +21,7 @@ TILES = [
     make_tile(lambda r, c: 2),                                          # 0: wall
     make_tile(lambda r, c: 1),                                          # 1: road
     make_tile(lambda r, c: 3),                                          # 2: center dashes
-    make_tile(lambda r, c: 1 + ((r + c) % 2)),                         # 3: sand checkerboard
+    make_tile(lambda r, c: 0 if (r + c) % 2 == 0 else 2),              # 3: sand checkerboard (white/dark-grey)
     make_tile(lambda r, c: 2 if (2 <= r <= 4 and 2 <= c <= 5) else 3), # 4: oil puddle
     make_tile(lambda r, c: r % 2),                                      # 5: boost stripes
 ]
