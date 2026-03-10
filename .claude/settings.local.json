@@ -55,7 +55,18 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:gbdev.gg8.se)"
+      "WebFetch(domain:gbdev.gg8.se)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//home/mathdaman/code/gmb-wasteland-racer/**)",
+      "Bash(done)",
+      "Bash(grep -r \"__code\\\\|__rom\\\\|__flash\" /home/mathdaman/gbdk/include/ 2>/dev/null | head -5; /home/mathdaman/gbdk/bin/sdcc --version 2>&1 | head -3)",
+      "Bash(python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep -E \"error:|Error\" | grep -v EVELYN && ls -lh build/wasteland-racer.gb)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep \"error:\")",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | tail -10)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk make clean && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep -E \"error:|Error\" | grep -v EVELYN && ls -lh build/wasteland-racer.gb)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk make clean && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep -vE \"warning|EVELYN\" | tail -20)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1 | grep \"error:\" | grep -v EVELYN)"
     ]
   }
 }
