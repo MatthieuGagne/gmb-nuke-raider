@@ -13,8 +13,11 @@ After completing the task, append any new bugs, API gotchas, or confirmed patter
 
 ## Reference Documentation
 **Pan Docs** (authoritative Game Boy hardware reference): https://gbdev.io/pandocs/
+**Single-page version** (use `WebFetch` on this for any hardware detail you're unsure about): https://gbdev.io/pandocs/single.html
 
-Use `WebFetch` for precise details not covered here. Key pages:
+When uncertain about hardware behavior, registers, timing, or any spec detail — fetch the single-page URL with a targeted prompt rather than guessing. It contains the full specification in one document.
+
+Key individual pages:
 - Tile data / 2bpp: https://gbdev.io/pandocs/Tile_Data.html
 - LCDC register: https://gbdev.io/pandocs/LCDC.html
 - STAT / PPU modes: https://gbdev.io/pandocs/STAT.html
@@ -24,6 +27,9 @@ Use `WebFetch` for precise details not covered here. Key pages:
 - Interrupts: https://gbdev.io/pandocs/Interrupts.html
 - MBC1 banking: https://gbdev.io/pandocs/MBC1.html
 - Joypad: https://gbdev.io/pandocs/Joypad_Input.html
+- Timer: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+- Audio/APU: https://gbdev.io/pandocs/Audio.html
+- OAM DMA: https://gbdev.io/pandocs/OAM_DMA_Transfer.html
 
 When Pan Docs contradicts your cached knowledge, trust Pan Docs and update memory.
 
@@ -49,6 +55,7 @@ When Pan Docs contradicts your cached knowledge, trust Pan Docs and update memor
 **Key I/O register addresses:**
 - FF00: Joypad (P1/JOYP)
 - FF0F: IF — Interrupt Flag
+- FF03: DIV | FF05: TIMA | FF06: TMA | FF07: TAC (Timer)
 - FF40: LCDC | FF41: STAT | FF42/43: SCY/SCX | FF44: LY | FF45: LYC
 - FF46: OAM DMA trigger
 - FF47: BGP | FF48: OBP0 | FF49: OBP1 (DMG palettes)
@@ -100,6 +107,16 @@ LCDC can be written at any time (PPU never locks it).
 - Safe VRAM write window: Mode 0 (HBlank), Mode 1 (VBlank), or with display off
 - **`wait_vbl_done()` waits for VBlank (Mode 1) — always call before VRAM writes when display is on**
 - BCPD/OCPD (CGB palette RAM) also locked during Mode 3
+- Mode 3 duration varies: **172–289 dots** depending on scroll position, window, and sprite count penalties
+
+**Frame timing:**
+- 1 frame = 154 scanlines × 456 dots = 70,224 dots total
+- ~59.7 fps (not 60); frame period ≈ 16.74 ms
+- VBlank window = lines 144–153 = ~1.09 ms (use it wisely)
+
+**Window rendering gotcha:** The window has an internal line counter that increments only when the window is visible on screen. Disabling the window mid-frame and re-enabling it later does not reset the counter — the window resumes from where it left off within the same frame.
+
+**STAT interrupt quirk (DMG/MGB/SGB):** Writing to STAT during OAM scan, HBlank, VBlank, or LY=LYC can spuriously trigger the LCD STAT interrupt on original DMG hardware. This quirk is absent on GBC running in CGB mode. Avoid writing to STAT while the display is on unless you account for this.
 
 ---
 
@@ -126,6 +143,13 @@ Each sprite = 4 bytes at FE00–FE9F:
 
 **Drawing priority (non-CGB):** lower X = higher priority; ties broken by OAM index.
 **Drawing priority (CGB):** OAM index only (first entry wins).
+
+**CGB BG-to-OBJ priority** is controlled by three flags simultaneously:
+- LCDC bit 0: when 0, objects always appear on top of BG/Win regardless of other flags
+- BG map attribute bit 7 (VRAM bank 1): when 1, BG colors 1–3 cover objects
+- OAM attribute bit 7: when 1, BG/Win colors 1–3 cover object
+
+**OAM corruption bug (DMG/MGB/SGB/SGB2):** Reading $FEA0–$FEFF while OAM is blocked (Modes 2/3) triggers OAM corruption. Avoid accessing this range. On CGB the behavior varies by revision.
 
 ---
 
@@ -208,6 +232,60 @@ CGB: VRAM bank 1 holds 384 additional tiles (total 768 tiles per bank pair).
 
 ---
 
+## Timer Registers
+
+| Register | Address | Purpose                                                        |
+|----------|---------|----------------------------------------------------------------|
+| DIV      | FF03    | Divider — always increments; **any write resets it to 0**     |
+| TIMA     | FF05    | Timer counter — increments at TAC frequency; triggers interrupt on overflow |
+| TMA      | FF06    | Timer modulo — reloaded into TIMA on overflow                 |
+| TAC      | FF07    | Timer control: bit2=enable, bits1–0=clock select              |
+
+**TAC clock select:**
+| Bits 1–0 | TIMA frequency |
+|----------|----------------|
+| 00       | 4096 Hz (~1024 cycles/tick) |
+| 01       | 262144 Hz (~16 cycles/tick) |
+| 10       | 65536 Hz (~64 cycles/tick)  |
+| 11       | 16384 Hz (~256 cycles/tick) |
+
+- GBDK: use `TMA_REG`, `TIMA_REG`, `TAC_REG` from `gb/hardware.h`
+- Timer interrupt = bit 2 of IE/IF; handler registered via `add_TIM(handler)`
+
+---
+
+## OAM DMA Transfer
+
+- Triggered by writing source address high byte to FF46 (e.g., `0xC0` copies from $C000)
+- Transfers 160 bytes (40 sprites × 4 bytes) from source to OAM ($FE00–$FE9F)
+- Takes **160 M-cycles** (640 dots normal speed; 320 dots CGB double speed)
+- **During DMA, CPU can only access HRAM ($FF80–$FFFE)** — the DMA routine must run from HRAM
+- CGB allows WRAM access during cartridge (MBC) DMA, but not during OAM DMA
+- Avoid triggering interrupts during DMA (stack accesses to WRAM corrupt transfer)
+- GBDK handles OAM DMA internally via `shadow_OAM` and `hOAMCopy` — don't trigger FF46 manually unless you know what you're doing
+
+---
+
+## Audio / APU
+
+Four channels — all run off the master clock, fully synced with CPU/PPU:
+- **CH1** — Pulse with frequency sweep
+- **CH2** — Pulse (no sweep)
+- **CH3** — Wave (arbitrary 32-sample 4-bit waveform from FF30–FF3F)
+- **CH4** — Noise (LFSR)
+
+Key registers:
+- FF24: Master volume (NR50) — left/right channel volume
+- FF25: Channel panning (NR51) — which channels play left/right
+- FF26: Audio master control (NR52) — bit7=sound on/off; bits3–0=channel active (RO)
+
+Length timers tick at 256 Hz; envelopes (CH1/CH2/CH4) tick at 64 Hz.
+CH3 length counter cuts off at 256 steps; CH1/CH2/CH4 cut off at 64 steps.
+
+**Note:** GBDK provides a music driver; raw APU register access is needed only for sound effects or custom engines. Fetch https://gbdev.io/pandocs/single.html for full APU register details.
+
+---
+
 ## CGB Extra Registers
 
 | Register | Address | Purpose                                         |
@@ -230,6 +308,16 @@ CGB: VRAM bank 1 holds 384 additional tiles (total 768 tiles per bank pair).
 ---
 
 ## Critical Rules
+
+### LCD Disable Warning
+**Only disable the LCD during VBlank.** Turning off LCDC bit 7 outside VBlank can physically damage real hardware. In GBDK:
+```c
+wait_vbl_done();
+DISPLAY_OFF;   /* safe — we're in VBlank */
+/* ... VRAM init ... */
+DISPLAY_ON;
+```
+When the display is off, VRAM/OAM/palette RAM are freely accessible without timing concerns.
 
 ### VRAM Writes
 Always guard VRAM writes with `wait_vbl_done()` **unless display is off** (`DISPLAY_OFF`).
