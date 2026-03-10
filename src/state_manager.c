@@ -9,9 +9,9 @@ void state_manager_init(void) {
     depth = 0;
 }
 
-void state_manager_update(uint8_t input) {
+void state_manager_update(void) {
     if (depth == 0) return;
-    stack[depth - 1]->update(input);
+    stack[depth - 1]->update();
 }
 
 void state_push(const State *s) {

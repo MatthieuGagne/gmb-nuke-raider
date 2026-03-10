@@ -20,11 +20,11 @@ static int call_order_len = 0;
 #define LOG_B_EXIT   4
 
 static void a_enter(void)  { calls_a_enter++;  call_order[call_order_len++] = LOG_A_ENTER; }
-static void a_update(uint8_t input) { (void)input; calls_a_update++; }
+static void a_update(void) { calls_a_update++; }
 static void a_exit(void)   { calls_a_exit++;   call_order[call_order_len++] = LOG_A_EXIT; }
 
 static void b_enter(void)  { calls_b_enter++;  call_order[call_order_len++] = LOG_B_ENTER; }
-static void b_update(uint8_t input) { (void)input; calls_b_update++; }
+static void b_update(void) { calls_b_update++; }
 static void b_exit(void)   { calls_b_exit++;   call_order[call_order_len++] = LOG_B_EXIT; }
 
 static const State state_a = { a_enter, a_update, a_exit };
@@ -51,7 +51,7 @@ void test_push_calls_enter(void) {
 /* update calls the top state's update */
 void test_update_calls_top_state_update(void) {
     state_push(&state_a);
-    state_manager_update(0);
+    state_manager_update();
     TEST_ASSERT_EQUAL_INT(1, calls_a_update);
     TEST_ASSERT_EQUAL_INT(0, calls_b_update);
 }
@@ -60,7 +60,7 @@ void test_update_calls_top_state_update(void) {
 void test_push_second_update_routes_to_top(void) {
     state_push(&state_a);
     state_push(&state_b);
-    state_manager_update(0);
+    state_manager_update();
     TEST_ASSERT_EQUAL_INT(0, calls_a_update);
     TEST_ASSERT_EQUAL_INT(1, calls_b_update);
 }
@@ -91,7 +91,7 @@ void test_pop_routes_update_to_base(void) {
     calls_a_update = 0;
     calls_b_update = 0;
 
-    state_manager_update(0);
+    state_manager_update();
     TEST_ASSERT_EQUAL_INT(1, calls_a_update);
     TEST_ASSERT_EQUAL_INT(0, calls_b_update);
 }
@@ -118,7 +118,7 @@ void test_replace_routes_update_to_new_state(void) {
     calls_a_update = 0;
     calls_b_update = 0;
 
-    state_manager_update(0);
+    state_manager_update();
     TEST_ASSERT_EQUAL_INT(0, calls_a_update);
     TEST_ASSERT_EQUAL_INT(1, calls_b_update);
 }
@@ -133,7 +133,7 @@ void test_push_beyond_capacity_is_safe(void) {
 
     /* update must still work (routes to state_b, the last valid top) */
     calls_b_update = 0;
-    state_manager_update(0);
+    state_manager_update();
     TEST_ASSERT_EQUAL_INT(1, calls_b_update);
 }
 
