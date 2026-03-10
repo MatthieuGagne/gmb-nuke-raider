@@ -92,6 +92,8 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
 
+**Worktree policy:** ALL file writes — including implementation plans, code, tests, and docs — MUST happen inside a git worktree. Use the `using-git-worktrees` skill or `EnterWorktree` tool before writing any files. Never write implementation files directly to the main working tree.
+
 **Smoketest gate:** NEVER commit or create a PR before running a smoketest in the emulator. Launch it yourself with `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb` (run in background), then tell the user it's running and ask them to confirm it looks correct before proceeding.
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
 
