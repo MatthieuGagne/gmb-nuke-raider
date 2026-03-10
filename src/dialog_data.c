@@ -1,3 +1,4 @@
+#pragma bank 255
 #include <stddef.h>
 #include "dialog_data.h"
 

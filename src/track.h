@@ -1,6 +1,7 @@
 #ifndef TRACK_H
 #define TRACK_H
 
+#include <gb/gb.h>
 #include <stdint.h>
 #include "config.h"
 
@@ -12,8 +13,8 @@ typedef uint8_t TileType;
 #define TILE_OIL    3u
 #define TILE_BOOST  4u
 
-TileType track_tile_type_from_index(uint8_t tile_idx);
-TileType track_tile_type(int16_t world_x, int16_t world_y);
+TileType track_tile_type_from_index(uint8_t tile_idx) BANKED;
+TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED;
 
 #define MAP_PX_W  160u   /* MAP_TILES_W * 8 */
 #define MAP_PX_H  800u   /* MAP_TILES_H * 8 */
@@ -23,7 +24,7 @@ extern const int16_t track_start_y;
 extern const uint8_t track_map[];
 extern const uint8_t track_finish_line_y;
 
-void    track_init(void);
-uint8_t track_passable(int16_t world_x, int16_t world_y);
+void    track_init(void) BANKED;
+uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;
 
 #endif /* TRACK_H */

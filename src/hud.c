@@ -1,3 +1,4 @@
+#pragma bank 255
 #include <gb/gb.h>
 #include "config.h"
 #include "hud.h"
@@ -62,7 +63,7 @@ static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
 
 /* --- Public API --- */
 
-void hud_init(void) {
+void hud_init(void) BANKED {
     static uint8_t row0[20];
     static uint8_t row1[20];
     uint8_t i;
@@ -106,7 +107,7 @@ void hud_init(void) {
     set_win_tiles(0u, 1u, 20u, 1u, row1);
 }
 
-void hud_update(void) {
+void hud_update(void) BANKED {
     hud_frame_tick++;
     if (hud_frame_tick >= 60u) {
         hud_frame_tick = 0u;
@@ -117,7 +118,7 @@ void hud_update(void) {
     }
 }
 
-void hud_render(void) {
+void hud_render(void) BANKED {
     uint8_t timer[5];
     uint8_t hp_digits[3];
 
@@ -140,10 +141,10 @@ void hud_render(void) {
     hud_dirty = 0u;
 }
 
-void hud_set_hp(uint8_t hp) {
+void hud_set_hp(uint8_t hp) BANKED {
     hud_hp    = hp;
     hud_dirty = 1u;
 }
 
-uint16_t hud_get_seconds(void) { return hud_seconds; }
-uint8_t  hud_is_dirty(void)    { return hud_dirty;   }
+uint16_t hud_get_seconds(void) BANKED { return hud_seconds; }
+uint8_t  hud_is_dirty(void) BANKED    { return hud_dirty;   }

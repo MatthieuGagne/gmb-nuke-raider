@@ -1,3 +1,4 @@
+#pragma bank 255
 #include <gb/gb.h>
 #include "track.h"
 
@@ -13,12 +14,12 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_ROAD,   /* 6: finish line visual — passable */
 };
 
-TileType track_tile_type_from_index(uint8_t tile_idx) {
+TileType track_tile_type_from_index(uint8_t tile_idx) BANKED {
     if (tile_idx >= TILE_LUT_LEN) return TILE_ROAD;
     return (TileType)tile_type_lut[tile_idx];
 }
 
-TileType track_tile_type(int16_t world_x, int16_t world_y) {
+TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
     uint8_t tx;
     uint8_t ty;
     if (world_x < 0 || world_y < 0) return TILE_WALL;
@@ -32,7 +33,7 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) {
 extern const uint8_t track_tile_data[];
 extern const uint8_t track_tile_data_count;
 
-void track_init(void) {
+void track_init(void) BANKED {
     set_bkg_data(0, track_tile_data_count, track_tile_data);
     /* Finish line tile — horizontal alternating stripes; color 1/3 */
     static const uint8_t finish_tile_data[16] = {
@@ -44,7 +45,7 @@ void track_init(void) {
     SHOW_BKG;
 }
 
-uint8_t track_passable(int16_t world_x, int16_t world_y) {
+uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     uint8_t tx;
     uint8_t ty;
     if (world_x < 0 || world_y < 0) return 0u;

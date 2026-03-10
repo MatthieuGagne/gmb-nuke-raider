@@ -1,3 +1,4 @@
+#pragma bank 255
 #include <gb/gb.h>
 #include "camera.h"
 #include "track.h"
@@ -33,7 +34,7 @@ static uint16_t clamp_cam(int16_t v, uint16_t max) {
     return (uint16_t)v;
 }
 
-void camera_init(int16_t player_world_x, int16_t player_world_y) {
+void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED {
     uint8_t ty;
     uint8_t first_row;
     (void)player_world_x;  /* cam_x is always 0; no horizontal scroll */
@@ -49,7 +50,7 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) {
 
 }
 
-void camera_update(int16_t player_world_x, int16_t player_world_y) {
+void camera_update(int16_t player_world_x, int16_t player_world_y) BANKED {
     uint16_t ncy;
     uint8_t old_top;
     uint8_t new_top;
@@ -72,7 +73,7 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) {
     cam_y = ncy;
 }
 
-void camera_flush_vram(void) {
+void camera_flush_vram(void) BANKED {
     uint8_t i;
     if (stream_buf_len > 0u) {
         DBG_INT("stream_flush", stream_buf_len);

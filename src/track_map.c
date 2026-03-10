@@ -1,5 +1,7 @@
 /* GENERATED — do not edit by hand. Source: assets/maps/track.tmx */
 /* Regenerate: python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c */
+#pragma bank 255
+#include <gb/gb.h>
 #include "track.h"
 
 const int16_t track_start_x = 88;

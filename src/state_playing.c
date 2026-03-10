@@ -1,3 +1,4 @@
+#pragma bank 255
 #include <gb/gb.h>
 #include "input.h"
 #include "state_manager.h"
