@@ -82,6 +82,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, MBC banking, compilation errors.
 - **`gb-c-optimizer`** — C code review for GBC performance/ROM size, anti-pattern detection, SDCC optimization.
+- **`/map-expert`** — Map pipeline: Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`, `gen_tileset`), GB BG tilemap hardware. Use when creating or modifying maps. **Update this skill in the same PR** whenever the pipeline changes.
 
 ## Workflow
 
