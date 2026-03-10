@@ -37,10 +37,6 @@ static void vbl_isr(void) {
     move_bkg(0, (uint8_t)cam_y);
 }
 
-static void lcd_isr(void) {
-    move_bkg(0, 0);
-}
-
 void main(void) {
     DISPLAY_OFF;
 
@@ -48,7 +44,6 @@ void main(void) {
     player_init();
     add_VBL(vbl_isr);
     set_interrupts(VBL_IFLAG);
-    /* LCD ISR (lcd_isr / LYC_REG / STATF_LYC) enabled when HUD is implemented */
 
     DISPLAY_ON;
 

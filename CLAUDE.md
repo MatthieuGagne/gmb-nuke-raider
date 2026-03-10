@@ -91,6 +91,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill)
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
+**Brainstorming skill override:** Skip step 5 (write design doc to `docs/plans/`) — use `/prd` to create a GitHub issue instead.
 
 **Worktree policy:** ALL file writes — including implementation plans, code, tests, and docs — MUST happen inside a git worktree. Use the `using-git-worktrees` skill or `EnterWorktree` tool before writing any files. Never write implementation files directly to the main working tree.
 

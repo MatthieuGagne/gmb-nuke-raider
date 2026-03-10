@@ -16,13 +16,13 @@
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
 #define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
-#define PLAYER_HP        10  /* Damage system: raw health pool (hp -= damage - armor) */
+#define PLAYER_HP        100 /* Damage system: starting HP (equals PLAYER_HP_MAX — full health) */
 #define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
 
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
-#define HUD_SCANLINE 128  /* LYC fires here: 2-tile HUD = 16px at bottom, scanline 128 is first HUD line */
+#define HUD_SCANLINE 128  /* pixel row where HUD window begins; used for player movement bounds */
 #define PLAYER_HP_MAX 100
 
 /* Terrain physics modifiers */
