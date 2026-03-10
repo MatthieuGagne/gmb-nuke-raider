@@ -47,6 +47,8 @@ extern uint8_t mock_move_sprite_last_nb;
 extern uint8_t mock_move_sprite_last_x;
 extern uint8_t mock_move_sprite_last_y;
 extern int     mock_move_sprite_call_count;
+extern uint8_t mock_sprite_x[40];
+extern uint8_t mock_sprite_y[40];
 void mock_move_sprite_reset(void);
 void move_sprite(uint8_t nb, uint8_t x, uint8_t y);
 
