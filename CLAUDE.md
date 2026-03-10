@@ -93,7 +93,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
 **Brainstorming skill override:** Skip step 5 (write design doc to `docs/plans/`) — use `/prd` to create a GitHub issue instead.
 
-**Worktree policy:** ALL file writes — including implementation plans, code, tests, and docs — MUST happen inside a git worktree. Use the `using-git-worktrees` skill or `EnterWorktree` tool before writing any files. Never write implementation files directly to the main working tree.
+**Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first.
 
 **Smoketest gate:** NEVER commit or create a PR before running a smoketest in the emulator. Launch it yourself with `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb` (run in background), then tell the user it's running and ask them to confirm it looks correct before proceeding.
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
