@@ -10,6 +10,7 @@ const int16_t track_start_x = 88;
 BANKREF(track_start_y)
 const int16_t track_start_y = 720;
 
+BANKREF(track_finish_line_y)
 const uint8_t track_finish_line_y = 5;
 
 BANKREF(track_map)

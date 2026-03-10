@@ -71,9 +71,8 @@
       "WebFetch(domain:gbdk-2020.github.io)",
       "WebFetch(domain:gbdk.org)",
       "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/.worktrees/feat-autobanking/src/*.h)",
-      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v 2>&1 | tail -30)",
-      "Bash(git stash:*)",
-      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v 2>&1 | tail -20)"
+      "Bash(mkdir -p ~/.local/bin && cp /mnt/c/Users/mathd/Downloads/Aseprite_1.3.17-x64.AppImage ~/.local/bin/aseprite && chmod +x ~/.local/bin/aseprite && echo \"Done\")",
+      "Bash(mv ~/.local/squashfs-root ~/.local/aseprite && ln -sf ~/.local/aseprite/AppRun ~/.local/bin/aseprite && echo \"Done\")"
     ]
   }
 }

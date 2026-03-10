@@ -116,6 +116,8 @@ If two `SET_BANK` calls are needed in one function, wrap each in its own `{ }` b
 
 Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git` if push fails due to missing credentials.
 
+**Settings files:** `.claude/settings.local.json` is checked into git and must always be committed. When any new tool permission is approved during a session, commit `.claude/settings.local.json` along with the feature work so permissions are not lost.
+
 ## Specialized Agents
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, MBC banking, compilation errors.
