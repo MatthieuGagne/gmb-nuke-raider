@@ -2,6 +2,8 @@
 #include <gb/gb.h>
 #include "input.h"
 #include "player.h"
+#include "banking.h"
+BANKREF_EXTERN(player_tile_data)
 #include "track.h"
 #include "camera.h"
 #include "debug.h"
@@ -32,11 +34,15 @@ void player_init(void) BANKED {
     sprite_pool_init();
     player_sprite_slot     = get_sprite();  /* OAM slot for top half    */
     player_sprite_slot_bot = get_sprite();  /* OAM slot for bottom half */
-    set_sprite_data(0, 2, player_tile_data); /* load 2 tiles (32 bytes)  */
+    { SET_BANK(player_tile_data);
+      set_sprite_data(0, 2, player_tile_data);
+      RESTORE_BANK(); }
     set_sprite_tile(player_sprite_slot,     0); /* top    half = tile 0 */
     set_sprite_tile(player_sprite_slot_bot, 1); /* bottom half = tile 1 */
-    px = track_start_x;
-    py = track_start_y;
+    { SET_BANK(track_start_x);
+      px = track_start_x;
+      py = track_start_y;
+      RESTORE_BANK(); }
     vx = 0;
     vy = 0;
     SHOW_SPRITES;

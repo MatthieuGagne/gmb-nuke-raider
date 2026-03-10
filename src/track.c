@@ -1,6 +1,8 @@
 #pragma bank 255
 #include <gb/gb.h>
 #include "track.h"
+#include "banking.h"
+BANKREF_EXTERN(track_tile_data)
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
 #define TILE_LUT_LEN 7u
@@ -34,7 +36,9 @@ extern const uint8_t track_tile_data[];
 extern const uint8_t track_tile_data_count;
 
 void track_init(void) BANKED {
+    SET_BANK(track_tile_data);
     set_bkg_data(0, track_tile_data_count, track_tile_data);
+    RESTORE_BANK();
     /* Finish line tile — horizontal alternating stripes; color 1/3 */
     static const uint8_t finish_tile_data[16] = {
         0xFF,0xFF, 0xFF,0x00, 0xFF,0xFF, 0xFF,0x00,

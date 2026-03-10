@@ -1,6 +1,7 @@
 #pragma bank 255
 #include <stddef.h>
 #include "dialog_data.h"
+#include "banking.h"
 
 /* --- NPC 0: Mechanic — 3-level branching conversation ------------------- */
 /*
@@ -38,6 +39,7 @@ static const DialogNode mechanic_nodes[] = {
 
 /* --- NPC dialog table (indexed by npc_id) ------------------------------- */
 /* Slots 1-5 are placeholders pointing at mechanic until more NPCs are added */
+BANKREF(npc_dialogs)
 const NpcDialog npc_dialogs[] = {
     { mechanic_nodes, 7 }, /* NPC 0: mechanic */
     { mechanic_nodes, 7 }, /* NPC 1: placeholder */
