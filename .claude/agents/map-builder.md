@@ -112,6 +112,10 @@ Generated files include `#pragma bank 255` and `BANKREF`. Wrap cross-bank data r
 | CSV encoding not set | Tiled: File → Map Properties → Tile Layer Format → CSV |
 | `set_bkg_data` after game logic | Always VRAM writes → then game logic, not the reverse |
 
+## Delegating Sprite Work
+
+If the map requires new OAM sprites (e.g., moving obstacles, map-specific HUD icons, animated overlays), delegate to the **sprite-builder** agent. It owns the full Aseprite → `png_to_tiles.py` → OAM pool → VBlank load pipeline. You handle the BG tilemap; sprite-builder handles OAM objects that sit on top.
+
 ## Verification Commands
 
 - `/test` skill — `make test` (host-side unit tests)
