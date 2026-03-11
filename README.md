@@ -74,19 +74,18 @@ wait_vbl_done()
 
 ## Asset Pipeline
 
-Maps are authored in [Tiled](https://www.mapeditor.org/) and converted to C arrays:
+Sprites and tile art are authored in [Aseprite](https://www.aseprite.org/) and
+maps in [Tiled](https://www.mapeditor.org/). Both export to intermediate formats
+that are converted to C arrays:
 
 ```sh
+make export-sprites  # re-export .aseprite → .png (requires aseprite in PATH)
+python3 tools/png_to_tiles.py assets/sprites/player_car.png src/player_sprite.c player_tile_data
 python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c
 ```
 
-### Sprite Editor
-
-A Cairo-based GUI sprite editor for 8×8 GBC tiles (4-color palette):
-
-```sh
-python3 tools/run_sprite_editor.py
-```
+See `docs/asset-pipeline.md` for the full workflow including Aseprite palette
+setup and export settings.
 
 ## Project Structure
 
@@ -109,14 +108,13 @@ gmb-wasteland-racer/
 │   ├── input.h             # Key tick/press/release helpers
 │   └── config.h            # Capacity constants (MAX_NPCS, etc.)
 ├── assets/
-│   ├── maps/             # Tiled map files (.tmx, .tsx, tileset.png)
-│   ├── sprites/          # Raw sprite source files
+│   ├── maps/             # Tiled map files (.tmx, .tsx) + tileset.aseprite/.png
+│   ├── sprites/          # Aseprite source files (.aseprite) + exported PNGs
 │   ├── tiles/            # Background tile source files
 │   └── music/            # Music / sound data
 ├── tools/
 │   ├── tmx_to_c.py       # Tiled → C array converter
-│   ├── run_sprite_editor.py  # Sprite editor launcher
-│   └── sprite_editor/    # Cairo-based sprite editor source
+│   └── png_to_tiles.py   # PNG → GB 2bpp C array converter
 ├── tests/                # Unity unit tests (gcc, no hardware needed)
 │   ├── test_player.c
 │   ├── test_player_physics.c

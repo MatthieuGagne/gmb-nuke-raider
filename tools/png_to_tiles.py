@@ -11,6 +11,7 @@ Writes a C source file defining:
 
 Supported PNG formats:
     - Color type 3 (indexed), bit depth 2: pixel index used directly (0–3).
+    - Color type 3 (indexed), bit depth 8: pixel index used directly (0–3).
     - Color type 2 (RGB), bit depth 8: luminance quantised to GB index 0–3.
 
 Rejects PNGs with more than 4 distinct colour values.
@@ -76,6 +77,20 @@ def load_png_pixels(data):
                     if col < width:
                         pixels.append((byte >> shift) & 3)
                         col += 1
+
+    elif color_type == 3 and bit_depth == 8:
+        # 8-bit indexed: 1 byte per pixel, value is the palette index directly
+        row_stride = 1 + width
+        for y in range(height):
+            row_start = y * row_stride + 1  # +1 skip filter byte
+            for x in range(width):
+                idx = raw[row_start + x]
+                if idx > 3:
+                    raise ValueError(
+                        f"Indexed PNG has palette index {idx} at ({x},{y}) — max is 3. "
+                        "Reduce palette to 4 colours."
+                    )
+                pixels.append(idx)
 
     elif color_type == 2 and bit_depth == 8:
         # 8-bit RGB: 3 bytes per pixel

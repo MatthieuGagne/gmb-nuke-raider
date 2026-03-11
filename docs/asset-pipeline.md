@@ -8,49 +8,63 @@ into the Game Boy ROM.
 ## Overview
 
 ```
-Sprite editor / external tool
+  assets/maps/tileset.aseprite   (background tile art — canonical source)
+  assets/sprites/*.aseprite      (sprite art — canonical source)
          │
-         ▼
-   assets/maps/tileset.png       (background tile art, 16×8 = 2 tiles)
+         ▼  aseprite --batch  (or: make export-sprites)
+         │
+   assets/maps/tileset.png       (exported PNG, checked in for CI)
+   assets/sprites/*.png          (exported PNG, checked in for CI)
    assets/maps/track.tmx         (tile map layout, 40×36)
-         │                               │
-         ▼                               ▼
-  tools/png_to_tiles.py          tools/tmx_to_c.py
-         │                               │
-         ▼                               ▼
-  src/track_tiles.c              src/track_map.c
-  (2bpp tile data array)         (tilemap index array)
-         │                               │
-         └──────────┬────────────────────┘
-                    ▼
-            GBDK/SDCC compiler
-                    │
-                    ▼
-         build/wasteland-racer.gb
+         │               │               │
+         ▼               ▼               ▼
+  png_to_tiles.py  png_to_tiles.py  tmx_to_c.py
+         │               │               │
+         ▼               ▼               ▼
+  src/track_tiles.c  src/*_sprite.c  src/track_map.c
+  (2bpp tile data)   (2bpp tile data) (tilemap index array)
+         │               │               │
+         └───────────────┴───────────────┘
+                         ▼
+                 GBDK/SDCC compiler
+                         │
+                         ▼
+              build/wasteland-racer.gb
 ```
 
-Both generated `.c` files are **checked into git** so CI builds work without
-Python or Tiled installed.
+Generated `.c` files and exported `.png` files are **checked into git** so CI
+builds work without Aseprite, Python, or Tiled installed.
 
 ---
 
 ## Background Tiles
 
 ### Source file
-`assets/maps/tileset.png` — an 8-pixel-tall PNG strip, one 8×8 tile per column.
+`assets/maps/tileset.aseprite` — canonical Aseprite source.
+`assets/maps/tileset.png` — exported PNG (checked in; regenerate with `make export-sprites`).
 
-### Authoring
-- Open `tileset.png` in Aseprite, GIMP, or the sprite editor (`tools/run_sprite_editor.py`).
-- Use at most **4 distinct grey shades** (or 4 colours from the sprite editor's palette).
-- Save / export as PNG (8-bit RGB or 2-bit indexed).
+The PNG is an 8-pixel-tall strip, one 8×8 tile per column.
+
+### Authoring in Aseprite
+1. Open `assets/maps/tileset.aseprite` in Aseprite.
+2. Canvas is 8px tall, N×8px wide (one 8×8 tile per column). Extend rightward to add tiles.
+3. Use **indexed color mode** (Sprite → Color Mode → Indexed) with exactly **4 palette entries**:
+
+   | Index | Colour | RGB |
+   |-------|--------|-----|
+   | 0 | White | `#FFFFFF` |
+   | 1 | Light grey | `#AAAAAA` |
+   | 2 | Dark grey | `#555555` |
+   | 3 | Black | `#000000` |
+
+4. Export: **File → Export As**, format PNG. Or run `make export-sprites`.
 
 ### Conversion
 ```bash
 python3 tools/png_to_tiles.py assets/maps/tileset.png src/track_tiles.c track_tile_data
 ```
 
-Or just run `make` — the Makefile regenerates `src/track_tiles.c` automatically
-when `tileset.png` is newer.
+Or just `make` — regenerates `src/track_tiles.c` automatically when `tileset.png` is newer.
 
 #### How it works
 Each pixel's luminance is rounded to the nearest of 4 GB grey levels:
@@ -62,11 +76,12 @@ Each 8×8 tile is encoded as 16 bytes of GB 2bpp:
 - For each row: `low_byte` (bit 0 of each pixel, MSB-first), then `high_byte` (bit 1).
 
 ### Adding more tiles
-1. Extend `tileset.png` by appending 8×8 columns to the right.
-2. Run `make` to regenerate `src/track_tiles.c`.
-3. In Tiled, add the new tile index to `assets/maps/track.tsx` and use it in `track.tmx`.
-4. Run `make` again to regenerate `src/track_map.c`.
-5. Verify the ROM renders correctly in Emulicious: `java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`.
+1. Open `assets/maps/tileset.aseprite` in Aseprite, extend canvas rightward by 8px per new tile, draw tiles.
+2. Export PNG: `make export-sprites` (requires Aseprite in PATH) or File → Export As.
+3. Run `make` to regenerate `src/track_tiles.c`.
+4. In Tiled, add the new tile index to `assets/maps/track.tsx` and use it in `track.tmx`.
+5. Run `make` again to regenerate `src/track_map.c`.
+6. Verify in Emulicious: `java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`.
 
 ---
 
@@ -92,26 +107,45 @@ Or just `make` — same automatic-regeneration rule.
 
 ## Sprites
 
-Sprites are authored in the built-in sprite editor.
+### Source files
+`assets/sprites/<name>.aseprite` — canonical Aseprite source.
+`assets/sprites/<name>.png` — exported PNG (checked in; regenerate with `make export-sprites`).
 
+### Authoring in Aseprite
+1. Open or create `assets/sprites/<name>.aseprite` in Aseprite.
+2. Canvas dimensions must be **multiples of 8** in both axes. Each 8×8 block = one GB tile.
+3. Use **indexed color mode** with the same 4-shade GBC palette as above (indices 0–3).
+   - Palette index 0 (white) renders as the lightest GBC shade.
+   - In OBJ (sprite) mode, **palette index 0 is always transparent** — use indices 1–3 for visible pixels.
+4. A 32×32 canvas = 4×4 = 16 tiles (useful for a full sprite sheet).
+5. Export: **File → Export As**, format PNG, filename `assets/sprites/<name>.png`.
+   Or run `make export-sprites` to re-export all `.aseprite` sources at once.
+
+### Conversion
 ```bash
-python3 tools/run_sprite_editor.py
+python3 tools/png_to_tiles.py assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data
 ```
 
-The editor saves a 2-bit indexed PNG (32×32 pixels = 4×4 tiles) via
-`tools/sprite_editor/model.py::TileSheet.save_png`.
+Or just `make` — the Makefile has a pattern rule for `src/*_sprite.c`.
 
-**Sprite → ROM** (manual step for now):
-1. Save the sprite sheet from the editor.
-2. Use `tools/png_to_tiles.py` to convert the PNG to a C array:
-   ```bash
-   python3 tools/png_to_tiles.py assets/sprites/player.png src/player_sprite.c player_tile_data
-   ```
-3. `#include` or `extern` the symbol in the relevant module.
+### Sprite → ROM
+1. Draw in Aseprite → export to `assets/sprites/<name>.png`.
+2. Run `make` to regenerate `src/<name>_sprite.c`.
+3. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
+4. In init (during VBlank): `wait_vbl_done(); set_sprite_data(base_tile, <name>_tile_data_count, <name>_tile_data);`
 
-> **Note:** A Makefile auto-rule for sprite sheets is out of scope for this
-> pipeline (sprites are not yet stored under `assets/sprites/`). Add one when
-> the sprite art workflow is established.
+---
+
+## Exporting All Aseprite Sources
+
+Requires Aseprite installed and available as `aseprite` in `$PATH`.
+
+```bash
+make export-sprites
+```
+
+This re-exports all `.aseprite` files under `assets/` to their corresponding `.png` files.
+Commit both the `.aseprite` and the regenerated `.png` together.
 
 ---
 
@@ -130,5 +164,5 @@ and then links the ROM.
 
 ```bash
 make test          # C unit tests (gcc + Unity, no GBDK needed)
-make test-tools    # Python tool tests (sprite editor, png_to_tiles)
+make test-tools    # Python tool tests (png_to_tiles, tmx_to_c)
 ```

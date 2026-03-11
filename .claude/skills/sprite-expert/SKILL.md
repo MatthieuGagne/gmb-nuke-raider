@@ -1,6 +1,6 @@
 ---
 name: sprite-expert
-description: Use when creating sprites, editing sprite assets, changing how sprites are loaded or rendered, adding new sprite types, modifying the sprite pool, changing OAM slot assignments, updating sprite tile data, or working with the sprite editor or png_to_tiles pipeline.
+description: Use when creating sprites, editing sprite assets, changing how sprites are loaded or rendered, adding new sprite types, modifying the sprite pool, changing OAM slot assignments, updating sprite tile data, or working with the Aseprite pipeline or png_to_tiles converter.
 ---
 
 # Sprite Expert — Wasteland Racer
@@ -12,25 +12,39 @@ description: Use when creating sprites, editing sprite assets, changing how spri
 ## Asset Pipeline
 
 ```
-tools/sprite_editor/  →  assets/sprites/<name>.png  →  tools/png_to_tiles.py  →  src/<name>_sprite.c
+assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/<name>.png  →  tools/png_to_tiles.py  →  src/<name>_sprite.c
 ```
 
 | Step | Tool | Notes |
 |------|------|-------|
-| Draw pixels | `python3 tools/run_sprite_editor.py` (GTK3) | 4×4 grid of 8×8 tiles (32×32 px); saves 2-bit indexed PNG |
+| Draw pixels | Aseprite | Indexed color mode, 4-color GBC palette; canvas must be multiples of 8 |
+| Export PNG | `make export-sprites` or Aseprite File → Export As | Requires `aseprite` in PATH; PNGs are checked in for CI |
 | Convert | `python3 tools/png_to_tiles.py <in.png> src/<name>_sprite.c <array_name>` | Emits `const uint8_t <array_name>[]` + `<array_name>_count` |
 | Use | `extern` declare in `.c` file that calls `set_sprite_data` | Generated file — **never edit by hand** |
 
+**Aseprite setup for GBC sprites:**
+- Color mode: Sprite → Color Mode → **Indexed**
+- Palette: exactly 4 entries — index 0 = white `#FFFFFF`, 1 = light grey `#AAAAAA`, 2 = dark grey `#555555`, 3 = black `#000000`
+- Canvas: multiples of 8 in both dimensions (each 8×8 block = one GB tile)
+- **Palette index 0 is always transparent in OBJ mode** — use indices 1–3 for visible sprite pixels
+- Export: File → Export As → PNG, or `make export-sprites` to batch-export all sources
+
 **PNG requirements for `png_to_tiles.py`:**
-- Color type 3 (indexed), bit depth 2 — produced automatically by the sprite editor
-- OR color type 2 (RGB8) with ≤ 4 distinct luminance values
+- Color type 3 (indexed), bit depth 8 — **default output from Aseprite** `--save-as` export; indices must be 0–3
+- Color type 3 (indexed), bit depth 2 — also accepted; indices used directly
+- Color type 2 (RGB8) with ≤ 4 distinct luminance values — also accepted
 - Dimensions must be multiples of 8
 - Each 8×8 block = one tile; tiles read left-to-right, top-to-bottom
+
+**Aseprite CLI export (correct flag):**
+```sh
+aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.png
+```
+Note: `--export-type` is NOT a valid flag. Use `--save-as` with a `.png` extension.
 
 **Run tests after any converter change:**
 ```sh
 python3 -m unittest discover -s tests -p "test_png_to_tiles.py" -v
-python3 -m unittest discover -s tests -p "test_sprite_editor.py" -v
 ```
 
 ---
@@ -134,13 +148,14 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 
 ## Adding a New Sprite
 
-1. Draw in `tools/sprite_editor/` → save as `assets/sprites/<name>.png`
-2. Run: `python3 tools/png_to_tiles.py assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
-3. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
-4. In init: `wait_vbl_done(); set_sprite_data(base_tile, <name>_tile_data_count, <name>_tile_data);`
-5. Allocate OAM slots via `get_sprite()` — one per 8×8 tile used on screen at once
-6. Position with `move_sprite(slot, sx + 8, sy + 16)`
-7. Update `config.h` capacity constants if pool budget changes
+1. Create or edit `assets/sprites/<name>.aseprite` in Aseprite (indexed color, 4-shade GBC palette, multiples of 8)
+2. Export PNG: `make export-sprites` or File → Export As → `assets/sprites/<name>.png`
+3. Run: `python3 tools/png_to_tiles.py assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
+4. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
+5. In init: `wait_vbl_done(); set_sprite_data(base_tile, <name>_tile_data_count, <name>_tile_data);`
+6. Allocate OAM slots via `get_sprite()` — one per 8×8 tile used on screen at once
+7. Position with `move_sprite(slot, sx + 8, sy + 16)`
+8. Update `config.h` capacity constants if pool budget changes
 
 ---
 
@@ -152,7 +167,7 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 | Hardcoding OAM slot numbers | Use `get_sprite()` / `clear_sprite()` |
 | Calling `set_sprite_data` outside VBlank | Wrap with `wait_vbl_done()` unless display is off |
 | Using 152/136 as max position | Visible bounds: oam_x ∈ [8,167], oam_y ∈ [16,159] |
-| Editing `src/*_sprite.c` by hand | Generated — edit the PNG, re-run `png_to_tiles.py` |
+| Editing `src/*_sprite.c` by hand | Generated — edit the `.aseprite`, re-export, re-run `png_to_tiles.py` |
 | Using palette index 0 for sprite pixels | Always transparent; use indices 1–3 |
 | Forgetting to check `SPRITE_POOL_INVALID` | `get_sprite()` returns `0xFF` when pool is full |
 | Loading tile data before `SPRITES_8x8` | Set mode first, then load data and assign tiles |
