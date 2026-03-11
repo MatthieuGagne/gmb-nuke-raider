@@ -72,7 +72,8 @@
       "WebFetch(domain:gbdk.org)",
       "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/.worktrees/feat-autobanking/src/*.h)",
       "Bash(mkdir -p ~/.local/bin && cp /mnt/c/Users/mathd/Downloads/Aseprite_1.3.17-x64.AppImage ~/.local/bin/aseprite && chmod +x ~/.local/bin/aseprite && echo \"Done\")",
-      "Bash(mv ~/.local/squashfs-root ~/.local/aseprite && ln -sf ~/.local/aseprite/AppRun ~/.local/bin/aseprite && echo \"Done\")"
+      "Bash(mv ~/.local/squashfs-root ~/.local/aseprite && ln -sf ~/.local/aseprite/AppRun ~/.local/bin/aseprite && echo \"Done\")",
+      "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/sprite-expert-skill/tests/*.py)"
     ]
   }
 }
