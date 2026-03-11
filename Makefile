@@ -1,7 +1,7 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
@@ -62,7 +62,7 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS) | build
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS)
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
