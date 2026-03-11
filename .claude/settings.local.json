@@ -75,7 +75,7 @@
       "Bash(mv ~/.local/squashfs-root ~/.local/aseprite && ln -sf ~/.local/aseprite/AppRun ~/.local/bin/aseprite && echo \"Done\")",
       "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/sprite-expert-skill/tests/*.py)",
       "Bash(GBDK_HOME=/home/mathdaman/gbdk make 2>&1 | grep -v \"^$\" | grep -v \"warning\" | tail -10)",
-      "Bash(aseprite --help 2>&1 | grep -A2 -i \"save\\\\|export\\\\|batch\")",
+      "Bash(aseprite --help 2>&1 | grep -A2 -i \"save\\|export\\|batch\")",
       "Bash(aseprite --batch assets/sprites/player_car.aseprite --save-as assets/sprites/player_car.png && aseprite --batch assets/maps/tileset.aseprite --save-as assets/maps/tileset.png && echo \"export OK\")",
       "Bash(curl -s https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/include/hUGEDriver.h)",
       "Bash(curl -s https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/README.md)",
@@ -88,13 +88,8 @@
       "Bash(curl -s https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/gbdk_player_example.c)",
       "Bash(curl -s https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/sample_song.c | wc -l)",
       "Bash(curl -s https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/sample_song.c)",
-      "Bash(mkdir -p /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/include /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/gbdk && unzip -j /tmp/hUGEDriver.zip include/hUGEDriver.h -d /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/include/ && unzip -j /tmp/hUGEDriver.zip gbdk/hUGEDriver.lib -d /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/gbdk/ && echo \"Extraction complete\")",
-      "Bash(cd /tmp && wget -q https://github.com/SuperDisk/hUGETracker/releases/download/v1.0.11/hUGETracker-1.0.11-linux.zip -O hUGETracker.zip && unzip -o hUGETracker.zip -d hUGETracker/ && ls hUGETracker/)",
-      "Bash(git show:*)",
-      "Bash(file /home/mathdaman/gbdk/lib/sm83/*.lib 2>/dev/null | head -5; ls /home/mathdaman/gbdk/lib/sm83/*.lib 2>/dev/null | head -5)",
-      "Bash(cd /tmp && ar x /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/gbdk/hUGEDriver.lib && ls -la && head -5 hUGEDriver.o)",
-      "Bash(GBDK_HOME=/home/mathdaman/gbdk /home/mathdaman/gbdk/bin/sdldgb -n -i -m -j -g _shadow_OAM=0xC000 -g .STACK=0xE000 -g .refresh_OAM=0xFF80 -b _DATA=0xC0A0 -b _CODE=0x0200 -k \"/home/mathdaman/gbdk/lib/sm83/\" -l sm83.lib -k \"/home/mathdaman/gbdk/lib/gb/\" -l gb.lib /tmp/test_music2.ihx \"/home/mathdaman/gbdk/lib/gb/crt0.o\" -f /tmp/test_banks2.lk 2>&1 | head -20)",
-      "Bash(# First put the correct .rel back\ncp /tmp/hUGEDriver.o /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hugedriver-music/lib/hUGEDriver/gbdk/hUGEDriver.rel\n\n# Now run bankpack with verbose to see what it does\nGBDK_HOME=/home/mathdaman/gbdk /home/mathdaman/gbdk/bin/bankpack --help 2>&1 | head -20)"
+      "Bash(git -C /home/mathdaman/code/gmb-wasteland-racer branch --show-current && ls /home/mathdaman/code/gmb-wasteland-racer/src/overmap*.c 2>/dev/null || echo \"no overmap files in main tree\")",
+      "Bash(pwd && ls src/overmap*.c 2>/dev/null || echo \"no overmap in cwd\" && ls /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/sprite-expert-skill/src/overmap*.c)"
     ]
   }
 }
