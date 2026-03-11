@@ -198,10 +198,23 @@ void main(void) {
 # Add to CFLAGS:
 CFLAGS := ... -Ilib/hUGEDriver/include
 
-# Add lib to the ROM link rule:
+# Add lib to the ROM link rule using -Wl-k / -Wl-l (NOT as a positional arg):
 $(TARGET): $(OBJS) | build
-    $(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 ```
+
+### CRITICAL: Do NOT pass hUGEDriver.lib as a positional argument
+
+```makefile
+# WRONG — bankpack will process the .lib, overwrite hUGEDriver.rel with just
+# the 68-byte ar symbol index, and _hUGE_init/_hUGE_dosound become undefined:
+$(LCC) ... $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
+
+# CORRECT — route directly to sdldgb as a search-path library (bypasses bankpack):
+$(LCC) ... $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
+```
+
+`-Wl-k<dir>` adds a library search directory; `-Wl-l<name>` names the lib to link. This is the same pattern GBDK uses internally for `sm83.lib` and `gb.lib`.
 
 ---
 
@@ -263,4 +276,5 @@ https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/s
 | Calling `hUGE_init` without `__critical` | Wrap in `__critical { ... }` |
 | Forgetting APU enable | Call `NR52_REG = 0x80` before `hUGE_init` |
 | `BANKED` on `music_init`/`music_tick` | Not needed — they're in bank 0 |
+| Passing `hUGEDriver.lib` as positional arg to lcc | Use `-Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib` — positional arg causes bankpack to corrupt the lib |
 | Accessing `hUGE_current_wave` to silence CH3 | Use `hUGE_mute_channel(HT_CH3, HT_CH_MUTE)` |

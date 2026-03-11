@@ -94,10 +94,10 @@ Edit `Makefile`:
 CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ```
 
-2. Add the library to the ROM link rule (after `$(OBJS)`):
+2. Add the library to the ROM link rule using `-Wl-k`/`-Wl-l` (NOT as a positional arg — bankpack would corrupt it):
 ```makefile
 $(TARGET): $(OBJS) | build
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 ```
 
 **Step 3: Verify build still works (no music yet)**
