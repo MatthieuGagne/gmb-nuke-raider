@@ -58,6 +58,17 @@ src/player_sprite.c: assets/sprites/player_car.png tools/png_to_tiles.py
 
 $(TARGET): src/player_sprite.c
 
+src/npc_mechanic_portrait.c: assets/sprites/npc_mechanic.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
+
+src/npc_trader_portrait.c: assets/sprites/npc_trader.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
+
+src/npc_drifter_portrait.c: assets/sprites/npc_drifter.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
+
+$(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter_portrait.c
+
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 

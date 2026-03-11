@@ -10,6 +10,9 @@
 #include "dialog.h"
 #include "dialog_data.h"
 #include "config.h"
+#include "npc_mechanic_portrait.h"
+#include "npc_trader_portrait.h"
+#include "npc_drifter_portrait.h"
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
@@ -66,6 +69,23 @@ static void hub_render_dialog(void) {
 
 /* ── Logic helpers ──────────────────────────────────────────────────────── */
 
+static void load_portrait(uint8_t npc_idx) {
+    wait_vbl_done();
+    if (npc_idx == 0u) {
+        { SET_BANK(npc_mechanic_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_mechanic_portrait);
+          RESTORE_BANK(); }
+    } else if (npc_idx == 1u) {
+        { SET_BANK(npc_trader_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_trader_portrait);
+          RESTORE_BANK(); }
+    } else {
+        { SET_BANK(npc_drifter_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_drifter_portrait);
+          RESTORE_BANK(); }
+    }
+}
+
 static void hub_start_dialog(uint8_t npc_cursor) {
     uint8_t npc_id;
     active_npc    = npc_cursor;
@@ -78,6 +98,7 @@ static void hub_start_dialog(uint8_t npc_cursor) {
     wait_vbl_done();
     DISPLAY_OFF;
     cls();
+    load_portrait(npc_cursor);
     hub_render_dialog();
     DISPLAY_ON;
 }
