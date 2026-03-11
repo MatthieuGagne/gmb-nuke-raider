@@ -62,7 +62,7 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS) | build
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
