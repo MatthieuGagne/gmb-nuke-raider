@@ -71,7 +71,7 @@ static void update(void) {
 
     {
         uint8_t tile = overmap_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
-        if (tile == OVERMAP_TILE_HUB) {
+        if (tile == OVERMAP_TILE_CITY_HUB) {
             state_push(&state_hub);
             overmap_hub_entered = 1u;  /* set after enter() so hub can clear on re-entry */
             return;

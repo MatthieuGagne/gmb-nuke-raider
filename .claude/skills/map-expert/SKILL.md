@@ -11,7 +11,7 @@ Full reference for the Wasteland Racer map pipeline: Tiled authoring → Python 
 
 **Keep this skill current:** When you modify any tool in `tools/` or `assets/maps/`, add a new map tool, change the TMX schema, or add GB tilemap features — update the relevant section of this skill in the same PR. The skill is the source of truth for the pipeline.
 
-**Pipeline:**
+**Track pipeline:**
 ```
 assets/maps/tileset.png   ←─ gen_tileset.py (or hand-drawn in Aseprite)
          │
@@ -19,6 +19,15 @@ assets/maps/tileset.png   ←─ gen_tileset.py (or hand-drawn in Aseprite)
 tools/png_to_tiles.py  →  src/track_tiles.c  (2bpp C array)
 assets/maps/track.tmx  →  tools/tmx_to_c.py  →  src/track_map.c  (tile index array)
 ```
+
+**Overmap pipeline (separate converter — note different script name):**
+```
+assets/maps/overmap_tiles.aseprite  →  (Aseprite export or Python)  →  assets/maps/overmap_tiles.png
+assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py  →  src/overmap_tiles.c
+assets/maps/overmap.tmx        →  tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h  →  src/overmap_map.c
+```
+
+Note: the overmap uses `tmx_to_array_c.py` (not `tmx_to_c.py`) and takes `config.h` as an extra arg.
 
 ---
 
@@ -65,6 +74,108 @@ const uint8_t <array_name>_count;   // number of tiles
 **2bpp encoding:** each 8×8 tile = 16 bytes; each row = 2 bytes (low bit plane, high bit plane). Pixel color = `(high_bit << 1) | low_bit`, bit 7 = leftmost pixel.
 
 Test: `python3 -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
+
+---
+
+### Manipulating Tileset PNGs with Python stdlib (no PIL)
+
+**Aseprite exports tileset PNGs as indexed color (type 3), bit depth 8, not RGB.**
+Always check the IHDR color_type before reading pixels — assuming RGB will cause `IndexError`.
+
+**Read + write recipe (handles Aseprite's indexed format):**
+
+```python
+import struct, zlib
+
+def read_indexed_png(fname):
+    """Returns (width, height, palette, rows) where rows[y] is a list of palette indices."""
+    with open(fname, 'rb') as f:
+        data = f.read()
+    pos = 8; idat = b''; w = h = 0; palette = []
+    while pos < len(data):
+        length = struct.unpack('>I', data[pos:pos+4])[0]
+        ct = data[pos+4:pos+8].decode('ascii')
+        cd = data[pos+8:pos+8+length]
+        if ct == 'IHDR':
+            w, h, bd, color_type = struct.unpack('>IIBB', cd[:10])
+            assert color_type == 3 and bd == 8, f"Expected indexed/8-bit got ct={color_type} bd={bd}"
+        elif ct == 'PLTE':
+            palette = [(cd[i], cd[i+1], cd[i+2]) for i in range(0, len(cd), 3)]
+        elif ct == 'IDAT':
+            idat += cd
+        pos += 12 + length
+    raw = zlib.decompress(idat)
+    rows = [list(raw[y*(1+w)+1 : y*(1+w)+1+w]) for y in range(h)]
+    return w, h, palette, rows
+
+def write_indexed_png(fname, width, height, palette, rows):
+    def chunk(name, payload):
+        c = name.encode('ascii') + payload
+        return struct.pack('>I', len(payload)) + c + struct.pack('>I', zlib.crc32(c) & 0xFFFFFFFF)
+    raw = b''.join(b'\x00' + bytes(row) for row in rows)
+    ihdr = struct.pack('>IIBBBBB', width, height, 8, 3, 0, 0, 0)
+    plte = b''.join(bytes(c) for c in palette)
+    with open(fname, 'wb') as f:
+        f.write(b'\x89PNG\r\n\x1a\n')
+        f.write(chunk('IHDR', ihdr))
+        f.write(chunk('PLTE', plte))
+        f.write(chunk('IDAT', zlib.compress(raw)))
+        f.write(chunk('IEND', b''))
+
+# Palette index lookup by luminance:
+def palette_map(palette):
+    """Returns dict {'W':idx, 'L':idx, 'D':idx, 'B':idx} from a 4-entry GB palette."""
+    m = {}
+    for i, rgb in enumerate(palette):
+        l = rgb[0]  # all channels equal for greyscale
+        if l >= 230: m['W'] = i
+        elif l >= 140: m['L'] = i
+        elif l >= 60:  m['D'] = i
+        else:          m['B'] = i
+    return m
+```
+
+**Adding a new tile to a tileset:**
+```python
+w, h, palette, rows = read_indexed_png('assets/maps/overmap_tiles.png')
+pm = palette_map(palette)
+W, L, D, B = pm['W'], pm['L'], pm['D'], pm['B']
+new_tile = [
+    [W, W, B, B, B, B, W, W],  # row 0
+    # ... 7 rows of 8 palette indices ...
+]
+new_rows = [rows[y] + new_tile[y] for y in range(h)]
+write_indexed_png('assets/maps/overmap_tiles.png', w + 8, h, palette, new_rows)
+```
+
+**Aseprite CLI: syncing the `.aseprite` file after manually editing the PNG**
+
+When you expand a tileset PNG using Python, sync the `.aseprite` source with a Lua script:
+
+```lua
+-- Usage: aseprite --batch assets/maps/overmap_tiles.aseprite --script sync_tile.lua
+local sprite = app.activeSprite
+-- NOTE: sprite:crop(0,0,W,H) expands the canvas but NOT the cel image.
+-- Check image.width and create a new Image if smaller than the desired width:
+local image = sprite.cels[1].image
+if image.width < TARGET_W then
+  local newImage = Image(TARGET_W, 8, image.colorMode)
+  for y = 0, 7 do
+    for x = 0, image.width - 1 do
+      newImage:putPixel(x, y, image:getPixel(x, y))
+    end
+  end
+  -- Draw new tile pixels into newImage at x = old_width
+  sprite.cels[1].image = newImage
+end
+sprite:saveAs(sprite.filename)
+```
+
+Key pitfalls:
+- `sprite:resize(W, H)` **scales** content — never use to expand canvas
+- `sprite:crop(0, 0, W, H)` expands canvas but cel image stays at original size
+- `sprite:save()` does not exist; use `sprite:saveAs(sprite.filename)`
+- The Aseprite file's canvas and cel size are independent — always check both
 
 ---
 

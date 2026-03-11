@@ -38,11 +38,12 @@
 #define OVERMAP_DEST_LEFT_TX  2u
 #define OVERMAP_DEST_RIGHT_TX 17u
 
-/* Overmap tile type indices (BKG tile data slots 0-3) */
-#define OVERMAP_TILE_BLANK  0u
-#define OVERMAP_TILE_ROAD   1u
-#define OVERMAP_TILE_HUB    2u
-#define OVERMAP_TILE_DEST   3u
+/* Overmap tile type indices (BKG tile data slots 0-N) */
+#define OVERMAP_TILE_BLANK    0u
+#define OVERMAP_TILE_ROAD     1u
+#define OVERMAP_TILE_HUB      2u  /* spawn marker — car starts here */
+#define OVERMAP_TILE_DEST     3u
+#define OVERMAP_TILE_CITY_HUB 4u  /* city hub building — drives north to enter */
 
 /* Hub system */
 #define MAX_HUB_NPCS           3u
