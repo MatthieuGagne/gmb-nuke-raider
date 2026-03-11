@@ -6,6 +6,7 @@
 #include "player.h"
 #include "state_manager.h"
 #include "state_title.h"
+#include "music.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -35,6 +36,7 @@ static volatile uint8_t frame_ready = 0;
 static void vbl_isr(void) {
     frame_ready = 1;
     move_bkg(0, (uint8_t)cam_y);
+    music_tick();
 }
 
 void main(void) {
@@ -42,6 +44,7 @@ void main(void) {
 
     init_palettes();
     player_init();
+    music_init();
     add_VBL(vbl_isr);
     set_interrupts(VBL_IFLAG);
 

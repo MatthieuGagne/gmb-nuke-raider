@@ -1,7 +1,7 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
@@ -15,7 +15,7 @@ OBJS      := $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 UNITY_SRC    := tests/unity/src/unity.c
 TEST_SRCS    := $(wildcard tests/test_*.c)
-TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Wall -Wextra
+TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -Wall -Wextra
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
@@ -62,7 +62,7 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS) | build
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS)
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
