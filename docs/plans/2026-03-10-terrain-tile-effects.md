@@ -83,7 +83,7 @@ Expected: all tests pass.
 **Step 3: Commit**
 
 ```bash
-cd /home/mathdaman/code/gmb-wasteland-racer/.worktrees/terrain-effects
+cd /home/mathdaman/code/gmb-junk-runner/.worktrees/terrain-effects
 git add src/config.h
 git commit -m "feat: add terrain constants to config.h (sand friction mul, boost delta)"
 ```
@@ -146,7 +146,7 @@ tile 5 (boost):   horizontal stripes: even rows=0, odd rows=1
 
 ```python
 #!/usr/bin/env python3
-"""Generate the 6-tile Wasteland Racer tileset PNG (48×8, RGB).
+"""Generate the 6-tile Junk Runner tileset PNG (48×8, RGB).
 
 Run: python3 tools/gen_tileset.py assets/maps/tileset.png
 """
@@ -754,12 +754,12 @@ Use the `/build` skill or:
 ```bash
 GBDK_HOME=/home/mathdaman/gbdk make
 ```
-Expected: `build/wasteland-racer.gb` produced, 0 errors (ignore "EVELYN" optimizer notice).
+Expected: `build/junk-runner.gb` produced, 0 errors (ignore "EVELYN" optimizer notice).
 
 **Step 2: Launch smoketest in Emulicious**
 
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb &
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb &
 ```
 
 Ask the user to confirm:

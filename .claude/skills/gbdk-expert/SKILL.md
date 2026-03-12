@@ -3,11 +3,11 @@ name: gbdk-expert
 description: Use when writing or reviewing GBDK-2020 code — API calls, hardware registers, sprite/tile/palette setup, VBlank timing, CGB color palettes, interrupt handling, MBC banking, or GBDK compilation errors. Use during planning to verify API names and constraints before writing tests.
 ---
 
-# GBDK Expert — Wasteland Racer
+# GBDK Expert — Junk Runner
 
 ## Memory
 At the start of any GBDK-related task, read:
-`~/.claude/projects/-home-mathdaman-code-gmb-wasteland-racer/memory/gbdk-expert.md`
+`~/.claude/projects/-home-mathdaman-code-gmb-junk-runner/memory/gbdk-expert.md`
 
 After completing the task, append any new bugs, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
 

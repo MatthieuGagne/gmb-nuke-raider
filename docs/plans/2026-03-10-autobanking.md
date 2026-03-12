@@ -100,7 +100,7 @@ Expected: all 26 tests PASS (banking macros are no-ops in mock).
 ```
 GBDK_HOME=/home/mathdaman/gbdk make
 ```
-Expected: `build/wasteland-racer.gb` produced with no errors. The flags will now pass through lcc but since no file has `#pragma bank 255` yet, nothing is banked yet.
+Expected: `build/junk-runner.gb` produced with no errors. The flags will now pass through lcc but since no file has `#pragma bank 255` yet, nothing is banked yet.
 
 ### Step 6: Commit
 
@@ -216,7 +216,7 @@ Expected: all 26 tests PASS (`BANKED` is `#define BANKED` = empty string in mock
 ```
 GBDK_HOME=/home/mathdaman/gbdk make
 ```
-Expected: `build/wasteland-racer.gb` built. Bankpack will assign all `#pragma bank 255` files to banks. No linker errors.
+Expected: `build/junk-runner.gb` built. Bankpack will assign all `#pragma bank 255` files to banks. No linker errors.
 
 ### Step 6: Commit
 
@@ -505,7 +505,7 @@ GBDK_HOME=/home/mathdaman/gbdk make
 ### Step 2: Launch smoketest
 
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb &
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb &
 ```
 
 Tell the user the emulator is running and ask them to confirm:

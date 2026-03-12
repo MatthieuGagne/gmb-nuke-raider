@@ -88,7 +88,7 @@ static uint8_t LCDC_REG = 0x91U; /* realistic boot value: LCD on, BG on, tile da
 **Step 2: Run existing tests to confirm nothing broke**
 
 ```bash
-cd /home/mathdaman/code/gmb-wasteland-racer/.claude/worktrees/feat/hud
+cd /home/mathdaman/code/gmb-junk-runner/.claude/worktrees/feat/hud
 make test 2>&1 | tail -20
 ```
 
@@ -500,7 +500,7 @@ git commit -m "feat: integrate hud_init/render/update into state_playing"
 GBDK_HOME=/home/mathdaman/gbdk make 2>&1
 ```
 
-Expected: `build/wasteland-racer.gb` produced with zero errors. Warnings about "so said EVELYN" are harmless and expected.
+Expected: `build/junk-runner.gb` produced with zero errors. Warnings about "so said EVELYN" are harmless and expected.
 
 If compile errors appear:
 - `LCDC_REG` / `LCDCF_WIN9C00` undefined → add `#include <gb/hardware.h>` to `hud.c`
@@ -522,7 +522,7 @@ If nothing new, no commit needed here.
 **Step 1: Launch the emulator in the background**
 
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb &
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb &
 ```
 
 **Step 2: Tell the user to confirm the following in the emulator:**

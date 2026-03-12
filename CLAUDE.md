@@ -12,10 +12,10 @@ GBDK_HOME=/home/mathdaman/gbdk make
 make clean
 
 # Run in emulator
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
 ```
 
-Output ROM: `build/wasteland-racer.gb`
+Output ROM: `build/junk-runner.gb`
 
 ## Architecture
 
@@ -64,7 +64,7 @@ These apply to every feature, no matter how small.
 
 ## ROM Header
 
-Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt1` (MBC1), `-Wm-yn"WSTLND RACER"`.
+Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt1` (MBC1), `-Wm-yn"JUNK RUNNER"`.
 To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
 
 ## ROM Banking — Autobanking Conventions
@@ -151,7 +151,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Rebuild: `GBDK_HOME=/home/mathdaman/gbdk make`
-3. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
+3. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 4. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 5. Only after the user confirms: push the branch and create the PR.
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.

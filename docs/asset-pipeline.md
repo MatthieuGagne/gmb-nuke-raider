@@ -29,7 +29,7 @@ into the Game Boy ROM.
                  GBDK/SDCC compiler
                          │
                          ▼
-              build/wasteland-racer.gb
+              build/junk-runner.gb
 ```
 
 Generated `.c` files and exported `.png` files are **checked into git** so CI
@@ -81,7 +81,7 @@ Each 8×8 tile is encoded as 16 bytes of GB 2bpp:
 3. Run `make` to regenerate `src/track_tiles.c`.
 4. In Tiled, add the new tile index to `assets/maps/track.tsx` and use it in `track.tmx`.
 5. Run `make` again to regenerate `src/track_map.c`.
-6. Verify in Emulicious: `java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb`.
+6. Verify in Emulicious: `java -jar ~/.local/share/emulicious/Emulicious.jar build/junk-runner.gb`.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: map-builder
-description: Use when creating a new map or track for Wasteland Racer — designing the layout, drawing in Tiled, running the TMX conversion pipeline, and wiring the generated C files into the game.
+description: Use when creating a new map or track for Junk Runner — designing the layout, drawing in Tiled, running the TMX conversion pipeline, and wiring the generated C files into the game.
 ---
 
 # Map Builder
@@ -125,7 +125,7 @@ Wrap tile data load similarly if `track_tile_data` is in a banked file.
 
 ```sh
 GBDK_HOME=/home/mathdaman/gbdk make
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
 ```
 
 Check:

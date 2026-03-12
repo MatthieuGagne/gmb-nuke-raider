@@ -190,7 +190,7 @@ aseprite --batch sprite.aseprite --list-layer-hierarchy
 
 ---
 
-## Wasteland Racer Pipeline
+## Junk Runner Pipeline
 
 ```sh
 # Export a sprite to PNG (used by make export-sprites)
@@ -220,5 +220,5 @@ PNG requirements for `png_to_tiles.py` downstream:
 
 ## Cross-References
 
-- **`sprite-expert`** — Wasteland Racer sprite pipeline, OAM API, indexed palette setup
+- **`sprite-expert`** — Junk Runner sprite pipeline, OAM API, indexed palette setup
 - **`map-expert`** — Background tileset export pipeline

@@ -105,7 +105,7 @@ $(TARGET): $(OBJS) | build
 ```bash
 GBDK_HOME=/home/mathdaman/gbdk make
 ```
-Expected: `build/wasteland-racer.gb` produced, no errors. The `-I` flag is new but harmless until music headers are included.
+Expected: `build/junk-runner.gb` produced, no errors. The `-I` flag is new but harmless until music headers are included.
 
 **Step 4: Commit**
 
@@ -389,7 +389,7 @@ void main(void) {
 ```bash
 GBDK_HOME=/home/mathdaman/gbdk make 2>&1 | grep -i "error" | grep -v "so said EVELYN"
 ```
-Expected: no errors, `build/wasteland-racer.gb` produced.
+Expected: no errors, `build/junk-runner.gb` produced.
 
 **Step 6: Commit**
 
@@ -405,7 +405,7 @@ git commit -m "feat: wire music_init() and music_tick() into main.c"
 **Step 1: Launch emulator in background**
 
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb &
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb &
 ```
 
 **Step 2: Inform the user**
@@ -421,7 +421,7 @@ Tell the user: "Emulicious is running. Please confirm that music plays and loops
 **Step 1: Push the branch**
 
 ```bash
-gh repo set-default MatthieuGagne/gmb-wasteland-racer
+gh repo set-default MatthieuGagne/gmb-junk-runner
 git push -u origin worktree-feat/hugedriver-music
 ```
 

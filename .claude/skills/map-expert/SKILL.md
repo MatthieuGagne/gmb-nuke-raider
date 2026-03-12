@@ -1,13 +1,13 @@
 ---
 name: map-expert
-description: Use when creating, editing, or converting maps for Wasteland Racer — Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles, gen_tileset), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes).
+description: Use when creating, editing, or converting maps for Junk Runner — Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles, gen_tileset), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes).
 ---
 
 # Map Expert
 
 ## Overview
 
-Full reference for the Wasteland Racer map pipeline: Tiled authoring → Python conversion → GB hardware rendering.
+Full reference for the Junk Runner map pipeline: Tiled authoring → Python conversion → GB hardware rendering.
 
 **Keep this skill current:** When you modify any tool in `tools/` or `assets/maps/`, add a new map tool, change the TMX schema, or add GB tilemap features — update the relevant section of this skill in the same PR. The skill is the source of truth for the pipeline.
 

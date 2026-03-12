@@ -1,6 +1,6 @@
-# Music Expert — Wasteland Racer
+# Music Expert — Junk Runner
 
-Use when working with hUGEDriver music integration, song data, APU registers, or audio for the Wasteland Racer GBC project.
+Use when working with hUGEDriver music integration, song data, APU registers, or audio for the Junk Runner GBC project.
 
 ---
 

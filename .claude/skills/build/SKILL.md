@@ -5,7 +5,7 @@ description: Use this skill to build the GBC ROM. Triggers when verifying a buil
 
 Run `GBDK_HOME=/home/mathdaman/gbdk make`.
 
-On success: report ROM size with `ls -lh build/wasteland-racer.gb`.
+On success: report ROM size with `ls -lh build/junk-runner.gb`.
 
 On failure: extract lines containing "error:" from the output, show each as
 `file:line: message`. Distinguish compiler errors (fixable in source) from

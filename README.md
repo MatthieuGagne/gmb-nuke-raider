@@ -1,4 +1,4 @@
-# Wasteland Racer
+# Junk Runner
 
 A Game Boy Color (GBC) top-down racing game built with [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020).
 
@@ -15,7 +15,7 @@ A Game Boy Color (GBC) top-down racing game built with [GBDK-2020](https://githu
 GBDK_HOME=~/gbdk make
 ```
 
-Output: `build/wasteland-racer.gb`
+Output: `build/junk-runner.gb`
 
 ### Clean
 
@@ -34,10 +34,10 @@ make test
 ## Running
 
 ```sh
-java -jar ~/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar ~/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
 ```
 
-Or load `build/wasteland-racer.gb` in any GB/GBC emulator ([Emulicious](https://emulicious.net/), [SameBoy](https://sameboy.github.io/), [BGB](https://bgb.bircd.org/)).
+Or load `build/junk-runner.gb` in any GB/GBC emulator ([Emulicious](https://emulicious.net/), [SameBoy](https://sameboy.github.io/), [BGB](https://bgb.bircd.org/)).
 
 ## Game Modules
 
@@ -95,7 +95,7 @@ setup and export settings.
 ## Project Structure
 
 ```
-gmb-wasteland-racer/
+gmb-junk-runner/
 ├── src/
 │   ├── main.c              # Entry point, main loop, game state machine
 │   ├── state_manager.c/.h  # Game state transitions
@@ -163,7 +163,7 @@ gmb-wasteland-racer/
 | `-Wm-yc` | CGB compatible | Runs on DMG and GBC |
 | `-Wm-yC` | CGB only | GBC exclusive (enhanced color) |
 | `-Wm-yt1` | MBC1 | Memory bank controller type |
-| `-Wm-yn"WSTLND RACER"` | ROM title | 11-char header string |
+| `-Wm-yn"JUNK RUNNER"` | ROM title | 11-char header string |
 
 To target GBC-only (for extra VRAM, 8 palettes, etc.) swap `-Wm-yc` for `-Wm-yC` in the Makefile.
 

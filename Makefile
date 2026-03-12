@@ -5,9 +5,9 @@ CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/i
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
-ROMFLAGS  := -Wm-yc -Wm-yt1 -Wm-yn"WSTLND RACER"
+ROMFLAGS  := -Wm-yc -Wm-yt1 -Wm-yn"JUNK RUNNER"
 
-TARGET    := build/wasteland-racer.gb
+TARGET    := build/junk-runner.gb
 OBJ_DIR   := build/obj
 
 SRCS      := $(wildcard src/*.c)

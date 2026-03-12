@@ -757,17 +757,17 @@ Expected: ALL tests PASS.
 ```sh
 GBDK_HOME=/home/mathdaman/gbdk make
 ```
-Expected: `build/wasteland-racer.gb` produced with no errors.
+Expected: `build/junk-runner.gb` produced with no errors.
 
 **Step 3: Launch emulator** (run in background; ask user to verify)
 
 ```sh
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
 ```
 
 **Verify these scenarios manually:**
 
-1. Title screen shows "WASTELAND RACER / Press START"
+1. Title screen shows "JUNK RUNNER / Press START"
 2. Pressing START shows the overmap — horizontal road with hub center, dest squares at left+right
 3. D-pad left/right moves the car sprite along the road; up/down do nothing
 4. Car cannot move past the dest tiles (screen edge direction is blank)

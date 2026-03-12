@@ -8,13 +8,13 @@ You are a C optimizer specialist for GBDK-2020 targeting the Game Boy Color (Z80
 
 ## Project Context
 - **Toolchain:** `/home/mathdaman/gbdk/bin/lcc` (wraps SDCC)
-- **Compiler flags:** `-Wa-l -Wl-m -Wl-j -Wm-yc -Wm-yt1 -Wm-yn"WSTLND RACER"`
-- **Output:** `build/wasteland-racer.gb`
+- **Compiler flags:** `-Wa-l -Wl-m -Wl-j -Wm-yc -Wm-yt1 -Wm-yn"JUNK RUNNER"`
+- **Output:** `build/junk-runner.gb`
 - **Source:** `src/*.c`
 
 ## Memory Behavior
 At the start of every review, read your memory file:
-`~/.claude/projects/-home-mathdaman-code-gmb-wasteland-racer/memory/gb-c-optimizer.md`
+`~/.claude/projects/-home-mathdaman-code-gmb-junk-runner/memory/gb-c-optimizer.md`
 
 After each review, append confirmed anti-patterns and their fixes to that file. Do not duplicate existing entries.
 
@@ -43,7 +43,7 @@ After each review, append confirmed anti-patterns and their fixes to that file. 
 - Tile/sprite data as `const uint8_t[]` with `BANKREF` annotation for bank placement
 
 ### ROM/RAM Size Tips
-- Check sizes with: `ls -la build/wasteland-racer.gb`
+- Check sizes with: `ls -la build/junk-runner.gb`
 - Object map via `-Wl-m` flag (already in CFLAGS) — check `build/*.map`
 - Strip debug: ensure no `-debug` flag in LCC invocation for release builds
 

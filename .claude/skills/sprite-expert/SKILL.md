@@ -3,7 +3,7 @@ name: sprite-expert
 description: Use when creating sprites, editing sprite assets, changing how sprites are loaded or rendered, adding new sprite types, modifying the sprite pool, changing OAM slot assignments, updating sprite tile data, or working with the Aseprite pipeline or png_to_tiles converter.
 ---
 
-# Sprite Expert — Wasteland Racer
+# Sprite Expert — Junk Runner
 
 **Update this skill whenever the sprite system changes** (new pipeline steps, new API usage, pool budget changes, coordinate system corrections).
 

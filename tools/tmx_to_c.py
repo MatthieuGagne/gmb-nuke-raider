@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TMX to C converter for Wasteland Racer track maps.
+"""TMX to C converter for Junk Runner track maps.
 
 Usage: python3 tools/tmx_to_c.py <track.tmx> <track_map.c>
 
