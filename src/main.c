@@ -36,7 +36,7 @@ static volatile uint8_t frame_ready = 0;
 static void vbl_isr(void) {
     frame_ready = 1;
     move_bkg(0, (uint8_t)cam_y);
-    music_tick();
+    /* music_tick removed — no SET_BANK/SWITCH_ROM in ISR */
 }
 
 void main(void) {
@@ -56,6 +56,7 @@ void main(void) {
     while (1) {
         while (!frame_ready);
         frame_ready = 0;
+        music_tick();             /* once per VBL, safely in main context */
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();   /* no longer passes raw joypad byte */
     }
