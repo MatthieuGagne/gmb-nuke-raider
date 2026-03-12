@@ -104,7 +104,10 @@
       "Bash(aseprite --batch assets/maps/overmap_tiles.aseprite --script /tmp/add_hub_tile.lua 2>&1)",
       "Bash(aseprite --batch assets/maps/overmap_tiles.aseprite --save-as assets/maps/overmap_tiles.png 2>&1 | grep -v \"Unsupported chunk\")",
       "Bash(aseprite --batch assets/maps/overmap_tiles.aseprite --script /tmp/sync_aseprite_tile.lua 2>&1 | grep -v \"Unsupported chunk\")",
-      "WebFetch(domain:www.aseprite.org)"
+      "WebFetch(domain:www.aseprite.org)",
+      "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/src/ && echo \"---\" && ls /home/mathdaman/code/gmb-wasteland-racer/tests/test_*.c 2>/dev/null | xargs -I{} basename {})",
+      "Bash(git add:*)",
+      "Bash(GIT_EDITOR=true git rebase --continue && git push origin master)"
     ]
   }
 }
