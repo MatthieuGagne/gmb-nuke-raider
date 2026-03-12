@@ -175,7 +175,7 @@ void music_tick(void);
 static void vbl_isr(void) {
     frame_ready = 1;
     move_bkg(0, (uint8_t)cam_y);
-    music_tick();          /* called every VBlank */
+    /* DO NOT call music_tick() here — see CRITICAL note below */
 }
 
 void main(void) {
@@ -186,9 +186,29 @@ void main(void) {
     add_VBL(vbl_isr);
     set_interrupts(VBL_IFLAG);
     DISPLAY_ON;
-    /* ... */
+
+    while (1) {
+        while (!frame_ready);
+        frame_ready = 0;
+        music_tick();      /* once per VBL, safely in main context */
+        input_update();
+        state_manager_update();
+    }
 }
 ```
+
+**CRITICAL — Never call `music_tick()` from a VBL ISR:**
+
+`music_tick()` calls `SET_BANK`/`SWITCH_ROM`, which is a two-step write:
+`_current_bank = b; rROMB0 = b`. If the ISR fires between these two writes while a
+BANKED function trampoline is in progress in the main loop, the shadow variable and
+MBC hardware disagree. `RESTORE_BANK` in the ISR then restores from the stale shadow
+value — corrupting bank state for the trampoline's epilogue. After several deep BANKED
+call sequences (e.g., repeated state transitions), the mismatched bank causes a crash.
+
+**Rule:** The VBL ISR does display work only (`move_bkg`, sprite updates). All
+`SET_BANK` activity — including `music_tick()` — runs in the main loop after
+`frame_ready = 0`. This preserves exactly-once-per-VBL timing without ISR bank hazards.
 
 ---
 
@@ -278,3 +298,4 @@ https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/s
 | `BANKED` on `music_init`/`music_tick` | Not needed — they're in bank 0 |
 | Passing `hUGEDriver.lib` as positional arg to lcc | Use `-Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib` — positional arg causes bankpack to corrupt the lib |
 | Accessing `hUGE_current_wave` to silence CH3 | Use `hUGE_mute_channel(HT_CH3, HT_CH_MUTE)` |
+| Calling `music_tick()` inside `vbl_isr()` | Call it in the main loop after `frame_ready = 0` — `SET_BANK` inside an ISR corrupts MBC shadow state when the ISR fires mid-trampoline, causing crashes after several deep BANKED call sequences |
