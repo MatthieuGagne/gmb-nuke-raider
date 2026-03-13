@@ -55,13 +55,17 @@ static const DialogNode drifter_nodes[] = {
     { d1, 0, {NULL, NULL, NULL}, {DIALOG_END, DIALOG_END, DIALOG_END} },
 };
 
+static const char npc_name_mechanic[] = "MECHANIC";
+static const char npc_name_trader[]   = "TRADER";
+static const char npc_name_drifter[]  = "DRIFTER";
+
 /* --- NPC dialog table (indexed by npc_id) ------------------------------- */
 BANKREF(npc_dialogs)
 const NpcDialog npc_dialogs[] = {
-    { mechanic_nodes, 7 }, /* NPC 0: Mechanic   */
-    { trader_nodes,   2 }, /* NPC 1: Trader     */
-    { drifter_nodes,  2 }, /* NPC 2: Drifter    */
-    { mechanic_nodes, 7 }, /* NPC 3: placeholder */
-    { mechanic_nodes, 7 }, /* NPC 4: placeholder */
-    { mechanic_nodes, 7 }, /* NPC 5: placeholder */
+    { mechanic_nodes, 7, npc_name_mechanic }, /* NPC 0: Mechanic   */
+    { trader_nodes,   2, npc_name_trader   }, /* NPC 1: Trader     */
+    { drifter_nodes,  2, npc_name_drifter  }, /* NPC 2: Drifter    */
+    { mechanic_nodes, 7, npc_name_mechanic }, /* NPC 3: placeholder */
+    { mechanic_nodes, 7, npc_name_mechanic }, /* NPC 4: placeholder */
+    { mechanic_nodes, 7, npc_name_mechanic }, /* NPC 5: placeholder */
 };
