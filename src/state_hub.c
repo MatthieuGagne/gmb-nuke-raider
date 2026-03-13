@@ -16,6 +16,7 @@
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
+#define DIALOG_INNER_W 12u  /* inner text cols inside dialog box (cols 7-18) */
 
 uint8_t overmap_hub_entered = 0u;
 
@@ -24,6 +25,9 @@ static uint8_t           cursor;
 static uint8_t           active_npc;
 static uint8_t           dialog_cursor;
 static const HubDef     *hub;
+static char              dialog_text_buf[64]; /* WRAM — copy banked text here before printf */
+static char              dialog_name_buf[16]; /* WRAM — copy banked NPC name here before printf */
+static uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
 
 uint8_t hub_get_cursor(void)    { return cursor; }
 uint8_t hub_get_sub_state(void) { return sub_state; }
@@ -45,25 +49,153 @@ static void hub_render_menu(void) {
     printf(">");
 }
 
+/* Renders word-wrapped text starting at (start_col, start_row).
+ * width is max chars per line. max_rows limits output rows. */
+static void render_wrapped(const char *text, uint8_t start_col, uint8_t start_row,
+                            uint8_t width, uint8_t max_rows) {
+    static char word[20]; /* off-stack: WRAM buffer — re-entrancy via ISR
+                           * is not possible here (input-driven, not ISR-driven) */
+    uint8_t row      = start_row;
+    uint8_t col      = start_col;
+    uint8_t wi       = 0u;  /* index into current word */
+    uint8_t si       = 0u;  /* index into source text */
+    uint8_t line_len = 0u;
+
+    while (row < start_row + max_rows) {
+        char ch = text[si];
+        if (ch == ' ' || ch == '\0') {
+            /* try to place current word on current line */
+            if (wi > 0u) {
+                word[wi] = '\0';
+                if (line_len + wi > width) {
+                    /* word doesn't fit — wrap */
+                    row++;
+                    col      = start_col;
+                    line_len = 0u;
+                    if (row >= start_row + max_rows) break;
+                }
+                gotoxy(col, row);
+                printf(word);
+                col      += wi;
+                line_len += wi;
+                wi        = 0u;
+                if (ch == ' ') { col++; line_len++; } /* account for space */
+            }
+            if (ch == '\0') break;
+            si++;
+        } else {
+            /* accumulate character into word */
+            word[wi++] = ch;
+            /* force-break words longer than width */
+            if (wi >= width) {
+                word[wi] = '\0';
+                gotoxy(col, row);
+                printf(word);
+                wi       = 0u;
+                row++;
+                col      = start_col;
+                line_len = 0u;
+            }
+            si++;
+        }
+    }
+}
+
 static void hub_render_dialog(void) {
     uint8_t num_choices;
     uint8_t i;
-    static const uint8_t portrait_map[4] = {
-        HUB_PORTRAIT_TILE_SLOT,       HUB_PORTRAIT_TILE_SLOT + 1u,
-        HUB_PORTRAIT_TILE_SLOT + 2u,  HUB_PORTRAIT_TILE_SLOT + 3u
+    /* portrait_map: corrected for column-major tile order from png_to_tiles.py.
+     * Tile array index = tx*4+ty (col-major). For visual row r, col c:
+     * tile index = c*4+r → VRAM slot = HUB_PORTRAIT_TILE_SLOT + c*4+r.
+     * portrait_map[r*4+c] = HUB_PORTRAIT_TILE_SLOT + c*4+r */
+    static const uint8_t portrait_map[16] = {
+        HUB_PORTRAIT_TILE_SLOT,        HUB_PORTRAIT_TILE_SLOT + 4u,
+        HUB_PORTRAIT_TILE_SLOT + 8u,   HUB_PORTRAIT_TILE_SLOT + 12u,
+        HUB_PORTRAIT_TILE_SLOT + 1u,   HUB_PORTRAIT_TILE_SLOT + 5u,
+        HUB_PORTRAIT_TILE_SLOT + 9u,   HUB_PORTRAIT_TILE_SLOT + 13u,
+        HUB_PORTRAIT_TILE_SLOT + 2u,   HUB_PORTRAIT_TILE_SLOT + 6u,
+        HUB_PORTRAIT_TILE_SLOT + 10u,  HUB_PORTRAIT_TILE_SLOT + 14u,
+        HUB_PORTRAIT_TILE_SLOT + 3u,   HUB_PORTRAIT_TILE_SLOT + 7u,
+        HUB_PORTRAIT_TILE_SLOT + 11u,  HUB_PORTRAIT_TILE_SLOT + 15u,
     };
-    set_bkg_tiles(0u, 0u, 2u, 2u, portrait_map);
-    gotoxy(3u, 2u);
-    printf(dialog_get_text());
+
+    /* --- Copy banked text + name to WRAM before bank restore --- */
+    { SET_BANK(npc_dialogs);
+      {
+          const char *src = dialog_get_text();
+          uint8_t     k   = 0u;
+          while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
+              dialog_text_buf[k] = src[k]; k++;
+          }
+          dialog_text_buf[k] = '\0';
+      }
+      {
+          const char *src = dialog_get_name();
+          uint8_t     k   = 0u;
+          while (src[k] && k < (uint8_t)(sizeof(dialog_name_buf) - 1u)) {
+              dialog_name_buf[k] = src[k]; k++;
+          }
+          dialog_name_buf[k] = '\0';
+      }
+      RESTORE_BANK(); }
+
+    /* --- Draw portrait box border (cols 0-5, rows 0-7) --- */
+    gotoxy(0u, 0u); printf("+----+");
+    gotoxy(0u, 1u); printf("|    |");
+    gotoxy(0u, 2u); printf("|    |");
+    gotoxy(0u, 3u); printf("|    |");
+    gotoxy(0u, 4u); printf("|    |");
+    gotoxy(0u, 5u); printf("|    |");
+    gotoxy(0u, 6u); printf("|    |");
+    gotoxy(0u, 7u); printf("+----+");
+
+    /* --- Draw dialog box border (cols 6-19, rows 0-7) --- */
+    gotoxy(6u, 0u); printf("+------------+");
+    gotoxy(6u, 1u); printf("|            |");
+    gotoxy(6u, 2u); printf("|            |");
+    gotoxy(6u, 3u); printf("|            |");
+    gotoxy(6u, 4u); printf("|            |");
+    gotoxy(6u, 5u); printf("|            |");
+    gotoxy(6u, 6u); printf("|            |");
+    gotoxy(6u, 7u); printf("+------------+");
+
+    /* --- Place portrait BG tiles at inner cols 1-4, rows 2-5 --- */
+    set_bkg_tiles(1u, 2u, 4u, 4u, portrait_map);
+
+    /* --- Draw NPC name at row 1, inner col 7 --- */
+    gotoxy(7u, 1u);
+    printf(dialog_name_buf);
+    printf(":");
+
+    /* --- Word-wrap dialog text into inner cols 7-18, rows 2-6 --- */
+    render_wrapped(dialog_text_buf, 7u, 2u, DIALOG_INNER_W, 5u);
+
+    /* --- Draw choices or continue indicator --- */
     num_choices = dialog_get_num_choices();
     if (num_choices == 0u) {
-        gotoxy(1u, 4u);
-        printf("[A] Continue");
+        /* Narration: show > continue indicator (no key label) */
+        gotoxy(0u, 9u);
+        printf(">");
     } else {
         for (i = 0u; i < num_choices; i++) {
-            gotoxy(3u, (uint8_t)(4u + i));
-            printf(dialog_get_choice(i));
+            /* Copy choice label to WRAM (banked pointer) */
+            { SET_BANK(npc_dialogs);
+              {
+                  const char *src = dialog_get_choice(i);
+                  uint8_t     k   = 0u;
+                  while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
+                      dialog_text_buf[k] = src[k]; k++;
+                  }
+                  dialog_text_buf[k] = '\0';
+              }
+              RESTORE_BANK(); }
+            gotoxy(1u, (uint8_t)(9u + i));
+            printf(dialog_text_buf);
         }
+        /* Draw initial cursor */
+        gotoxy(0u, (uint8_t)(9u + dialog_cursor));
+        printf(">");
+        dialog_prev_cursor = dialog_cursor;
     }
 }
 
@@ -73,23 +205,24 @@ static void load_portrait(uint8_t npc_idx) {
     wait_vbl_done();
     if (npc_idx == 0u) {
         { SET_BANK(npc_mechanic_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_mechanic_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_mechanic_portrait);
           RESTORE_BANK(); }
     } else if (npc_idx == 1u) {
         { SET_BANK(npc_trader_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_trader_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_trader_portrait);
           RESTORE_BANK(); }
     } else {
         { SET_BANK(npc_drifter_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 4u, npc_drifter_portrait);
+          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_drifter_portrait);
           RESTORE_BANK(); }
     }
 }
 
 static void hub_start_dialog(uint8_t npc_cursor) {
     uint8_t npc_id;
-    active_npc    = npc_cursor;
-    dialog_cursor = 0u;
+    active_npc         = npc_cursor;
+    dialog_cursor      = 0u;
+    dialog_prev_cursor = 0u;
     npc_id = hub->npc_dialog_ids[npc_cursor];
     { SET_BANK(npc_dialogs);
       dialog_start(npc_id, &npc_dialogs[npc_id]);
@@ -128,20 +261,30 @@ static void update_dialog(void) {
     if (num_choices > 0u) {
         if (KEY_TICKED(J_UP) && dialog_cursor > 0u) {
             dialog_cursor--;
-            hub_render_dialog();
+            /* dirty cursor: erase old >, draw new > — 2 tile writes */
+            gotoxy(0u, (uint8_t)(9u + dialog_prev_cursor)); printf(" ");
+            gotoxy(0u, (uint8_t)(9u + dialog_cursor));      printf(">");
+            dialog_prev_cursor = dialog_cursor;
             return;
         }
         if (KEY_TICKED(J_DOWN) && dialog_cursor < num_choices - 1u) {
             dialog_cursor++;
-            hub_render_dialog();
+            gotoxy(0u, (uint8_t)(9u + dialog_prev_cursor)); printf(" ");
+            gotoxy(0u, (uint8_t)(9u + dialog_cursor));      printf(">");
+            dialog_prev_cursor = dialog_cursor;
             return;
         }
     }
     if (KEY_TICKED(J_A) || KEY_TICKED(J_START)) {
         more = dialog_advance(dialog_cursor);
-        dialog_cursor = 0u;
+        dialog_cursor      = 0u;
+        dialog_prev_cursor = 0u;
         if (more) {
+            wait_vbl_done();
+            DISPLAY_OFF;
+            cls();
             hub_render_dialog();
+            DISPLAY_ON;
         } else {
             sub_state = HUB_SUB_MENU;
             cursor    = 0u;
@@ -160,8 +303,9 @@ static void enter(void) {
     hub       = &rust_town;
     sub_state = HUB_SUB_MENU;
     cursor    = 0u;
-    active_npc    = 0u;
-    dialog_cursor = 0u;
+    active_npc         = 0u;
+    dialog_cursor      = 0u;
+    dialog_prev_cursor = 0u;
     move_sprite(0u, 0u, 0u);
     move_sprite(1u, 0u, 0u);
     wait_vbl_done();
