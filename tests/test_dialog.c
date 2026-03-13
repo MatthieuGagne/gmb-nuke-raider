@@ -128,6 +128,17 @@ void test_dialog_multiple_flags_independent(void) {
     TEST_ASSERT_EQUAL_UINT8(1, dialog_get_flag(0, 7));
 }
 
+/* --- Test: NPC name ---------------------------------------------------- */
+
+static const NpcDialog named_dialog = {
+    test_nodes, 4, "VENDOR"
+};
+
+void test_dialog_get_name_returns_correct_name(void) {
+    dialog_start(0, &named_dialog);
+    TEST_ASSERT_EQUAL_STRING("VENDOR", dialog_get_name());
+}
+
 /* --- runner ------------------------------------------------------------- */
 
 int main(void) {
@@ -146,5 +157,6 @@ int main(void) {
     RUN_TEST(test_dialog_set_flag_makes_get_flag_true);
     RUN_TEST(test_dialog_flag_is_per_npc);
     RUN_TEST(test_dialog_multiple_flags_independent);
+    RUN_TEST(test_dialog_get_name_returns_correct_name);
     return UNITY_END();
 }

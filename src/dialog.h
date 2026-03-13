@@ -16,10 +16,11 @@ typedef struct {
     uint8_t     next[3];        /* destination node index per choice/advance */
 } DialogNode;
 
-/* ROM-side per-NPC dialog: pointer to node array + count. */
+/* ROM-side per-NPC dialog: pointer to node array + count + NPC name. */
 typedef struct {
     const DialogNode *nodes;
     uint8_t           num_nodes;
+    const char       *name;      /* NPC display name, e.g. "MECHANIC" */
 } NpcDialog;
 
 /* --- Public API ---------------------------------------------------------- */
@@ -39,6 +40,9 @@ uint8_t dialog_get_num_choices(void) BANKED;
 
 /* Return the label of choice idx (idx < dialog_get_num_choices()). */
 const char *dialog_get_choice(uint8_t idx) BANKED;
+
+/* Return the name of the active NPC (valid after dialog_start). */
+const char *dialog_get_name(void) BANKED;
 
 /* Advance the conversation.
  * For narration nodes (num_choices == 0): choice_idx is ignored.
