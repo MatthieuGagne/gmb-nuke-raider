@@ -48,7 +48,7 @@ aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.
 make export-sprites
 
 # Convert PNG → GB 2bpp C array
-python3 tools/png_to_tiles.py assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data
+python3 tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data
 ```
 
 This generates `src/<name>_sprite.c` with:

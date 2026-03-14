@@ -40,6 +40,10 @@ uint8_t dialog_get_num_choices(void) BANKED {
     return active_dialog->nodes[node_idx].num_choices;
 }
 
+const char *dialog_get_name(void) BANKED {
+    return active_dialog->name;
+}
+
 const char *dialog_get_choice(uint8_t idx) BANKED {
     uint8_t node_idx = npc_states[active_npc_id].current_node;
     return active_dialog->nodes[node_idx].choices[idx];

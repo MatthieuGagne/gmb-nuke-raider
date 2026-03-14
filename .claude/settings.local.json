@@ -108,28 +108,9 @@
       "Bash(ls /home/mathdaman/code/gmb-wasteland-racer/src/ && echo \"---\" && ls /home/mathdaman/code/gmb-wasteland-racer/tests/test_*.c 2>/dev/null | xargs -I{} basename {})",
       "Bash(git add:*)",
       "Bash(GIT_EDITOR=true git rebase --continue && git push origin master)",
-      "Bash(find . -type f \\\\\\( -name \"*.c\" -o -name \"*.h\" -o -name \"*.md\" -o -name \"*.yml\" -o -name \"*.py\" -o -name \"Makefile\" \\\\\\) ! -path './.git/*' | while read f; do\n  sed -i \\\\\n    -e 's/gmb-wasteland-racer/gmb-junk-runner/g' \\\\\n    -e 's/wasteland-racer/junk-runner/g' \\\\\n    -e 's/Wasteland Racer/Junk Runner/g' \\\\\n    -e 's/WASTELAND RACER/JUNK RUNNER/g' \\\\\n    -e 's/WSTLND RACER/JUNK RUNNER/g' \\\\\n    -e 's/Wasteland racer/Junk Runner/g' \\\\\n    \"$f\"\ndone && echo \"done\")",
-      "Bash(find . -type f \\\\\\( -name \"*.md\" -o -name \"*.c\" -o -name \"*.h\" -o -name \"*.yml\" -o -name \"*.py\" -o -name \"*.json\" -o -name \"Makefile\" \\\\\\) \\\\\n  ! -path \"./.worktrees/*\" \\\\\n  ! -path \"./.git/*\" \\\\\n  -exec sed -i \\\\\n    -e 's/Wasteland Racer/Nuke Raider/g' \\\\\n    -e 's/wasteland-racer/nuke-raider/g' \\\\\n    -e 's/wasteland_racer/nuke_raider/g' \\\\\n    -e 's/WSTLND RACER/NUKE RAIDER/g' \\\\\n    -e 's/WASTELAND RACER/NUKE RAIDER/g' \\\\\n    -e 's/gmb-wasteland-racer/gmb-nuke-raider/g' \\\\\n    {} +)",
-      "Bash(ls /home/mathdaman/code/gmb-junk-runner/build/*.gb 2>/dev/null)",
-      "Bash(jobs && ps aux | grep -E \"emulicious|java\" | grep -v grep)",
-      "Bash(romusage /home/mathdaman/code/gmb-junk-runner/build/junk-runner.gb -g 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-junk-runner/build/junk-runner.gb -g 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-junk-runner/build/junk-runner.gb -a 2>&1)",
-      "Bash(make clean:*)",
-      "Bash(ls -la /home/mathdaman/code/gmb-junk-runner/.worktrees/debug-race-freeze/src/*.c | grep -E \"\\(debug|test_debug\\)\" || echo \"No debug.c found\")",
-      "Bash(ls /home/mathdaman/code/gmb-junk-runner/.worktrees/debug-race-freeze/build/obj/state_playing* 2>/dev/null && head -50 /home/mathdaman/code/gmb-junk-runner/.worktrees/debug-race-freeze/build/obj/state_playing.asm 2>/dev/null)",
-      "Bash(ls -lh /home/mathdaman/code/gmb-junk-runner/assets/sprites/npc_*.png)",
-      "Bash(find /home/mathdaman/gbdk -name \"bcall_ehl*.s\" -o -name \"bcall_ehl*.asm\" 2>/dev/null | head -5)",
-      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1)",
-      "Bash(GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make clean && GBDK_HOME=/home/mathdaman/gbdk DEBUG=1 make 2>&1)",
-      "Bash(cd /home/mathdaman/code/gmb-junk-runner/.worktrees/debug-race-freeze && DEBUG=1 GBDK_HOME=/home/mathdaman/gbdk make 2>&1)",
-      "Bash(DEBUG=1 GBDK_HOME=/home/mathdaman/gbdk make 2>&1)",
-      "WebFetch(domain:superdisk.github.io)",
-      "Bash(GBDK_HOME=/home/mathdaman/gbdk make 2>&1 | tail -5 && ls build/*.map 2>/dev/null && cat build/*.map 2>/dev/null | grep -E \"^_|BANK|bank\" | head -40)",
-      "Bash(ls build/*.noi 2>/dev/null && head -100 build/junk-runner.noi 2>/dev/null | grep -E \"state|music|camera|player|track|hud\" || find build/ -name \"*.sym\" 2>/dev/null | head -5)",
-      "Bash(find /home/mathdaman/.claude -name \"*.md\" | grep -i music 2>/dev/null; find /home/mathdaman/code/gmb-junk-runner -name \"*.md\" | grep -i music 2>/dev/null)",
-      "Bash(python3 /tmp/parse_sound.py 2>&1; echo \"EXIT: $?\")",
-      "Bash(ls -la /home/mathdaman/code/gmb-junk-runner/src/*.h | head -20)"
+      "Bash(git fetch:*)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk make 2>&1 | grep -E \"error:|Error\" | grep -v EVELYN; echo \"exit: $?\")",
+      "Bash(java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/wasteland-racer.gb)"
     ]
   }
 }

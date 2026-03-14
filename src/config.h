@@ -47,6 +47,6 @@
 
 /* Hub system */
 #define MAX_HUB_NPCS           3u
-#define HUB_PORTRAIT_TILE_SLOT 96u   /* BKG tile slots 96-99 for 16x16 portrait */
+#define HUB_PORTRAIT_TILE_SLOT 96u   /* BKG tile slots 96-111 (16 tiles) for 32x32 portrait */
 
 #endif /* CONFIG_H */
