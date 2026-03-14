@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Read(**)",
       "Bash(git:*)",
       "Bash(xargs ls:*)",
       "Bash(make:*)",
@@ -152,7 +153,24 @@
       "Bash(/home/mathdaman/gbdk/bin/romusage build/junk-runner.gb -g 2>&1 | head -30)",
       "Bash(ls build/*.map 2>/dev/null && grep -i \"wram\\\\|ram\\\\|bss\\\\|_data\" build/junk-runner.map 2>/dev/null | head -30)",
       "Bash(ls src/*tiles* src/*_tiles* 2>/dev/null)",
-      "Bash(ls src/*.c | xargs grep -l \"uint8_t.*\\\\[\\\\] = {\" 2>/dev/null)"
+      "Bash(ls src/*.c | xargs grep -l \"uint8_t.*\\\\[\\\\] = {\" 2>/dev/null)",
+      "Bash(find:*)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.gb -g)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.gb -a)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.gb -B)",
+      "Bash(ls:*)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.gb -B -s 2>/dev/null || /home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.gb -a -s 2>/dev/null)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/hide-hud-outside-races/build/junk-runner.map -a)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/fix/music-lag-dialog/build/junk-runner.gb -g)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/fix/music-lag-dialog/build/junk-runner.gb -a)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/fix/music-lag-dialog/build/junk-runner.gb -B 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/fix/music-lag-dialog/build/junk-runner.gb -r 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/fix/music-lag-dialog/build/junk-runner.map -a 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/node-nav/build/junk-runner.gb -g)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/node-nav/build/junk-runner.gb -a)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/node-nav/build/junk-runner.gb -B 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/node-nav/build/junk-runner.gb -Rs 2>&1 | head -60)",
+      "Bash(pip install:*)"
     ]
   }
 }
