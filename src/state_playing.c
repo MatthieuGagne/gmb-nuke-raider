@@ -39,6 +39,7 @@ static void update(void) {
 }
 
 static void sp_exit(void) {
+    HIDE_WIN;
 }
 
 const State state_playing = { enter, update, sp_exit };
