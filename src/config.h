@@ -16,14 +16,17 @@
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
 #define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
-#define PLAYER_HP        100 /* Damage system: starting HP (equals PLAYER_HP_MAX — full health) */
 #define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
 
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
 #define HUD_SCANLINE 128  /* pixel row where HUD window begins; used for player movement bounds */
-#define PLAYER_HP_MAX 100
+
+/* Damage system */
+#define PLAYER_MAX_HP               8   /* max and starting HP */
+#define DAMAGE_INVINCIBILITY_FRAMES 30  /* frames of immunity after a hit */
+#define DAMAGE_REPAIR_AMOUNT         2  /* HP restored by TILE_REPAIR */
 
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */

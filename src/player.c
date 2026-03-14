@@ -8,6 +8,7 @@ BANKREF_EXTERN(player_tile_data)
 #include "camera.h"
 #include "sprite_pool.h"
 #include "config.h"
+#include "damage.h"
 
 extern const uint8_t player_tile_data[];
 extern const uint8_t player_tile_data_count;
@@ -52,34 +53,52 @@ void player_update(void) BANKED {
     int16_t new_py;
     TileType terrain;
 
-    /* Query terrain at player centre (4px = centre of 8-wide hitbox) */
+    /* Query terrain at player centre; heal on repair tile before physics */
     terrain = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
+    if (terrain == TILE_REPAIR) { damage_heal(DAMAGE_REPAIR_AMOUNT); }
     player_apply_physics(input, terrain);
 
-    /* Apply X velocity — zero on wall/edge collision */
+    /* Apply X velocity — screen edge: stop only; wall: stop + damage */
     new_px = (int16_t)(px + (int16_t)vx);
-    if (new_px >= 0 && new_px <= 159 && corners_passable(new_px, py)) {
-        px = new_px;
-    } else {
+    if (new_px < 0 || new_px > 159) {
         vx = 0;
+    } else if (!corners_passable(new_px, py)) {
+        vx = 0;
+        damage_apply(1u);
+    } else {
+        px = new_px;
     }
 
-    /* Apply Y velocity — zero on wall/edge collision */
+    /* Apply Y velocity — screen edge: stop only; wall: stop + damage */
     new_py = (int16_t)(py + (int16_t)vy);
-    if (new_py >= (int16_t)cam_y && new_py <= (int16_t)(cam_y + (HUD_SCANLINE - 16u)) && corners_passable(px, new_py)) {
-        py = new_py;
-    } else {
+    if (new_py < (int16_t)cam_y || new_py > (int16_t)(cam_y + (HUD_SCANLINE - 16u))) {
         vy = 0;
+    } else if (!corners_passable(px, new_py)) {
+        vy = 0;
+        damage_apply(1u);
+    } else {
+        py = new_py;
     }
 }
 
 void player_render(void) BANKED {
+    static uint8_t render_frame = 0;
+    uint8_t hw_x;
+    uint8_t hw_y;
+
+    render_frame++;
+    /* Flicker when HP <= 2: hide sprite every other 8-frame window */
+    if (damage_get_hp() <= 2u && ((render_frame >> 3) & 1u)) {
+        move_sprite(player_sprite_slot,     0u, 0u);
+        move_sprite(player_sprite_slot_bot, 0u, 0u);
+        return;
+    }
+
     /* cam_x is always 0; cam_y is uint16_t but py >= cam_y is enforced so offset fits uint8_t */
-    uint8_t hw_x = (uint8_t)(px + 8);
-    uint8_t hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
+    hw_x = (uint8_t)(px + 8);
+    hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
     move_sprite(player_sprite_slot,     hw_x, hw_y);
     move_sprite(player_sprite_slot_bot, hw_x, (uint8_t)(hw_y + 8u));
-
 }
 
 void player_set_pos(int16_t x, int16_t y) BANKED {
