@@ -46,7 +46,7 @@ export-sprites: assets/maps/tileset.png $(patsubst assets/sprites/%.aseprite,ass
 # src/track_tiles.c is checked into git so CI works without Python.
 # Running `make src/track_tiles.c` (or plain `make`) regenerates it when needed.
 src/track_tiles.c: assets/maps/tileset.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py assets/maps/tileset.png src/track_tiles.c track_tile_data
+	python3 tools/png_to_tiles.py --bank 255 assets/maps/tileset.png src/track_tiles.c track_tile_data
 
 # Ensure regeneration happens before ROM link if PNG is newer
 $(TARGET): src/track_tiles.c
@@ -54,7 +54,7 @@ $(TARGET): src/track_tiles.c
 # src/player_sprite.c is checked into git so CI works without Python.
 # Running `make src/player_sprite.c` (or plain `make`) regenerates it when needed.
 src/player_sprite.c: assets/sprites/player_car.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py assets/sprites/player_car.png src/player_sprite.c player_tile_data
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/player_car.png src/player_sprite.c player_tile_data
 
 $(TARGET): src/player_sprite.c
 
@@ -92,7 +92,7 @@ test: $(TEST_SRCS) | build
 
 # src/overmap_tiles.c is checked into git so CI works without Python/Aseprite.
 src/overmap_tiles.c: assets/maps/overmap_tiles.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tile_data
+	python3 tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tile_data
 
 $(TARGET): src/overmap_tiles.c
 

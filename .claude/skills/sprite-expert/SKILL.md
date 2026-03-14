@@ -19,7 +19,7 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 |------|------|-------|
 | Draw pixels | Aseprite | Indexed color mode, 4-color GBC palette; canvas must be multiples of 8 |
 | Export PNG | `make export-sprites` or Aseprite File → Export As | Requires `aseprite` in PATH; PNGs are checked in for CI |
-| Convert | `python3 tools/png_to_tiles.py <in.png> src/<name>_sprite.c <array_name>` | Emits `const uint8_t <array_name>[]` + `<array_name>_count` |
+| Convert | `python3 tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank, explicit bank number for assets that must be isolated (e.g. portraits use `2`) |
 | Use | `extern` declare in `.c` file that calls `set_sprite_data` | Generated file — **never edit by hand** |
 
 **Aseprite setup for GBC sprites:**
@@ -160,7 +160,7 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 
 1. Create or edit `assets/sprites/<name>.aseprite` in Aseprite (indexed color, 4-shade GBC palette, multiples of 8)
 2. Export PNG: `make export-sprites` or File → Export As → `assets/sprites/<name>.png`
-3. Run: `python3 tools/png_to_tiles.py assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
+3. Run: `python3 tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
 4. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
 5. In init: `wait_vbl_done(); set_sprite_data(base_tile, <name>_tile_data_count, <name>_tile_data);`
 6. Allocate OAM slots via `get_sprite()` — one per 8×8 tile used on screen at once

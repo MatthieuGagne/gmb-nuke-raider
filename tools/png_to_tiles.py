@@ -152,7 +152,7 @@ def encode_2bpp(pixels, width, height):
     return bytes(result)
 
 
-def png_to_c(png_path, out_path, array_name, bank=255):
+def png_to_c(png_path, out_path, array_name, bank):
     """Convert PNG file to a C source file with the 2bpp array."""
     with open(png_path, 'rb') as f:
         data = f.read()
@@ -193,8 +193,8 @@ def main():
     parser.add_argument("png_path")
     parser.add_argument("out_path")
     parser.add_argument("array_name")
-    parser.add_argument("--bank", type=int, default=255,
-                        help="ROM bank number for #pragma bank (default: 255 = autobank)")
+    parser.add_argument("--bank", type=int, required=True,
+                        help="ROM bank number for #pragma bank (use 255 for autobank)")
     args = parser.parse_args()
     try:
         png_to_c(args.png_path, args.out_path, args.array_name, bank=args.bank)

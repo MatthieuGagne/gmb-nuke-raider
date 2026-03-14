@@ -30,12 +30,12 @@ Step-by-step guide to create a new map from scratch. Uses the Tiled → `tmx_to_
 If extending the existing tileset (`assets/maps/tileset.aseprite`):
 - Add new 8×8 tiles in Aseprite (indexed color, 4-shade GBC palette)
 - Export: `make export-sprites` or `aseprite --batch assets/maps/tileset.aseprite --save-as assets/maps/tileset.png`
-- Regenerate tile C array: `python3 tools/png_to_tiles.py assets/maps/tileset.png src/track_tiles.c track_tile_data`
+- Regenerate tile C array: `python3 tools/png_to_tiles.py --bank <N> assets/maps/tileset.png src/track_tiles.c track_tile_data`
 
 If creating a new tileset for a new map:
 - New `.aseprite` under `assets/maps/<mapname>_tiles.aseprite`
 - Export to `assets/maps/<mapname>_tiles.png`
-- Convert: `python3 tools/png_to_tiles.py assets/maps/<mapname>_tiles.png src/<mapname>_tiles.c <mapname>_tile_data`
+- Convert: `python3 tools/png_to_tiles.py --bank <N> assets/maps/<mapname>_tiles.png src/<mapname>_tiles.c <mapname>_tile_data`
 
 **Tile budget:** 192 tiles in DMG bank 0, 192 more in CGB bank 1. Keep total unique tiles ≤ 192 for DMG compat.
 
