@@ -1,22 +1,23 @@
 #include "unity.h"
 #include <gb/gb.h>
 #include "sprite_pool.h"
+#include "../src/config.h"
 
 void setUp(void)    { mock_move_sprite_reset(); sprite_pool_init(); }
 void tearDown(void) {}
 
 /* --- sprite_pool_init ----------------------------------------------- */
 
-/* After init all 40 slots are free: get_sprite() returns a valid index */
+/* After init all slots are free: get_sprite() returns a valid index */
 void test_init_all_slots_free(void) {
     uint8_t slot = get_sprite();
     TEST_ASSERT_NOT_EQUAL(SPRITE_POOL_INVALID, slot);
 }
 
-/* get_sprite returns indices in range [0, 39] */
+/* get_sprite returns indices in range [0, MAX_SPRITES-1] */
 void test_get_sprite_returns_valid_index(void) {
     uint8_t slot = get_sprite();
-    TEST_ASSERT_LESS_THAN(40u, slot);
+    TEST_ASSERT_LESS_THAN(MAX_SPRITES, slot);
 }
 
 /* --- get_sprite ----------------------------------------------------- */
@@ -29,10 +30,10 @@ void test_get_sprite_returns_sequential_slots(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, s1);
 }
 
-/* After all 40 slots are claimed, returns INVALID */
+/* After all MAX_SPRITES slots are claimed, returns INVALID */
 void test_get_sprite_returns_invalid_when_full(void) {
     uint8_t i;
-    for (i = 0u; i < 40u; i++) get_sprite();
+    for (i = 0u; i < MAX_SPRITES; i++) get_sprite();
     TEST_ASSERT_EQUAL_UINT8(SPRITE_POOL_INVALID, get_sprite());
 }
 
@@ -57,24 +58,25 @@ void test_clear_sprite_hides_sprite(void) {
 
 /* --- clear_sprites_from -------------------------------------------- */
 
-/* clear_sprites_from(20) frees slots 20-39 */
+/* clear_sprites_from(half) frees slots [half, MAX_SPRITES-1] */
 void test_clear_sprites_from_frees_range(void) {
     uint8_t i;
     uint8_t next;
-    /* Claim all 40 slots */
-    for (i = 0u; i < 40u; i++) get_sprite();
-    /* Free from 20 onward */
-    clear_sprites_from(20u);
-    /* Next allocation should be in [20, 39] */
+    uint8_t half = MAX_SPRITES / 2u;
+    /* Claim all slots */
+    for (i = 0u; i < MAX_SPRITES; i++) get_sprite();
+    /* Free from halfway onward */
+    clear_sprites_from(half);
+    /* Next allocation should be in [half, MAX_SPRITES-1] */
     next = get_sprite();
-    TEST_ASSERT_GREATER_OR_EQUAL_UINT8(20u, next);
-    TEST_ASSERT_LESS_THAN(40u, next);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT8(half, next);
+    TEST_ASSERT_LESS_THAN(MAX_SPRITES, next);
 }
 
 /* clear_sprites_from(0) frees everything */
 void test_clear_sprites_from_zero_frees_all(void) {
     uint8_t i;
-    for (i = 0u; i < 40u; i++) get_sprite();
+    for (i = 0u; i < MAX_SPRITES; i++) get_sprite();
     clear_sprites_from(0u);
     TEST_ASSERT_NOT_EQUAL(SPRITE_POOL_INVALID, get_sprite());
 }

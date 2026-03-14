@@ -10,8 +10,10 @@ void test_max_npcs_sane(void) {
 }
 
 void test_max_sprites_sane(void) {
-    /* OAM hardware limit is 40; pool must cover full OAM budget */
-    TEST_ASSERT_GREATER_OR_EQUAL(40, MAX_SPRITES);
+    /* Pool needs at least 2 slots (player top+bottom) and must not exceed
+     * the hardware OAM limit of 40 — leave headroom for future sprites */
+    TEST_ASSERT_GREATER_OR_EQUAL(2, MAX_SPRITES);
+    TEST_ASSERT_LESS_OR_EQUAL(40, MAX_SPRITES);
 }
 
 void test_hud_scanline_is_128(void) {
