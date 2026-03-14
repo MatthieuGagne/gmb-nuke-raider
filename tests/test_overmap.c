@@ -15,6 +15,15 @@ static void tick(uint8_t btn) {
     input = 0;
 }
 
+/* Helper: arm travel with one press, then run 80 frames to complete */
+static void travel_to_node(uint8_t btn) {
+    uint8_t i;
+    prev_input = 0; input = btn;
+    state_overmap.update();
+    prev_input = input; input = 0;
+    for (i = 0u; i < 80u; i++) { state_overmap.update(); }
+}
+
 void setUp(void) {
     input = 0;
     prev_input = 0;
@@ -28,21 +37,21 @@ void test_car_starts_at_hub(void) {
     TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY, overmap_get_car_ty());
 }
 
-void test_left_moves_onto_road(void) {
-    tick(J_LEFT);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX - 1u, overmap_get_car_tx());
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY,      overmap_get_car_ty());
+void test_left_travels_to_dest(void) {
+    travel_to_node(J_LEFT);
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_LEFT_TX, overmap_get_car_tx());
 }
 
-void test_right_moves_onto_road(void) {
-    tick(J_RIGHT);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX + 1u, overmap_get_car_tx());
+void test_right_travels_to_dest(void) {
+    travel_to_node(J_RIGHT);
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_RIGHT_TX, overmap_get_car_tx());
 }
 
-void test_up_moves_onto_road_tile(void) {
-    /* Row 7 col 9 is now a road tile — moving up from spawn must succeed */
-    tick(J_UP);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY - 1u, overmap_get_car_ty());
+void test_up_travels_to_city_hub(void) {
+    travel_to_node(J_UP);
+    /* city hub tile is at (9,6) — arrives at (9,6) which triggers hub entry */
+    /* car_ty should be OVERMAP_HUB_TY - 2u = 6 */
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY - 2u, overmap_get_car_ty());
 }
 
 void test_down_blocked_by_blank(void) {
@@ -59,52 +68,59 @@ void test_held_button_does_not_repeat(void) {
 }
 
 void test_dest_left_sets_race_id(void) {
-    /* Walk left from hub (tx=9) to dest (tx=2): 7 ticks */
-    uint8_t moves = OVERMAP_HUB_TX - OVERMAP_DEST_LEFT_TX;
-    uint8_t i;
-    for (i = 0; i < moves; i++) {
-        tick(J_LEFT);
-    }
+    travel_to_node(J_LEFT);
     TEST_ASSERT_EQUAL_UINT8(0u, current_race_id);
 }
 
 void test_dest_right_sets_race_id(void) {
-    uint8_t moves = OVERMAP_DEST_RIGHT_TX - OVERMAP_HUB_TX;
-    uint8_t i;
-    for (i = 0; i < moves; i++) {
-        tick(J_RIGHT);
-    }
+    travel_to_node(J_RIGHT);
     TEST_ASSERT_EQUAL_UINT8(1u, current_race_id);
 }
 
 void test_city_hub_tile_triggers_hub_entry(void) {
-    /* City hub building is at (9, 6) — two moves north from spawn. */
     overmap_hub_entered = 0u;
-    tick(J_UP);  /* (9,8) → (9,7) road */
-    TEST_ASSERT_EQUAL_UINT8(0u, overmap_hub_entered);  /* road: no trigger yet */
-    tick(J_UP);  /* (9,7) → (9,6) city hub */
+    travel_to_node(J_UP);
     TEST_ASSERT_EQUAL_UINT8(1u, overmap_hub_entered);
 }
 
 void test_city_hub_tile_car_position_unchanged_after_enter(void) {
-    /* Car should stay at (9,6) after entering hub */
-    tick(J_UP);
-    tick(J_UP);
+    travel_to_node(J_UP);
     TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX,      overmap_get_car_tx());
     TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY - 2u, overmap_get_car_ty());
+}
+
+void test_input_ignored_while_traveling(void) {
+    uint8_t i;
+    prev_input = 0; input = J_LEFT; state_overmap.update();  /* arm travel */
+    prev_input = 0; input = J_RIGHT; state_overmap.update(); /* mid-travel: ignored */
+    prev_input = input; input = 0;
+    for (i = 0u; i < 80u; i++) { state_overmap.update(); }
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_LEFT_TX, overmap_get_car_tx());
+}
+
+void test_travel_advances_one_tile_per_four_frames(void) {
+    uint8_t i;
+    prev_input = 0; input = J_LEFT; state_overmap.update();
+    prev_input = input; input = 0;
+    for (i = 0u; i < 3u; i++) state_overmap.update();
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX, overmap_get_car_tx());      /* no move at frame 3 */
+    state_overmap.update();
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX - 1u, overmap_get_car_tx()); /* moved at frame 4 */
 }
 
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_car_starts_at_hub);
-    RUN_TEST(test_left_moves_onto_road);
-    RUN_TEST(test_right_moves_onto_road);
-    RUN_TEST(test_up_moves_onto_road_tile);
+    RUN_TEST(test_left_travels_to_dest);
+    RUN_TEST(test_right_travels_to_dest);
+    RUN_TEST(test_up_travels_to_city_hub);
     RUN_TEST(test_down_blocked_by_blank);
     RUN_TEST(test_held_button_does_not_repeat);
     RUN_TEST(test_dest_left_sets_race_id);
     RUN_TEST(test_dest_right_sets_race_id);
     RUN_TEST(test_city_hub_tile_triggers_hub_entry);
     RUN_TEST(test_city_hub_tile_car_position_unchanged_after_enter);
+    RUN_TEST(test_input_ignored_while_traveling);
+    RUN_TEST(test_travel_advances_one_tile_per_four_frames);
     return UNITY_END();
 }
