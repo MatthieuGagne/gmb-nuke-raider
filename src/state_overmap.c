@@ -77,7 +77,11 @@ static void overmap_check_tile_effect(void) {
     if (tile == OVERMAP_TILE_DEST) {
         traveling = 0u;
         current_race_id = (car_tx < OVERMAP_HUB_TX) ? 0u : 1u;
-        player_set_pos(track_start_x, track_start_y);
+        { int16_t sx, sy;
+          SET_BANK(track_start_x);
+          sx = track_start_x; sy = track_start_y;
+          RESTORE_BANK();
+          player_set_pos(sx, sy); }
         player_reset_vel();
         state_replace(&state_playing);
     }

@@ -12,7 +12,11 @@
 #include "damage.h"
 
 static void enter(void) {
-    player_set_pos(track_start_x, track_start_y);
+    { int16_t sx, sy;
+      SET_BANK(track_start_x);
+      sx = track_start_x; sy = track_start_y;
+      RESTORE_BANK();
+      player_set_pos(sx, sy); }
     player_reset_vel();
     DISPLAY_OFF;
     track_init();
@@ -40,7 +44,11 @@ static void update(void) {
     /* Finish line detection — check must be last so physics runs first */
     {
         uint8_t fin_ty = (uint8_t)((uint16_t)player_get_y() >> 3u);
-        if (fin_ty == track_finish_line_y) {
+        uint8_t fly;
+        { SET_BANK(track_finish_line_y);
+          fly = track_finish_line_y;
+          RESTORE_BANK(); }
+        if (fin_ty == fly) {
             state_replace(&state_overmap);
             return;
         }

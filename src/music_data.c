@@ -1,4 +1,4 @@
-#pragma bank 255
+#pragma bank 2
 #include <gb/gb.h>
 #include <stddef.h>
 #include "banking.h"

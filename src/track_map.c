@@ -1,6 +1,6 @@
 /* GENERATED — do not edit by hand. Source: assets/maps/track.tmx */
 /* Regenerate: python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c */
-#pragma bank 255
+#pragma bank 2
 #include <gb/gb.h>
 #include "track.h"
 #include "banking.h"

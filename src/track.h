@@ -29,6 +29,7 @@ extern const uint8_t track_finish_line_y;
 BANKREF_EXTERN(track_map)
 BANKREF_EXTERN(track_start_x)
 BANKREF_EXTERN(track_start_y)
+BANKREF_EXTERN(track_finish_line_y)
 
 void    track_init(void) BANKED;
 uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;
