@@ -1,13 +1,13 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya4 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya16 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
-ROMFLAGS  := -Wm-yc -Wm-yt1 -Wm-yn"JUNK RUNNER"
+ROMFLAGS  := -Wm-yc -Wm-yt25 -Wm-yn"NUKE RAIDER"
 
-TARGET    := build/junk-runner.gb
+TARGET    := build/nuke-raider.gb
 OBJ_DIR   := build/obj
 
 SRCS      := $(wildcard src/*.c)
