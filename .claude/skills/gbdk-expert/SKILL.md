@@ -12,6 +12,7 @@ At the start of any GBDK-related task, read:
 After completing the task, append any new bugs, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
 
 ## Reference Documentation
+**GBDK-2020 API docs**: https://gbdk.org/docs/api/
 **Pan Docs** (authoritative Game Boy hardware reference): https://gbdev.io/pandocs/
 **Single-page version** (use `WebFetch` on this for any hardware detail you're unsure about): https://gbdev.io/pandocs/single.html
 
@@ -74,6 +75,7 @@ When Pan Docs contradicts your cached knowledge, trust Pan Docs and update memor
 - Tiles: 8×8 pixels, 4 colors per palette; each tile = 16 bytes (2bpp)
 - CGB palettes: 8 BG + 8 OBJ, 4 colors each (64 bytes each palette RAM)
 - ROM: MBC1, 16 KB banks; bank 0 always at 0000–3FFF; bank switching affects 4000–7FFF only
+- **MBC1 warning:** Banks 0x20, 0x40, 0x60 are unavailable (alias to adjacent banks). Use MBC5 (`-Wm-yt2`) for new projects — clean 0–255 bank range via `SWITCH_ROM`
 
 ---
 
@@ -299,20 +301,44 @@ CH3 length counter cuts off at 256 steps; CH1/CH2/CH4 cut off at 64 steps.
 ---
 
 ## Key Headers
-- `gb/gb.h` — core (joypad, sprites, tiles, DISPLAY_ON/OFF, wait_vbl_done)
-- `gb/cgb.h` — CGB: `set_bkg_palette()`, `set_sprite_palette()`, `VBK_REG`
+- `gb/gb.h` — core (joypad, sprites, tiles, DISPLAY_ON/OFF, vsync)
+- `gb/cgb.h` — CGB: `set_bkg_palette()`, `set_sprite_palette()`, `VBK_REG`, `cpu_fast()`, `cpu_slow()`
 - `gb/hardware.h` — raw hardware registers
 - `gbdk/console.h` — text output
 - `stdio.h` — **required for `printf`** (NOT in console.h — omitting causes implicit declaration errors)
 
 ---
 
+## VBlank / Sync
+
+**`vsync()`** is the preferred way to wait for VBlank. It halts the CPU via the `HALT` instruction until the next VBlank interrupt fires — CPU idles, saving power.
+
+**`wait_vbl_done()` is deprecated** — documented as obsolete in GBDK-2020 docs. Replace all uses with `vsync()`.
+
+**`display_off()`** — safe LCD disable function that waits for VBlank internally before clearing LCDC bit 7. Safer than calling bare `DISPLAY_OFF` which requires you to be in VBlank already.
+
+---
+
+## Banking Macros
+
+| Macro | Description |
+|-------|-------------|
+| `SWITCH_ROM(bank)` | Switch active ROM bank |
+| `SWITCH_ROM_MBC1()` | MBC1-specific variant |
+| `SWITCH_ROM_MBC5()` | MBC5-specific variant |
+| `SWITCH_ROM_MBC5_8M()` | MBC5 for >4 MB ROMs |
+| `CURRENT_BANK` | Global: currently active ROM bank number |
+
+See the `rom-banking` skill for full patterns and the `SET_BANK`/`RESTORE_BANK` project wrappers.
+
+---
+
 ## Critical Rules
 
 ### LCD Disable Warning
-**Only disable the LCD during VBlank.** Turning off LCDC bit 7 outside VBlank can physically damage real hardware. In GBDK:
+**Only disable the LCD during VBlank.** Turning off LCDC bit 7 outside VBlank can physically damage real hardware. Use `display_off()` (waits for VBlank internally) or:
 ```c
-wait_vbl_done();
+vsync();
 DISPLAY_OFF;   /* safe — we're in VBlank */
 /* ... VRAM init ... */
 DISPLAY_ON;
@@ -320,14 +346,14 @@ DISPLAY_ON;
 When the display is off, VRAM/OAM/palette RAM are freely accessible without timing concerns.
 
 ### VRAM Writes
-Always guard VRAM writes with `wait_vbl_done()` **unless display is off** (`DISPLAY_OFF`).
+Always guard VRAM writes with `vsync()` **unless display is off** (`DISPLAY_OFF`).
 Writing to VRAM outside VBlank (Mode 0/1) causes graphical corruption.
 CGB palette RAM (BCPD/OCPD) is also inaccessible during Mode 3.
 
 ### Sprite Init Sequence
 ```c
 SPRITES_8x8;                                  /* safe anytime — LCDC flag */
-wait_vbl_done();                              /* required if display is ON */
+vsync();                                      /* required if display is ON */
 set_sprite_data(0, 1, player_tile_data);      /* correct API name */
 set_sprite_tile(0, 0);
 move_sprite(0, start_x, start_y);
@@ -336,6 +362,29 @@ SHOW_SPRITES;
 
 **`set_sprite_data` — not `set_sprite_tile_data`** (that name does not exist).
 Aliases: `set_sprite_2bpp_data` → `set_sprite_data`, `set_sprite_1bpp_data` for 1bpp source.
+
+### Sprite Properties (`set_sprite_prop`)
+
+```c
+set_sprite_prop(nb, flags);
+```
+
+Constants for `flags`:
+| Constant | Meaning |
+|----------|---------|
+| `S_BANK` | VRAM bank (CGB) |
+| `S_PALETTE` | CGB palette number (bits 0–2) |
+| `S_FLIPX` | Horizontal flip |
+| `S_FLIPY` | Vertical flip |
+| `S_PRIORITY` | BG priority (sprite behind BG colors 1–3) |
+
+**`OAM_item_t` struct** (from `shadow_OAM[]`):
+```c
+typedef struct {
+    uint8_t y, x, tile, prop;
+} OAM_item_t;
+```
+`shadow_OAM[nb]` gives direct access to the OAM shadow buffer (flushed to hardware each VBlank).
 
 ### Sprite Coordinate System
 `move_sprite(nb, x, y)` writes raw OAM bytes. Screen pixel = (x − 8, y − 16).
@@ -346,14 +395,91 @@ Aliases: `set_sprite_2bpp_data` → `set_sprite_data`, `set_sprite_1bpp_data` fo
 
 ### CGB Palettes
 - Format: 5-bit RGB packed with `RGB(r, g, b)` macro (values 0–31)
+- **`RGB8(r, g, b)`** — convenience macro accepting 8-bit (0–255) inputs, converts to 5-bit RGB555
+- **`RGBHTML(hex)`** — accepts 24-bit HTML hex (e.g., `RGBHTML(0xFF8800)`)
+- Predefined color constants available in `cgb.h` (e.g., `RGB_WHITE`, `RGB_BLACK`, `RGB_RED`)
 - Sprite color index 0 is **always transparent** — usable indices: 1, 2, 3
 - All BG tiles default to palette 0 unless you write the attribute map (VRAM bank 1)
 - `set_bkg_palette(0, 1, pal)` controls console text color
+- `set_bkg_palette_entry(pal, entry, color)` — update a single color entry in a BG palette
+- `set_sprite_palette_entry(pal, entry, color)` — update a single color entry in a sprite palette
+- `set_default_palette()` — replaces obsolete `cgb_compatibility()` for setting up default DMG-compat palettes
 - Cannot write palette RAM during PPU Mode 3 — always update during VBlank
 
 ### 8×16 Sprite Mode
 - LCDC bit 2 = 1 enables 8×16; tile index bit 0 is ignored
 - Top tile = `tile_id & 0xFE`, bottom tile = `tile_id | 0x01`
+
+---
+
+## Large Maps
+
+- **`set_bkg_submap(x, y, w, h, map, map_w)`** — set a rectangular region of BG tiles from a larger-than-32×32 map source
+- **`set_bkg_based_tiles(x, y, w, h, tiles, base_tile)`** — load tiles with a tile ID offset (useful when tile data starts at a non-zero VRAM slot)
+
+---
+
+## CGB Speed
+
+```c
+#include <gb/cgb.h>
+cpu_fast();   /* switch to CGB double-speed mode (2 MHz → 4 MHz) */
+cpu_slow();   /* switch back to normal speed */
+```
+
+Double-speed halves the time available per scanline for CPU work. OAM DMA takes half as many cycles in double-speed mode.
+
+---
+
+## Interrupts — Advanced
+
+**`critical {}` blocks** — wrap shared variables accessed from both ISR and main code to prevent race conditions:
+```c
+critical {
+    shared_var = new_value;
+}
+```
+
+**ISR chain limit:** Max 4 handlers per interrupt type can be registered via `add_VBL()` / `add_LCD()` etc.
+
+**`nowait_int_handler()`** — skip STAT check; use when you know which interrupt fired and want to avoid the check overhead.
+
+---
+
+## Miscellaneous APIs
+
+**`INCBIN(file)`** — include a binary file as a `const` array directly in ROM:
+```c
+INCBIN(uint8_t, my_data, "assets/data.bin")
+```
+
+**`get_system()`** — returns system type:
+- `SYSTEM_60HZ` (NTSC) or `SYSTEM_50HZ` (PAL)
+- `DMG_TYPE`, `CGB_TYPE`, `MGB_TYPE` constants for hardware detection
+
+**`GBA_DETECTED` / `GBA_NOT_DETECTED`** — result of `gba_detect()` to check if running on GBA.
+
+**`hiramcpy(dest, src, count)`** — copy a routine to HRAM (used for OAM DMA handler that must run from HRAM).
+
+---
+
+## SDCC Warning 283
+
+```
+warning 283: function called without prototype
+```
+Cause: `func()` with no parameters. Fix: declare as `func(void)`.
+
+---
+
+## gbt_player Gotcha
+
+`gbt_update()` changes the active ROM bank **without restoring it**. Always save and restore after calling:
+```c
+uint8_t saved = CURRENT_BANK;
+gbt_update();
+SWITCH_ROM(saved);
+```
 
 ---
 

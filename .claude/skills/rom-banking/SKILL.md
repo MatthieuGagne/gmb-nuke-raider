@@ -76,3 +76,65 @@ Data-only assets (portraits, tilesets, maps) must NOT use `#pragma bank 255` —
 ## Why BANKED Function Pointers Aren't the Fix
 
 CLAUDE.md documents that `void (*fn)(void) BANKED` in a struct field is **broken on SDCC/SM83**: it generates double-dereference code (reads 2 bytes from the function's address, then jumps there → garbage). The correct fix is to keep all state code in bank 1, not to add `BANKED` to the struct fields.
+
+---
+
+## Native GBDK Banking Macros
+
+The project's `SET_BANK`/`RESTORE_BANK` wrappers call these internally:
+
+| Macro | Description |
+|-------|-------------|
+| `SWITCH_ROM(bank)` | Switch ROM bank (MBC1 or MBC5) |
+| `SWITCH_ROM_MBC5_8M()` | MBC5 variant for >4 MB ROMs |
+| `SWITCH_RAM(bank)` | Switch external RAM bank |
+| `ENABLE_RAM` | Enable external RAM access |
+| `DISABLE_RAM` | Disable external RAM access |
+
+**`CURRENT_BANK` global** tracks the currently active ROM bank. Safe restore pattern:
+```c
+uint8_t saved = CURRENT_BANK;
+SWITCH_ROM(target_bank);
+/* ... use data in target_bank ... */
+SWITCH_ROM(saved);
+```
+
+**DANGER:** Never call `SWITCH_ROM` from inside a `BANKED` function — this switches out the ROM page currently executing → instant crash.
+
+**`NONBANKED` keyword:** Forces a function/data into fixed bank 0 regardless of the file's `#pragma bank` setting.
+
+---
+
+## MBC5 vs MBC1
+
+**MBC5 is recommended for new projects.** MBC1 has unavailable banks in its addressing range (banks 0x20, 0x40, 0x60 alias to adjacent banks). MBC5 gives a clean 0–255 bank range via `SWITCH_ROM`.
+
+Current project uses MBC1 (`-Wm-yt1`). To switch: change to `-Wm-yt2` and update `SWITCH_ROM` calls.
+
+**Far pointer limits:**
+- MBC1: max bank 15 for far pointers
+- MBC5: max bank 255 for far pointers
+
+---
+
+## Bankpack Flags
+
+| Flag | Purpose |
+|------|---------|
+| `-Wb-min=N` | Constrain auto-bank range minimum |
+| `-Wb-max=N` | Constrain auto-bank range maximum |
+| `-ext=` | Force bankpack to reassess all files each compile cycle (prevents stale assignments) |
+
+---
+
+## Overflow Detection
+
+```sh
+# ihxcheck warns on cross-bank spillage
+/home/mathdaman/gbdk/bin/ihxcheck build/junk-runner.ihx
+
+# romusage shows full per-bank usage
+/home/mathdaman/gbdk/bin/romusage build/junk-runner.gb -a
+```
+
+**Bank 0 constraint:** Fixed section (HOME) must be ≤ 16 KB. If bank 0 overflows, code spills into bank 1 which corrupts the switchable bank region.
