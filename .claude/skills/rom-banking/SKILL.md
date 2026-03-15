@@ -15,11 +15,11 @@ description: Use when the ROM shows a blank screen at low FPS (~2 FPS), when que
 
 | Bank | Used  | Notes |
 |------|-------|-------|
-| ROM_0 | ~46% | Fixed/HOME code, always mapped |
-| ROM_1 | ~100% | All autobanked modules — very tight (~26 bytes headroom) |
-| ROM_2 | ~2%  | Portrait data (explicit `#pragma bank 2`) |
+| ROM_0 | ~56% | Fixed/HOME code, always mapped |
+| ROM_1 | ~100% | All autobanked modules — 14 bytes free, overflows to bank 2 |
+| ROM_2 | ~5%  | Autobank overflow (portraits land here naturally) |
 
-Total autobanked data: ~16,358 bytes (bank 1 max = 16,384).
+Current config: MBC1, 4 banks declared (`-Wm-ya4`, `-Wm-yt1`). To add capacity, bump to `-Wm-ya8` — never hardcode bank numbers.
 
 ## Diagnosing Bank Overflow
 
@@ -35,43 +35,37 @@ grep "024[0-9A-Fa-f]\{3\}" build/junk-runner.map
 
 If `_state_ti`, `_state_hu`, `_state_pl`, `_state_ov` appear at `0x024xxx` addresses, bank 1 overflowed and the game will crash at boot.
 
-## Fix: Move Data Files to Explicit Banks
+## Fix: Bank Overflow
 
-Data-only assets (portraits, tilesets, maps) must NOT use `#pragma bank 255` — that puts them in the autobank pool competing with state code for bank 1 space.
+All files use `#pragma bank 255` — bankpack fills bank 1, then overflows to banks 2, 3, etc. automatically. No manual bank assignments needed for data assets.
 
-```c
-// ❌ BAD — competes with state code for bank 1
-#pragma bank 255
+If bank 1 is too full and state code is at risk of overflowing, the fix is to bump `-Wm-ya` to the next power of 2 (e.g., 4→8) in the Makefile. **Never hardcode a bank number** — `#pragma bank 2` is wrong policy.
 
-// ✅ GOOD — goes directly to bank 2, never touches bank 1
-#pragma bank 2
-```
-
-`BANKREF` / `BANK()` / `SET_BANK()` resolve correctly at link time regardless of whether the file uses `255` or an explicit number. No changes needed in callers or headers.
+`BANKREF` / `BANK()` / `SET_BANK()` resolve correctly at link time regardless of which bank a file lands in — no changes needed in callers.
 
 ## Asset Banking Rules
 
 | Asset type | Pragma | Reason |
 |------------|--------|--------|
-| `npc_*_portrait.c` | `#pragma bank 2` | Pure data, large |
-| `*_tiles.c` (generated) | `#pragma bank 2` | Pure data, large |
-| `*_map.c` (generated) | `#pragma bank 2` | Pure data, large |
+| `npc_*_portrait.c` | `#pragma bank 255` | Autobanked — bankpack places in bank 2+ naturally |
+| `*_tiles.c` (generated) | `#pragma bank 255` | Autobanked — bankpack places in bank 2+ naturally |
+| `*_map.c` (generated) | `#pragma bank 255` | Autobanked — bankpack places in bank 2+ naturally |
 | State modules (`state_*.c`) | `#pragma bank 255` | Must stay in bank 1 with state_manager |
-| Music data | check — may be large | If bank 1 is tight, move to explicit bank |
+| `music.c` | no `#pragma bank` (bank 0) | `SET_BANK` cannot be called from banked code — intentionally bank 0 |
 
 ## Checklist: After Adding Any Large Asset
 
 1. Build: `GBDK_HOME=/home/mathdaman/gbdk make`
 2. Check bank 1: `romusage build/junk-runner.gb -a` → if bank 1 ≥ 95%, act now
 3. Check for state code overflow: `grep "024[0-9A-Fa-f]\{3\}" build/junk-runner.map`
-4. If state code appears in bank 2+: find the largest new data file, change it to `#pragma bank 2`, rebuild
+4. If state code appears in bank 2+: fix is to bump `-Wm-ya8` in the Makefile so data overflows to bank 3+ instead of pushing state code out of bank 1
 
 ## Autobanker Behavior
 
-- `#pragma bank 255` → bankpack assigns automatically, fills bank 1 first, then bank 3+ if bank 2 is explicitly used
-- `#pragma bank 2` → linker places in bank 2 directly; bankpack does not touch it
-- Explicit and autobanked files coexist; bankpack fills auto-banks around the explicit ones
-- Bank 2 explicit data does **not** get mixed with bank 2 autobank overflow — autobank overflow goes to bank 3+
+- `#pragma bank 255` → bankpack assigns automatically, fills bank 1 first, then spills to bank 2, 3, etc.
+- All files (state code, data assets, portraits, tiles, maps) use `#pragma bank 255`
+- Bankpack fills banks sequentially — state code lands in bank 1, overflow data lands in bank 2+
+- With 4 banks declared (`-Wm-ya4`), bank 2 is available for overflow; bump to `-Wm-ya8` if needed — never hardcode bank numbers
 
 ## Why BANKED Function Pointers Aren't the Fix
 
