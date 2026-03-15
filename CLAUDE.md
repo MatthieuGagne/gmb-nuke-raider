@@ -12,10 +12,10 @@ GBDK_HOME=/home/mathdaman/gbdk make
 make clean
 
 # Run in emulator
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
 ```
 
-Output ROM: `build/junk-runner.gb`
+Output ROM: `build/nuke-raider.gb`
 
 ## Architecture
 
@@ -52,7 +52,7 @@ These apply to every feature, no matter how small.
 - OAM: 40 sprites total (player = 2; budget the rest for enemies/projectiles/HUD)
 - VRAM: 192 tiles (DMG bank 0) + 192 (CGB bank 1 for color variants)
 - WRAM: 8 KB — large arrays must be global or `static`, never local
-- ROM: MBC1 up to 1 MB — assets tagged for banking, code stays in bank 0
+- ROM: MBC5 up to 8 MB — assets tagged for banking, code stays in bank 0
 
 **Refactor checkpoint — required before closing any task:**
 > "Does this implementation generalize, or did we hard-code something that breaks when N > 1?"
@@ -64,7 +64,7 @@ These apply to every feature, no matter how small.
 
 ## ROM Header
 
-Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt1` (MBC1), `-Wm-yn"JUNK RUNNER"`.
+Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt25` (MBC5), `-Wm-ya16` (16 banks = 256KB declared), `-Wm-yn"NUKE RAIDER"`.
 To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
 
 ## ROM Banking — Autobanking Conventions
@@ -165,7 +165,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Rebuild: `GBDK_HOME=/home/mathdaman/gbdk make`
 3. Run `gb-memory-validator` agent (post-build validation). The agent auto-fixes ROM bank pressure if found. If FAIL cannot be auto-fixed (WRAM/VRAM/OAM), stop and fix manually before continuing.
-4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
+4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: push the branch and create the PR.
 

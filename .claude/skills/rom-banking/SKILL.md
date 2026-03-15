@@ -1,9 +1,9 @@
 ---
 name: rom-banking
-description: Use when the ROM shows a blank screen at low FPS (~2 FPS), when questions arise about ROM memory management, bank assignments, or where to place new data assets in Junk Runner.
+description: Use when the ROM shows a blank screen at low FPS (~2 FPS), when questions arise about ROM memory management, bank assignments, or where to place new data assets in Nuke Raider.
 ---
 
-# ROM Banking — Junk Runner
+# ROM Banking — Nuke Raider
 
 ## The Critical Constraint
 
@@ -16,10 +16,10 @@ description: Use when the ROM shows a blank screen at low FPS (~2 FPS), when que
 | Bank | Used  | Notes |
 |------|-------|-------|
 | ROM_0 | ~46% | Fixed/HOME code, always mapped |
-| ROM_1 | ~100% | All autobanked modules — very tight (~26 bytes headroom) |
-| ROM_2 | ~2%  | Portrait data (explicit `#pragma bank 2`) |
+| ROM_1 | ~100% | All autobanked modules — overflows naturally into bank 2+ |
+| ROM_2 | ~5%  | Autobank overflow + portrait data (explicit `#pragma bank 2`) |
 
-Total autobanked data: ~16,358 bytes (bank 1 max = 16,384).
+Total autobanked data: ~16,370 + 788 bytes across banks 1–2 (MBC5, 16 banks declared).
 
 ## Diagnosing Bank Overflow
 
@@ -27,10 +27,10 @@ Total autobanked data: ~16,358 bytes (bank 1 max = 16,384).
 
 ```sh
 # Step 1: Check bank percentages
-/home/mathdaman/gbdk/bin/romusage build/junk-runner.gb -a
+/home/mathdaman/gbdk/bin/romusage build/nuke-raider.gb -a
 
 # Step 2: Find symbols placed in bank 2+ — state_* code here = crash
-grep "024[0-9A-Fa-f]\{3\}" build/junk-runner.map
+grep "024[0-9A-Fa-f]\{3\}" build/nuke-raider.map
 ```
 
 If `_state_ti`, `_state_hu`, `_state_pl`, `_state_ov` appear at `0x024xxx` addresses, bank 1 overflowed and the game will crash at boot.
@@ -62,8 +62,8 @@ Data-only assets (portraits, tilesets, maps) must NOT use `#pragma bank 255` —
 ## Checklist: After Adding Any Large Asset
 
 1. Build: `GBDK_HOME=/home/mathdaman/gbdk make`
-2. Check bank 1: `romusage build/junk-runner.gb -a` → if bank 1 ≥ 95%, act now
-3. Check for state code overflow: `grep "024[0-9A-Fa-f]\{3\}" build/junk-runner.map`
+2. Check bank 1: `romusage build/nuke-raider.gb -a` → if bank 1 ≥ 95%, act now
+3. Check for state code overflow: `grep "024[0-9A-Fa-f]\{3\}" build/nuke-raider.map`
 4. If state code appears in bank 2+: find the largest new data file, change it to `#pragma bank 2`, rebuild
 
 ## Autobanker Behavior
