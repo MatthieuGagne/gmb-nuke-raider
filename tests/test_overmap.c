@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "state_overmap.h"
 #include "state_hub.h"
-#include "config.h"
+
 #include "input.h"
 
 /* input and prev_input defined by tests/mocks/input_globals.c */
@@ -33,30 +33,30 @@ void setUp(void) {
 void tearDown(void) {}
 
 void test_car_starts_at_hub(void) {
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX, overmap_get_car_tx());
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY, overmap_get_car_ty());
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_tx(), overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_ty(), overmap_get_car_ty());
 }
 
 void test_left_travels_to_dest(void) {
     travel_to_node(J_LEFT);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_LEFT_TX, overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(2u, overmap_get_car_tx());
 }
 
 void test_right_travels_to_dest(void) {
     travel_to_node(J_RIGHT);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_RIGHT_TX, overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(17u, overmap_get_car_tx());
 }
 
 void test_up_travels_to_city_hub(void) {
     travel_to_node(J_UP);
     /* city hub tile is at (9,6) — arrives at (9,6) which triggers hub entry */
-    /* car_ty should be OVERMAP_HUB_TY - 2u = 6 */
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY - 2u, overmap_get_car_ty());
+    /* car_ty should be 6 (city hub is at row 6) */
+    TEST_ASSERT_EQUAL_UINT8(6u, overmap_get_car_ty());
 }
 
 void test_down_blocked_by_blank(void) {
     tick(J_DOWN);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY, overmap_get_car_ty());
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_ty(), overmap_get_car_ty());
 }
 
 void test_held_button_does_not_repeat(void) {
@@ -64,7 +64,7 @@ void test_held_button_does_not_repeat(void) {
     prev_input = J_LEFT;
     input      = J_LEFT;
     state_overmap.update();
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX, overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_tx(), overmap_get_car_tx());
 }
 
 void test_dest_left_sets_race_id(void) {
@@ -85,8 +85,8 @@ void test_city_hub_tile_triggers_hub_entry(void) {
 
 void test_city_hub_tile_car_position_unchanged_after_enter(void) {
     travel_to_node(J_UP);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX,      overmap_get_car_tx());
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TY - 2u, overmap_get_car_ty());
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_tx(), overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(6u,                     overmap_get_car_ty());
 }
 
 void test_input_ignored_while_traveling(void) {
@@ -95,7 +95,7 @@ void test_input_ignored_while_traveling(void) {
     prev_input = 0; input = J_RIGHT; state_overmap.update(); /* mid-travel: ignored */
     prev_input = input; input = 0;
     for (i = 0u; i < 80u; i++) { state_overmap.update(); }
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_DEST_LEFT_TX, overmap_get_car_tx());
+    TEST_ASSERT_EQUAL_UINT8(2u, overmap_get_car_tx());
 }
 
 void test_travel_advances_one_tile_per_four_frames(void) {
@@ -103,9 +103,9 @@ void test_travel_advances_one_tile_per_four_frames(void) {
     prev_input = 0; input = J_LEFT; state_overmap.update();
     prev_input = input; input = 0;
     for (i = 0u; i < 3u; i++) state_overmap.update();
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX, overmap_get_car_tx());      /* no move at frame 3 */
+    TEST_ASSERT_EQUAL_UINT8(overmap_get_spawn_tx(),           overmap_get_car_tx()); /* no move at frame 3 */
     state_overmap.update();
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_HUB_TX - 1u, overmap_get_car_tx()); /* moved at frame 4 */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(overmap_get_spawn_tx() - 1u), overmap_get_car_tx()); /* moved at frame 4 */
 }
 
 int main(void) {
