@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "state_hub.h"
 #include "hub_data.h"
+#include "state_overmap.h"
 #include "state_manager.h"
 #include "input.h"
 #include "banking.h"
@@ -331,7 +332,7 @@ static void update_dialog(void) {
 
 static void enter(void) {
     overmap_hub_entered = 0u;
-    hub       = &rust_town;
+    hub       = hub_table[current_hub_id];
     sub_state = HUB_SUB_MENU;
     cursor    = 0u;
     active_npc         = 0u;
