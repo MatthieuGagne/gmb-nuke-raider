@@ -3,7 +3,11 @@
 #include <stdint.h>
 #include "banking.h"
 
-BANKREF(overmap_tile_data)
+/* Bank reference: volatile __at(bank) places the bank symbol in DATA (not CODE),
+   so bankpack assigns it to the same bank as this file's data array.
+   BANKREF() creates a CODE stub that bankpack may assign to a different bank. */
+volatile __at(255) uint8_t __bank_overmap_tile_data;
+
 const uint8_t overmap_tile_data[] = {
     /* tile 0 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     /* tile 1 */ 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00,
