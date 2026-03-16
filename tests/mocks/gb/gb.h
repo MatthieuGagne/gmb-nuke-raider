@@ -5,9 +5,12 @@
 
 #include <stdint.h>
 
-/* SDCC ROM-placement qualifier — noop on gcc */
+/* SDCC ROM-placement qualifiers — noop on gcc */
 #ifndef __code
 #define __code
+#endif
+#ifndef __at
+#define __at(x)
 #endif
 
 typedef uint8_t  UBYTE;
