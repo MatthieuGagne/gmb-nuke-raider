@@ -15,6 +15,7 @@
 #include "npc_trader_portrait.h"
 #include "npc_drifter_portrait.h"
 #include "dialog_arrow_sprite.h"
+#include "dialog_border_tiles.h"
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
@@ -256,6 +257,9 @@ static void hub_start_dialog(uint8_t npc_cursor) {
     wait_vbl_done(); /* sync to VBlank; writes complete well within ~1ms window */
     cls();
     load_portrait(npc_cursor);
+    { SET_BANK(dialog_border_tiles);
+      set_bkg_data(HUB_BORDER_TILE_SLOT, 8u, dialog_border_tiles);
+      RESTORE_BANK(); }
     hub_render_dialog();
 }
 
