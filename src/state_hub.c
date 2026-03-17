@@ -114,6 +114,15 @@ uint8_t render_wrapped(const char *text, uint8_t start_col, uint8_t start_row,
     return finished ? 0u : word_start;
 }
 
+#define BRD_TL (HUB_BORDER_TILE_SLOT + 0u)
+#define BRD_T  (HUB_BORDER_TILE_SLOT + 1u)
+#define BRD_TR (HUB_BORDER_TILE_SLOT + 2u)
+#define BRD_L  (HUB_BORDER_TILE_SLOT + 3u)
+#define BRD_R  (HUB_BORDER_TILE_SLOT + 4u)
+#define BRD_BL (HUB_BORDER_TILE_SLOT + 5u)
+#define BRD_B  (HUB_BORDER_TILE_SLOT + 6u)
+#define BRD_BR (HUB_BORDER_TILE_SLOT + 7u)
+
 static void hub_render_dialog(void) {
     uint8_t num_choices;
     uint8_t i;
@@ -152,25 +161,32 @@ static void hub_render_dialog(void) {
       }
       RESTORE_BANK(); }
 
-    /* --- Draw portrait box border (cols 0-5, rows 0-7) --- */
-    gotoxy(0u, 0u); printf("+----+");
-    gotoxy(0u, 1u); printf("|    |");
-    gotoxy(0u, 2u); printf("|    |");
-    gotoxy(0u, 3u); printf("|    |");
-    gotoxy(0u, 4u); printf("|    |");
-    gotoxy(0u, 5u); printf("|    |");
-    gotoxy(0u, 6u); printf("|    |");
-    gotoxy(0u, 7u); printf("+----+");
+    /* portrait box border rows (6 tiles wide: cols 0-5) */
+    static const uint8_t portrait_top[HUB_PORTRAIT_BOX_W]  = {BRD_TL, BRD_T,  BRD_T,  BRD_T,  BRD_T,  BRD_TR};
+    static const uint8_t portrait_side[HUB_PORTRAIT_BOX_W] = {BRD_L,  0u,     0u,     0u,     0u,     BRD_R };
+    static const uint8_t portrait_bot[HUB_PORTRAIT_BOX_W]  = {BRD_BL, BRD_B,  BRD_B,  BRD_B,  BRD_B,  BRD_BR};
+    /* dialog box border rows (14 tiles wide: cols 6-19) */
+    static const uint8_t dialog_top[HUB_DIALOG_BOX_W]  = {BRD_TL, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_TR};
+    static const uint8_t dialog_side[HUB_DIALOG_BOX_W] = {BRD_L,  0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    BRD_R };
+    static const uint8_t dialog_bot[HUB_DIALOG_BOX_W]  = {BRD_BL, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_BR};
 
-    /* --- Draw dialog box border (cols 6-19, rows 0-7) --- */
-    gotoxy(6u, 0u); printf("+------------+");
-    gotoxy(6u, 1u); printf("|            |");
-    gotoxy(6u, 2u); printf("|            |");
-    gotoxy(6u, 3u); printf("|            |");
-    gotoxy(6u, 4u); printf("|            |");
-    gotoxy(6u, 5u); printf("|            |");
-    gotoxy(6u, 6u); printf("|            |");
-    gotoxy(6u, 7u); printf("+------------+");
+    /* --- Draw portrait box border (cols 0-5, rows 0-7) using BG tiles --- */
+    set_bkg_tiles(0u, 0u, HUB_PORTRAIT_BOX_W, 1u, portrait_top);
+    { uint8_t r;
+      for (r = 1u; r <= 6u; r++) {
+          set_bkg_tiles(0u, r, HUB_PORTRAIT_BOX_W, 1u, portrait_side);
+      }
+    }
+    set_bkg_tiles(0u, 7u, HUB_PORTRAIT_BOX_W, 1u, portrait_bot);
+
+    /* --- Draw dialog box border (cols 6-19, rows 0-7) using BG tiles --- */
+    set_bkg_tiles(6u, 0u, HUB_DIALOG_BOX_W, 1u, dialog_top);
+    { uint8_t r;
+      for (r = 1u; r <= 6u; r++) {
+          set_bkg_tiles(6u, r, HUB_DIALOG_BOX_W, 1u, dialog_side);
+      }
+    }
+    set_bkg_tiles(6u, 7u, HUB_DIALOG_BOX_W, 1u, dialog_bot);
 
     /* --- Place portrait BG tiles at inner cols 1-4, rows 2-5 --- */
     set_bkg_tiles(1u, 2u, 4u, 4u, portrait_map);
@@ -221,6 +237,14 @@ static void hub_render_dialog(void) {
     }
     } /* end if (dialog_next_offset == 0u) */
 }
+#undef BRD_TL
+#undef BRD_T
+#undef BRD_TR
+#undef BRD_L
+#undef BRD_R
+#undef BRD_BL
+#undef BRD_B
+#undef BRD_BR
 
 /* ── Logic helpers ──────────────────────────────────────────────────────── */
 
