@@ -111,7 +111,9 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
 - **`prd`** — Create a GitHub issue with a PRD for a new feature.
 
-**Project-local shadows/extensions of global superpowers skills** (in `.claude/skills/`, override the global versions automatically):
+### Project-local shadows/extensions of global superpowers skills
+
+These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
 
 - **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
