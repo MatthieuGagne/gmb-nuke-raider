@@ -52,8 +52,11 @@ Only continue to Step 3 when both gates pass.
    git fetch origin && git merge origin/master
    ```
 
-2. Rebuild from the worktree directory:
+2. Ensure a ROM exists — if `build/nuke-raider.gb` is missing, do a clean build first:
    ```bash
+   # Check if ROM exists
+   ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)
+   # Always rebuild to include latest changes
    GBDK_HOME=/home/mathdaman/gbdk make
    ```
 
