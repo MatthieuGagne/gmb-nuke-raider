@@ -117,14 +117,16 @@ After all tasks are complete and the final code reviewer approves, run the post-
 
 1. Run `make test` — if any tests fail, stop and fix before continuing
 2. Invoke `bank-post-build` skill — if FAIL, stop and fix
-3. Run `gb-memory-validator` agent — if any budget is FAIL, stop and fix
-4. Run smoketest sequence:
+3. Run smoketest sequence:
    ```bash
    # From the worktree directory
    git fetch origin && git merge origin/master
-   # Ensure ROM exists — clean build if missing
-   ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)
-   GBDK_HOME=/home/mathdaman/gbdk make
+   # Always clean build before memory validator + smoketest
+   make clean && GBDK_HOME=/home/mathdaman/gbdk make
+   ```
+4. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix
+5. Launch:
+   ```bash
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
    ```
    Tell the user it's running. Wait for their confirmation before proceeding.

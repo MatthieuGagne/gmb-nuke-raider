@@ -136,8 +136,8 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
-2. Ensure ROM exists — if `build/nuke-raider.gb` is missing do a clean build first: `ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)`. Then rebuild: `GBDK_HOME=/home/mathdaman/gbdk make`
-3. Run `gb-memory-validator` agent — if any budget is FAIL, stop and fix before continuing.
+2. Always do a clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
+3. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix before continuing.
 4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
