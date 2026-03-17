@@ -231,7 +231,8 @@
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.gb -B 2>&1)",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.gb -a -S 2>&1)",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.map -a 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.map -B 2>&1)"
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.map -B 2>&1)",
+      "WebFetch(domain:yarnspinner.dev)"
     ]
   }
 }
