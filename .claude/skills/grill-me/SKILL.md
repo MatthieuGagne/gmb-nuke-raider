@@ -9,15 +9,23 @@ Interview me relentlessly about every aspect of this plan until we reach a share
 
 If a question can be answered by exploring the codebase, explore the codebase instead of asking.
 
+## Before You Begin
+
+If the user has not yet described the plan or design to be reviewed, ask them to do so now before asking any questions:
+
+> "Please describe the plan or design you'd like me to grill you on."
+
 ## GB Constraint Question Areas
 
 For any GBC feature plan, work through ALL of these areas. Ask one question at a time.
+
+For non-hardware plans (refactors, tooling, workflow changes): skip hardware-specific areas (OAM, VRAM) and focus on banking, WRAM, SDCC constraints, and testability as applicable. Always probe for correctness, testability, and architectural fit.
 
 ### 1. Banking
 - Which ROM bank does this code live in?
 - Does it call functions in other banks? Are those cross-bank calls safe (SET_BANK used correctly)?
 - Are any data arrays large enough to need banking? Which bank?
-- Have you checked the current bank budget (`make bank-post-build`)?
+- Have you checked the current bank budget (invoke the `bank-post-build` skill)?
 
 ### 2. OAM Budget
 - How many OAM sprite slots does this feature consume?
