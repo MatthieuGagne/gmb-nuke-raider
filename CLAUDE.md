@@ -138,7 +138,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 3. Run `gb-memory-validator` agent — if any budget is FAIL, stop and fix before continuing.
 4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
-6. Only after the user confirms: push the branch and create the PR.
+6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates (mandatory):**
 - Before writing any `src/*.c` or `src/*.h` file → invoke `bank-pre-write` skill, then `gbdk-expert`
