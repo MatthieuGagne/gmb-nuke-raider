@@ -27,10 +27,11 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 | 2 | Invoke `bank-pre-write` skill (HARD GATE) |
 | 3 | Invoke `gbdk-expert` agent (HARD GATE) |
 | 4 | Write the C file |
-| 5 | Run tests (`make test` → PASS) |
-| 6 | Build ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS) |
-| 7 | Invoke `bank-post-build` skill (HARD GATE) |
-| 8 | Commit |
+| 5 | Write minimal implementation |
+| 6 | Run tests (`make test` → PASS) |
+| 7 | Build ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS) |
+| 8 | Invoke `bank-post-build` skill (HARD GATE) |
+| 9 | Commit |
 
 Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
 
@@ -157,7 +158,7 @@ git commit -m "feat: add/update X"
 - Exact file paths always
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
-- Reference relevant skills with @ syntax
+- Reference skills by name (e.g., `bank-pre-write` skill, `gbdk-expert` agent)
 - DRY, YAGNI, TDD, frequent commits
 - C files ALWAYS get the 9-step template with all three HARD GATE steps
 
