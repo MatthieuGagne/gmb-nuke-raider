@@ -38,16 +38,17 @@ If not in a worktree: use the `using-git-worktrees` skill or `EnterWorktree` too
 
 ### Step 3: Execute Batch
 
-**Default: first 3 tasks**
+**Default: first 3 tasks (or all remaining if fewer than 3)**
 
 For each task:
 1. Mark as in_progress
 2. Follow each step exactly (plan has bite-sized steps)
 3. Before writing any `src/*.c` or `src/*.h` file:
-   - Invoke `bank-pre-write` skill (HARD GATE)
-   - Invoke `gbdk-expert` agent (HARD GATE)
+   - Invoke `bank-pre-write` **skill** (HARD GATE — use the `Skill` tool)
+   - Invoke `gbdk-expert` **agent** (HARD GATE — use the `Agent` tool)
 4. After any successful build:
-   - Invoke `bank-post-build` skill (HARD GATE)
+   - Invoke `bank-post-build` **skill** (HARD GATE — use the `Skill` tool)
+   - Run `gb-memory-validator` **agent** (HARD GATE — use the `Agent` tool); if any budget is FAIL, stop and fix before continuing
 5. Run verifications as specified
 6. Mark as completed
 
@@ -88,11 +89,10 @@ After all tasks complete and verified, run the smoketest sequence:
    ```
    Tell the user it's running and ask them to confirm it looks correct.
 
-5. Only after the user confirms: proceed to finishing-a-development-branch.
-
-Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-**REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-Follow that skill to verify tests, present options, execute choice.
+5. Only after the user confirms:
+   - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
+   - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
+   - Follow that skill to verify tests, present options, execute choice.
 
 ## When to Stop and Ask for Help
 
