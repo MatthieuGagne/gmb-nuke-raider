@@ -2,6 +2,7 @@
   "src/camera.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog_arrow_sprite.c":   {"bank": 255, "reason": "autobank"},
+  "src/dialog_border_tiles.c":   {"bank": 255, "reason": "autobank"},
   "src/dialog_data.c":           {"bank": 255, "reason": "autobank"},
   "src/hub_data.c":              {"bank": 0,   "reason": "bank-0 data, always mapped — no #pragma bank"},
   "src/hud.c":                   {"bank": 255, "reason": "autobank"},
