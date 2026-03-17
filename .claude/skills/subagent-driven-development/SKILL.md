@@ -122,6 +122,8 @@ After all tasks are complete and the final code reviewer approves, run the post-
    ```bash
    # From the worktree directory
    git fetch origin && git merge origin/master
+   # Ensure ROM exists — clean build if missing
+   ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)
    GBDK_HOME=/home/mathdaman/gbdk make
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
    ```
