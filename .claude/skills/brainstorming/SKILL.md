@@ -26,12 +26,11 @@ You MUST create a task for each of these items and complete them in order:
 1. **Explore project context** — check files, docs, recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design** — in sections scaled to their complexity, get user approval after each section;
-   include a **Design-It-Twice** step: sketch two alternative module interfaces / APIs for any new
-   `src/*.c` module, compare them explicitly, then choose the better one
+4. **Present design** — in sections scaled to their complexity, get user approval after each section
+   - **Design-It-Twice** (required for any new `src/*.c` module): sketch two alternative module interfaces / APIs, compare them explicitly, then choose the better one
 5. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
    Do NOT save a local design doc file. The GitHub issue IS the design doc.
-6. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+6. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
 
 ## GB Constraint Checklist
 
