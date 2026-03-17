@@ -215,10 +215,23 @@
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/overmap-data-driven/build/nuke-raider.gb --ram 2>&1; /home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/overmap-data-driven/build/nuke-raider.gb --help 2>&1 | head -30)",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/overmap-data-driven/build/nuke-raider.map -a 2>&1)",
       "WebFetch(domain:www.reddit.com)",
-      "Bash(WORKTREE=/home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest)",
+      "Bash(WORKTREE=\"/home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/src\")",
       "Bash(do)",
       "Bash(echo \"=== $f ===\")",
-      "Read(//home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/$WORKTREE/src/**)"
+      "Read(//home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/$WORKTREE/**)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/build/junk-runner.gb -a 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/build/nuke-raider.gb -a 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/build/nuke-raider.gb -B 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage --help 2>&1 | head -40)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-111-bank-manifest/build/nuke-raider.map -a 2>&1)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_post_build -v 2>&1 | head -20)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_post_build -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c.TestGidIntegration.test_empty_cell_produces_zero_not_underflow -v 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.gb -a 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.gb -B 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.gb -a -S 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.map -a 2>&1)",
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/issue-113-bank-post-build-script/build/nuke-raider.map -B 2>&1)"
     ]
   }
 }

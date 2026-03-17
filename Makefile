@@ -1,7 +1,7 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya16 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
@@ -19,7 +19,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build
 
 all: $(TARGET)
 
@@ -111,11 +111,14 @@ src/overmap_map.c: assets/maps/overmap.tmx tools/tmx_to_array_c.py
 $(TARGET): src/overmap_map.c
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c -v
+	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
 	python3 tools/bank_check.py .
+
+bank-post-build:
+	python3 tools/bank_post_build.py .
 
 clean:
 	rm -rf build/
