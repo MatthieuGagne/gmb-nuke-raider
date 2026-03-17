@@ -47,8 +47,10 @@ def _check_romusage(banks):
     """Return list of (bank_num, pct, status) for each bank."""
     results = []
     for bank_num, pct in banks:
-        if pct >= 100:
+        if pct > 100:
             status = 'FAIL'
+        elif pct == 100:
+            status = 'WARN'
         elif bank_num == 1 and pct > 90:
             status = 'WARN'
         elif bank_num != 1 and pct > 80:

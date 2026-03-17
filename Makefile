@@ -1,7 +1,7 @@
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
-CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya16 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
+CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
