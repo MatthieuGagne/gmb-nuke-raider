@@ -111,6 +111,17 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
 - **`prd`** — Create a GitHub issue with a PRD for a new feature.
 
+### Project-local shadows/extensions of global superpowers skills
+
+These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
+
+- **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
+- **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
+- **`brainstorming`** — Shadows superpowers:brainstorming; redirects step 5 from local file to `/prd` GitHub issue; adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
+- **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
+- **`subagent-driven-development`** — Shadows superpowers:subagent-driven-development; adds worktree hard gate at top; injects bank-pre-write + gbdk-expert into implementer dispatch instructions; adds bank-post-build + gb-memory-validator + smoketest to post-build review step.
+- **`grill-me`** — New skill (adapted from mattpocock/skills); structured interview that stress-tests a plan; covers all 7 GB constraint areas (banking, OAM, WRAM, VRAM, SoA, SDCC, testability); ends with resolved/unresolved summary.
+
 ## Workflow
 
 This project uses [Superpowers](https://github.com/obra/superpowers) (installed globally in `~/.claude/`).
@@ -120,22 +131,23 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` skill and `bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, both bank skills, `bank_check.py`, `gbdk-expert`, `gb-memory-validator`, and this file.
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
-**Brainstorming skill override:** Skip step 5 (write design doc to `docs/plans/`) — use `/prd` to create a GitHub issue instead.
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first.
 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
-2. Rebuild: `GBDK_HOME=/home/mathdaman/gbdk make`
+2. Ensure ROM exists — if `build/nuke-raider.gb` is missing do a clean build first: `ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)`. Then rebuild: `GBDK_HOME=/home/mathdaman/gbdk make`
 3. Run `gb-memory-validator` agent — if any budget is FAIL, stop and fix before continuing.
 4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
-6. Only after the user confirms: push the branch and create the PR.
+6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates (mandatory):**
 - Before writing any `src/*.c` or `src/*.h` file → invoke `bank-pre-write` skill, then `gbdk-expert`
 - After a successful build, before smoketest → invoke `bank-post-build` skill, then `gb-memory-validator` agent
 - When debugging any runtime issue → invoke `emulicious-debug`
+
+**Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).
 
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
 
