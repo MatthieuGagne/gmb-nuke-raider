@@ -53,5 +53,8 @@
 /* Hub system */
 #define MAX_HUB_NPCS           3u
 #define HUB_PORTRAIT_TILE_SLOT 96u   /* BKG tile slots 96-111 (16 tiles) for 32x32 portrait */
+#define HUB_BORDER_TILE_SLOT   112u  /* BKG tile slots 112-119 (8 tiles) for dialog box border */
+#define HUB_PORTRAIT_BOX_W     6u    /* portrait box width in tiles (cols 0-5) */
+#define HUB_DIALOG_BOX_W       14u   /* dialog box width in tiles (cols 6-19) */
 
 #endif /* CONFIG_H */

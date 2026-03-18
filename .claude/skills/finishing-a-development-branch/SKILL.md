@@ -36,14 +36,13 @@ Stop. Don't proceed to Step 2.
 
 **If tests pass:** Continue to Step 2.
 
-### Step 2: HARD GATE — bank-post-build + gb-memory-validator
+### Step 2: HARD GATE — bank-post-build
 
-**Run these before the smoketest:**
+**Run before the smoketest:**
 
-1. Invoke the `bank-post-build` skill. If it reports any FAIL, stop and fix before continuing.
-2. Run the `gb-memory-validator` agent. If any budget is FAIL, stop and fix before continuing.
+Invoke the `bank-post-build` skill. If it reports any FAIL, stop and fix before continuing.
 
-Only continue to Step 3 when both gates pass.
+Only continue to Step 3 when it passes.
 
 ### Step 3: Smoketest in Emulicious
 
@@ -52,15 +51,14 @@ Only continue to Step 3 when both gates pass.
    git fetch origin && git merge origin/master
    ```
 
-2. Ensure a ROM exists — if `build/nuke-raider.gb` is missing, do a clean build first:
+2. Always do a clean build:
    ```bash
-   # Check if ROM exists
-   ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)
-   # Always rebuild to include latest changes
-   GBDK_HOME=/home/mathdaman/gbdk make
+   make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
 
-3. Launch the ROM immediately in the background (from the worktree directory so `build/` resolves
+3. Run `gb-memory-validator` agent on the clean build ROM. If any budget is FAIL, stop and fix before continuing.
+
+4. Launch the ROM immediately in the background (from the worktree directory so `build/` resolves
    to the worktree's build output — NEVER from the main repo's `build/`):
    ```bash
    # Run from the worktree directory (cd there first if needed)

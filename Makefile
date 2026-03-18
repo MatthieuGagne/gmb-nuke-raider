@@ -77,6 +77,13 @@ src/npc_drifter_portrait.c: assets/sprites/npc_drifter.png tools/png_to_tiles.py
 
 $(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter_portrait.c
 
+# src/dialog_border_tiles.c is checked into git so CI works without Python.
+# Run `make src/dialog_border_tiles.c` to regenerate from updated PNG.
+src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_border.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py --bank 2 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
+
+$(TARGET): src/dialog_border_tiles.c
+
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 

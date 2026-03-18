@@ -76,13 +76,12 @@ After all tasks complete and verified, run the smoketest sequence:
    ```
    NEVER use `git merge master` alone — the local master ref may be stale.
 
-2. Ensure a ROM exists — if `build/nuke-raider.gb` is missing, do a clean build first:
+2. Always do a clean build:
    ```bash
-   ls build/nuke-raider.gb 2>/dev/null || (make clean && GBDK_HOME=/home/mathdaman/gbdk make)
-   GBDK_HOME=/home/mathdaman/gbdk make
+   make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
 
-3. Run `gb-memory-validator` agent — if any budget is FAIL, stop and fix before continuing.
+3. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix before continuing.
 
 4. Launch the ROM immediately in the background (run from the worktree directory):
    ```bash

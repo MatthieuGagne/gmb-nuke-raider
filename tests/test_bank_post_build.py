@@ -86,12 +86,12 @@ class TestRomusageBudget(unittest.TestCase):
         statuses = {r[0]: r[2] for r in result['bank_results']}
         self.assertEqual(statuses[1], 'WARN')
 
-    def test_bank1_warn_at_100(self):
+    def test_bank1_fail_at_100(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FULL)
         statuses = {r[0]: r[2] for r in result['bank_results']}
-        self.assertEqual(statuses[1], 'WARN')
+        self.assertEqual(statuses[1], 'FAIL')
 
     def test_bank1_fail_above_100(self):
         with tempfile.TemporaryDirectory() as d:
@@ -261,11 +261,11 @@ class TestOverallStatus(unittest.TestCase):
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_WARN)
         self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
-    def test_bank1_full_overall_warn(self):
+    def test_bank1_full_overall_fail(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d, noi=NOI_STATES_OK)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FULL)
-        self.assertEqual(bank_post_build.overall_status(result), 'WARN')
+        self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
 
     def test_bank1_overflow_overall_fail(self):
         with tempfile.TemporaryDirectory() as d:
