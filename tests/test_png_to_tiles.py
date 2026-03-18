@@ -141,8 +141,8 @@ class TestPngToC(unittest.TestCase):
             src = f.read()
         self.assertIn('tiles_count = 2', src)
 
-    def test_bank_ref_uses_volatile_at_255(self):
-        """volatile __at(255) emitted for autobanked files — no BANKREF function."""
+    def test_bank_ref_uses_bankref_for_autobank(self):
+        """BANKREF(sym) emitted for --bank 255 (autobank) — bankpack resolves real bank at link time."""
         data = _make_indexed_png(8, 8, [1] * 64)
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as pf:
             pf.write(data)
@@ -152,9 +152,8 @@ class TestPngToC(unittest.TestCase):
         png_to_c(png_path, c_path, 'my_tiles', bank=255)
         with open(c_path) as f:
             src = f.read()
-        self.assertIn('volatile __at(255) uint8_t __bank_my_tiles;', src)
-        self.assertNotIn('BANKREF(my_tiles)', src)
-        self.assertNotIn('__func_my_tiles', src)
+        self.assertIn('BANKREF(my_tiles)', src)
+        self.assertNotIn('volatile __at(255)', src)
 
     def test_bank_ref_uses_volatile_at_explicit_bank(self):
         """volatile __at(N) emitted for explicit bank N — no BANKREF function."""
@@ -169,6 +168,20 @@ class TestPngToC(unittest.TestCase):
             src = f.read()
         self.assertIn('volatile __at(2) uint8_t __bank_my_tiles;', src)
         self.assertNotIn('BANKREF(my_tiles)', src)
+
+    def test_bank_ref_uses_volatile_at_bank2(self):
+        """volatile __at(2) still emitted for explicit --bank 2."""
+        data = _make_indexed_png(8, 8, [1] * 64)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as pf:
+            pf.write(data)
+            png_path = pf.name
+        with tempfile.NamedTemporaryFile(suffix='.c', delete=False, mode='w') as cf:
+            c_path = cf.name
+        png_to_c(png_path, c_path, 'my_tiles', bank=2)
+        with open(c_path) as f:
+            src = f.read()
+        self.assertIn('volatile __at(2) uint8_t __bank_my_tiles;', src)
+        self.assertNotIn('BANKREF', src)
 
 
 if __name__ == '__main__':
