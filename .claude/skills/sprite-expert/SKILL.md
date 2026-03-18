@@ -19,7 +19,7 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 |------|------|-------|
 | Draw pixels | Aseprite | Indexed color mode, 4-color GBC palette; canvas must be multiples of 8 |
 | Export PNG | `make export-sprites` or Aseprite File → Export As | Requires `aseprite` in PATH; PNGs are checked in for CI |
-| Convert | `python3 tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank, explicit bank number for assets that must be isolated (e.g. portraits use `2`) |
+| Convert | `python3 tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank for all assets including portraits (portraits use `255`); loader.c handles bank switching |
 | Use | `extern` declare in `.c` file that calls `set_sprite_data` | Generated file — **never edit by hand** |
 
 **Aseprite setup for GBC sprites:**
@@ -153,6 +153,8 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 ```
 
 `move_sprite` writes to OAM shadow buffer (GBDK copies it via DMA) — safe anytime.
+
+**Banked tile data — loader.c rule:** `set_sprite_data` / `set_bkg_data` calls that load banked tile data must be made from bank-0 code (via `loader.c` wrappers), not from within BANKED callers.
 
 ---
 
