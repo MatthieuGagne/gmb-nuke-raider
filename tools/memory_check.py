@@ -43,8 +43,11 @@ def _status(used, budget):
 def _check_wram(repo_root):
     """Parse build/nuke-raider.map for s__HEAP_E. Returns (used_bytes, status)."""
     map_path = os.path.join(repo_root, 'build', 'nuke-raider.map')
-    with open(map_path) as f:
-        content = f.read()
+    try:
+        with open(map_path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        return None, 'ERROR'
     m = re.search(r'([0-9A-Fa-f]{8})\s+s__HEAP_E\b', content)
     if not m:
         return None, 'ERROR'
@@ -68,8 +71,11 @@ def _check_vram(repo_root):
 def _check_oam(repo_root):
     """Parse src/config.h for MAX_SPRITES + fixed slots. Returns (slots, status)."""
     config_path = os.path.join(repo_root, 'src', 'config.h')
-    with open(config_path) as f:
-        content = f.read()
+    try:
+        with open(config_path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        return None, 'ERROR'
     m = re.search(r'#define\s+MAX_SPRITES\s+(\d+)', content)
     pool_sprites = int(m.group(1)) if m else 0
     total = pool_sprites + OAM_FIXED_SLOTS

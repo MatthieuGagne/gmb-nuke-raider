@@ -48,7 +48,7 @@ For each task:
    - Invoke `gbdk-expert` **agent** (HARD GATE — use the `Agent` tool)
 4. After any successful build:
    - Invoke `bank-post-build` **skill** (HARD GATE — use the `Skill` tool)
-   - Run `gb-memory-validator` **agent** (HARD GATE — use the `Agent` tool); if any budget is FAIL, stop and fix before continuing
+   - Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE); if any budget is FAIL or ERROR, stop and fix before continuing
 5. Run verifications as specified
 6. Mark as completed
 
@@ -81,7 +81,7 @@ After all tasks complete and verified, run the smoketest sequence:
    make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
 
-3. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix before continuing.
+3. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix before continuing.
 
 4. Launch the ROM immediately in the background (run from the worktree directory):
    ```bash

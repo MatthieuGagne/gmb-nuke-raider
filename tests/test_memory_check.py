@@ -60,6 +60,14 @@ class TestCheckWRAM(unittest.TestCase):
             self.assertIsNone(used)
             self.assertEqual(status, 'ERROR')
 
+    def test_missing_map_file_returns_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, 'build'), exist_ok=True)
+            os.makedirs(os.path.join(d, 'src'), exist_ok=True)
+            used, status = memory_check._check_wram(d)
+            self.assertIsNone(used)
+            self.assertEqual(status, 'ERROR')
+
 
 # ── VRAM tests ─────────────────────────────────────────────────────────────────
 
@@ -129,6 +137,13 @@ class TestCheckOAM(unittest.TestCase):
             used, status = memory_check._check_oam(d)
             self.assertEqual(used, 3)
             self.assertEqual(status, 'PASS')
+
+    def test_missing_config_file_returns_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, 'src'), exist_ok=True)
+            used, status = memory_check._check_oam(d)
+            self.assertIsNone(used)
+            self.assertEqual(status, 'ERROR')
 
 
 # ── Integration / report tests ─────────────────────────────────────────────────

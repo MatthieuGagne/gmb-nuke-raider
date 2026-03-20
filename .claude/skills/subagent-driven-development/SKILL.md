@@ -107,7 +107,7 @@ When dispatching the implementer subagent, include ALL of the following in the p
    >
    > After any successful build:
    > 1. Invoke the `bank-post-build` skill (HARD GATE) — verify bank placements and budgets
-   > 2. Run the `gb-memory-validator` agent (HARD GATE) — if any budget is FAIL, stop and fix
+   > 2. Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE) — if any budget is FAIL or ERROR, stop and fix
    >
    > Follow TDD: write failing test first, make it pass, then build.
 
@@ -124,7 +124,7 @@ After all tasks are complete and the final code reviewer approves, run the post-
    # Always clean build before memory validator + smoketest
    make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
-4. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix
+4. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix
 5. Launch:
    ```bash
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
