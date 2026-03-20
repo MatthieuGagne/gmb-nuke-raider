@@ -19,7 +19,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check
 
 all: $(TARGET)
 
@@ -120,6 +120,9 @@ bank-check:
 
 bank-post-build:
 	python3 tools/bank_post_build.py .
+
+memory-check:
+	python3 tools/memory_check.py .
 
 clean:
 	rm -rf build/
