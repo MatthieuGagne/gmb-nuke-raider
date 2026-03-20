@@ -242,7 +242,9 @@
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat/skill-resolved-summary/build/nuke-raider.gb -a 2>&1)",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/build/nuke-raider.gb -B)",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/build/nuke-raider.gb -a)",
-      "Bash(echo \"Exit code: $?\")"
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(git commit:*)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c -v)"
     ]
   }
 }

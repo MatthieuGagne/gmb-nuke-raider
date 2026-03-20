@@ -20,20 +20,21 @@ void tearDown(void) {}
 
 /* --- AC1: acceleration reaches max speed -------------------------------- */
 
-/* Holding J_RIGHT for MAX_SPEED/ACCEL frames gives vx == MAX_SPEED. */
+/* Holding J_RIGHT | J_A: X friction is 0 while J_RIGHT pressed, so vx accumulates
+ * by PLAYER_ACCEL each frame up to PLAYER_MAX_SPEED. */
 void test_accel_reaches_max_speed(void) {
     uint8_t i;
-    input = J_RIGHT;
+    input = J_RIGHT | J_A;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update();
     TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
 }
 
 /* --- AC2: velocity capped at max speed ---------------------------------- */
 
-/* Additional frames beyond max do not exceed MAX_SPEED. */
+/* Additional frames beyond max do not exceed PLAYER_MAX_SPEED. */
 void test_accel_capped_at_max_speed(void) {
     uint8_t i;
-    input = J_RIGHT;
+    input = J_RIGHT | J_A;
     for (i = 0; i <= PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update(); /* one extra */
     TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
 }
@@ -44,7 +45,7 @@ void test_accel_capped_at_max_speed(void) {
  * MAX_SPEED/FRICTION frames. */
 void test_friction_decelerates_to_zero(void) {
     uint8_t i;
-    input = J_RIGHT;
+    input = J_RIGHT | J_A;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update(); /* reach max */
     input = 0;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_FRICTION; i++) player_update(); /* friction */
@@ -55,40 +56,38 @@ void test_friction_decelerates_to_zero(void) {
 
 /* Row 90 (y=720) road: cols 6-17 (x=48-143). Right wall at col 18 (x=144+).
  * Player at px=136: corner px+7=143 (col 17 = road).
- * Moving right: new_px=137, corner=144 (col 18 = sand) → blocked → vx=0.
- * Simultaneously moving up: vy accumulates normally. */
+ * Moving right (gas): new_px=137, corner=144 (col 18 = sand) → blocked → vx=0. */
 void test_wall_zeros_vx_not_vy(void) {
     player_set_pos(136, 720);
-    input = J_RIGHT | J_UP;
+    input = J_RIGHT | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */
+    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL,  player_get_vy()); /* A still moves forward */
 }
 
 /* --- AC5: wall collision zeros vy, not vx ------------------------------- */
 
 /* Player at py=cam_y (648): screen top acts as wall.
- * Moving up: new_py < cam_y → blocked → vy=0.
- * Simultaneously moving right: vx accumulates normally. */
+ * Moving up (gas): new_py < cam_y → blocked → vy=0. */
 void test_wall_zeros_vy_not_vx(void) {
     player_set_pos(88, 648);  /* py == cam_y: at screen top */
-    input = J_UP | J_RIGHT;
+    input = J_UP | J_A;
     player_update();
     TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
-    TEST_ASSERT_EQUAL_INT8(PLAYER_ACCEL, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
 }
 
-/* --- AC6: independent axis accumulation --------------------------------- */
+/* --- AC6: X and Y axes accumulate independently to max speed ----------- */
 
-/* Holding J_RIGHT + J_UP for MAX_SPEED/ACCEL frames accumulates
- * both axes independently to MAX_SPEED. */
-void test_independent_axes_accumulate(void) {
+/* D-pad L/R and A operate on separate axes with no friction while held.
+ * Holding J_RIGHT | J_A accumulates both vx and vy to PLAYER_MAX_SPEED. */
+void test_x_and_y_axes_accumulate_independently(void) {
     uint8_t i;
-    input = J_RIGHT | J_UP;
+    input = J_RIGHT | J_A;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) {
         player_update();
     }
-    TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED,  player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( PLAYER_MAX_SPEED, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-PLAYER_MAX_SPEED, player_get_vy());
 }
 
@@ -98,7 +97,7 @@ void test_independent_axes_accumulate(void) {
 void test_y_clamped_above_hud(void) {
     camera_init(88, 0);       /* cam_y = 0 */
     player_set_pos(88, 112);  /* screen Y = 112, car bottom = 127 — just inside play area */
-    input = J_DOWN;
+    input = J_DOWN | J_A;
     player_update();           /* would push py to 113 — bottom pixel = 128 = HUD */
     TEST_ASSERT_TRUE(player_get_y() <= 112);  /* must not cross into HUD */
 }
@@ -110,7 +109,7 @@ int main(void) {
     RUN_TEST(test_friction_decelerates_to_zero);
     RUN_TEST(test_wall_zeros_vx_not_vy);
     RUN_TEST(test_wall_zeros_vy_not_vx);
-    RUN_TEST(test_independent_axes_accumulate);
+    RUN_TEST(test_x_and_y_axes_accumulate_independently);
     RUN_TEST(test_y_clamped_above_hud);
     return UNITY_END();
 }

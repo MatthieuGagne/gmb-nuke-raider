@@ -93,46 +93,71 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
     uint8_t i;
     uint8_t fric_x;
     uint8_t fric_y;
+    uint8_t stopped;
 
-    /* Step 1: determine friction */
+    /* Step 1: capture stopped state BEFORE friction alters velocity */
+    stopped = (vx == 0 && vy == 0) ? 1u : 0u;
+
+    /* Step 2: determine coast friction per terrain and per axis.
+     * X: no friction while D-pad L/R held (steering accumulates freely).
+     * Y: no friction while A held (gas accumulates freely). */
     if (terrain == TILE_SAND) {
-        fric_x = (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-        fric_y = fric_x;
+        fric_x = (buttons & (J_LEFT | J_RIGHT)) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+        fric_y = (buttons & J_A)                 ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
     } else if (terrain == TILE_OIL) {
         fric_x = 0;
         fric_y = 0;
     } else {
-        /* Road / Boost: friction only on unpressed axis */
+        /* Road / Boost */
         fric_x = (buttons & (J_LEFT | J_RIGHT)) ? 0u : (uint8_t)PLAYER_FRICTION;
-        fric_y = (buttons & (J_UP   | J_DOWN))  ? 0u : (uint8_t)PLAYER_FRICTION;
+        fric_y = (buttons & J_A)                 ? 0u : (uint8_t)PLAYER_FRICTION;
     }
 
-    /* Step 2: apply X friction */
+    /* Step 3: apply X coast friction */
     for (i = 0; i < fric_x; i++) {
         if      (vx > 0) vx = (int8_t)(vx - 1);
         else if (vx < 0) vx = (int8_t)(vx + 1);
     }
 
-    /* Step 3: apply Y friction */
+    /* Step 4: apply Y coast friction */
     for (i = 0; i < fric_y; i++) {
         if      (vy > 0) vy = (int8_t)(vy - 1);
         else if (vy < 0) vy = (int8_t)(vy + 1);
     }
 
-    /* Step 4: input acceleration (disabled on oil) */
+    /* Step 5: D-pad LEFT/RIGHT = lateral steering (X axis only, disabled on oil) */
     if (terrain != TILE_OIL) {
         if (buttons & J_LEFT)  vx = (int8_t)(vx - (int8_t)PLAYER_ACCEL);
         if (buttons & J_RIGHT) vx = (int8_t)(vx + (int8_t)PLAYER_ACCEL);
-        if (buttons & J_UP)    vy = (int8_t)(vy - (int8_t)PLAYER_ACCEL);
-        if (buttons & J_DOWN)  vy = (int8_t)(vy + (int8_t)PLAYER_ACCEL);
     }
 
-    /* Step 5: boost kick (upward = negative vy) */
+    /* Step 6: A = gas (always forward = negative vy, disabled on oil) */
+    if ((buttons & J_A) && terrain != TILE_OIL) {
+        vy = (int8_t)(vy - (int8_t)PLAYER_ACCEL);
+    }
+
+    /* Step 7: B = brake while moving / reverse while stopped (Y axis) */
+    if (buttons & J_B) {
+        if (!stopped) {
+            /* Braking: extra friction on vy */
+            for (i = 0; i < PLAYER_FRICTION; i++) {
+                if      (vy > 0) vy = (int8_t)(vy - 1);
+                else if (vy < 0) vy = (int8_t)(vy + 1);
+            }
+        } else if (terrain != TILE_OIL) {
+            /* Reverse: thrust backward (positive vy), capped at PLAYER_REVERSE_MAX_SPEED */
+            vy = (int8_t)(vy + (int8_t)PLAYER_ACCEL);
+            if (vy > (int8_t)PLAYER_REVERSE_MAX_SPEED)
+                vy = (int8_t)PLAYER_REVERSE_MAX_SPEED;
+        }
+    }
+
+    /* Step 8: boost kick (upward = negative vy) */
     if (terrain == TILE_BOOST) {
         vy = (int8_t)(vy - (int8_t)TERRAIN_BOOST_DELTA);
     }
 
-    /* Step 6: clamp vx; clamp vy with boost-aware cap */
+    /* Step 9: clamp to max speed */
     {
         uint8_t max_vy = (terrain == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : PLAYER_MAX_SPEED;
         if (vx >  (int8_t)PLAYER_MAX_SPEED) vx =  (int8_t)PLAYER_MAX_SPEED;
