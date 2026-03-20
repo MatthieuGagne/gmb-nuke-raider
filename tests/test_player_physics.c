@@ -18,26 +18,25 @@ void setUp(void) {
 }
 void tearDown(void) {}
 
-/* --- AC1: gas gives constant velocity ----------------------------------- */
+/* --- AC1: acceleration reaches max speed -------------------------------- */
 
-/* With PLAYER_ACCEL == PLAYER_FRICTION (both 1), coast friction and gas cancel
- * each other: net velocity = PLAYER_ACCEL per frame, capped there indefinitely.
- * Holding J_RIGHT | J_A for many frames keeps vx == PLAYER_ACCEL. */
+/* Holding J_RIGHT | J_A: X friction is 0 while J_RIGHT pressed, so vx accumulates
+ * by PLAYER_ACCEL each frame up to PLAYER_MAX_SPEED. */
 void test_accel_reaches_max_speed(void) {
     uint8_t i;
     input = J_RIGHT | J_A;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update();
-    TEST_ASSERT_EQUAL_INT8(PLAYER_ACCEL, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
 }
 
-/* --- AC2: velocity stays constant when gas is held ---------------------- */
+/* --- AC2: velocity capped at max speed ---------------------------------- */
 
-/* Holding gas for extra frames does not exceed PLAYER_ACCEL with current tuning. */
+/* Additional frames beyond max do not exceed PLAYER_MAX_SPEED. */
 void test_accel_capped_at_max_speed(void) {
     uint8_t i;
     input = J_RIGHT | J_A;
     for (i = 0; i <= PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update(); /* one extra */
-    TEST_ASSERT_EQUAL_INT8(PLAYER_ACCEL, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
 }
 
 /* --- AC3: friction decelerates to zero ---------------------------------- */
@@ -62,8 +61,8 @@ void test_wall_zeros_vx_not_vy(void) {
     player_set_pos(136, 720);
     input = J_RIGHT | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */
+    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL,  player_get_vy()); /* A still moves forward */
 }
 
 /* --- AC5: wall collision zeros vy, not vx ------------------------------- */
@@ -78,19 +77,18 @@ void test_wall_zeros_vy_not_vx(void) {
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
 }
 
-/* --- AC6: facing last-dpad-key wins ------------------------------------ */
+/* --- AC6: X and Y axes accumulate independently to max speed ----------- */
 
-/* When J_RIGHT and J_UP are held simultaneously with J_A, facing resolves
- * to UP (J_UP is evaluated after J_RIGHT in the if-chain).
- * Gas fires in facing direction only: vy accumulates, vx stays 0. */
-void test_diagonal_facing_uses_last_dpad_key(void) {
+/* D-pad L/R and A operate on separate axes with no friction while held.
+ * Holding J_RIGHT | J_A accumulates both vx and vy to PLAYER_MAX_SPEED. */
+void test_x_and_y_axes_accumulate_independently(void) {
     uint8_t i;
-    input = J_RIGHT | J_UP | J_A;
+    input = J_RIGHT | J_A;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) {
         player_update();
     }
-    TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* J_UP beats J_RIGHT */
-    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL, player_get_vy()); /* constant velocity, not max speed */
+    TEST_ASSERT_EQUAL_INT8( PLAYER_MAX_SPEED, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-PLAYER_MAX_SPEED, player_get_vy());
 }
 
 /* Player cannot move into the HUD band (bottom 16px reserved for Window layer).
@@ -111,7 +109,7 @@ int main(void) {
     RUN_TEST(test_friction_decelerates_to_zero);
     RUN_TEST(test_wall_zeros_vx_not_vy);
     RUN_TEST(test_wall_zeros_vy_not_vx);
-    RUN_TEST(test_diagonal_facing_uses_last_dpad_key);
+    RUN_TEST(test_x_and_y_axes_accumulate_independently);
     RUN_TEST(test_y_clamped_above_hud);
     return UNITY_END();
 }

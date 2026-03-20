@@ -44,7 +44,7 @@ void test_player_update_moves_up(void) {
 }
 
 void test_player_update_moves_down(void) {
-    input = J_DOWN | J_A;
+    input = J_B;   /* B while stopped = reverse (backward = positive vy) */
     player_update();
     TEST_ASSERT_EQUAL_INT16(721, player_get_y());
 }
@@ -97,9 +97,9 @@ void test_player_clamped_at_screen_top(void) {
 /* cam_y=648, cam_y+143=791. Track at (80,792) IS passable (col 10, row 99 = road),
  * so ONLY screen clamp prevents downward movement past screen bottom. */
 void test_player_clamped_at_screen_bottom(void) {
-    player_set_pos(80, 791);  /* py == cam_y+143: at bottom of viewport */
-    input = J_DOWN | J_A;
-    player_update();          /* new_py=792 > cam_y+143=791 -> blocked */
+    player_set_pos(80, 791);  /* py beyond HUD clamp (cam_y+112=760) */
+    input = J_A;              /* gas tries to move up to 790, still > 760 -> blocked */
+    player_update();
     TEST_ASSERT_EQUAL_INT16(791, player_get_y());
 }
 
@@ -130,9 +130,12 @@ void test_player_render_both_halves_aligned(void) {
 
 /* ===== Gas / Brake / Facing tests (issue #132) ============================= */
 
-/* AC5: D-pad alone must NOT change velocity */
-void test_dpad_alone_does_not_change_velocity(void) {
-    player_apply_physics(J_LEFT, TILE_ROAD);
+/* AC5: D-pad UP/DOWN have no effect on velocity — only A/B control Y axis */
+void test_dpad_up_down_does_not_change_velocity(void) {
+    player_apply_physics(J_UP,   TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
+    player_apply_physics(J_DOWN, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
 }
@@ -146,11 +149,12 @@ void test_gas_while_facing_up_decreases_vy(void) {
     TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
 }
 
-/* AC1: D-pad changes facing, then J_A fires in the new facing direction. */
-void test_gas_with_dpad_down_increases_vy(void) {
+/* AC1: A always moves forward (negative vy) even when D-pad down is held.
+ * D-pad direction does not affect A/B axis. */
+void test_gas_always_moves_forward_regardless_of_dpad(void) {
     player_apply_physics(J_DOWN | J_A, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(0,  player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(1,  player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
 }
 
 /* AC4: J_B while stopped reverses in the direction opposite to facing.
@@ -161,12 +165,12 @@ void test_brake_while_stopped_facing_up_reverses_down(void) {
     TEST_ASSERT_EQUAL_INT8(1,  player_get_vy());
 }
 
-/* AC4: Set facing right (no gas), then J_B while stopped → reverse left (vx = -1). */
-void test_brake_while_stopped_facing_right_reverses_left(void) {
-    player_apply_physics(J_RIGHT, TILE_ROAD);   /* sets facing right, no movement */
-    player_apply_physics(J_B,     TILE_ROAD);   /* stopped → reverse: vx = -1 */
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
+/* AC4: B while moving decelerates — never reverses lateral direction.
+ * Steer right (vx=1), then B: coast friction + brake. vx must not go negative. */
+void test_brake_while_moving_laterally_does_not_reverse_x(void) {
+    player_apply_physics(J_RIGHT, TILE_ROAD);   /* vx = 1 */
+    player_apply_physics(J_B,     TILE_ROAD);   /* not stopped: brake, coast clears vx */
+    TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
 }
 
 /* AC3: J_B while moving must NOT reverse the car. */
@@ -193,11 +197,11 @@ int main(void) {
     RUN_TEST(test_player_init_claims_two_sprite_slots);
     RUN_TEST(test_player_render_calls_move_sprite_twice);
     RUN_TEST(test_player_render_both_halves_aligned);
-    RUN_TEST(test_dpad_alone_does_not_change_velocity);
+    RUN_TEST(test_dpad_up_down_does_not_change_velocity);
     RUN_TEST(test_gas_while_facing_up_decreases_vy);
-    RUN_TEST(test_gas_with_dpad_down_increases_vy);
+    RUN_TEST(test_gas_always_moves_forward_regardless_of_dpad);
     RUN_TEST(test_brake_while_stopped_facing_up_reverses_down);
-    RUN_TEST(test_brake_while_stopped_facing_right_reverses_left);
+    RUN_TEST(test_brake_while_moving_laterally_does_not_reverse_x);
     RUN_TEST(test_brake_while_moving_does_not_reverse);
     return UNITY_END();
 }

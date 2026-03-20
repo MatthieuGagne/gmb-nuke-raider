@@ -54,7 +54,7 @@ void test_oil_does_not_increase_vx(void) {
     /* Build up speed on road */
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
-    entry_vx = player_get_vx();   /* 1 (PLAYER_ACCEL; friction and gas cancel each extra step) */
+    entry_vx = player_get_vx();   /* 2 (no x-friction while J_RIGHT held, so vx accumulates) */
 
     /* On oil: input ignored, no friction */
     for (i = 0; i < 4u; i++) {
@@ -70,7 +70,7 @@ void test_oil_preserves_velocity_without_input(void) {
 
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
-    entry_vx = player_get_vx();   /* 1 (PLAYER_ACCEL) */
+    entry_vx = player_get_vx();   /* 2 (no x-friction while J_RIGHT held) */
 
     /* No input on oil — should not decelerate */
     player_apply_physics(0, TILE_OIL);
