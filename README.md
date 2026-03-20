@@ -1,4 +1,4 @@
-# Junk Runner
+# Nuke Raider
 
 A Game Boy Color (GBC) top-down racing game built with [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020).
 
@@ -15,7 +15,7 @@ A Game Boy Color (GBC) top-down racing game built with [GBDK-2020](https://githu
 GBDK_HOME=~/gbdk make
 ```
 
-Output: `build/junk-runner.gb`
+Output: `build/nuke-raider.gb`
 
 ### Clean
 
@@ -34,10 +34,10 @@ make test
 ## Running
 
 ```sh
-java -jar ~/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
+java -jar ~/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
 ```
 
-Or load `build/junk-runner.gb` in any GB/GBC emulator ([Emulicious](https://emulicious.net/), [SameBoy](https://sameboy.github.io/), [BGB](https://bgb.bircd.org/)).
+Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emulicious.net/), [SameBoy](https://sameboy.github.io/), [BGB](https://bgb.bircd.org/)).
 
 ## Game Modules
 
@@ -51,13 +51,17 @@ Or load `build/junk-runner.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries |
 | Camera | `src/camera.c/.h` | Scrolling ring-buffer VRAM streaming, `move_bkg()` |
 | Sprite pool | `src/sprite_pool.c/.h` | OAM slot management |
+| Loader | `src/loader.c/.h` | Asset/state loading sequences |
 | Dialog | `src/dialog.c/.h`, `src/dialog_data.c/.h` | NPC conversation trees, branching choices, per-NPC flags |
+| Dialog border | `src/dialog_border_tiles.c/.h` | Dialog box border tile data |
+| Dialog arrow | `src/dialog_arrow_sprite.c/.h` | Dialog scroll arrow sprite data |
 | HUD | `src/hud.c/.h` | On-screen display elements |
 | Music | `src/music.c/.h`, `src/music_data.c/.h` | hUGEDriver music playback |
 | Overmap | `src/state_overmap.c/.h`, `src/overmap_map.c`, `src/overmap_tiles.c` | World overmap navigation |
 | Hub | `src/state_hub.c/.h`, `src/hub_data.c/.h` | City hub menu, NPC list, hub entry/exit |
 | NPC portraits | `src/npc_*_portrait.c/.h` | Per-NPC portrait tile data |
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |
+| Banking | `src/banking.h` | ROM bank switching helpers |
 | Config | `src/config.h` | Capacity constants (`MAX_NPCS`, etc.) |
 
 ### Game States
@@ -95,7 +99,7 @@ setup and export settings.
 ## Project Structure
 
 ```
-gmb-junk-runner/
+gmb-nuke-raider/
 ├── src/
 │   ├── main.c              # Entry point, main loop, game state machine
 │   ├── state_manager.c/.h  # Game state transitions
@@ -104,12 +108,15 @@ gmb-junk-runner/
 │   ├── player.c/.h         # Player movement and boundary checks
 │   ├── player_sprite.c     # Player OAM rendering (8×16 two-tile sprite)
 │   ├── sprite_pool.c/.h    # OAM slot management
+│   ├── loader.c/.h         # Asset/state loading sequences
 │   ├── track.c/.h          # Track tile data and passability
 │   ├── track_map.c         # Generated tile map array (from Tiled)
 │   ├── track_tiles.c       # Generated tile pixel data (from tileset.png)
 │   ├── camera.c/.h         # Scrolling camera with VRAM ring buffer
 │   ├── dialog.c/.h         # NPC dialog engine
 │   ├── dialog_data.c/.h    # NPC dialog content
+│   ├── dialog_border_tiles.c/.h  # Dialog box border tile data
+│   ├── dialog_arrow_sprite.c/.h  # Dialog scroll arrow sprite data
 │   ├── hud.c/.h            # On-screen display
 │   ├── music.c/.h          # hUGEDriver music playback
 │   ├── music_data.c/.h     # Song data
@@ -121,6 +128,7 @@ gmb-junk-runner/
 │   ├── npc_*_portrait.c/.h # NPC portrait tile data
 │   ├── debug.h             # Debug macros (EMU_printf etc.)
 │   ├── input.h             # Key tick/press/release helpers
+│   ├── banking.h           # ROM bank switching helpers
 │   └── config.h            # Capacity constants (MAX_NPCS, etc.)
 ├── assets/
 │   ├── maps/             # Tiled map files (.tmx, .tsx) + tileset.aseprite/.png
@@ -137,16 +145,18 @@ gmb-junk-runner/
 │   ├── test_track.c
 │   ├── test_camera.c
 │   ├── test_dialog.c
+│   ├── test_dialog_border.c
 │   ├── test_gamestate.c
 │   ├── test_hud.c
 │   ├── test_input.c
+│   ├── test_loader.c
 │   ├── test_overmap.c
 │   ├── test_sprite_pool.c
 │   ├── test_state_manager.c
 │   ├── test_soa_convention.c
 │   ├── test_hub_data.c
 │   ├── test_state_hub.c
-│   ├── test_debug.c
+│   └── test_debug.c
 │   ├── mocks/            # Stub GBDK headers for host-side compilation
 │   └── unity/            # Unity test framework (vendored)
 ├── docs/                 # Design documents
@@ -162,8 +172,9 @@ gmb-junk-runner/
 |---|---|---|
 | `-Wm-yc` | CGB compatible | Runs on DMG and GBC |
 | `-Wm-yC` | CGB only | GBC exclusive (enhanced color) |
-| `-Wm-yt1` | MBC1 | Memory bank controller type |
-| `-Wm-yn"JUNK RUNNER"` | ROM title | 11-char header string |
+| `-Wm-yt25` | MBC5 | Memory bank controller type |
+| `-Wm-ya32` | 32 ROM banks | Up to 512 KB addressable |
+| `-Wm-yn"NUKE RAIDER"` | ROM title | Header string |
 
 To target GBC-only (for extra VRAM, 8 palettes, etc.) swap `-Wm-yc` for `-Wm-yC` in the Makefile.
 
@@ -174,7 +185,7 @@ To target GBC-only (for extra VRAM, 8 palettes, etc.) swap `-Wm-yc` for `-Wm-yC`
 | OAM | 40 sprites | Player = 2; rest for NPCs/projectiles/HUD |
 | VRAM BG tiles | 192 (DMG bank 0) + 192 (CGB bank 1) | Bank 1 for color variants |
 | WRAM | 8 KB | Large arrays must be global or `static` |
-| ROM | Up to 1 MB (MBC1) | Code in bank 0; assets banked |
+| ROM | 32 banks, MBC5 (up to 512 KB) | Code in bank 0; assets autobanked |
 
 ## SDCC / GBDK Constraints
 
