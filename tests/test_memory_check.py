@@ -178,6 +178,14 @@ class TestCheck(unittest.TestCase):
         }
         self.assertEqual(memory_check.overall_status(result), 'WARN')
 
+    def test_error_treated_as_fail(self):
+        result = {
+            'wram': {'used': None, 'budget': 8192, 'status': 'ERROR'},
+            'vram': {'used': 10,   'budget': 384,  'status': 'PASS'},
+            'oam':  {'used': 19,   'budget': 40,   'status': 'PASS'},
+        }
+        self.assertEqual(memory_check.overall_status(result), 'FAIL')
+
 
 if __name__ == '__main__':
     unittest.main()

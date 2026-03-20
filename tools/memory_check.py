@@ -43,7 +43,8 @@ def _status(used, budget):
 def _check_wram(repo_root):
     """Parse build/nuke-raider.map for s__HEAP_E. Returns (used_bytes, status)."""
     map_path = os.path.join(repo_root, 'build', 'nuke-raider.map')
-    content = open(map_path).read()
+    with open(map_path) as f:
+        content = f.read()
     m = re.search(r'([0-9A-Fa-f]{8})\s+s__HEAP_E\b', content)
     if not m:
         return None, 'ERROR'
@@ -57,7 +58,8 @@ def _check_vram(repo_root):
     src_dir = os.path.join(repo_root, 'src')
     total = 0
     for path in glob.glob(os.path.join(src_dir, '*_tiles.c')):
-        content = open(path).read()
+        with open(path) as f:
+            content = f.read()
         for m in re.finditer(r'_count\s*=\s*(\d+)', content):
             total += int(m.group(1))
     return total, _status(total, VRAM_BUDGET)
@@ -66,7 +68,8 @@ def _check_vram(repo_root):
 def _check_oam(repo_root):
     """Parse src/config.h for MAX_SPRITES + fixed slots. Returns (slots, status)."""
     config_path = os.path.join(repo_root, 'src', 'config.h')
-    content = open(config_path).read()
+    with open(config_path) as f:
+        content = f.read()
     m = re.search(r'#define\s+MAX_SPRITES\s+(\d+)', content)
     pool_sprites = int(m.group(1)) if m else 0
     total = pool_sprites + OAM_FIXED_SLOTS
@@ -76,7 +79,7 @@ def _check_oam(repo_root):
 def overall_status(result):
     """Return FAIL > WARN > PASS based on worst individual status."""
     statuses = [v['status'] for v in result.values()]
-    if 'FAIL' in statuses:
+    if 'FAIL' in statuses or 'ERROR' in statuses:
         return 'FAIL'
     if 'WARN' in statuses:
         return 'WARN'
