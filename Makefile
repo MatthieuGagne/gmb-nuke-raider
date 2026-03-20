@@ -58,29 +58,23 @@ src/player_sprite.c: assets/sprites/player_car.png tools/png_to_tiles.py
 
 $(TARGET): src/player_sprite.c
 
-# NPC portraits are pinned to --bank 2, NOT --bank 255 (autobank).
-# Rationale: bankpack fills bank 1 first; portraits would land in bank 1 and
-# push track_tile_data / player_tile_data to bank 2.  track_init() and
-# player_init() are BANKED functions in bank 1 that call SET_BANK() to reach
-# those assets — SET_BANK inside a banked function in the switchable window
-# (0x4000-0x7FFF) unmaps the executing code and crashes.  Pinning portraits
-# to bank 2 keeps the hot assets (track_tile_data, player_tile_data) in bank 1
-# alongside the code that accesses them, making SET_BANK a no-op there.
+# NPC portraits use --bank 255 (autobank). state_hub.c (bank 0) calls SET_BANK to
+# load portrait tiles into VRAM. Bank-0 code may freely call SWITCH_ROM.
 src/npc_mechanic_portrait.c: assets/sprites/npc_mechanic.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 2 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
 
 src/npc_trader_portrait.c: assets/sprites/npc_trader.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 2 assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
 
 src/npc_drifter_portrait.c: assets/sprites/npc_drifter.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 2 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
 
 $(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter_portrait.c
 
 # src/dialog_border_tiles.c is checked into git so CI works without Python.
 # Run `make src/dialog_border_tiles.c` to regenerate from updated PNG.
 src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_border.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 2 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
 
 $(TARGET): src/dialog_border_tiles.c
 

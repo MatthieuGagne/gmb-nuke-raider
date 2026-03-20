@@ -4,17 +4,17 @@ description: Use this agent for GBDK-2020 API questions, Game Boy hardware regis
 color: cyan
 ---
 
-You are a GBDK-2020 expert for the Junk Runner Game Boy Color game.
+You are a GBDK-2020 expert for the Nuke Raider Game Boy Color game.
 
 ## Project Context
-- **ROM title:** JUNK RUNNER
-- **Hardware target:** CGB compatible (`-Wm-yc`), MBC1 (`-Wm-yt1`)
-- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`, output `build/junk-runner.gb`
+- **ROM title:** NUKE RAIDER
+- **Hardware target:** CGB compatible (`-Wm-yc`), MBC5 (`-Wm-yt25`)
+- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`, output `build/nuke-raider.gb`
 - **Source:** `src/*.c`
 
 ## Memory Behavior
 At the start of every task, read your memory file:
-`~/.claude/projects/-home-mathdaman-code-gmb-junk-runner/memory/gbdk-expert.md`
+`~/.claude/projects/-home-mathdaman-code-gmb-nuke-raider/memory/gbdk-expert.md`
 
 After completing a task, append any new bugs found, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
 
@@ -46,6 +46,34 @@ After completing a task, append any new bugs found, API gotchas, or confirmed pa
 - Forgetting `SPRITES_8x8` / `SPRITES_8x16` mode before using sprites
 - MBC bank switching questions → use bank-pre-write / bank-post-build skills
 - `set_sprite_tile()` index is absolute tile number in OBJ tile data, not relative
+
+### Banking Architecture (post-autobank-migration)
+
+**Invariant:** Only bank-0 files (no `#pragma bank`) may call `SET_BANK` or `SWITCH_ROM`.
+Files with `#pragma bank 255` (autobank) or explicit bank N: call BANKED functions or NONBANKED loader wrappers — never touch `SWITCH_ROM` directly.
+
+**loader.c pattern** — bank-0 NONBANKED wrappers for VRAM asset loads:
+```c
+void load_player_tiles(void) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(BANK(player_tile_data));
+    set_sprite_data(0, player_tile_data_count, player_tile_data);
+    SWITCH_ROM(saved);
+}
+```
+
+**invoke() state dispatch pattern** — `state_manager.c` (bank 0) holds:
+```c
+static void invoke(void (*fn)(void), uint8_t bank) {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(bank);
+    fn();
+    SWITCH_ROM(saved);
+}
+```
+State struct carries a `uint8_t bank` field. Callbacks are plain function pointers (NOT BANKED — SDCC generates broken double-dereference for BANKED struct field pointers).
+
+**BANKREF for autobank:** Use `BANKREF(sym)` in `#pragma bank 255` files — bankpack rewrites `___bank_sym` to the real assigned bank at link time. Use `volatile __at(N)` only for explicit bank N (not 255), in data-only files.
 
 ## Verification Commands
 After making changes, verify with:

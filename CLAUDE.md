@@ -52,7 +52,7 @@ These apply to every feature, no matter how small.
 - OAM: 40 sprites total (player = 2; budget the rest for enemies/projectiles/HUD)
 - VRAM: 192 tiles (DMG bank 0) + 192 (CGB bank 1 for color variants)
 - WRAM: 8 KB — large arrays must be global or `static`, never local
-- ROM: MBC1 up to 1 MB — assets tagged for banking, code stays in bank 0
+- ROM: MBC5, 32 banks declared (`-Wm-ya32`), up to 512 KB addressable — assets tagged for banking, code stays in bank 0
 
 **Refactor checkpoint — required before closing any task:**
 > "Does this implementation generalize, or did we hard-code something that breaks when N > 1?"
@@ -64,7 +64,7 @@ These apply to every feature, no matter how small.
 
 ## ROM Header
 
-Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt1` (MBC1), `-Wm-yn"JUNK RUNNER"`.
+Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt25` (MBC5), `-Wm-yn"NUKE RAIDER"`.
 To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
 
 ## GBDK / SDCC Constraints
@@ -148,6 +148,8 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 - When debugging any runtime issue → invoke `emulicious-debug`
 
 **Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).
+Examples of safe parallelism: multiple file audits; implementing loaders for independent systems (different output files); skill/agent doc updates (different files); read-only exploration.
+Not safe to parallelize: writing the same file; multiple actors committing to the same branch; tasks with sequential data dependencies.
 
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
 

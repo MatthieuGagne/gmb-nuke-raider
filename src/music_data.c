@@ -1,10 +1,10 @@
-#pragma bank 3
+#pragma bank 2
 #include <gb/gb.h>
 #include <stddef.h>
 #include "banking.h"
 #include "hUGEDriver.h"
 
-BANKREF(music_data_song)
+volatile uint8_t __at(2) __bank_music_data_song;
 
 
 static const unsigned char order_cnt = 68;

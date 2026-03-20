@@ -54,6 +54,16 @@ def check(repo_root='.'):
                     f"manifest expects '{expected_pragma}', found: {found}"
                 )
 
+            # Check 2b: no SET_BANK/SWITCH_ROM in banked files
+            with open(abs_path) as f:
+                content = f.read()
+            if 'SET_BANK' in content or 'SWITCH_ROM' in content:
+                errors.append(
+                    f"ERROR: {rel_path} contains SET_BANK or SWITCH_ROM but is not bank 0 "
+                    f"(bank {expected_bank}). Only bank-0 files may call these. "
+                    f"Move to loader.c or another bank-0 wrapper."
+                )
+
     return errors
 
 

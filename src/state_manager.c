@@ -1,4 +1,5 @@
-#pragma bank 1
+/* state_manager.c — bank 0 (no #pragma bank). Uses invoke() to dispatch
+ * state callbacks; SWITCH_ROM is safe from bank-0 code. */
 #include <gb/gb.h>
 #include "state_manager.h"
 
@@ -7,37 +8,44 @@
 static const State *stack[STACK_MAX];
 static uint8_t depth = 0;
 
-void state_manager_init(void) BANKED {
+static void invoke(void (*fn)(void), uint8_t bank) {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(bank);
+    fn();
+    SWITCH_ROM(saved);
+}
+
+void state_manager_init(void) {
     depth = 0;
 }
 
-void state_manager_update(void) BANKED {
+void state_manager_update(void) {
     if (depth == 0) return;
-    stack[depth - 1]->update();
+    invoke(stack[depth - 1]->update, stack[depth - 1]->bank);
 }
 
-void state_push(const State *s) BANKED {
+void state_push(const State *s) {
     if (depth >= STACK_MAX) return;
     stack[depth++] = s;
-    s->enter();
+    invoke(s->enter, s->bank);
 }
 
-void state_pop(void) BANKED {
+void state_pop(void) {
     if (depth == 0) return;
-    stack[depth - 1]->exit();
+    invoke(stack[depth - 1]->exit, stack[depth - 1]->bank);
     depth--;
     if (depth > 0) {
-        stack[depth - 1]->enter();
+        invoke(stack[depth - 1]->enter, stack[depth - 1]->bank);
     }
 }
 
-void state_replace(const State *s) BANKED {
+void state_replace(const State *s) {
     if (depth == 0) {
         stack[depth++] = s;
-        s->enter();
+        invoke(s->enter, s->bank);
         return;
     }
-    stack[depth - 1]->exit();
+    invoke(stack[depth - 1]->exit, stack[depth - 1]->bank);
     stack[depth - 1] = s;
-    s->enter();
+    invoke(s->enter, s->bank);
 }

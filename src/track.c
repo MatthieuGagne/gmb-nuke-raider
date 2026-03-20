@@ -2,7 +2,7 @@
 #include <gb/gb.h>
 #include "track.h"
 #include "banking.h"
-BANKREF_EXTERN(track_tile_data)
+#include "loader.h"
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
 #define TILE_LUT_LEN 7u
@@ -31,16 +31,15 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
     return track_tile_type_from_index(track_map[(uint16_t)ty * MAP_TILES_W + tx]);
 }
 
-/* Tile data generated from assets/maps/tileset.png — see src/track_tiles.c */
-extern const uint8_t track_tile_data[];
-extern const uint8_t track_tile_data_count;
-
 void track_init(void) BANKED {
-    SET_BANK(track_tile_data);
-    set_bkg_data(0, track_tile_data_count, track_tile_data);
-    RESTORE_BANK();
+    load_track_tiles();
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
+}
+
+uint8_t track_get_raw_tile(uint8_t tx, uint8_t ty) BANKED {
+    if (tx >= MAP_TILES_W || ty >= MAP_TILES_H) return 0u;
+    return track_map[(uint16_t)ty * MAP_TILES_W + tx];
 }
 
 uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {

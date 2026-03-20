@@ -1,4 +1,4 @@
-/* state_hub.c — NO #pragma bank 255: in bank 0, safe to call SET_BANK */
+/* state_hub.c — bank 0 (no #pragma bank), safe to call SET_BANK/SWITCH_ROM */
 #include <gb/gb.h>
 #include <gbdk/console.h>
 #include <stdio.h>
@@ -390,4 +390,4 @@ static void update(void) {
 
 static void hub_exit(void) {}
 
-const State state_hub = { enter, update, hub_exit };
+const State state_hub = { 0, enter, update, hub_exit };

@@ -208,11 +208,16 @@ class TestGidIntegration(unittest.TestCase):
         self.assertIn('/* row  0 */ 0,', result)
 
     def test_empty_cell_produces_zero_not_underflow(self):
-        # GID 0 → 0; must NOT produce -1 or 255
+        # GID 0 → 0; must NOT produce tile value -1 or 255 in the data array.
+        # Note: the generated output legitimately contains "#pragma bank 255",
+        # so we only check the array body (everything after the opening brace).
         result = self._convert(EMPTY_CELL_TMX)
         self.assertIn('0,0', result)
         self.assertNotIn('-1', result)
-        self.assertNotIn('255', result)
+        # Extract only the array body to avoid matching "#pragma bank 255"
+        array_start = result.find('{')
+        array_body = result[array_start:] if array_start != -1 else result
+        self.assertNotIn('255', array_body)
 
     def test_firstgid_2_offsets_correctly(self):
         # GID 2 → 0, GID 3 → 1

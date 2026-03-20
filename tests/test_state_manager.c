@@ -27,8 +27,8 @@ static void b_enter(void)  { calls_b_enter++;  call_order[call_order_len++] = LO
 static void b_update(void) { calls_b_update++; }
 static void b_exit(void)   { calls_b_exit++;   call_order[call_order_len++] = LOG_B_EXIT; }
 
-static const State state_a = { a_enter, a_update, a_exit };
-static const State state_b = { b_enter, b_update, b_exit };
+static const State state_a = { 0, a_enter, a_update, a_exit };
+static const State state_b = { 0, b_enter, b_update, b_exit };
 
 /* ── setUp / tearDown ─────────────────────────────────────────────── */
 void setUp(void) {
@@ -126,7 +126,7 @@ void test_replace_routes_update_to_new_state(void) {
 /* overflow guard: pushing beyond capacity does not crash and does not
  * corrupt the stack. The third push is silently ignored. */
 void test_push_beyond_capacity_is_safe(void) {
-    static const State state_c = { a_enter, a_update, a_exit }; /* reuse fns */
+    static const State state_c = { 0, a_enter, a_update, a_exit }; /* reuse fns */
     state_push(&state_a);
     state_push(&state_b);
     state_push(&state_c); /* depth already at max — must not crash */

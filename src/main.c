@@ -36,10 +36,6 @@ static volatile uint8_t frame_ready = 0;
 static void vbl_isr(void) {
     frame_ready = 1;
     move_bkg(0, (uint8_t)cam_y);
-    /* music_tick is safe here: music.c is in bank 0 (fixed), so SET_BANK
-     * inside music_tick saves/restores whatever bank the main loop had active
-     * on the stack — no aliasing with main-code _saved_bank locals. */
-    music_tick();
 }
 
 void main(void) {
@@ -59,6 +55,7 @@ void main(void) {
     while (1) {
         while (!frame_ready);
         frame_ready = 0;
+        music_tick();
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();
     }

@@ -1,22 +1,31 @@
-#pragma bank 1
+#pragma bank 255
 #include <gb/gb.h>
+#include <gbdk/emu_debug.h>
+#include "banking.h"
 #include "input.h"
 #include "state_manager.h"
 #include "state_playing.h"
 #include "state_overmap.h"
+BANKREF(state_playing)
+BANKREF_EXTERN(state_playing)
 #include "player.h"
 #include "track.h"
 #include "camera.h"
 #include "hud.h"
 
 static void enter(void) {
+    EMU_printf("PLAYING enter\n");
     player_set_pos(track_start_x, track_start_y);
+    EMU_printf("PLAYING pos set\n");
     player_reset_vel();
     DISPLAY_OFF;
     track_init();
+    EMU_printf("PLAYING track_init done\n");
     camera_init(player_get_x(), player_get_y());
+    EMU_printf("PLAYING camera_init done\n");
     hud_init();
     DISPLAY_ON;
+    EMU_printf("PLAYING enter done\n");
 }
 
 static void update(void) {
@@ -42,4 +51,4 @@ static void sp_exit(void) {
     HIDE_WIN;
 }
 
-const State state_playing = { enter, update, sp_exit };
+const State state_playing = { BANK(state_playing), enter, update, sp_exit };

@@ -9,14 +9,17 @@ volatile uint16_t cam_y;
 #define CAM_MAX_Y  656u
 
 /* Write one full world row into the VRAM ring buffer.
- * VRAM y slot = world_ty % 32. MAP_TILES_W=20 <= 32: no X wrapping needed. */
+ * VRAM y slot = world_ty % 32. MAP_TILES_W=20 <= 32: no X wrapping needed.
+ * track_get_raw_tile() is BANKED — the trampoline handles bank switching safely.
+ * Direct access to track_map[] is forbidden here (camera.c and track_map.c may
+ * be in different autobanks). */
 static void stream_row(uint8_t world_ty) {
     static uint8_t row_buf[MAP_TILES_W];
     uint8_t tx;
     uint8_t vram_y = world_ty & 31u;
 
     for (tx = 0u; tx < MAP_TILES_W; tx++) {
-        row_buf[tx] = track_map[(uint16_t)world_ty * MAP_TILES_W + tx];
+        row_buf[tx] = track_get_raw_tile(tx, world_ty);
     }
     set_bkg_tiles(0u, vram_y, MAP_TILES_W, 1u, row_buf);
 }

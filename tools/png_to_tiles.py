@@ -167,10 +167,25 @@ def png_to_c(png_path, out_path, array_name, bank):
         "#include <stdint.h>",
         "#include \"banking.h\"",
         "",
-        "/* Bank reference: volatile __at(bank) places the bank symbol in DATA (not CODE),",
-        "   so bankpack assigns it to the same bank as this file's data array.",
-        "   BANKREF() creates a CODE stub that bankpack may assign to a different bank. */",
-        f"volatile __at({bank}) uint8_t __bank_{array_name};",
+        # Bank reference generation:
+        # --bank 255 (autobank): use BANKREF(sym) so bankpack rewrites ___bank_sym to
+        #   the real assigned bank at link time. This is required when bank-0 code
+        #   (loader.c) uses BANK(sym) to actually switch banks — volatile __at(255)
+        #   would make BANK() return 255 (wrong after bankpack assigns a real bank).
+        # --bank N (explicit): use volatile __at(N) — hardcodes N at compile time,
+        #   correct for explicit bank assignment.
+        *(
+            [
+                "/* Bank reference: BANKREF(name) emits a CODE stub; bankpack rewrites",
+                "   ___bank_name to the actual assigned bank at link time.",
+                "   Required for autobank (255) so BANK(name) returns the real bank. */",
+                f"BANKREF({array_name})",
+            ] if bank == 255 else [
+                f"/* Bank reference: volatile __at({bank}) hardcodes bank number {bank}.",
+                "   Correct for explicit bank assignment where BANK(sym) = N. */",
+                f"volatile __at({bank}) uint8_t __bank_{array_name};",
+            ]
+        ),
         "",
         f"const uint8_t {array_name}[] = {{",
     ]

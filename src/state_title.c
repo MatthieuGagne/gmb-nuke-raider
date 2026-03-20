@@ -1,11 +1,14 @@
-#pragma bank 1
+#pragma bank 255
 #include <gb/gb.h>
 #include <gbdk/console.h>
 #include <stdio.h>
+#include "banking.h"
 #include "input.h"
 #include "state_manager.h"
 #include "state_title.h"
 #include "state_overmap.h"
+BANKREF(state_title)
+BANKREF_EXTERN(state_title)
 
 static void enter(void) {
     cls();
@@ -24,4 +27,4 @@ static void update(void) {
 static void st_exit(void) {
 }
 
-const State state_title = { enter, update, st_exit };
+const State state_title = { BANK(state_title), enter, update, st_exit };

@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include "banking.h"
 
-/* Bank reference: volatile __at(bank) places the bank symbol in DATA (not CODE),
-   so bankpack assigns it to the same bank as this file's data array.
-   BANKREF() creates a CODE stub that bankpack may assign to a different bank. */
-volatile __at(255) uint8_t __bank_player_tile_data;
+/* Bank reference: BANKREF(name) emits a CODE stub; bankpack rewrites
+   ___bank_name to the actual assigned bank at link time.
+   Required for autobank (255) so BANK(name) returns the real bank. */
+BANKREF(player_tile_data)
 
 const uint8_t player_tile_data[] = {
     /* tile 0 */ 0x3C, 0x3C, 0x7E, 0x7E, 0xFF, 0xFF, 0xFF, 0xC3, 0xFF, 0xC3, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
