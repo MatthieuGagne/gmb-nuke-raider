@@ -58,6 +58,10 @@ Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No ba
 
 **Tech Stack:** [Key technologies/libraries]
 
+## Open questions (must resolve before starting)
+
+- [Question 1 — or delete this line if none]
+
 ---
 ```
 

@@ -28,9 +28,14 @@ You MUST create a task for each of these items and complete them in order:
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
 4. **Present design** — in sections scaled to their complexity, get user approval after each section
    - **Design-It-Twice** (required for any new `src/*.c` module): sketch two alternative module interfaces / APIs, compare them explicitly, then choose the better one
-5. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
+5. **Resolved / Unresolved / Deferred summary** — before calling `/prd`, output a short bullet list per category:
+   - **Resolved:** decisions that are settled
+   - **Unresolved:** open questions that must be answered before implementation begins
+   - **Deferred:** items deliberately set aside (not blocking now)
+   If Unresolved is non-empty, stop and resolve those questions before continuing.
+6. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
    Do NOT save a local design doc file. The GitHub issue IS the design doc.
-6. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
+7. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
 
 ## GB Constraint Checklist
 
@@ -63,7 +68,12 @@ digraph brainstorming {
     "Propose 2-3 approaches" -> "Present design sections + Design-It-Twice";
     "Present design sections + Design-It-Twice" -> "User approves design?";
     "User approves design?" -> "Present design sections + Design-It-Twice" [label="no, revise"];
-    "User approves design?" -> "Create GitHub issue with /prd" [label="yes"];
+    "User approves design?" -> "Resolved/Unresolved/Deferred summary" [label="yes"];
+    "Resolved/Unresolved/Deferred summary" [shape=box];
+    "Unresolved items?" [shape=diamond];
+    "Resolved/Unresolved/Deferred summary" -> "Unresolved items?";
+    "Unresolved items?" -> "Ask clarifying questions" [label="yes, resolve first"];
+    "Unresolved items?" -> "Create GitHub issue with /prd" [label="no"];
     "Create GitHub issue with /prd" -> "Invoke writing-plans skill";
 }
 ```
