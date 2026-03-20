@@ -19,6 +19,7 @@
 #define PLAYER_ACCEL      1
 #define PLAYER_FRICTION   1
 #define PLAYER_MAX_SPEED  3
+#define PLAYER_REVERSE_MAX_SPEED  2
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
