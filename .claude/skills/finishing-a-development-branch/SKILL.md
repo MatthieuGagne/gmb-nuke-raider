@@ -56,7 +56,7 @@ Only continue to Step 3 when it passes.
    make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
 
-3. Run `gb-memory-validator` agent on the clean build ROM. If any budget is FAIL, stop and fix before continuing.
+3. Run `make memory-check` and report the output. If any budget is FAIL or ERROR, stop and fix before continuing.
 
 4. Launch the ROM immediately in the background (from the worktree directory so `build/` resolves
    to the worktree's build output — NEVER from the main repo's `build/`):

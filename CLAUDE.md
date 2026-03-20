@@ -137,14 +137,14 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Always do a clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
-3. Run `gb-memory-validator` agent on the clean build ROM — if any budget is FAIL, stop and fix before continuing.
+3. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix before continuing.
 4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates (mandatory):**
 - Before writing any `src/*.c` or `src/*.h` file → invoke `bank-pre-write` skill, then `gbdk-expert`
-- After a successful build, before smoketest → invoke `bank-post-build` skill, then `gb-memory-validator` agent
+- After a successful build, before smoketest → invoke `bank-post-build` skill, then `make memory-check` (gb-memory-validator skill)
 - When debugging any runtime issue → invoke `emulicious-debug`
 
 **Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).
