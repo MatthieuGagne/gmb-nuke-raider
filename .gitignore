@@ -48,3 +48,6 @@ __pycache__/
 # Emulicious emulator
 Emulicious.jar
 
+# Implementation plans (local only, never pushed)
+docs/plans/
+
