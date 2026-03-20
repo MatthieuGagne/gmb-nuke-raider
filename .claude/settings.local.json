@@ -237,19 +237,7 @@
       "Bash(\\\\ aseprite:*)",
       "Bash(echo \"exit: $?\")",
       "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat-dialog-border-tiles/build/nuke-raider.gb -B)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat-dialog-border-tiles/build/nuke-raider.gb -a 2>&1)",
-      "Bash(PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles -v)",
-      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check -v)",
-      "Bash(curl -s \"https://api.github.com/repos/untoxa/BlackCastle/contents/include\")",
-      "Bash(curl -s \"https://api.github.com/repos/untoxa/BlackCastle/contents/src\")",
-      "Bash(curl -s \"https://api.github.com/repos/untoxa/BlackCastle/contents/src/sm83\")",
-      "Bash(echo \"EXIT:$?\")",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.gb -B)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.gb -a 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.gb -a -S)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.gb -a -smWRAM 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.map -a 2>&1)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.claude/worktrees/feat/autobank-migration/build/nuke-raider.map -a -smWRAM 2>&1)"
+      "Bash(/home/mathdaman/gbdk/bin/romusage /home/mathdaman/code/gmb-nuke-raider/.worktrees/feat-dialog-border-tiles/build/nuke-raider.gb -a 2>&1)"
     ]
   }
 }

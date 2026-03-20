@@ -37,7 +37,7 @@ If the file's manifest bank is **not 0** (i.e., it lives in the switchable windo
   > Reason: calling SET_BANK/SWITCH_ROM from banked code switches the window away from the running function → crash.
   > Fix: move the SET_BANK call into `loader.c` (a bank-0 NONBANKED wrapper), or into another bank-0 file.
 
-Only these bank-0 files may call `SET_BANK`/`SWITCH_ROM`: `main.c`, `music.c`, `hub_data.c`, `state_hub.c`, `state_overmap.c`, `loader.c`.
+Only these bank-0 files may call `SET_BANK`/`SWITCH_ROM`: `main.c`, `music.c`, `hub_data.c`, `state_hub.c`, `state_overmap.c`, `loader.c`, `state_manager.c`.
 
 ## Check 4 — No `BANKED` on static functions or bank-0 functions
 
