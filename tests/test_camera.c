@@ -3,6 +3,9 @@
 #include "camera.h"
 #include "track.h"
 
+extern int     mock_move_bkg_call_count;
+extern uint8_t mock_move_bkg_last_y;
+
 void setUp(void)    { mock_vram_clear(); }
 void tearDown(void) {}
 
@@ -125,6 +128,34 @@ void test_camera_init_clears_stale_stream_buffer(void) {
     TEST_ASSERT_EQUAL_INT(count_after_reinit, mock_set_bkg_tiles_call_count);
 }
 
+/* --- camera_apply_scroll: writes SCY after flush ----------------------- */
+
+/* camera_apply_scroll() must call move_bkg exactly once */
+void test_camera_apply_scroll_calls_move_bkg(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    mock_move_bkg_call_count = 0;
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_INT(1, mock_move_bkg_call_count);
+}
+
+/* camera_apply_scroll() passes cam_y as the Y argument */
+void test_camera_apply_scroll_uses_cam_y(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(8u, mock_move_bkg_last_y);
+}
+
+/* Ordering: flush must write VRAM before apply_scroll updates SCY.
+ * After update queues a row and flush runs, apply_scroll must reflect
+ * the new cam_y (not the old one). */
+void test_camera_apply_scroll_reflects_post_flush_cam_y(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    camera_update(80, 72);         /* cam_y -> 0, buffers row 0 */
+    camera_flush_vram();           /* writes row 0 to VRAM */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_move_bkg_last_y);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -140,5 +171,8 @@ int main(void) {
     RUN_TEST(test_camera_flush_clears_buffer);
     RUN_TEST(test_camera_flush_noop_on_empty_buffer);
     RUN_TEST(test_camera_init_clears_stale_stream_buffer);
+    RUN_TEST(test_camera_apply_scroll_calls_move_bkg);
+    RUN_TEST(test_camera_apply_scroll_uses_cam_y);
+    RUN_TEST(test_camera_apply_scroll_reflects_post_flush_cam_y);
     return UNITY_END();
 }
