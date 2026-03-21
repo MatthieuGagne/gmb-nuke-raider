@@ -12,12 +12,15 @@ BANKREF_EXTERN(state_playing)
 #include "track.h"
 #include "camera.h"
 #include "hud.h"
+#include "damage.h"
+#include "state_game_over.h"
 
 static void enter(void) {
     EMU_printf("PLAYING enter\n");
     player_set_pos(track_start_x, track_start_y);
     EMU_printf("PLAYING pos set\n");
     player_reset_vel();
+    damage_init();          /* reset HP pool for new race */
     DISPLAY_OFF;
     track_init();
     EMU_printf("PLAYING track_init done\n");
@@ -38,6 +41,11 @@ static void update(void) {
     player_update();
     camera_update(player_get_x(), player_get_y());
     hud_update();
+    /* Death check */
+    if (damage_is_dead()) {
+        state_replace(&state_game_over);
+        return;
+    }
     /* Finish line detection — check must be last so physics runs first */
     {
         uint8_t fin_ty = (uint8_t)((uint16_t)player_get_y() >> 3u);

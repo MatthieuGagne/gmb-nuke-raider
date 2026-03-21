@@ -8,6 +8,7 @@
 #include "loader.h"
 #include "sprite_pool.h"
 #include "config.h"
+#include "damage.h"
 
 static int16_t px;
 static int16_t py;
@@ -44,6 +45,8 @@ void player_update(void) BANKED {
     int16_t new_py;
     TileType terrain;
 
+    damage_tick();   /* decrement invincibility cooldown each frame */
+
     /* Query terrain at player centre (4px = centre of 8-wide hitbox) */
     terrain = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
     player_apply_physics(input, terrain);
@@ -54,6 +57,7 @@ void player_update(void) BANKED {
         px = new_px;
     } else {
         vx = 0;
+        damage_apply(1u);
     }
 
     /* Apply Y velocity — zero on wall/edge collision */
@@ -62,6 +66,7 @@ void player_update(void) BANKED {
         py = new_py;
     } else {
         vy = 0;
+        damage_apply(1u);
     }
 }
 
