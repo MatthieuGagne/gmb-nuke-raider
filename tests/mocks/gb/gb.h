@@ -68,7 +68,10 @@ static inline void set_bkg_data(uint8_t first_tile, uint8_t nb_tiles,
                                  const uint8_t *data) {
     (void)first_tile; (void)nb_tiles; (void)data;
 }
-static inline void move_bkg(uint8_t x, uint8_t y) { (void)x; (void)y; }
+/* Declared in mock_bkg.c — linked in */
+extern int     mock_move_bkg_call_count;
+extern uint8_t mock_move_bkg_last_y;
+void move_bkg(uint8_t x, uint8_t y);
 
 /* Window layer stubs */
 #define SHOW_WIN    ((void)0)
