@@ -35,7 +35,6 @@ static volatile uint8_t frame_ready = 0;
 
 static void vbl_isr(void) {
     frame_ready = 1;
-    move_bkg(0, (uint8_t)cam_y);
 }
 
 void main(void) {

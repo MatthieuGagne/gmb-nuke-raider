@@ -33,6 +33,7 @@ static void update(void) {
     player_render();
     hud_render();
     camera_flush_vram();
+    camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
     /* Game logic phase: runs during active display */
     player_update();
     camera_update(player_get_x(), player_get_y());

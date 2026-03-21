@@ -79,3 +79,7 @@ void camera_flush_vram(void) BANKED {
     }
     stream_buf_len = 0u;
 }
+
+void camera_apply_scroll(void) BANKED {
+    move_bkg(0u, (uint8_t)cam_y);
+}

@@ -18,4 +18,9 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) BANKED;
 /* Call in VBlank phase after wait_vbl_done(). Drains buffered row streams. */
 void camera_flush_vram(void) BANKED;
 
+/* Call immediately after camera_flush_vram() in the VBlank phase.
+ * Applies cam_y to the hardware SCY register AFTER VRAM is ready.
+ * Must NOT be called from the VBlank ISR (banked context unsafe in ISR). */
+void camera_apply_scroll(void) BANKED;
+
 #endif /* CAMERA_H */
