@@ -94,6 +94,15 @@ After all tasks complete and verified, run the smoketest sequence:
    - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
    - Follow that skill to verify tests, present options, execute choice.
 
+### Step 7: Lessons Learned
+
+After the smoketest passes (before pushing/PR), ask:
+
+> "Any important lessons learned from this implementation? (e.g. surprises, sharp edges, things that should update CLAUDE.md / skills / agents / memory)"
+
+- If **yes** or the user provides lessons: invoke the `/prd` skill to create a GitHub issue capturing the needed documentation updates.
+- If **no** or lessons are trivial: skip the PRD and proceed normally.
+
 ## When to Stop and Ask for Help
 
 **STOP executing immediately when:**
