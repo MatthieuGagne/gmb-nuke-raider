@@ -59,10 +59,10 @@ void test_friction_decelerates_to_zero(void) {
  * Moving right (gas): new_px=137, corner=144 (col 18 = sand) → blocked → vx=0. */
 void test_wall_zeros_vx_not_vy(void) {
     player_set_pos(136, 720);
-    input = J_RIGHT | J_A;
+    input = J_RIGHT | J_UP;
     player_update();
     TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */
-    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL,  player_get_vy()); /* A still moves forward */
+    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL,  player_get_vy()); /* UP still moves forward */
 }
 
 /* --- AC5: wall collision zeros vy, not vx ------------------------------- */
@@ -83,7 +83,7 @@ void test_wall_zeros_vy_not_vx(void) {
  * Holding J_RIGHT | J_A accumulates both vx and vy to PLAYER_MAX_SPEED. */
 void test_x_and_y_axes_accumulate_independently(void) {
     uint8_t i;
-    input = J_RIGHT | J_A;
+    input = J_RIGHT | J_UP;
     for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) {
         player_update();
     }
@@ -97,8 +97,8 @@ void test_x_and_y_axes_accumulate_independently(void) {
 void test_y_clamped_above_hud(void) {
     camera_init(88, 0);       /* cam_y = 0 */
     player_set_pos(88, 112);  /* screen Y = 112, car bottom = 127 — just inside play area */
-    input = J_DOWN | J_A;
-    player_update();           /* would push py to 113 — bottom pixel = 128 = HUD */
+    input = J_DOWN;
+    player_update();           /* reverse from stopped pushes py to 113 > HUD boundary (112) — blocked */
     TEST_ASSERT_TRUE(player_get_y() <= 112);  /* must not cross into HUD */
 }
 
