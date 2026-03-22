@@ -220,6 +220,10 @@ git commit -m "feat: add/update X"
 - Group tasks into batches of 2-4; each batch MUST end with a Smoketest Checkpoint
 - Mark tasks that create independent files as parallelizable — implementer can dispatch them as concurrent subagents
 
+## Lessons Learned Gate
+
+**Note for plan authors:** The `executing-plans` skill includes a final "Lessons Learned" step (Step 7) that runs after the smoketest passes. The implementer will ask the user whether any lessons should be captured as documentation updates (CLAUDE.md, memory, skills, or agents). No action is needed in the plan itself — this gate runs automatically at execution time.
+
 ## Execution Handoff
 
 After saving the plan, offer execution choice:
