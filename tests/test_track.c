@@ -97,6 +97,9 @@ void test_finish_tile_is_road(void) {
     /* tile index 6 (finish visual) must be classified as road — passable */
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(6));
 }
+void test_track_tile_data_count_is_8(void) {
+    TEST_ASSERT_EQUAL_UINT8(8u, track_tile_data_count);
+}
 
 /* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
 
@@ -166,5 +169,6 @@ int main(void) {
     RUN_TEST(test_track_tile_type_repair);
     RUN_TEST(test_track_tile_type_oob_x_is_wall);
     RUN_TEST(test_track_tile_type_negative_is_wall);
+    RUN_TEST(test_track_tile_data_count_is_8);
     return UNITY_END();
 }
