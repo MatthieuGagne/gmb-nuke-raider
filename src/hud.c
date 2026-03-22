@@ -68,7 +68,7 @@ void hud_init(void) BANKED {
     static uint8_t row1[20];
     uint8_t i;
 
-    hud_hp         = PLAYER_HP_MAX;
+    hud_hp         = PLAYER_MAX_HP;
     hud_frame_tick = 0u;
     hud_seconds    = 0u;
     hud_dirty      = 0u;
@@ -83,9 +83,9 @@ void hud_init(void) BANKED {
     row0[0]  = HUD_FONT_BASE + HUD_TILE_H;
     row0[1]  = HUD_FONT_BASE + HUD_TILE_P;
     row0[2]  = HUD_FONT_BASE + HUD_TILE_COLON;
-    row0[3]  = HUD_FONT_BASE + (uint8_t)(PLAYER_HP_MAX / 100u);
-    row0[4]  = HUD_FONT_BASE + (uint8_t)((PLAYER_HP_MAX / 10u) % 10u);
-    row0[5]  = HUD_FONT_BASE + (uint8_t)(PLAYER_HP_MAX % 10u);
+    row0[3]  = HUD_FONT_BASE + HUD_TILE_SPACE;   /* hundreds: always blank for 0-8 */
+    row0[4]  = HUD_FONT_BASE + HUD_TILE_SPACE;   /* tens:     always blank for 0-8 */
+    row0[5]  = HUD_FONT_BASE + PLAYER_MAX_HP;     /* units:    initial = 8 */
     row0[15] = HUD_FONT_BASE + 0u;             /* MM tens */
     row0[16] = HUD_FONT_BASE + 0u;             /* MM units */
     row0[17] = HUD_FONT_BASE + HUD_TILE_COLON;
@@ -133,9 +133,9 @@ void hud_render(void) BANKED {
     set_win_tiles(15u, 0u, 5u, 1u, timer);
 
     /* Update HP digit tiles (cols 3-5) */
-    hp_digits[0] = HUD_FONT_BASE + (uint8_t)(hud_hp / 100u);
-    hp_digits[1] = HUD_FONT_BASE + (uint8_t)((hud_hp / 10u) % 10u);
-    hp_digits[2] = HUD_FONT_BASE + (uint8_t)(hud_hp % 10u);
+    hp_digits[0] = HUD_FONT_BASE + HUD_TILE_SPACE;  /* hundreds: always blank */
+    hp_digits[1] = HUD_FONT_BASE + HUD_TILE_SPACE;  /* tens:     always blank */
+    hp_digits[2] = HUD_FONT_BASE + hud_hp;           /* units:    direct digit 0-8 */
     set_win_tiles(3u, 0u, 3u, 1u, hp_digits);
 
     hud_dirty = 0u;
