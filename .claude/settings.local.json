@@ -261,7 +261,8 @@
       "Bash(then echo:*)",
       "Bash(fi)",
       "Bash(for wt:*)",
-      "Bash(echo \"=== $wt ===\")"
+      "Bash(echo \"=== $wt ===\")",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestValidation.test_three_choices_ok -v 2>&1)"
     ]
   }
 }
