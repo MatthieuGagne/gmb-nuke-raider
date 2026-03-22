@@ -9,6 +9,7 @@
 #include "input.h"
 #include "player.h"
 #include "track.h"
+#include "camera.h"
 
 /* Tile and map data are generated from Aseprite/Tiled sources.
  * Edit assets/maps/overmap_tiles.aseprite in Aseprite or assets/maps/overmap.tmx
@@ -165,8 +166,9 @@ static void enter(void) {
     { SET_BANK(overmap_map);
       set_bkg_tiles(0u, 0u, OVERMAP_W, OVERMAP_H, overmap_map);
       RESTORE_BANK(); }
-    move_bkg(0u, 0u);   /* reset SCY: overmap has no vertical scroll */
-    overmap_move_sprite(); /* pre-set OAM so first visible frame has car in correct position */
+    cam_scy_shadow = 0u;    /* reset shadow so VBL ISR keeps SCY=0 in overmap */
+    move_bkg(0u, 0u);      /* apply immediately for the first frame */
+    overmap_move_sprite();  /* pre-set OAM so first visible frame has car in correct position */
     DISPLAY_ON;
 
     SHOW_BKG;
