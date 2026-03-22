@@ -46,7 +46,7 @@ void test_player_update_moves_up(void) {
 }
 
 void test_player_update_moves_down(void) {
-    input = J_DOWN;   /* DOWN while stopped = reverse (backward = positive vy) */
+    input = J_DOWN | J_A;  /* face south + gas → moves south (+vy) */
     player_update();
     TEST_ASSERT_EQUAL_INT16(721, player_get_y());
 }
@@ -132,45 +132,38 @@ void test_player_render_both_halves_aligned(void) {
 
 /* ===== Gas / Brake / Facing tests (issue #132) ============================= */
 
-/* After remap: A=gun(no-op), B=special(no-op) — neither changes velocity */
-void test_ab_buttons_do_not_change_velocity(void) {
-    player_apply_physics(J_A, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
+/* B button is unbound — must not change velocity */
+void test_b_button_does_not_change_velocity(void) {
     player_apply_physics(J_B, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
 }
 
-/* AC1: J_UP (gas) accelerates forward (negative vy = up).
- * setUp resets player to stopped; gas should give vy = -1. */
+/* AC1: J_UP + J_A: face north, gas → vy = -1. */
 void test_gas_while_facing_up_decreases_vy(void) {
-    player_apply_physics(J_UP, TILE_ROAD);
+    player_apply_physics(J_UP | J_A, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
 }
 
-/* Steering (J_LEFT/J_RIGHT) does not affect forward gas (J_UP).
- * Both axes are independent: vx steers, vy accelerates. */
-void test_gas_always_moves_forward_regardless_of_dpad(void) {
-    player_apply_physics(J_RIGHT | J_UP, TILE_ROAD);
+/* UP+RIGHT=NE facing: both axes get ACCEL simultaneously */
+void test_gas_diagonal_dpad_applies_diagonal_vector(void) {
+    player_apply_physics(J_RIGHT | J_UP | J_A, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
 }
 
-/* AC4: J_B while stopped reverses in the direction opposite to facing.
- * Default facing = up (dy=-1), so reverse = vy += 1. */
+/* Face south + gas = move south */
 void test_brake_while_stopped_facing_up_reverses_down(void) {
-    player_apply_physics(J_DOWN, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(0,  player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(1,  player_get_vy());
+    player_apply_physics(J_DOWN | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(1, player_get_vy());
 }
 
-/* AC4: B while moving decelerates — never reverses lateral direction.
- * Steer right (vx=1), then B: coast friction + brake. vx must not go negative. */
+/* Gas east (vx=1), then gas south: friction on vx — must not reverse. */
 void test_brake_while_moving_laterally_does_not_reverse_x(void) {
-    player_apply_physics(J_RIGHT, TILE_ROAD);   /* vx = 1 */
-    player_apply_physics(J_DOWN,  TILE_ROAD);   /* not stopped: brake, coast clears vx */
+    player_apply_physics(J_RIGHT | J_A, TILE_ROAD);   /* gas east: vx=1 */
+    player_apply_physics(J_DOWN  | J_A, TILE_ROAD);   /* gas south: friction on vx */
     TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
 }
 
@@ -226,12 +219,110 @@ void test_heal_call_restores_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(PLAYER_MAX_HP - 1u, damage_get_hp());
 }
 
-/* AC3: J_B while moving must NOT reverse the car. */
+/* Gas NE (vx=1, vy=-1), then gas south: vy toward +1, vx friction'd — must not reverse. */
 void test_brake_while_moving_does_not_reverse(void) {
-    player_apply_physics(J_RIGHT | J_UP, TILE_ROAD);  /* vx = 1, gas forward */
-    player_apply_physics(J_DOWN,         TILE_ROAD);  /* brake, not reverse */
-    /* vx must not go negative */
+    player_apply_physics(J_RIGHT | J_UP | J_A, TILE_ROAD);  /* gas NE: vx=1, vy=-1 */
+    player_apply_physics(J_DOWN  | J_A,        TILE_ROAD);  /* gas S: vy toward +1 */
     TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
+}
+
+/* ===== 8-directional facing (issue #133) ============================= */
+
+/* Helper: reset velocity, apply one physics frame, check direction */
+static void apply_and_check_dir(uint8_t buttons, player_dir_t expected) {
+    player_reset_vel();
+    player_apply_physics(buttons, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT(expected, player_get_dir());
+}
+
+/* AC1: each D-pad combo maps to the correct facing direction */
+void test_dir_up_sets_T(void)          { apply_and_check_dir(J_UP,            DIR_T);  }
+void test_dir_up_right_sets_RT(void)   { apply_and_check_dir(J_UP | J_RIGHT,  DIR_RT); }
+void test_dir_right_sets_R(void)       { apply_and_check_dir(J_RIGHT,          DIR_R);  }
+void test_dir_down_right_sets_RB(void) { apply_and_check_dir(J_DOWN | J_RIGHT, DIR_RB); }
+void test_dir_down_sets_B(void)        { apply_and_check_dir(J_DOWN,           DIR_B);  }
+void test_dir_down_left_sets_LB(void)  { apply_and_check_dir(J_DOWN | J_LEFT,  DIR_LB); }
+void test_dir_left_sets_L(void)        { apply_and_check_dir(J_LEFT,            DIR_L);  }
+void test_dir_up_left_sets_LT(void)    { apply_and_check_dir(J_UP | J_LEFT,    DIR_LT); }
+
+/* AC1: no D-pad held preserves last direction */
+void test_dir_no_dpad_keeps_last(void) {
+    player_apply_physics(J_RIGHT, TILE_ROAD);  /* set facing = R */
+    player_apply_physics(0,       TILE_ROAD);  /* no dpad: keep R */
+    TEST_ASSERT_EQUAL_INT(DIR_R, player_get_dir());
+}
+
+/* AC2: A + each facing direction applies correct velocity vector */
+
+/* DIR_T (North): dx=0, dy=-ACCEL → vx=0, vy=-1 */
+void test_gas_facing_T_moves_north(void) {
+    player_apply_physics(J_UP | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+}
+
+/* DIR_RT (NE): dx=+ACCEL, dy=-ACCEL → vx=1, vy=-1 */
+void test_gas_facing_RT_moves_northeast(void) {
+    player_apply_physics(J_UP | J_RIGHT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+}
+
+/* DIR_R (East): dx=+ACCEL, dy=0 → vx=1, vy=0 */
+void test_gas_facing_R_moves_east(void) {
+    player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
+}
+
+/* DIR_RB (SE): dx=+ACCEL, dy=+ACCEL → vx=1, vy=1 */
+void test_gas_facing_RB_moves_southeast(void) {
+    player_apply_physics(J_DOWN | J_RIGHT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+}
+
+/* DIR_B (South): dx=0, dy=+ACCEL → vx=0, vy=1 */
+void test_gas_facing_B_moves_south(void) {
+    player_apply_physics(J_DOWN | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+}
+
+/* DIR_LB (SW): dx=-ACCEL, dy=+ACCEL → vx=-1, vy=1 */
+void test_gas_facing_LB_moves_southwest(void) {
+    player_apply_physics(J_DOWN | J_LEFT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+}
+
+/* DIR_L (West): dx=-ACCEL, dy=0 → vx=-1, vy=0 */
+void test_gas_facing_L_moves_west(void) {
+    player_apply_physics(J_LEFT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
+}
+
+/* DIR_LT (NW): dx=-ACCEL, dy=-ACCEL → vx=-1, vy=-1 */
+void test_gas_facing_LT_moves_northwest(void) {
+    player_apply_physics(J_UP | J_LEFT | J_A, TILE_ROAD);
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+}
+
+/* A with no D-pad held: applies gas in last held direction */
+void test_gas_with_no_dpad_uses_last_dir(void) {
+    player_apply_physics(J_RIGHT, TILE_ROAD);  /* set facing = R, no gas */
+    player_apply_physics(J_A,     TILE_ROAD);  /* gas with R still set: vx=1 */
+    TEST_ASSERT_EQUAL_INT8(1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
+}
+
+/* Oil terrain disables gas */
+void test_gas_disabled_on_oil(void) {
+    player_apply_physics(J_UP | J_A, TILE_OIL);
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
 }
 
 int main(void) {
@@ -250,9 +341,9 @@ int main(void) {
     RUN_TEST(test_player_init_claims_two_sprite_slots);
     RUN_TEST(test_player_render_calls_move_sprite_twice);
     RUN_TEST(test_player_render_both_halves_aligned);
-    RUN_TEST(test_ab_buttons_do_not_change_velocity);
+    RUN_TEST(test_b_button_does_not_change_velocity);
     RUN_TEST(test_gas_while_facing_up_decreases_vy);
-    RUN_TEST(test_gas_always_moves_forward_regardless_of_dpad);
+    RUN_TEST(test_gas_diagonal_dpad_applies_diagonal_vector);
     RUN_TEST(test_brake_while_stopped_facing_up_reverses_down);
     RUN_TEST(test_brake_while_moving_laterally_does_not_reverse_x);
     RUN_TEST(test_brake_while_moving_does_not_reverse);
@@ -260,5 +351,26 @@ int main(void) {
     RUN_TEST(test_render_at_low_hp_hides_on_flicker_frame);
     RUN_TEST(test_render_at_low_hp_visible_on_non_flicker_frame);
     RUN_TEST(test_heal_call_restores_hp);
+    /* AC1: direction facing */
+    RUN_TEST(test_dir_up_sets_T);
+    RUN_TEST(test_dir_up_right_sets_RT);
+    RUN_TEST(test_dir_right_sets_R);
+    RUN_TEST(test_dir_down_right_sets_RB);
+    RUN_TEST(test_dir_down_sets_B);
+    RUN_TEST(test_dir_down_left_sets_LB);
+    RUN_TEST(test_dir_left_sets_L);
+    RUN_TEST(test_dir_up_left_sets_LT);
+    RUN_TEST(test_dir_no_dpad_keeps_last);
+    /* AC2: direction → velocity vector */
+    RUN_TEST(test_gas_facing_T_moves_north);
+    RUN_TEST(test_gas_facing_RT_moves_northeast);
+    RUN_TEST(test_gas_facing_R_moves_east);
+    RUN_TEST(test_gas_facing_RB_moves_southeast);
+    RUN_TEST(test_gas_facing_B_moves_south);
+    RUN_TEST(test_gas_facing_LB_moves_southwest);
+    RUN_TEST(test_gas_facing_L_moves_west);
+    RUN_TEST(test_gas_facing_LT_moves_northwest);
+    RUN_TEST(test_gas_with_no_dpad_uses_last_dir);
+    RUN_TEST(test_gas_disabled_on_oil);
     return UNITY_END();
 }
