@@ -3,6 +3,7 @@
 #include "../src/input.h"
 #include "player.h"
 #include "camera.h"
+#include "../src/damage.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
@@ -12,6 +13,7 @@ void setUp(void) {
     mock_vram_clear();
     mock_move_sprite_reset();
     camera_init(88, 720);  /* cam_y = 648 */
+    damage_init();
     player_init();
 }
 void tearDown(void) {}
@@ -173,6 +175,45 @@ void test_brake_while_moving_laterally_does_not_reverse_x(void) {
     TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
 }
 
+/* --- flicker: HP > 2 = no hide --- */
+void test_render_at_full_hp_calls_move_sprite_normally(void) {
+    /* setUp calls damage_init → full HP */
+    mock_move_sprite_reset();
+    player_render();
+    /* Both halves must be placed on-screen (y > 0) */
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[0]);
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[1]);
+}
+
+/* --- flicker: HP <= 2, frame counter bit 3 set = hide --- */
+void test_render_at_low_hp_hides_on_flicker_frame(void) {
+    uint8_t i;
+    /* Force hp to 1 */
+    damage_init();
+    damage_apply((uint8_t)(PLAYER_MAX_HP - 1u));  /* hp = 1 */
+    /* Burn 30 frames of i-frames */
+    for (i = 0u; i < DAMAGE_INVINCIBILITY_FRAMES; i++) damage_tick();
+    /* Call render 8 times (frame counter = 0..7, bit3 = 0: visible)
+     * then 1 more (frame counter = 8, bit3 = 1: hidden) */
+    for (i = 0u; i < 8u; i++) player_render();
+    mock_move_sprite_reset();
+    player_render();  /* frame_counter == 8, bit3 set → hide */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[1]);
+}
+
+/* --- flicker: HP <= 2, frame counter bit 3 clear = visible --- */
+void test_render_at_low_hp_visible_on_non_flicker_frame(void) {
+    uint8_t i;
+    damage_init();
+    damage_apply((uint8_t)(PLAYER_MAX_HP - 1u));
+    for (i = 0u; i < DAMAGE_INVINCIBILITY_FRAMES; i++) damage_tick();
+    /* frame_counter=0 at init, bit3=0: visible */
+    mock_move_sprite_reset();
+    player_render();
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[0]);
+}
+
 /* AC3: J_B while moving must NOT reverse the car. */
 void test_brake_while_moving_does_not_reverse(void) {
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);  /* vx = 1 */
@@ -203,5 +244,8 @@ int main(void) {
     RUN_TEST(test_brake_while_stopped_facing_up_reverses_down);
     RUN_TEST(test_brake_while_moving_laterally_does_not_reverse_x);
     RUN_TEST(test_brake_while_moving_does_not_reverse);
+    RUN_TEST(test_render_at_full_hp_calls_move_sprite_normally);
+    RUN_TEST(test_render_at_low_hp_hides_on_flicker_frame);
+    RUN_TEST(test_render_at_low_hp_visible_on_non_flicker_frame);
     return UNITY_END();
 }

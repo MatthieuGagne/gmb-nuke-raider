@@ -165,6 +165,7 @@ static void enter(void) {
     { SET_BANK(overmap_map);
       set_bkg_tiles(0u, 0u, OVERMAP_W, OVERMAP_H, overmap_map);
       RESTORE_BANK(); }
+    move_bkg(0u, 0u);   /* reset SCY: overmap has no vertical scroll */
     DISPLAY_ON;
 
     SHOW_BKG;

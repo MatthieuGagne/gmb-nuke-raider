@@ -16,6 +16,7 @@ static int8_t  vx;
 static int8_t  vy;
 static uint8_t player_sprite_slot     = 0;
 static uint8_t player_sprite_slot_bot = 0;
+static uint8_t player_flicker_tick;
 
 /* Returns 1 if all 4 corners of a player at world (wx, wy) are on track. */
 static uint8_t corners_passable(int16_t wx, int16_t wy) {
@@ -37,6 +38,7 @@ void player_init(void) BANKED {
     load_track_start_pos(&px, &py);
     vx = 0;
     vy = 0;
+    player_flicker_tick = 0u;
     SHOW_SPRITES;
 }
 
@@ -71,12 +73,17 @@ void player_update(void) BANKED {
 }
 
 void player_render(void) BANKED {
-    /* cam_x is always 0; cam_y is uint16_t but py >= cam_y is enforced so offset fits uint8_t */
     uint8_t hw_x = (uint8_t)(px + 8);
     uint8_t hw_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
-    move_sprite(player_sprite_slot,     hw_x, hw_y);
-    move_sprite(player_sprite_slot_bot, hw_x, (uint8_t)(hw_y + 8u));
-
+    player_flicker_tick++;
+    if (damage_get_hp() <= 2u && (player_flicker_tick & 8u)) {
+        /* Hide: move both halves off-screen (y=0 is above OAM visible area) */
+        move_sprite(player_sprite_slot,     0u, 0u);
+        move_sprite(player_sprite_slot_bot, 0u, 0u);
+    } else {
+        move_sprite(player_sprite_slot,     hw_x, hw_y);
+        move_sprite(player_sprite_slot_bot, hw_x, (uint8_t)(hw_y + 8u));
+    }
 }
 
 void player_set_pos(int16_t x, int16_t y) BANKED {
