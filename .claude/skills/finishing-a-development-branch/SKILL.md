@@ -216,6 +216,13 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - **Problem:** Local master ref may be stale; silently merges old code
 - **Fix:** Always `git fetch origin && git merge origin/master`
 
+**`git worktree prune` fails when session CWD is the deleted worktree**
+- **Problem:** After `git worktree remove`, if the session's working directory was inside that worktree, `git worktree prune` (and bare `git` commands) fail with "Working directory no longer exists"
+- **Fix:** Use explicit `GIT_DIR` to target the main repo:
+  ```bash
+  GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
+  ```
+
 **Merging directly to main**
 - **Problem:** Bypasses review, violates branch policy
 - **Fix:** Always use a PR — never `git merge` to main locally
