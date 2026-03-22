@@ -1,0 +1,166 @@
+{
+  "npcs": [
+    {
+      "id": 0,
+      "name": "STEEVE",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "Roads. Parts. Sharp. Racer. Grease. Caps.",
+          "choices": [],
+          "next": [
+            1
+          ]
+        },
+        {
+          "idx": 1,
+          "text": "Da FUQ ?",
+          "choices": [
+            "The races",
+            "Supplies",
+            "TEST, TEST 2"
+          ],
+          "next": [
+            2,
+            3,
+            "END"
+          ]
+        },
+        {
+          "idx": 2,
+          "text": "The circuit is brutal. Stay sharp.",
+          "choices": [
+            "Thanks",
+            "Tell me more"
+          ],
+          "next": [
+            4,
+            5
+          ]
+        },
+        {
+          "idx": 3,
+          "text": "I've got parts if you've got caps.",
+          "choices": [],
+          "next": [
+            6
+          ]
+        },
+        {
+          "idx": 4,
+          "text": "Good luck out there.",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        },
+        {
+          "idx": 5,
+          "text": "Watch the east corner. It bites.",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        },
+        {
+          "idx": 6,
+          "text": "Come back with caps.",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "TRADER",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "Got caps? I've got wares.",
+          "choices": [
+            "Browse",
+            "Leave"
+          ],
+          "next": [
+            1,
+            "END"
+          ]
+        },
+        {
+          "idx": 1,
+          "text": "Come back when you're loaded.",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "DRIFTER",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "Just passing through.",
+          "choices": [],
+          "next": [
+            1
+          ]
+        },
+        {
+          "idx": 1,
+          "text": "Stay sharp out there.",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "PLACEHOLDER3",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "...",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "PLACEHOLDER4",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "...",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "PLACEHOLDER5",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "...",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    }
+  ]
+}

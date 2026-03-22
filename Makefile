@@ -19,7 +19,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check dialog_data
 
 all: $(TARGET)
 
@@ -78,6 +78,15 @@ src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_borde
 
 $(TARGET): src/dialog_border_tiles.c
 
+# src/dialog_data.c is checked into git so CI works without Python.
+# Run `make dialog_data` to regenerate from updated JSON.
+src/dialog_data.c: assets/dialog/npcs.json tools/dialog_to_c.py
+	python3 tools/dialog_to_c.py assets/dialog/npcs.json src/dialog_data.c
+
+dialog_data: src/dialog_data.c
+
+$(TARGET): src/dialog_data.c
+
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
@@ -112,7 +121,7 @@ src/overmap_map.c: assets/maps/overmap.tmx tools/tmx_to_array_c.py
 $(TARGET): src/overmap_map.c
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build -v
+	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
