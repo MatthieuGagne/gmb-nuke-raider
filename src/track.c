@@ -5,7 +5,7 @@
 #include "loader.h"
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
-#define TILE_LUT_LEN 7u
+#define TILE_LUT_LEN 8u
 static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_WALL,   /* 0: off-road */
     TILE_ROAD,   /* 1: road */
@@ -14,6 +14,7 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_OIL,    /* 4: oil puddle */
     TILE_BOOST,  /* 5: boost pad */
     TILE_ROAD,   /* 6: finish line visual — passable */
+    TILE_REPAIR, /* 7: repair pad */
 };
 
 TileType track_tile_type_from_index(uint8_t tile_idx) BANKED {

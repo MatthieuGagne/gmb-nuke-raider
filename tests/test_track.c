@@ -87,6 +87,9 @@ void test_tile_type_from_index_oil(void) {
 void test_tile_type_from_index_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
 }
+void test_tile_type_from_index_repair(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type_from_index(7));
+}
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
 }
@@ -121,6 +124,10 @@ void test_track_tile_type_boost(void) {
     /* tile (11,30) = tile_id 5 — placed in Task 4 */
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type(88, 240));
 }
+void test_track_tile_type_repair(void) {
+    /* tile (12,40) = tile_id 7 — repair pad placed in Task 4 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type(96, 320));
+}
 void test_track_tile_type_oob_x_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(160, 80));
 }
@@ -147,6 +154,7 @@ int main(void) {
     RUN_TEST(test_tile_type_from_index_sand);
     RUN_TEST(test_tile_type_from_index_oil);
     RUN_TEST(test_tile_type_from_index_boost);
+    RUN_TEST(test_tile_type_from_index_repair);
     RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
     RUN_TEST(test_finish_tile_is_road);
     RUN_TEST(test_track_tile_type_road);
@@ -155,6 +163,7 @@ int main(void) {
     RUN_TEST(test_track_tile_type_sand);
     RUN_TEST(test_track_tile_type_oil);
     RUN_TEST(test_track_tile_type_boost);
+    RUN_TEST(test_track_tile_type_repair);
     RUN_TEST(test_track_tile_type_oob_x_is_wall);
     RUN_TEST(test_track_tile_type_negative_is_wall);
     return UNITY_END();

@@ -214,6 +214,19 @@ void test_render_at_low_hp_visible_on_non_flicker_frame(void) {
     TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[0]);
 }
 
+/* --- repair tile healing ------------------------------------------------ */
+
+/* Tests damage_heal directly — TILE_REPAIR integration is verified in smoketest
+ * (requires map edit; mock track returns TILE_ROAD for all road coordinates). */
+void test_heal_call_restores_hp(void) {
+    uint8_t i;
+    damage_init();
+    damage_apply(3u);                              /* hp = PLAYER_MAX_HP - 3 */
+    for (i = 0u; i < DAMAGE_INVINCIBILITY_FRAMES; i++) damage_tick();
+    damage_heal(DAMAGE_REPAIR_AMOUNT);             /* hp += 2 */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_MAX_HP - 1u, damage_get_hp());
+}
+
 /* AC3: J_B while moving must NOT reverse the car. */
 void test_brake_while_moving_does_not_reverse(void) {
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);  /* vx = 1 */
@@ -247,5 +260,6 @@ int main(void) {
     RUN_TEST(test_render_at_full_hp_calls_move_sprite_normally);
     RUN_TEST(test_render_at_low_hp_hides_on_flicker_frame);
     RUN_TEST(test_render_at_low_hp_visible_on_non_flicker_frame);
+    RUN_TEST(test_heal_call_restores_hp);
     return UNITY_END();
 }

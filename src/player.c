@@ -70,6 +70,11 @@ void player_update(void) BANKED {
         vy = 0;
         damage_apply(1u);
     }
+
+    /* Repair tile: heal HP when standing on a repair pad */
+    if (terrain == TILE_REPAIR) {
+        damage_heal(DAMAGE_REPAIR_AMOUNT);
+    }
 }
 
 void player_render(void) BANKED {
