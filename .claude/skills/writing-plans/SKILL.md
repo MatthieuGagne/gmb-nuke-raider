@@ -13,6 +13,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
+**First action before anything else:** Pull and merge latest master into the current worktree branch:
+```bash
+git fetch origin && git merge origin/master
+```
+Resolve any conflicts before proceeding.
+
 **Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
@@ -219,6 +225,10 @@ git commit -m "feat: add/update X"
 - C files ALWAYS get the 11-step template with all HARD GATE steps
 - Group tasks into batches of 2-4; each batch MUST end with a Smoketest Checkpoint
 - Mark tasks that create independent files as parallelizable — implementer can dispatch them as concurrent subagents
+
+## Lessons Learned Gate
+
+**Note for plan authors:** The `executing-plans` skill includes a final "Lessons Learned" step (Step 7) that runs after the smoketest passes. The implementer will ask the user whether any lessons should be captured as documentation updates (CLAUDE.md, memory, skills, or agents). No action is needed in the plan itself — this gate runs automatically at execution time.
 
 ## Execution Handoff
 

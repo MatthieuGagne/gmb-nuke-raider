@@ -218,6 +218,9 @@ def gid_to_tile_id(gid, firstgid):
 - Only CSV encoding supported
 
 **Common conversion mistakes:**
+
+> **Source of truth:** `assets/maps/track.tmx` is the canonical data source for the track map. Hand-edits to `src/track_map.c` are silently overwritten by `tmx_to_c.py` on the next `make clean && make`. Always add new tiles in Tiled, save the TMX, and let the Makefile regenerate the C file.
+
 | Mistake | Fix |
 |---------|-----|
 | Hardcoding `- 1` as tile offset | Read `firstgid` from `<tileset>` element |

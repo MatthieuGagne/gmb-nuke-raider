@@ -30,6 +30,7 @@
       "Bash(gh issue:*)",
       "Bash(gh pr:*)",
       "Bash(grep:*)",
+      "Bash(echo:*)",
       "WebFetch(domain:gbdev.io)",
       "Bash(gcc:*)",
       "Bash(gh run:*)",
@@ -248,7 +249,19 @@
       "Bash(git commit:*)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestValidation tests.test_dialog_to_c.TestRenumber -v 2>&1)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(python3 -c \":*)",
+      "Bash(ar tv:*)",
+      "Bash(ar t:*)",
+      "Bash(sdas --version)",
+      "Bash(xxd /tmp/gbdk_extract/___sdcc_bcall.o)",
+      "Bash(mkdir -p /tmp/gbdk_extract)",
+      "Bash(ar x:*)",
+      "Bash(do if:*)",
+      "Bash(then echo:*)",
+      "Bash(fi)",
+      "Bash(for wt:*)",
+      "Bash(echo \"=== $wt ===\")"
     ]
   }
 }
