@@ -6,9 +6,9 @@
 #include "dialog_data.h"
 #include "banking.h"
 
-/* --- NPC 0: MECHANIC --- */
+/* --- NPC 0: STEEVE --- */
 static const char n0_0[] = "Roads. Parts. Sharp. Racer. Grease. Caps.";
-static const char n0_1[] = "What's on your mind?";
+static const char n0_1[] = "Da FUQ ?";
 static const char n0_2[] = "The circuit is brutal. Stay sharp.";
 static const char n0_3[] = "I've got parts if you've got caps.";
 static const char n0_4[] = "Good luck out there.";
@@ -16,13 +16,14 @@ static const char n0_5[] = "Watch the east corner. It bites.";
 static const char n0_6[] = "Come back with caps.";
 static const char n0_c1_0[] = "The races";
 static const char n0_c1_1[] = "Supplies";
+static const char n0_c1_2[] = "TEST, TEST 2";
 static const char n0_c2_0[] = "Thanks";
 static const char n0_c2_1[] = "Tell me more";
-static const char npc_name_mechanic[] = "MECHANIC";
+static const char npc_name_steeve[] = "STEEVE";
 
-static const DialogNode mechanic_nodes[] = {
+static const DialogNode steeve_nodes[] = {
     /* 0 */ { n0_0, 0, {NULL,   NULL,   NULL}, {1, DIALOG_END, DIALOG_END} },
-    /* 1 */ { n0_1, 2, {n0_c1_0,  n0_c1_1,  NULL}, {2, 3, DIALOG_END} },
+    /* 1 */ { n0_1, 3, {n0_c1_0,  n0_c1_1,  n0_c1_2}, {2, 3, DIALOG_END} },
     /* 2 */ { n0_2, 2, {n0_c2_0,  n0_c2_1,  NULL}, {4, 5, DIALOG_END} },
     /* 3 */ { n0_3, 0, {NULL,   NULL,   NULL}, {6, DIALOG_END, DIALOG_END} },
     /* 4 */ { n0_4, 0, {NULL,   NULL,   NULL}, {DIALOG_END, DIALOG_END, DIALOG_END} },
@@ -79,7 +80,7 @@ static const DialogNode placeholder5_nodes[] = {
 /* --- NPC dialog table (indexed by npc_id) --- */
 BANKREF(npc_dialogs)
 const NpcDialog npc_dialogs[] = {
-    { mechanic_nodes, 7, npc_name_mechanic }, /* NPC 0: MECHANIC */
+    { steeve_nodes, 7, npc_name_steeve }, /* NPC 0: STEEVE */
     { trader_nodes, 2, npc_name_trader }, /* NPC 1: TRADER */
     { drifter_nodes, 2, npc_name_drifter }, /* NPC 2: DRIFTER */
     { placeholder3_nodes, 1, npc_name_placeholder3 }, /* NPC 3: PLACEHOLDER3 */
