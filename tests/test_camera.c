@@ -128,32 +128,49 @@ void test_camera_init_clears_stale_stream_buffer(void) {
     TEST_ASSERT_EQUAL_INT(count_after_reinit, mock_set_bkg_tiles_call_count);
 }
 
-/* --- camera_apply_scroll: writes SCY after flush ----------------------- */
+/* --- camera_apply_scroll: shadow register (legacy ordering tests updated) */
 
-/* camera_apply_scroll() must call move_bkg exactly once */
-void test_camera_apply_scroll_calls_move_bkg(void) {
+/* camera_apply_scroll() must update cam_scy_shadow with current cam_y */
+void test_camera_apply_scroll_sets_shadow_to_cam_y(void) {
     camera_init(80, 80);           /* cam_y = 8 */
     mock_move_bkg_call_count = 0;
     camera_apply_scroll();
-    TEST_ASSERT_EQUAL_INT(1, mock_move_bkg_call_count);
+    TEST_ASSERT_EQUAL_UINT8(8u, cam_scy_shadow);
 }
 
-/* camera_apply_scroll() passes cam_y as the Y argument */
-void test_camera_apply_scroll_uses_cam_y(void) {
+/* cam_scy_shadow reflects cam_y at the moment of the call */
+void test_camera_apply_scroll_shadow_matches_cam_y(void) {
     camera_init(80, 80);           /* cam_y = 8 */
     camera_apply_scroll();
-    TEST_ASSERT_EQUAL_UINT8(8u, mock_move_bkg_last_y);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)cam_y, cam_scy_shadow);
 }
 
-/* Ordering: flush must write VRAM before apply_scroll updates SCY.
- * After update queues a row and flush runs, apply_scroll must reflect
- * the new cam_y (not the old one). */
+/* Ordering: flush must write VRAM before apply_scroll captures cam_y.
+ * After update queues a row and flush runs, shadow must reflect new cam_y. */
 void test_camera_apply_scroll_reflects_post_flush_cam_y(void) {
     camera_init(80, 80);           /* cam_y = 8 */
     camera_update(80, 72);         /* cam_y -> 0, buffers row 0 */
     camera_flush_vram();           /* writes row 0 to VRAM */
     camera_apply_scroll();
-    TEST_ASSERT_EQUAL_UINT8(0u, mock_move_bkg_last_y);
+    TEST_ASSERT_EQUAL_UINT8(0u, cam_scy_shadow);
+}
+
+/* --- camera_apply_scroll: shadow register (new behaviour) --------------- */
+
+/* camera_apply_scroll() must write cam_y into cam_scy_shadow, not move_bkg.
+ * The VBL ISR is responsible for applying the shadow to the hardware register. */
+void test_camera_apply_scroll_updates_shadow(void) {
+    camera_init(80, 80);   /* cam_y = 8 */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(8u, cam_scy_shadow);
+}
+
+/* camera_apply_scroll() must NOT call move_bkg directly — that is the ISR's job. */
+void test_camera_apply_scroll_does_not_call_move_bkg(void) {
+    camera_init(80, 80);
+    mock_move_bkg_call_count = 0;
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_bkg_call_count);
 }
 
 int main(void) {
@@ -171,8 +188,10 @@ int main(void) {
     RUN_TEST(test_camera_flush_clears_buffer);
     RUN_TEST(test_camera_flush_noop_on_empty_buffer);
     RUN_TEST(test_camera_init_clears_stale_stream_buffer);
-    RUN_TEST(test_camera_apply_scroll_calls_move_bkg);
-    RUN_TEST(test_camera_apply_scroll_uses_cam_y);
+    RUN_TEST(test_camera_apply_scroll_sets_shadow_to_cam_y);
+    RUN_TEST(test_camera_apply_scroll_shadow_matches_cam_y);
     RUN_TEST(test_camera_apply_scroll_reflects_post_flush_cam_y);
+    RUN_TEST(test_camera_apply_scroll_updates_shadow);
+    RUN_TEST(test_camera_apply_scroll_does_not_call_move_bkg);
     return UNITY_END();
 }

@@ -4,6 +4,7 @@
 #include "track.h"
 
 volatile uint16_t cam_y;
+volatile uint8_t  cam_scy_shadow;
 
 /* CAM_MAX_Y = (MAP_TILES_H * 8) - 144 = (100*8) - 144 = 656 */
 #define CAM_MAX_Y  656u
@@ -81,5 +82,5 @@ void camera_flush_vram(void) BANKED {
 }
 
 void camera_apply_scroll(void) BANKED {
-    move_bkg(0u, (uint8_t)cam_y);
+    cam_scy_shadow = (uint8_t)cam_y;
 }
