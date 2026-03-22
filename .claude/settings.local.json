@@ -30,6 +30,7 @@
       "Bash(gh issue:*)",
       "Bash(gh pr:*)",
       "Bash(grep:*)",
+      "Bash(echo:*)",
       "WebFetch(domain:gbdev.io)",
       "Bash(gcc:*)",
       "Bash(gh run:*)",
@@ -258,7 +259,9 @@
       "Bash(ar x:*)",
       "Bash(do if:*)",
       "Bash(then echo:*)",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(for wt:*)",
+      "Bash(echo \"=== $wt ===\")"
     ]
   }
 }
