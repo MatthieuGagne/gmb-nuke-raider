@@ -40,6 +40,7 @@ static void update(void) {
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
     /* Game logic phase: runs during active display */
     player_update();
+    hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
     camera_update(player_get_x(), player_get_y());
     hud_update();
     /* Death check */
