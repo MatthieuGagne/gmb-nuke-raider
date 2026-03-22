@@ -117,17 +117,17 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
 
     /* Step 2: determine coast friction per terrain and per axis.
      * X: no friction while D-pad L/R held (steering accumulates freely).
-     * Y: no friction while A held (gas accumulates freely). */
+     * Y: no friction while J_UP held (gas accumulates freely). */
     if (terrain == TILE_SAND) {
         fric_x = (buttons & (J_LEFT | J_RIGHT)) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-        fric_y = (buttons & J_A)                 ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+        fric_y = (buttons & J_UP)                ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
     } else if (terrain == TILE_OIL) {
         fric_x = 0;
         fric_y = 0;
     } else {
         /* Road / Boost */
         fric_x = (buttons & (J_LEFT | J_RIGHT)) ? 0u : (uint8_t)PLAYER_FRICTION;
-        fric_y = (buttons & J_A)                 ? 0u : (uint8_t)PLAYER_FRICTION;
+        fric_y = (buttons & J_UP)                ? 0u : (uint8_t)PLAYER_FRICTION;
     }
 
     /* Step 3: apply X coast friction */
@@ -148,20 +148,20 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
         if (buttons & J_RIGHT) vx = (int8_t)(vx + (int8_t)PLAYER_ACCEL);
     }
 
-    /* Step 6: A = gas (always forward = negative vy, disabled on oil) */
-    if ((buttons & J_A) && terrain != TILE_OIL) {
+    /* Step 6: J_UP = gas (always forward = negative vy, disabled on oil) */
+    if ((buttons & J_UP) && terrain != TILE_OIL) {
         vy = (int8_t)(vy - (int8_t)PLAYER_ACCEL);
     }
 
-    /* Step 7: B = brake while moving / reverse while stopped (Y axis) */
-    if (buttons & J_B) {
+    /* Step 7: J_DOWN = brake while moving / reverse while stopped (Y axis, disabled on oil) */
+    if ((buttons & J_DOWN) && terrain != TILE_OIL) {
         if (!stopped) {
             /* Braking: extra friction on vy */
             for (i = 0; i < PLAYER_FRICTION; i++) {
                 if      (vy > 0) vy = (int8_t)(vy - 1);
                 else if (vy < 0) vy = (int8_t)(vy + 1);
             }
-        } else if (terrain != TILE_OIL) {
+        } else {
             /* Reverse: thrust backward (positive vy), capped at PLAYER_REVERSE_MAX_SPEED */
             vy = (int8_t)(vy + (int8_t)PLAYER_ACCEL);
             if (vy > (int8_t)PLAYER_REVERSE_MAX_SPEED)

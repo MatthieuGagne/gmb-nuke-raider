@@ -29,14 +29,22 @@ Expected: current directory is under `.claude/worktrees/` and branch is a featur
 
 If not in a worktree: use the `using-git-worktrees` skill or `EnterWorktree` tool before proceeding.
 
-### Step 2: Load and Review Plan
+### Step 2: Sync with master
+
+After confirming you are in a worktree, pull and merge latest master:
+```bash
+git fetch origin && git merge origin/master
+```
+NEVER use `git merge master` alone — the local master ref may be stale. Resolve any conflicts before proceeding.
+
+### Step 3: Load and Review Plan
 
 1. Read plan file
 2. Review critically — identify any questions or concerns about the plan
 3. If concerns: raise them with your human partner before starting
 4. If no concerns: create TodoWrite tasks and proceed
 
-### Step 3: Execute Batch
+### Step 4: Execute Batch
 
 **Default: first 3 tasks (or all remaining if fewer than 3)**
 
@@ -52,25 +60,25 @@ For each task:
 5. Run verifications as specified
 6. Mark as completed
 
-### Step 4: Report
+### Step 5: Report
 
 When batch complete:
 - Show what was implemented
 - Show verification output
 - Say: "Ready for feedback."
 
-### Step 5: Continue
+### Step 6: Continue
 
 Based on feedback:
 - Apply changes if needed
 - Execute next batch
 - Repeat until complete
 
-### Step 6: Complete Development
+### Step 7: Complete Development
 
 After all tasks complete and verified, run the smoketest sequence:
 
-1. Fetch and merge latest master (from the worktree directory):
+1. Fetch and merge latest master again (from the worktree directory) to ensure you're up to date before pushing:
    ```bash
    git fetch origin && git merge origin/master
    ```
@@ -94,7 +102,7 @@ After all tasks complete and verified, run the smoketest sequence:
    - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
    - Follow that skill to verify tests, present options, execute choice.
 
-### Step 7: Lessons Learned
+### Step 8: Lessons Learned
 
 After the smoketest passes (before pushing/PR), ask:
 
@@ -116,7 +124,7 @@ After the smoketest passes (before pushing/PR), ask:
 
 ## When to Revisit Earlier Steps
 
-**Return to Review (Step 2) when:**
+**Return to Review (Step 3) when:**
 - Partner updates the plan based on your feedback
 - Fundamental approach needs rethinking
 

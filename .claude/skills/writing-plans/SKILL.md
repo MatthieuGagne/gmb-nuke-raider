@@ -13,6 +13,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
+**First action before anything else:** Pull and merge latest master into the current worktree branch:
+```bash
+git fetch origin && git merge origin/master
+```
+Resolve any conflicts before proceeding.
+
 **Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
