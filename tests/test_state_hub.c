@@ -2,9 +2,11 @@
 #include "state_hub.h"
 #include "config.h"
 #include "input.h"
+#include "music.h"
 
 static void tick(uint8_t btn) {
     prev_input = 0; input = btn;
+    frame_ready = 1;           /* prevent VBlank spin from deadlocking host tests */
     state_hub.update();
     prev_input = input; input = 0;
 }
