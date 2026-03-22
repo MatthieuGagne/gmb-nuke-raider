@@ -65,7 +65,7 @@ Only continue to Step 3 when it passes.
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
    ```
 
-4. Tell the user it's running and ask them to confirm it looks correct before proceeding.
+5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 
 **Stop. Wait for explicit confirmation.**
 
@@ -194,7 +194,7 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 
 | Option | Push | Cleanup Worktree | When |
 |--------|------|-----------------|------|
-| 1. Create PR | ✓ | ✓ | After merge confirmed |
+| 1. Push and Create PR | ✓ | ✓ | After merge confirmed |
 | 2. Keep as-is | - | - | Never |
 | 3. Discard | - | ✓ | After 'discard' typed |
 
