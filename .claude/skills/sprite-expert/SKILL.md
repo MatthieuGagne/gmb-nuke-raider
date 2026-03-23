@@ -101,6 +101,23 @@ HIDE_SPRITES;   /* LCDC bit 1 = 0 */
 
 ---
 
+### ⚠ Mock Header — Sprite Flip Stubs
+
+When writing host-side tests that exercise sprite flipping, verify these exist in `tests/mocks/gb/gb.h`:
+
+- `S_FLIPX` (`0x20U`) and `S_FLIPY` (`0x40U`) constants
+- `set_sprite_prop(uint8_t nb, uint8_t prop)` no-op stub
+
+These were **absent before PR #179** and caused a mid-implementation compile failure. They are now present. Before writing any sprite-flip feature, confirm with:
+
+```bash
+grep "S_FLIPX\|set_sprite_prop" tests/mocks/gb/gb.h
+```
+
+If either is absent, add it to the mock header before writing tests or implementation code.
+
+---
+
 ## Coordinate System
 
 OAM stores raw hardware coordinates. `move_sprite(slot, oam_x, oam_y)`:
@@ -161,6 +178,9 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 ## Adding a New Sprite
 
 1. Create or edit `assets/sprites/<name>.aseprite` in Aseprite (indexed color, 4-shade GBC palette, multiples of 8)
+
+   > **Directional placeholder art:** For any sprite with directional facing, use a simple arrow glyph (↑ ↗ → ↘ ↓ ↙ ← ↖) rather than an abstract shape. Arrows make facing direction immediately readable in the emulator during development and prevent smoketest confusion about which direction the sprite is facing.
+
 2. Export PNG: `make export-sprites` or File → Export As → `assets/sprites/<name>.png`
 3. Run: `python3 tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
 4. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
@@ -184,6 +204,21 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 | Using palette index 0 for sprite pixels | Always transparent; use indices 1–3 |
 | Forgetting to check `SPRITE_POOL_INVALID` | `get_sprite()` returns `0xFF` when pool is full |
 | Loading tile data before `SPRITES_8x8` | Set mode first, then load data and assign tiles |
+| Abstract placeholder art for directional sprites | Use a clear directional arrow (↑ ↗ → ↘) — makes facing readable at a glance in the emulator. |
+| Assigning gas to A/B button | D-pad = facing + gas simultaneously. A/B must NOT be used for movement. |
+
+---
+
+## Player Control Scheme
+
+**D-pad = facing AND gas simultaneously.** Pressing a direction sets the car's facing and applies thrust in that direction. There is no separate gas button — A/B are not used for movement.
+
+This means:
+- Directional sprite art must cover all 8 directions the player can face.
+- Do NOT design features that require the player to hold a direction without moving.
+- Do NOT reassign movement to A/B; doing so breaks the control contract and requires a plan revision.
+
+This was learned from a smoketest failure during PR #179 where an initial plan used A=gas.
 
 ---
 
