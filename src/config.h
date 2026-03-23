@@ -64,4 +64,11 @@
 #define HUB_PORTRAIT_BOX_W     6u    /* portrait box width in tiles (cols 0-5) */
 #define HUB_DIALOG_BOX_W       14u   /* dialog box width in tiles (cols 6-19) */
 
+/* Projectile pool */
+#define MAX_PROJECTILES       8u
+#define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
+#define PROJ_SPEED            4u    /* px/frame; intentionally faster than PLAYER_MAX_SPEED */
+#define PROJ_TTL_FRAMES       4u    /* frames alive; at PROJ_SPEED=4 → 16 px = 2 tiles travel */
+#define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
+
 #endif /* CONFIG_H */
