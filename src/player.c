@@ -119,7 +119,7 @@ void player_render(void) BANKED {
     set_sprite_prop(player_sprite_slot_bot, flip);
 
     player_flicker_tick++;
-    if (damage_get_hp() <= 2u && (player_flicker_tick & 8u)) {
+    if (damage_get_hp() <= 20u && (player_flicker_tick & 8u)) {
         move_sprite(player_sprite_slot,     0u, 0u);
         move_sprite(player_sprite_slot_bot, 0u, 0u);
     } else {
