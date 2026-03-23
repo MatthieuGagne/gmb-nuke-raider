@@ -60,6 +60,9 @@ For each task:
 5. Run verifications as specified
 6. Mark as completed
 
+**Parallel reviewer rule (within each batch):**
+After each task's implementer work is committed, dispatch spec and quality reviewers as two concurrent Agent calls in a single message (see `dispatching-parallel-agents` skill). Both must pass before marking the task complete.
+
 ### Step 5: Report
 
 When batch complete:
@@ -147,6 +150,8 @@ Do not push or open the PR until you have received an explicit answer to this qu
 - bank-post-build gate after every build
 - Smoketest uses Emulicious, not mgba-qt
 - Merge command is `git fetch origin && git merge origin/master`
+- Parallel reviewers: fire spec + quality in one message after each implementer commit (see dispatching-parallel-agents)
+- Explore agent: use for any codebase exploration > 2 files (see dispatching-parallel-agents)
 
 ## Integration
 
@@ -154,3 +159,4 @@ Do not push or open the PR until you have received an explicit answer to this qu
 - **superpowers:using-git-worktrees** — REQUIRED: set up isolated workspace before starting
 - **superpowers:writing-plans** — creates the plan this skill executes
 - **superpowers:finishing-a-development-branch** — complete development after all tasks
+- **dispatching-parallel-agents** — consult before any agent dispatch decision (offload table, parallelize rules)
