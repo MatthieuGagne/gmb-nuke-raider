@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: Use when you have a spec or requirements for a multi-step task, before touching code. Starting from a raw idea with no prior design session? Invoke the brainstorming skill first — writing-plans requires a completed, approved design as input.
 ---
 
 # Writing Plans
