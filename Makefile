@@ -78,12 +78,15 @@ src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_borde
 
 $(TARGET): src/dialog_border_tiles.c
 
-# src/dialog_data.c is checked into git so CI works without Python.
+# src/dialog_data.c and src/hub_data.c are checked into git so CI works without Python.
 # Run `make dialog_data` to regenerate from updated JSON.
-src/dialog_data.c: assets/dialog/npcs.json tools/dialog_to_c.py
-	python3 tools/dialog_to_c.py assets/dialog/npcs.json src/dialog_data.c
+src/dialog_data.c src/hub_data.c: assets/dialog/npcs.json assets/dialog/hubs.json tools/dialog_to_c.py src/config.h
+	python3 tools/dialog_to_c.py assets/dialog/npcs.json src/dialog_data.c \
+		--hubs-json assets/dialog/hubs.json \
+		--hub-out src/hub_data.c \
+		--config-h src/config.h
 
-dialog_data: src/dialog_data.c
+dialog_data: src/dialog_data.c src/hub_data.c
 
 $(TARGET): src/dialog_data.c
 
