@@ -327,6 +327,22 @@ void test_gas_disabled_on_oil(void) {
     TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
 }
 
+void test_player_dir_dx_east(void) {
+    TEST_ASSERT_EQUAL_INT8(1, player_dir_dx(DIR_R));
+}
+
+void test_player_dir_dx_west(void) {
+    TEST_ASSERT_EQUAL_INT8(-1, player_dir_dx(DIR_L));
+}
+
+void test_player_dir_dy_north(void) {
+    TEST_ASSERT_EQUAL_INT8(-1, player_dir_dy(DIR_T));
+}
+
+void test_player_dir_dy_south(void) {
+    TEST_ASSERT_EQUAL_INT8(1, player_dir_dy(DIR_B));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -374,5 +390,10 @@ int main(void) {
     RUN_TEST(test_gas_facing_LT_moves_northwest);
     RUN_TEST(test_no_dpad_preserves_dir_but_no_gas);
     RUN_TEST(test_gas_disabled_on_oil);
+    /* direction accessor */
+    RUN_TEST(test_player_dir_dx_east);
+    RUN_TEST(test_player_dir_dx_west);
+    RUN_TEST(test_player_dir_dy_north);
+    RUN_TEST(test_player_dir_dy_south);
     return UNITY_END();
 }
