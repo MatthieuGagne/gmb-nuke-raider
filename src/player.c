@@ -9,6 +9,7 @@
 #include "sprite_pool.h"
 #include "config.h"
 #include "damage.h"
+#include "projectile.h"
 
 static int16_t px;
 static int16_t py;
@@ -74,6 +75,13 @@ void player_update(void) BANKED {
     /* Query terrain at player centre (4px = centre of 8-wide hitbox) */
     terrain = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
     player_apply_physics(input, terrain);
+
+    /* Fire machine gun on Select (held + cooldown managed inside projectile module) */
+    if (KEY_PRESSED(J_SELECT)) {
+        uint8_t scr_x = (uint8_t)((int16_t)px + 8);
+        uint8_t scr_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
+        projectile_fire(scr_x, scr_y, player_dir);
+    }
 
     /* Apply X velocity — zero on wall/edge collision */
     new_px = (int16_t)(px + (int16_t)vx);
