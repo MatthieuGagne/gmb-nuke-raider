@@ -12,8 +12,6 @@ typedef struct {
     uint8_t     npc_dialog_ids[MAX_HUB_NPCS]; /* indices into npc_dialogs[] */
 } HubDef;
 
-extern const HubDef rust_town;
-
 extern const HubDef * const hub_table[];
 extern const uint8_t         hub_table_count;
 
