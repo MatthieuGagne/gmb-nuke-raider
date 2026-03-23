@@ -27,5 +27,7 @@
   "src/state_title.c":           {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/track.c":                 {"bank": 255, "reason": "autobank"},
   "src/track_map.c":             {"bank": 255, "reason": "autobank"},
-  "src/track_tiles.c":           {"bank": 255, "reason": "autobank"}
+  "src/track_tiles.c":           {"bank": 255, "reason": "autobank"},
+  "src/projectile.c":            {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
+  "src/bullet_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"}
 }
