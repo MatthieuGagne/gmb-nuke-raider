@@ -263,7 +263,9 @@
       "Bash(for wt:*)",
       "Bash(echo \"=== $wt ===\")",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestValidation.test_three_choices_ok -v 2>&1)",
-      "Bash(aseprite --batch assets/sprites/player_car.aseprite --list-tags)"
+      "Bash(aseprite --batch assets/sprites/player_car.aseprite --list-tags)",
+      "Bash(for skill:*)",
+      "Bash(aseprite:*)"
     ]
   }
 }
