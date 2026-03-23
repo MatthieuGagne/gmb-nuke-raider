@@ -601,14 +601,17 @@ class DialogEditor:
         self._save()
         if self.dirty:  # save was blocked
             return
-        result = subprocess.run(
-            [sys.executable, GENERATOR, self.path, OUT_C],
-            capture_output=True, text=True
-        )
+        cmd = [
+            sys.executable, GENERATOR, self.path, OUT_C,
+            "--hubs-json", self.hubs_path,
+            "--hub-out",   HUB_OUT_C,
+            "--config-h",  CONFIG_H,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            self.status = f"Generated {OUT_C}"
+            self.status = f"Generated {OUT_C} + {HUB_OUT_C}"
         else:
-            self.status = f"ERROR: {result.stderr[:60]}"
+            self.status = f"ERROR: {result.stderr[:80]}"
 
     def _quit(self):
         if self.dirty:
