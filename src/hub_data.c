@@ -1,18 +1,22 @@
-/* hub_data.c — NO #pragma bank 255: bank 0 data, always accessible */
+// GENERATED — do not edit by hand.
+// Source: assets/dialog/hubs.json + assets/dialog/npcs.json
+// Regenerate: make dialog_data
+// bank 0: always mapped, no pragma needed
 #include <gb/gb.h>
 #include "hub_data.h"
 
-static const char hub_name[]    = "RUST TOWN";
-static const char npc_name_0[]  = "Mechanic";
-static const char npc_name_1[]  = "Trader";
-static const char npc_name_2[]  = "Drifter";
+/* --- Hub 0: RUST TOWN --- */
+static const char hub0_name[] = "RUST TOWN";
+static const char hub0_npc0_name[] = "STEEVE";
+static const char hub0_npc1_name[] = "TRADER";
+static const char hub0_npc2_name[] = "DRIFTER";
 
-const HubDef rust_town = {
-    hub_name,
+static const HubDef hub0 = {
+    hub0_name,
     3u,
-    { npc_name_0, npc_name_1, npc_name_2 },
+    { hub0_npc0_name, hub0_npc1_name, hub0_npc2_name },
     { 0u, 1u, 2u }
 };
 
-const HubDef * const hub_table[] = { &rust_town };
+const HubDef * const hub_table[] = { &hub0 };
 const uint8_t         hub_table_count = 1u;
