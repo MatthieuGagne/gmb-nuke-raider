@@ -27,11 +27,30 @@ extern const int16_t track_start_y;
 extern const uint8_t track_map[];
 extern const uint8_t track_finish_line_y;
 
+extern const uint8_t track2_map[];
+extern const int16_t track2_start_x;
+extern const int16_t track2_start_y;
+extern const uint8_t track2_finish_line_y;
+
 #include "banking.h"
 BANKREF_EXTERN(track_map)
 BANKREF_EXTERN(track_tile_data)
 BANKREF_EXTERN(track_start_x)
 BANKREF_EXTERN(track_start_y)
+BANKREF_EXTERN(track2_map)
+BANKREF_EXTERN(track2_start_x)
+
+/* --- TrackDesc dispatch table --- */
+
+/* Select active track before entering STATE_PLAYING.
+ * Must be called from bank-0 code (state_overmap.c) via the BANKED trampoline. */
+void track_select(uint8_t id) BANKED;
+
+/* Accessors — read from active TrackDesc */
+uint8_t track_get_finish_ty(void) BANKED;
+uint8_t track_get_lap_count(void) BANKED;
+int16_t track_get_start_x(void) BANKED;
+int16_t track_get_start_y(void) BANKED;
 
 void    track_init(void) BANKED;
 uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;

@@ -28,6 +28,13 @@ void load_track_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
+void load_track2_tiles(void) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(BANK(track_tile_data));
+    set_bkg_data(0, track_tile_data_count, track_tile_data);
+    SWITCH_ROM(saved);
+}
+
 void load_bullet_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(bullet_tile_data));
