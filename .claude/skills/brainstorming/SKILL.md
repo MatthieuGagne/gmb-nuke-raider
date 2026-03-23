@@ -27,15 +27,16 @@ You MUST create a task for each of these items and complete them in order:
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
 4. **Present design** — in sections scaled to their complexity, get user approval after each section
-   - **Design-It-Twice** (required for any new `src/*.c` module): sketch two alternative module interfaces / APIs, compare them explicitly, then choose the better one
-5. **Resolved / Unresolved / Deferred summary** — before calling `/prd`, output a short bullet list per category:
+   - **Design-It-Twice** (required for any new `src/*.c` module): invoke the `design-an-interface` skill (`Skill` tool, `skill: "design-an-interface"`) to spawn 4 parallel sub-agents each exploring a different design constraint; compare their results and choose the best
+5. **Invoke grill-me** — use the `grill-me` skill (`Skill` tool, `skill: "grill-me"`) to stress-test the approved design. `grill-me` will NOT re-invoke brainstorming — it produces a Resolved/Unresolved/Risk summary only. Continue only after that summary is generated.
+6. **Resolved / Unresolved / Deferred summary** — before calling `/prd`, output a short bullet list per category:
    - **Resolved:** decisions that are settled
    - **Unresolved:** open questions that must be answered before implementation begins
    - **Deferred:** items deliberately set aside (not blocking now)
    If Unresolved is non-empty, stop and resolve those questions before continuing.
-6. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
+7. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
    Do NOT save a local design doc file. The GitHub issue IS the design doc.
-7. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
+8. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
 
 ## GB Constraint Checklist
 
@@ -68,7 +69,9 @@ digraph brainstorming {
     "Propose 2-3 approaches" -> "Present design sections + Design-It-Twice";
     "Present design sections + Design-It-Twice" -> "User approves design?";
     "User approves design?" -> "Present design sections + Design-It-Twice" [label="no, revise"];
-    "User approves design?" -> "Resolved/Unresolved/Deferred summary" [label="yes"];
+    "User approves design?" -> "Invoke grill-me skill" [label="yes"];
+    "Invoke grill-me skill" [shape=box];
+    "Invoke grill-me skill" -> "Resolved/Unresolved/Deferred summary";
     "Resolved/Unresolved/Deferred summary" [shape=box];
     "Unresolved items?" [shape=diamond];
     "Resolved/Unresolved/Deferred summary" -> "Unresolved items?";
@@ -99,8 +102,8 @@ digraph brainstorming {
 - Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
 - Ask after each section whether it looks right so far
 - Cover: architecture, components, data flow, error handling, testing
-- For any new `src/*.c` module: sketch two alternative interfaces (Design-It-Twice), compare them,
-  choose the better one — document why
+- For any new `src/*.c` module: invoke the `design-an-interface` skill to spawn 4 parallel sub-agents
+  (minimal API, testability, caller ergonomics, GB efficiency); compare results, choose the best — document why
 - Work through the GB Constraint Checklist explicitly for any GBC feature
 - Be ready to go back and clarify if something doesn't make sense
 

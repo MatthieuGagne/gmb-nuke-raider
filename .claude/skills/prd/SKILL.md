@@ -1,7 +1,17 @@
 ---
 name: prd
-description: Use when creating a new PRD for a feature — creates a GitHub issue with the PRD content. No local file is created.
+description: Use when creating a new PRD for a feature — creates a GitHub issue with the PRD content. No local file is created. Requires a completed brainstorming session; if no approved design exists in the conversation, invoke the brainstorming skill first.
 ---
+
+## Before You Begin
+
+Check whether this conversation contains an approved design from a brainstorming session.
+
+> **Is there an approved design in this conversation?**
+> - **Yes** → proceed to draft the PRD below
+> - **No** → invoke `brainstorming` first (`Skill` tool, `skill: "brainstorming"`); return here only after the user has approved a design
+
+This gate fires only when starting cold (no prior design). If brainstorming was already completed in this session, skip it.
 
 Create a new PRD as a GitHub issue.
 
