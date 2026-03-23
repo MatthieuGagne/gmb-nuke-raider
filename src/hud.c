@@ -5,11 +5,12 @@
 
 /* --- Tile index constants --- */
 #define HUD_FONT_BASE  128u  /* first font tile in BG tile data — above track tiles */
-#define HUD_FONT_COUNT  14u  /* tiles: 0-9 (10) + H(10) + P(11) + :(12) + space(13) */
+#define HUD_FONT_COUNT  15u  /* tiles: 0-9(10) + H(10) + P(11) + :(12) + space(13) + /(14) */
 #define HUD_TILE_H      10u
 #define HUD_TILE_P      11u
 #define HUD_TILE_COLON  12u
 #define HUD_TILE_SPACE  13u
+#define HUD_TILE_SLASH  14u
 
 /* --- Font tile data (2bpp, 8x8 each, color 0 + color 3 only)
  *
@@ -51,6 +52,8 @@ static const uint8_t __code hud_font_tiles[] = {
     0x00,0x00, 0x30,0x30, 0x30,0x30, 0x00,0x00, 0x00,0x00, 0x30,0x30, 0x30,0x30, 0x00,0x00,
     /* ' ' (space): all zeros */
     0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    /* /: ....# / ...#. / ...#. / ..#.. / ..#.. / .#... / .#... / ..... */
+    0x08,0x08, 0x10,0x10, 0x10,0x10, 0x20,0x20, 0x20,0x20, 0x40,0x40, 0x40,0x40, 0x00,0x00,
 };
 
 /* --- Module state --- */
@@ -60,6 +63,8 @@ static uint16_t hud_seconds;      /* total elapsed seconds */
 static uint8_t  hud_dirty;        /* 1 = timer tiles need rewrite */
 static uint8_t  hud_mm;           /* cached minutes for display */
 static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
+static uint8_t  hud_lap_current;
+static uint8_t  hud_lap_total;
 
 /* --- Public API --- */
 
@@ -68,12 +73,14 @@ void hud_init(void) BANKED {
     static uint8_t row1[20];
     uint8_t i;
 
-    hud_hp         = PLAYER_MAX_HP;
-    hud_frame_tick = 0u;
-    hud_seconds    = 0u;
-    hud_dirty      = 0u;
-    hud_mm         = 0u;
-    hud_ss         = 0u;
+    hud_hp          = PLAYER_MAX_HP;
+    hud_frame_tick  = 0u;
+    hud_seconds     = 0u;
+    hud_dirty       = 0u;
+    hud_mm          = 0u;
+    hud_ss          = 0u;
+    hud_lap_current = 1u;
+    hud_lap_total   = 3u;
 
     /* Load font tile patterns into BG/Win tile data starting at tile 128 */
     set_bkg_data(HUD_FONT_BASE, HUD_FONT_COUNT, hud_font_tiles);
@@ -83,9 +90,12 @@ void hud_init(void) BANKED {
     row0[0]  = HUD_FONT_BASE + HUD_TILE_H;
     row0[1]  = HUD_FONT_BASE + HUD_TILE_P;
     row0[2]  = HUD_FONT_BASE + HUD_TILE_COLON;
-    row0[3]  = HUD_FONT_BASE + HUD_TILE_SPACE;   /* hundreds: always blank for 0-8 */
-    row0[4]  = HUD_FONT_BASE + HUD_TILE_SPACE;   /* tens:     always blank for 0-8 */
-    row0[5]  = HUD_FONT_BASE + PLAYER_MAX_HP;     /* units:    initial = 8 */
+    row0[3]  = HUD_FONT_BASE + 1u;                      /* hundreds: '1' */
+    row0[4]  = HUD_FONT_BASE + 0u;                      /* tens:     '0' */
+    row0[5]  = HUD_FONT_BASE + 0u;                      /* units:    '0' */
+    row0[6]  = HUD_FONT_BASE + 1u;                      /* lap current: '1' */
+    row0[7]  = HUD_FONT_BASE + HUD_TILE_SLASH;          /* '/' */
+    row0[8]  = HUD_FONT_BASE + 3u;                      /* lap total: '3' (default) */
     row0[15] = HUD_FONT_BASE + 0u;             /* MM tens */
     row0[16] = HUD_FONT_BASE + 0u;             /* MM units */
     row0[17] = HUD_FONT_BASE + HUD_TILE_COLON;
@@ -132,11 +142,23 @@ void hud_render(void) BANKED {
     timer[4] = HUD_FONT_BASE + (uint8_t)(hud_ss % 10u);
     set_win_tiles(15u, 0u, 5u, 1u, timer);
 
-    /* Update HP digit tiles (cols 3-5) */
-    hp_digits[0] = HUD_FONT_BASE + HUD_TILE_SPACE;  /* hundreds: always blank */
-    hp_digits[1] = HUD_FONT_BASE + HUD_TILE_SPACE;  /* tens:     always blank */
-    hp_digits[2] = HUD_FONT_BASE + hud_hp;           /* units:    direct digit 0-8 */
+    /* Update HP digit tiles (cols 3-5): 3 digits for 0-100 */
+    {
+        uint8_t h = hud_hp;
+        hp_digits[0] = HUD_FONT_BASE + (uint8_t)(h / 100u);
+        hp_digits[1] = HUD_FONT_BASE + (uint8_t)((h % 100u) / 10u);
+        hp_digits[2] = HUD_FONT_BASE + (uint8_t)(h % 10u);
+    }
     set_win_tiles(3u, 0u, 3u, 1u, hp_digits);
+
+    /* Update lap tiles (cols 6-8): "1/3" format */
+    {
+        uint8_t lap_tiles[3];
+        lap_tiles[0] = HUD_FONT_BASE + hud_lap_current;
+        lap_tiles[1] = HUD_FONT_BASE + HUD_TILE_SLASH;
+        lap_tiles[2] = HUD_FONT_BASE + hud_lap_total;
+        set_win_tiles(6u, 0u, 3u, 1u, lap_tiles);
+    }
 
     hud_dirty = 0u;
 }
@@ -144,6 +166,12 @@ void hud_render(void) BANKED {
 void hud_set_hp(uint8_t hp) BANKED {
     hud_hp    = hp;
     hud_dirty = 1u;
+}
+
+void hud_set_lap(uint8_t current, uint8_t total) BANKED {
+    hud_lap_current = current;
+    hud_lap_total   = total;
+    hud_dirty       = 1u;
 }
 
 uint16_t hud_get_seconds(void) BANKED { return hud_seconds; }

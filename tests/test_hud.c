@@ -97,6 +97,23 @@ void test_set_hp_sets_dirty(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
 }
 
+/* --- hud_set_lap() sets dirty flag --- */
+void test_set_lap_sets_dirty(void) {
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+    hud_set_lap(2u, 3u);
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+}
+
+/* --- hud_set_lap() after render clears dirty, lap re-sets it --- */
+void test_set_lap_after_render_sets_dirty_again(void) {
+    uint8_t i;
+    for (i = 0u; i < 60u; i++) hud_update();
+    hud_render();
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+    hud_set_lap(2u, 3u);
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_seconds_zero);
@@ -110,5 +127,7 @@ int main(void) {
     RUN_TEST(test_three_seconds);
     RUN_TEST(test_one_minute);
     RUN_TEST(test_set_hp_sets_dirty);
+    RUN_TEST(test_set_lap_sets_dirty);
+    RUN_TEST(test_set_lap_after_render_sets_dirty_again);
     return UNITY_END();
 }
