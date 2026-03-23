@@ -169,5 +169,44 @@ class TestEmission(unittest.TestCase):
         self.assertEqual(conv.generate_c(data), conv.generate_c(data))
 
 
+# ── config.h helpers ─────────────────────────────────────────────────────────
+
+class TestConfigHelpers(unittest.TestCase):
+
+    _SAMPLE_CONFIG = (
+        "#define MAX_NPCS     6\n"
+        "#define OTHER        3\n"
+        "#define MAX_HUB_NPCS 3u\n"
+    )
+
+    # 23 — parse_max_npcs extracts integer value
+    def test_parse_max_npcs_returns_value(self):
+        self.assertEqual(conv.parse_max_npcs(self._SAMPLE_CONFIG), 6)
+
+    # 24 — parse_max_npcs raises if define is missing
+    def test_parse_max_npcs_missing_raises(self):
+        with self.assertRaises(ValueError) as cm:
+            conv.parse_max_npcs("#define OTHER 3\n")
+        self.assertIn("MAX_NPCS", str(cm.exception))
+
+    # 25 — patch_config_define replaces integer value
+    def test_patch_config_define_replaces_value(self):
+        result = conv.patch_config_define(self._SAMPLE_CONFIG, "MAX_NPCS", 7)
+        self.assertIn("#define MAX_NPCS     7", result)
+        self.assertNotIn("#define MAX_NPCS     6", result)
+
+    # 26 — patch_config_define leaves other defines untouched
+    def test_patch_config_define_leaves_others(self):
+        result = conv.patch_config_define(self._SAMPLE_CONFIG, "MAX_NPCS", 7)
+        self.assertIn("#define OTHER        3", result)
+        self.assertIn("#define MAX_HUB_NPCS 3u", result)
+
+    # 27 — patch_config_define raises if define is missing
+    def test_patch_config_define_missing_raises(self):
+        with self.assertRaises(ValueError) as cm:
+            conv.patch_config_define(self._SAMPLE_CONFIG, "NONEXISTENT", 9)
+        self.assertIn("NONEXISTENT", str(cm.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

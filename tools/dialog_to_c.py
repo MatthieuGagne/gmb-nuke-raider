@@ -12,6 +12,8 @@ Reads assets/dialog/npcs.json and writes src/dialog_data.c with:
   - const NpcDialog npc_dialogs[] table
 """
 import json
+import os
+import re
 import sys
 
 MAX_TEXT_LEN  = 63
@@ -19,6 +21,28 @@ MAX_NAME_LEN  = 15
 MAX_CHOICES   = 3
 MAX_NPCS      = 6
 DIALOG_END    = "DIALOG_END"
+
+CONFIG_H_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'config.h')
+
+
+def parse_max_npcs(config_text):
+    """Return the integer value of MAX_NPCS from config.h text."""
+    m = re.search(r'#define\s+MAX_NPCS\s+(\d+)', config_text)
+    if not m:
+        raise ValueError("MAX_NPCS not found in config.h text")
+    return int(m.group(1))
+
+
+def patch_config_define(config_text, name, new_value):
+    """Replace '#define NAME <old>' with '#define NAME <new_value>' in config text.
+    Preserves alignment (whitespace between name and value is kept, value replaced).
+    Raises ValueError if the define is not found.
+    """
+    pattern = rf'(#define\s+{re.escape(name)}\s+)\S+'
+    new_text, n = re.subn(pattern, rf'\g<1>{new_value}', config_text)
+    if n == 0:
+        raise ValueError(f"{name} not found in config text")
+    return new_text
 
 
 def validate(data):
