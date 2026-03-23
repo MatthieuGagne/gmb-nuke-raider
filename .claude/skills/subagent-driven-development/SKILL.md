@@ -117,7 +117,13 @@ When dispatching the implementer subagent, include ALL of the following in the p
 
 ## Parallel Implementer Batches
 
-When the plan flags tasks as **parallelizable** (different output files, no shared state), dispatch 2–3 implementer agents in a single message instead of sequentially.
+When the plan's `#### Parallel Execution Groups` table marks a group as `(parallel)`, dispatch all tasks in that group as concurrent implementer agents in a single message. The group table is the **authoritative source** — do not re-analyze file dependencies at runtime.
+
+**How to read the group table:**
+- `(parallel)` group → dispatch all tasks in the group as concurrent implementers in one message
+- `(sequential)` group → dispatch one task at a time, waiting for completion before starting the next
+- No group table in plan → fall back to per-task `**Parallelizable with:**` annotations
+- Neither table nor annotations present → treat all tasks as sequential
 
 See `dispatching-parallel-agents` skill for full rules. Summary:
 1. Dispatch 2–3 implementers in one message (each writing different files, no shared git commits)
