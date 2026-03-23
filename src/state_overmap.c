@@ -141,9 +141,9 @@ static void overmap_check_tile_effect(void) {
                 break;
             }
         }
-        player_set_pos(track_start_x, track_start_y);
-        player_reset_vel();
+        track_select(current_race_id);   /* wire up dispatch table before STATE_PLAYING */
         state_replace(&state_playing);
+        /* NOTE: player position is set in state_playing enter() via track_get_start_x/y() */
     }
 }
 
