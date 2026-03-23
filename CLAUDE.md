@@ -156,7 +156,7 @@ Not safe to parallelize: writing the same file; multiple actors committing to th
 
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
 
-**Doc-only workflow:** When ALL files changed in a session are non-compiled doc files, use this abbreviated path instead of the full gate sequence.
+**Doc-only workflow:** When ALL files changed in a session are non-compiled doc files, use this abbreviated path instead of the full gate sequence. **For doc-only PRD implementations, invoke the `doc-review` skill instead of `writing-plans` + `executing-plans`.**
 
 *Qualifies as doc-only:* `*.md`, `*.txt`, `*.json` (except `bank-manifest.json`), and any file under `.claude/skills/` or `.claude/agents/`.
 
