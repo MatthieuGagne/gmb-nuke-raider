@@ -25,8 +25,10 @@
   "src/state_game_over.c":       {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_playing.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_title.c":           {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
+  "src/lap.c":                   {"bank": 255, "reason": "autobank"},
   "src/track.c":                 {"bank": 255, "reason": "autobank"},
   "src/track_map.c":             {"bank": 255, "reason": "autobank"},
+  "src/track2_map.c":            {"bank": 255, "reason": "autobank — generated from track2.tmx; independently autobanked from track_map.c"},
   "src/track_tiles.c":           {"bank": 255, "reason": "autobank"},
   "src/projectile.c":            {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/bullet_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"}
