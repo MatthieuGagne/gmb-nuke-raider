@@ -197,6 +197,101 @@ class TestValidateWithExplicitMax(unittest.TestCase):
         conv.validate(data, max_npcs=3)  # must not raise
 
 
+# ── Hub data generation tests ─────────────────────────────────────────────────
+
+def _npc_stub(npc_id, name):
+    return {"id": npc_id, "name": name,
+            "nodes": [{"idx": 0, "text": "...", "choices": [], "next": ["END"]}]}
+
+
+class TestGenerateHubC(unittest.TestCase):
+
+    def _hub_data(self):
+        return {
+            "hubs": [
+                {"id": 0, "name": "RUST TOWN", "npc_ids": [0, 1, 2]}
+            ]
+        }
+
+    def _npcs_data(self):
+        return {"npcs": [
+            _npc_stub(0, "MECHANIC"),
+            _npc_stub(1, "TRADER"),
+            _npc_stub(2, "DRIFTER"),
+        ]}
+
+    def _emit(self, hubs=None, npcs=None):
+        return conv.generate_hub_c(hubs or self._hub_data(), npcs or self._npcs_data())
+
+    # 31 — GENERATED header present
+    def test_hub_generated_header(self):
+        out = self._emit()
+        self.assertIn("// GENERATED", out)
+
+    # 32 — no #pragma bank (bank 0)
+    def test_hub_no_pragma_bank(self):
+        out = self._emit()
+        self.assertNotIn("#pragma bank", out)
+
+    # 33 — hub name present
+    def test_hub_name_emitted(self):
+        out = self._emit()
+        self.assertIn('"RUST TOWN"', out)
+
+    # 34 — NPC names derived from npcs.json
+    def test_hub_npc_names_from_npcs(self):
+        out = self._emit()
+        self.assertIn('"MECHANIC"', out)
+        self.assertIn('"TRADER"', out)
+        self.assertIn('"DRIFTER"', out)
+
+    # 35 — npc_dialog_ids contain the npc_ids from hubs.json
+    def test_hub_npc_dialog_ids(self):
+        out = self._emit()
+        # IDs 0, 1, 2 emitted as uint8_t literals
+        self.assertIn("0u", out)
+        self.assertIn("1u", out)
+        self.assertIn("2u", out)
+
+    # 36 — hub_table array emitted
+    def test_hub_table_emitted(self):
+        out = self._emit()
+        self.assertIn("hub_table[]", out)
+        self.assertIn("hub_table_count", out)
+
+    # 37 — hub_table_count matches number of hubs
+    def test_hub_table_count_correct(self):
+        out = self._emit()
+        self.assertIn("hub_table_count = 1u", out)
+
+    # 38 — invalid NPC id raises
+    def test_hub_invalid_npc_id_raises(self):
+        hubs = {"hubs": [{"id": 0, "name": "HUB", "npc_ids": [99]}]}
+        with self.assertRaises(ValueError) as cm:
+            conv.generate_hub_c(hubs, self._npcs_data())
+        self.assertIn("99", str(cm.exception))
+
+    # 39 — compute_max_hub_npcs returns max roster length
+    def test_compute_max_hub_npcs(self):
+        hubs = {"hubs": [
+            {"id": 0, "name": "A", "npc_ids": [0, 1]},
+            {"id": 1, "name": "B", "npc_ids": [0, 1, 2]},
+        ]}
+        self.assertEqual(conv.compute_max_hub_npcs(hubs), 3)
+
+    # 40 — two hubs: both emitted, table has 2 entries
+    def test_two_hubs_emitted(self):
+        npcs = {"npcs": [_npc_stub(i, f"NPC{i}") for i in range(3)]}
+        hubs = {"hubs": [
+            {"id": 0, "name": "RUST TOWN", "npc_ids": [0]},
+            {"id": 1, "name": "DUST CITY", "npc_ids": [1, 2]},
+        ]}
+        out = conv.generate_hub_c(hubs, npcs)
+        self.assertIn('"RUST TOWN"', out)
+        self.assertIn('"DUST CITY"', out)
+        self.assertIn("hub_table_count = 2u", out)
+
+
 # ── config.h helpers ─────────────────────────────────────────────────────────
 
 class TestConfigHelpers(unittest.TestCase):

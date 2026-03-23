@@ -204,6 +204,70 @@ def generate_c(data):
     return "\n".join(lines)
 
 
+def compute_max_hub_npcs(hubs_data):
+    """Return the maximum NPC count across all hubs."""
+    return max((len(h["npc_ids"]) for h in hubs_data["hubs"]), default=0)
+
+
+def generate_hub_c(hubs_data, npcs_data):
+    """Generate hub_data.c content from hubs.json + npcs.json.
+
+    hub_data.c lives in bank 0 — no #pragma bank.
+    NPC names are looked up from npcs_data by id (per R11).
+    Raises ValueError if a hub references a nonexistent NPC id.
+    """
+    # Build id→name lookup from npcs
+    npc_by_id = {npc["id"]: npc["name"] for npc in npcs_data["npcs"]}
+
+    lines = []
+    lines.append("// GENERATED — do not edit by hand.")
+    lines.append("// Source: assets/dialog/hubs.json + assets/dialog/npcs.json")
+    lines.append("// Regenerate: make dialog_data")
+    lines.append("// bank 0: always mapped, no pragma needed")
+    lines.append('#include <gb/gb.h>')
+    lines.append('#include "hub_data.h"')
+    lines.append("")
+
+    hub_var_names = []
+    for hub in hubs_data["hubs"]:
+        hub_id   = hub["id"]
+        hub_name = hub["name"]
+        npc_ids  = hub["npc_ids"]
+        var      = f"hub{hub_id}"
+        hub_var_names.append(var)
+
+        # Validate NPC ids
+        for npc_id in npc_ids:
+            if npc_id not in npc_by_id:
+                raise ValueError(
+                    f"Hub {hub_id} references NPC id {npc_id} which does not exist in npcs.json")
+
+        lines.append(f"/* --- Hub {hub_id}: {hub_name} --- */")
+        lines.append(f'static const char {var}_name[] = "{hub_name}";')
+        for i, npc_id in enumerate(npc_ids):
+            lines.append(f'static const char {var}_npc{i}_name[] = "{npc_by_id[npc_id]}";')
+        lines.append("")
+
+        # HubDef initializer
+        num = len(npc_ids)
+        npc_names_init = ", ".join(f"{var}_npc{i}_name" for i in range(num))
+        npc_ids_init   = ", ".join(f"{npc_id}u" for npc_id in npc_ids)
+        lines.append(f"static const HubDef {var} = {{")
+        lines.append(f"    {var}_name,")
+        lines.append(f"    {num}u,")
+        lines.append(f"    {{ {npc_names_init} }},")
+        lines.append(f"    {{ {npc_ids_init} }}")
+        lines.append("};")
+        lines.append("")
+
+    # hub_table
+    table_entries = ", ".join(f"&{v}" for v in hub_var_names)
+    lines.append(f"const HubDef * const hub_table[] = {{ {table_entries} }};")
+    lines.append(f"const uint8_t         hub_table_count = {len(hub_var_names)}u;")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     if len(sys.argv) != 3:
         print(f"Usage: {sys.argv[0]} <npcs.json> <dialog_data.c>", file=sys.stderr)
