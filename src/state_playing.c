@@ -15,22 +15,23 @@ BANKREF_EXTERN(state_playing)
 #include "damage.h"
 #include "state_game_over.h"
 #include "projectile.h"
+#include "lap.h"
 
 static void enter(void) {
-    {
-        int16_t sx, sy;
-        load_track_start_pos(&sx, &sy);
-        player_set_pos(sx, sy);
-    }
+    int16_t sx = track_get_start_x();
+    int16_t sy = track_get_start_y();
+    player_set_pos(sx, sy);
     player_reset_vel();
-    damage_init();          /* reset HP pool for new race */
+    damage_init();
     projectile_init();
+    lap_init(track_get_lap_count());
     DISPLAY_OFF;
     track_init();
     camera_init(player_get_x(), player_get_y());
     hud_init();
-    camera_apply_scroll();  /* pre-set SCY so first visible frame is correct */
-    player_render();        /* pre-set OAM so sprites start in race position  */
+    hud_set_lap(lap_get_current(), lap_get_total());
+    camera_apply_scroll();
+    player_render();
     DISPLAY_ON;
 }
 
@@ -55,8 +56,17 @@ static void update(void) {
     /* Finish line detection — check must be last so physics runs first */
     {
         uint8_t fin_ty = (uint8_t)((uint16_t)player_get_y() >> 3u);
-        if (fin_ty == track_finish_line_y) {
-            state_replace(&state_overmap);
+        if (fin_ty == track_get_finish_ty()) {
+            if (lap_advance()) {
+                /* Final lap complete — return to overmap */
+                state_replace(&state_overmap);
+            } else {
+                /* Lap complete — wrap player to start */
+                player_set_pos(track_get_start_x(), track_get_start_y());
+                player_reset_vel();
+                camera_init(player_get_x(), player_get_y());
+                hud_set_lap(lap_get_current(), lap_get_total());
+            }
             return;
         }
     }
