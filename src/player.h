@@ -31,5 +31,7 @@ int8_t   player_get_vy(void) BANKED;
 void player_reset_vel(void) BANKED;
 void player_apply_physics(uint8_t buttons, TileType terrain) BANKED;
 player_dir_t player_get_dir(void) BANKED;
+int8_t player_dir_dx(player_dir_t dir) BANKED;
+int8_t player_dir_dy(player_dir_t dir) BANKED;
 
 #endif /* PLAYER_H */

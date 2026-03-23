@@ -14,6 +14,7 @@ BANKREF_EXTERN(state_playing)
 #include "loader.h"
 #include "damage.h"
 #include "state_game_over.h"
+#include "projectile.h"
 
 static void enter(void) {
     {
@@ -23,6 +24,7 @@ static void enter(void) {
     }
     player_reset_vel();
     damage_init();          /* reset HP pool for new race */
+    projectile_init();
     DISPLAY_OFF;
     track_init();
     camera_init(player_get_x(), player_get_y());
@@ -35,11 +37,13 @@ static void enter(void) {
 static void update(void) {
     /* VBlank phase: all VRAM writes immediately after frame_ready */
     player_render();
+    projectile_render();
     hud_render();
     camera_flush_vram();
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
     /* Game logic phase: runs during active display */
     player_update();
+    projectile_update();
     hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
     camera_update(player_get_x(), player_get_y());
     hud_update();
