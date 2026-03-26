@@ -68,7 +68,7 @@
 #define MAX_PROJECTILES       8u
 #define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
 #define PROJ_SPEED            4u    /* px/frame; intentionally faster than PLAYER_MAX_SPEED */
-#define PROJ_TTL_FRAMES       4u    /* frames alive; at PROJ_SPEED=4 → 16 px = 2 tiles travel */
+#define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
 
 #endif /* CONFIG_H */
