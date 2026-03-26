@@ -13,17 +13,12 @@ void test_track_select_0_start_x(void) {
 
 void test_track_select_0_start_y(void) {
     track_select(0u);
-    TEST_ASSERT_EQUAL_INT16(720, track_get_start_y());
-}
-
-void test_track_select_0_finish_ty(void) {
-    track_select(0u);
-    TEST_ASSERT_EQUAL_UINT8(5u, track_get_finish_ty());
+    TEST_ASSERT_EQUAL_INT16(8, track_get_start_y());   /* start moved to row 1 (y=8) */
 }
 
 void test_track_select_0_lap_count(void) {
     track_select(0u);
-    TEST_ASSERT_EQUAL_UINT8(3u, track_get_lap_count());
+    TEST_ASSERT_EQUAL_UINT8(1u, track_get_lap_count()); /* single finish crossing */
 }
 
 /* After track_select(1): accessors return track 1 values */
@@ -47,7 +42,6 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_select_0_start_x);
     RUN_TEST(test_track_select_0_start_y);
-    RUN_TEST(test_track_select_0_finish_ty);
     RUN_TEST(test_track_select_0_lap_count);
     RUN_TEST(test_track_select_1_lap_count);
     RUN_TEST(test_track_select_routes_raw_tile);

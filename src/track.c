@@ -26,7 +26,6 @@ static uint8_t active_track_id;
 static const uint8_t *active_map     = track_map;
 static int16_t        active_start_x;
 static int16_t        active_start_y;
-static uint8_t        active_finish_ty;
 static uint8_t        active_lap_count;
 
 void track_select(uint8_t id) BANKED {
@@ -35,18 +34,15 @@ void track_select(uint8_t id) BANKED {
         active_map       = track_map;
         active_start_x   = track_start_x;
         active_start_y   = track_start_y;
-        active_finish_ty = track_finish_line_y;
-        active_lap_count = 3u;
+        active_lap_count = 1u;                /* track 1: single finish crossing */
     } else {
         active_map       = track2_map;
         active_start_x   = track2_start_x;
         active_start_y   = track2_start_y;
-        active_finish_ty = track2_finish_line_y;
         active_lap_count = 3u;
     }
 }
 
-uint8_t track_get_finish_ty(void) BANKED { return active_finish_ty; }
 uint8_t track_get_lap_count(void) BANKED { return active_lap_count; }
 int16_t track_get_start_x(void)   BANKED { return active_start_x;   }
 int16_t track_get_start_y(void)   BANKED { return active_start_y;   }

@@ -26,12 +26,9 @@ extern const uint8_t track_tile_data_count;
 extern const int16_t track_start_x;
 extern const int16_t track_start_y;
 extern const uint8_t track_map[];
-extern const uint8_t track_finish_line_y;
-
 extern const uint8_t track2_map[];
 extern const int16_t track2_start_x;
 extern const int16_t track2_start_y;
-extern const uint8_t track2_finish_line_y;
 
 #include "banking.h"
 BANKREF_EXTERN(track_map)
@@ -48,7 +45,6 @@ BANKREF_EXTERN(track2_start_x)
 void track_select(uint8_t id) BANKED;
 
 /* Accessors — read from active TrackDesc */
-uint8_t track_get_finish_ty(void) BANKED;
 uint8_t track_get_lap_count(void) BANKED;
 int16_t track_get_start_x(void) BANKED;
 int16_t track_get_start_y(void) BANKED;

@@ -12,7 +12,7 @@ void setUp(void) {
     prev_input = 0;
     mock_vram_clear();
     mock_move_sprite_reset();
-    camera_init(88, 720);  /* cam_y = 648 */
+    camera_init(88, 8);  /* cam_y = 0 (clamped) */
     damage_init();
     player_init();
 }
@@ -22,7 +22,7 @@ void tearDown(void) {}
 
 void test_player_init_sets_start_position(void) {
     TEST_ASSERT_EQUAL_INT16(88, player_get_x());
-    TEST_ASSERT_EQUAL_INT16(720, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(8, player_get_y());
 }
 
 /* --- basic movement from track spawn (88,720) on road (cols 6-17, row 90) */
@@ -42,13 +42,13 @@ void test_player_update_moves_right(void) {
 void test_player_update_moves_up(void) {
     input = J_UP | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT16(719, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(7, player_get_y());
 }
 
 void test_player_update_moves_down(void) {
     input = J_DOWN;  /* face south + gas → moves south (+vy) */
     player_update();
-    TEST_ASSERT_EQUAL_INT16(721, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(9, player_get_y());
 }
 
 /* --- track collision (new map geometry) -------------------------------- */
