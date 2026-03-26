@@ -192,8 +192,11 @@ class DialogEditor:
         self.max_npcs = read_max_npcs_from_config()
         self.hubs_path = HUBS_JSON
         self.hubs_data = self._load_hubs()
-        self.hub_view  = False   # True when hub view is active
-        self.hub_cur   = 0       # selected hub index in hub view
+        self.mode          = 'main_menu'  # 'main_menu' | 'hub_view' | 'npc_view'
+        self.hub_cur       = 0
+        self.hub_focus     = 'hubs'       # 'hubs' | 'roster' — active pane in hub view
+        self.hub_roster_cur = 0           # cursor within selected hub's NPC roster
+        self.picker_cur    = 0            # cursor in NPC picker overlay
         curses.start_color()
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_YELLOW, -1)
@@ -216,12 +219,17 @@ class DialogEditor:
         curses.curs_set(0)
         self.scr.keypad(True)
         while True:
-            if self.hub_view:
+            if self.mode == 'main_menu':
+                self._draw_main_menu()
+                key = self.scr.getch()
+                if not self._handle_main_menu_key(key):
+                    break
+            elif self.mode == 'hub_view':
                 self._draw_hub_view()
                 key = self.scr.getch()
                 if not self._handle_hub_key(key):
                     break
-            else:
+            else:  # 'npc_view'
                 self.draw()
                 key = self.scr.getch()
                 if not self.handle_key(key):
@@ -305,7 +313,7 @@ class DialogEditor:
             row += 1  # blank line between nodes
 
         # Status bar
-        status = self.status or ("[TAB]pane [j/k]move [e]dit [a]dd [d]el [n]ext [c]hoice [r]ename [s]ave [g]en [h]hubs [q]uit")
+        status = self.status or ("[TAB]pane [j/k]move [e]dit [a]dd [d]el [n]ext [c]hoice [r]ename [s]ave [g]en [b]menu [q]uit")
         if h > 1:
             self.scr.addstr(h - 2, 0, "─" * (w - 1))
         if h > 0:
@@ -445,9 +453,8 @@ class DialogEditor:
             self._save()
         elif ch == 'g':
             self._generate()
-        elif ch in ('H', 'h'):
-            self.hub_view = not self.hub_view
-            self.hub_cur  = 0
+        elif ch in ('b',) or key == 27:   # Esc or b → main menu
+            self.mode = 'main_menu'
         elif ch == 'q':
             return self._quit()
         return True
@@ -507,8 +514,6 @@ class DialogEditor:
             stub = {"idx": 0, "text": "...", "choices": [], "next": ["END"]}
             self.npcs.append({"id": new_id, "name": name.upper()[:15], "nodes": [stub]})
             self.dirty = True
-            # Offer to assign to a hub immediately (R9)
-            self._offer_hub_assignment(new_id, name.upper()[:15])
             return
         else:
             nodes  = self.cur_nodes
@@ -527,37 +532,6 @@ class DialogEditor:
         with open(self.hubs_path, 'w') as f:
             json.dump(self.hubs_data, f, indent=2)
             f.write('\n')
-
-    def _offer_hub_assignment(self, npc_id, npc_name):
-        """Offer to assign newly created NPC to an existing hub (R9)."""
-        if not os.path.exists(HUBS_JSON):
-            return
-        try:
-            with open(HUBS_JSON) as f:
-                hubs_data = json.load(f)
-        except Exception:
-            return
-        hubs = hubs_data.get("hubs", [])
-        if not hubs:
-            return
-        hub_list = ", ".join(f"[{h['id']}]{h['name']}" for h in hubs)
-        ans = self._prompt(f"Assign '{npc_name}' to hub? {hub_list} (id or Enter to skip):", "")
-        if not ans:
-            return
-        try:
-            hub_id = int(ans)
-        except ValueError:
-            return
-        for h in hubs:
-            if h["id"] == hub_id:
-                if npc_id not in h["npc_ids"]:
-                    h["npc_ids"].append(npc_id)
-                with open(HUBS_JSON, 'w') as f:
-                    json.dump(hubs_data, f, indent=2)
-                    f.write('\n')
-                self.status = f"NPC {npc_id} added to hub '{h['name']}'"
-                return
-        self.status = f"Hub id {hub_id} not found"
 
     def _delete(self):
         if self.focus == 'node':
