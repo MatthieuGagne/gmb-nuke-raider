@@ -268,7 +268,8 @@
       "Bash(aseprite:*)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestConfigHelpers -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestGenerateHubC -v)",
-      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v)"
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v)",
+      "Bash(PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v)"
     ]
   }
 }

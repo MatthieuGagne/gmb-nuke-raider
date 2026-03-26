@@ -20,13 +20,24 @@ static const HubDef hub0 = {
 
 /* --- Hub 1: JANKY CITY --- */
 static const char hub1_name[] = "JANKY CITY";
+static const char hub1_npc0_name[] = "PLACEHOLDER3";
 
 static const HubDef hub1 = {
     hub1_name,
+    1u,
+    { hub1_npc0_name },
+    { 3u }
+};
+
+/* --- Hub 2: ST-MOISE --- */
+static const char hub2_name[] = "ST-MOISE";
+
+static const HubDef hub2 = {
+    hub2_name,
     0u,
     {  },
     {  }
 };
 
-const HubDef * const hub_table[] = { &hub0, &hub1 };
-const uint8_t         hub_table_count = 2u;
+const HubDef * const hub_table[] = { &hub0, &hub1, &hub2 };
+const uint8_t         hub_table_count = 3u;
