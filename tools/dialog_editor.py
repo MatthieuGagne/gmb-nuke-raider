@@ -355,35 +355,43 @@ class DialogEditor:
     def _draw_hub_view(self):
         self.scr.erase()
         h, w = self.scr.getmaxyx()
-        hubs = self.hubs_data.get("hubs", [])
+        hubs  = self.hubs_data.get("hubs", [])
 
-        # Header
-        header = "=== HUB VIEW === [h]back [a]addNPC [r]removeNPC [n]newHub [q]quit"
-        self.scr.addstr(0, 0, header[:w - 1])
-
-        # Left: hub list
+        # Left pane: hub list
         for i, hub in enumerate(hubs):
-            attr = curses.A_REVERSE if i == self.hub_cur else 0
-            line = f"[{hub['id']}] {hub['name'][:14]}"
-            if i + 1 < h - 2:
-                self.scr.addstr(i + 1, 0, line[:LEFT_W - 1].ljust(LEFT_W - 1), attr)
+            is_cur  = (i == self.hub_cur)
+            focused = (self.hub_focus == 'hubs' and is_cur)
+            attr    = curses.A_REVERSE if focused else (curses.A_BOLD if is_cur else 0)
+            line    = f"[{hub['id']}] {hub['name'][:14]}"
+            if i < h - 2:
+                self.scr.addstr(i, 0, line[:LEFT_W - 1].ljust(LEFT_W - 1), attr)
 
         # Divider
         for row in range(h - 2):
             self.scr.addstr(row, LEFT_W - 1, "│")
 
-        # Right: roster of selected hub
+        # Right pane: NPC roster of selected hub
         if hubs and self.hub_cur < len(hubs):
-            hub = hubs[self.hub_cur]
+            hub      = hubs[self.hub_cur]
             npc_by_id = {npc["id"]: npc["name"] for npc in self.npcs}
-            self.scr.addstr(0, LEFT_W, f"Hub: {hub['name']}")
-            for i, npc_id in enumerate(hub.get("npc_ids", [])):
-                name = npc_by_id.get(npc_id, f"<unknown id={npc_id}>")
+            roster   = hub.get("npc_ids", [])
+            header   = f"Hub: {hub['name']}"
+            self.scr.addstr(0, LEFT_W, header[:w - LEFT_W - 1])
+            for i, npc_id in enumerate(roster):
+                is_cur  = (i == self.hub_roster_cur)
+                focused = (self.hub_focus == 'roster' and is_cur)
+                attr    = curses.A_REVERSE if focused else 0
+                name    = npc_by_id.get(npc_id, f"<id={npc_id}>")
+                line    = f"  {name[:16]}"
                 if i + 1 < h - 2:
-                    self.scr.addstr(i + 1, LEFT_W, f"  [{npc_id}] {name}")
+                    self.scr.addstr(i + 1, LEFT_W, line[:w - LEFT_W - 1], attr)
 
         # Status bar
-        status = self.status or ""
+        if self.hub_focus == 'hubs':
+            hints = "[TAB]roster [j/k]move [n]newHub [r]rename [D]delete [g]gen [b/Esc]menu"
+        else:
+            hints = "[TAB]hubs [j/k]move [a]addNPC [d]remove [g]gen [b/Esc]menu"
+        status = self.status or hints
         if h > 1:
             self.scr.addstr(h - 2, 0, "─" * (w - 1))
         if h > 0:
@@ -392,63 +400,59 @@ class DialogEditor:
         self.status = ""
 
     def _handle_hub_key(self, key):
-        ch = chr(key) if 0 < key < 256 else None
+        ch   = chr(key) if 0 < key < 256 else None
         hubs = self.hubs_data.get("hubs", [])
-        if ch in ('j', '\n') or key == curses.KEY_DOWN:
-            self.hub_cur = min(self.hub_cur + 1, len(hubs) - 1)
-        elif ch == 'k' or key == curses.KEY_UP:
-            self.hub_cur = max(self.hub_cur - 1, 0)
-        elif ch in ('H', 'h'):
-            self.hub_view = False
-        elif ch == 'a' and hubs:
-            # Add NPC to current hub
-            hub = hubs[self.hub_cur]
-            npc_by_id = {npc["id"]: npc["name"] for npc in self.npcs}
-            choices = ", ".join(f"{i}={npc_by_id[i]}" for i in sorted(npc_by_id))
-            raw = self._prompt(f"Add NPC id ({choices}):", "")
-            if raw:
-                try:
-                    npc_id = int(raw)
-                    if npc_id in npc_by_id and npc_id not in hub["npc_ids"]:
-                        hub["npc_ids"].append(npc_id)
-                        self._save_hubs()
-                        self.status = f"Added NPC {npc_id} to {hub['name']}"
-                    elif npc_id in hub["npc_ids"]:
-                        self.status = "NPC already in hub"
-                    else:
-                        self.status = f"NPC id {npc_id} does not exist"
-                except ValueError:
-                    self.status = "Invalid id"
-        elif ch == 'r' and hubs:
-            # Remove NPC from current hub
-            hub = hubs[self.hub_cur]
-            if not hub["npc_ids"]:
-                self.status = "Hub has no NPCs"
+
+        # ── Navigation ────────────────────────────────────────────────────────
+        if ch == '\t':
+            self.hub_focus = 'roster' if self.hub_focus == 'hubs' else 'hubs'
+            return True
+
+        if ch in ('j',) or key == curses.KEY_DOWN:
+            if self.hub_focus == 'hubs':
+                self.hub_cur = min(self.hub_cur + 1, len(hubs) - 1)
+                self.hub_roster_cur = 0
             else:
-                roster = ", ".join(str(i) for i in hub["npc_ids"])
-                raw = self._prompt(f"Remove NPC id ({roster}):", "")
-                if raw:
-                    try:
-                        npc_id = int(raw)
-                        if npc_id in hub["npc_ids"]:
-                            hub["npc_ids"].remove(npc_id)
-                            self._save_hubs()
-                            self.status = f"Removed NPC {npc_id} from {hub['name']}"
-                        else:
-                            self.status = f"NPC {npc_id} not in hub"
-                    except ValueError:
-                        self.status = "Invalid id"
-        elif ch == 'n':
-            # Create new hub
-            name = self._prompt("New hub name:", "")
-            if name:
-                new_id = max((h["id"] for h in hubs), default=-1) + 1
-                hubs.append({"id": new_id, "name": name.upper()[:15], "npc_ids": []})
-                self._save_hubs()
-                self.hub_cur = len(hubs) - 1
-                self.status = f"Created hub '{name.upper()[:15]}'"
-        elif ch == 'q':
+                roster_len = len(hubs[self.hub_cur]["npc_ids"]) if hubs else 0
+                self.hub_roster_cur = min(self.hub_roster_cur + 1, max(roster_len - 1, 0))
+            return True
+
+        if ch in ('k',) or key == curses.KEY_UP:
+            if self.hub_focus == 'hubs':
+                self.hub_cur = max(self.hub_cur - 1, 0)
+                self.hub_roster_cur = 0
+            else:
+                self.hub_roster_cur = max(self.hub_roster_cur - 1, 0)
+            return True
+
+        # ── Back to main menu ─────────────────────────────────────────────────
+        if ch in ('b',) or key == 27:  # Esc = 27
+            self.mode = 'main_menu'
+            return True
+
+        # ── Hub-list actions (focus = hubs) ───────────────────────────────────
+        if self.hub_focus == 'hubs':
+            if ch == 'n':
+                return self._hub_new(hubs)
+            if ch == 'r' and hubs:
+                return self._hub_rename_action(hubs)
+            if ch == 'D' and hubs:
+                return self._hub_delete_action(hubs)
+
+        # ── Roster actions (focus = roster) ───────────────────────────────────
+        else:
+            if ch == 'a' and hubs:
+                return self._hub_picker(hubs)
+            if ch == 'd' and hubs:
+                return self._hub_remove_action(hubs)
+
+        # ── Shared ────────────────────────────────────────────────────────────
+        if ch == 'g':
+            self._generate()
+            return True
+        if ch == 'q':
             return self._quit()
+
         return True
 
     def handle_key(self, key):
