@@ -14,7 +14,7 @@ void setUp(void) {
     prev_input = 0;
     mock_move_sprite_reset();
     mock_vram_clear();
-    camera_init(88, 720);   /* cam_y = 648 */
+    camera_init(88, 648);   /* cam_y = 576; scr(80,80) -> world(72,640) ty=80 tx=9 passable */
     sprite_pool_init();     /* reset OAM pool — player_init not called here */
     projectile_init();
 }
@@ -76,16 +76,6 @@ void test_projectile_update_moves_north(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(80u - PROJ_SPEED), projectile_get_y(0u));
 }
 
-/* ── TTL despawn ──────────────────────────────────────────────────────── */
-
-/* After PROJ_TTL_FRAMES updates the bullet is inactive */
-void test_projectile_ttl_despawn(void) {
-    uint8_t i;
-    projectile_fire(80u, 80u, DIR_R);
-    for (i = 0u; i < PROJ_TTL_FRAMES; i++) projectile_update();
-    TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
-}
-
 /* ── boundary despawn ─────────────────────────────────────────────────── */
 
 /* Bullet at right edge (x >= 168) despawns on next update */
@@ -94,6 +84,24 @@ void test_projectile_boundary_despawn_right(void) {
     projectile_fire(165u, 80u, DIR_R);
     projectile_update();   /* 165 + 4 = 169 → past boundary */
     TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
+}
+
+/* ── wall despawn ─────────────────────────────────────────────────────── */
+
+/* Bullet heading east despawns when destination tile is impassable.
+ * With cam_y=576 (from setUp), scr(124,80) → world(116,640) ty=80 tx=14: passable.
+ * After one update east (+4): scr(128,80) → world(120,640) ty=80 tx=15: wall (tile=0). */
+void test_projectile_wall_despawn(void) {
+    projectile_fire(124u, 80u, DIR_R);
+    projectile_update();
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
+}
+
+/* Bullet on road does NOT despawn after one update (destination still passable). */
+void test_projectile_road_no_early_despawn(void) {
+    projectile_fire(80u, 80u, DIR_R);
+    projectile_update();
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
 }
 
 /* ── capacity ─────────────────────────────────────────────────────────── */
@@ -123,8 +131,9 @@ int main(void) {
     RUN_TEST(test_projectile_cooldown_expires);
     RUN_TEST(test_projectile_update_moves_east);
     RUN_TEST(test_projectile_update_moves_north);
-    RUN_TEST(test_projectile_ttl_despawn);
     RUN_TEST(test_projectile_boundary_despawn_right);
+    RUN_TEST(test_projectile_wall_despawn);
+    RUN_TEST(test_projectile_road_no_early_despawn);
     RUN_TEST(test_projectile_pool_fills_to_max);
     return UNITY_END();
 }
