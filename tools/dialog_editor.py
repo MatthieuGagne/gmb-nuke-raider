@@ -455,6 +455,38 @@ class DialogEditor:
 
         return True
 
+    def _hub_new(self, hubs):
+        name = self._prompt("New hub name:", "")
+        if not name:
+            return True
+        new_hub = {"id": next_hub_id(hubs), "name": name.upper()[:15], "npc_ids": []}
+        hubs.append(new_hub)
+        self.hubs_data["hubs"] = hubs
+        self._save_hubs()
+        self.hub_cur = len(hubs) - 1
+        self.hub_roster_cur = 0
+        self.status = f"Created hub '{new_hub['name']}'"
+        return True
+
+    def _hub_rename_action(self, hubs):
+        new_name = self._prompt(f"Rename '{hubs[self.hub_cur]['name']}' to:", "")
+        if not new_name:
+            return True
+        self.hubs_data["hubs"], self.status = hub_rename(hubs, self.hub_cur, new_name)
+        self._save_hubs()
+        return True
+
+    def _hub_delete_action(self, hubs):
+        name = hubs[self.hub_cur]["name"]
+        confirm = self._prompt(f"Delete hub '{name}'? (y/N):", "N")
+        if confirm.lower() != 'y':
+            return True
+        self.hubs_data["hubs"], self.status = hub_delete(hubs, self.hub_cur)
+        self._save_hubs()
+        self.hub_cur = max(0, self.hub_cur - 1) if self.hubs_data["hubs"] else 0
+        self.hub_roster_cur = 0
+        return True
+
     def handle_key(self, key):
         ch = chr(key) if 0 < key < 256 else None
         if ch == '\t':
