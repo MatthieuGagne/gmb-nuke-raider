@@ -90,9 +90,9 @@ void test_projectile_boundary_despawn_right(void) {
 
 /* Bullet heading east despawns when destination tile is impassable.
  * With cam_y=576 (from setUp): world_y = scr_y+cam_y-16 = 80+576-16 = 640, ty=80.
- * scr(124,80) → world_x=116 tx=14: passable. After +4 east: world_x=120 tx=15: wall. */
+ * scr(148,80) -> world_x=140 tx=17: passable. After +4 east: world_x=144 tx=18: wall (tile=0). */
 void test_projectile_wall_despawn(void) {
-    projectile_fire(124u, 80u, DIR_R);
+    projectile_fire(148u, 80u, DIR_R);
     projectile_update();
     TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
 }

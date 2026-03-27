@@ -6,6 +6,7 @@
 #include "sprite_pool.h"
 #include "loader.h"
 #include "camera.h"
+#include "track.h"
 #include "config.h"
 BANKREF(projectile)
 
@@ -52,7 +53,7 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir) BANKED {
             proj_y[i]      = scr_y;
             proj_dx[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dx(dir));
             proj_dy[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dy(dir));
-            proj_ttl[i]    = PROJ_TTL_FRAMES;
+            proj_ttl[i]    = PROJ_MAX_TTL;
             proj_owner[i]  = PROJ_OWNER_PLAYER;
             proj_oam[i]    = oam;
             proj_active[i] = 1u;
@@ -67,9 +68,11 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir) BANKED {
 /* ── update ────────────────────────────────────────────────────────────── */
 
 void projectile_update(void) BANKED {
-    uint8_t i;
-    uint8_t nx;
-    uint8_t ny;
+    uint8_t  i;
+    uint8_t  nx;
+    uint8_t  ny;
+    int16_t  world_x;
+    int16_t  world_y;
 
     if (proj_cooldown_tick > 0u) proj_cooldown_tick--;
 
@@ -80,16 +83,25 @@ void projectile_update(void) BANKED {
         nx = (uint8_t)((int16_t)proj_x[i] + (int16_t)proj_dx[i]);
         ny = (uint8_t)((int16_t)proj_y[i] + (int16_t)proj_dy[i]);
 
-        /* Decrement TTL */
-        proj_ttl[i]--;
+        /* Convert destination screen coords → world pixel coords.
+         * world_x = scr_x - 8  (GBDK OAM X has 8px left margin)
+         * world_y = scr_y + cam_y - 16  (GBDK OAM Y has 16px top margin) */
+        world_x = (int16_t)nx - 8;
+        world_y = (int16_t)ny + (int16_t)cam_y - 16;
 
-        /* Despawn: TTL expired or crossed screen boundary */
-        if (proj_ttl[i] == 0u || nx < 8u || nx >= 168u || ny < 16u || ny >= HUD_SCANLINE) {
+        /* Despawn: wall hit, screen boundary, or max-range cap expired.
+         * Wall check is first — track_passable returns 0 for out-of-bounds,
+         * naturally covering extreme positions before boundary math. */
+        if (!track_passable(world_x, world_y) ||
+                nx < 8u || nx >= 168u ||
+                ny < 16u || ny >= HUD_SCANLINE ||
+                proj_ttl[i] == 0u) {
             clear_sprite(proj_oam[i]);
             proj_active[i] = 0u;
             continue;
         }
 
+        proj_ttl[i]--;
         proj_x[i] = nx;
         proj_y[i] = ny;
     }
