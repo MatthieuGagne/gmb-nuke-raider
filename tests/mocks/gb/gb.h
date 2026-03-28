@@ -84,10 +84,12 @@ void move_bkg(uint8_t x, uint8_t y);
 #define SHOW_WIN    ((void)0)
 #define HIDE_WIN    ((void)0)
 static inline void move_win(uint8_t x, uint8_t y) { (void)x; (void)y; }
-static inline void set_win_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
-                                  const uint8_t *tiles) {
-    (void)x; (void)y; (void)w; (void)h; (void)tiles;
-}
+
+/* WIN tile mock — tracked by mock_bkg.c */
+extern uint8_t mock_win_vram[32u * 32u];
+extern int mock_set_win_tiles_call_count;
+void set_win_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
+                   const uint8_t *tiles);
 
 /* Mock VRAM: 32x32 tile BG map, shared across TUs via mock_bkg.c */
 extern uint8_t mock_vram[32u * 32u];
