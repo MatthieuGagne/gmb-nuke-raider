@@ -56,6 +56,7 @@ void main(void) {
         while (!frame_ready);
         frame_ready = 0;
         music_tick();
+        if (frame_ready) continue;   /* VBL fired during __critical — skip this frame */
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();
     }
