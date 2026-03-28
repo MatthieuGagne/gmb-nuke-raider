@@ -55,14 +55,11 @@ void music_tick(void) {
 void vbl_sync(void) {
     while (!frame_ready);
     frame_ready = 0;
-    music_tick();
-    frame_ready = 0;  /* drain any VBL that fired during music_tick()'s __critical */
 }
 
 void vbl_display_off(void) {
     while (!frame_ready);      /* wait for VBlank start */
     frame_ready = 0;
-    music_tick();              /* tick music for this VBlank */
     LCDC_REG &= ~0x80U;       /* disable LCD — safe: we're in VBlank */
 }
 
