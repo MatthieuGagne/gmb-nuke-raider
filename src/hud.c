@@ -2,6 +2,7 @@
 #include <gb/gb.h>
 #include "config.h"
 #include "hud.h"
+#include "vram_queue.h"
 
 /* --- Tile index constants --- */
 #define HUD_FONT_BASE  128u  /* first font tile in BG tile data — above track tiles */
@@ -140,7 +141,7 @@ void hud_render(void) BANKED {
     timer[2] = HUD_FONT_BASE + HUD_TILE_COLON;
     timer[3] = HUD_FONT_BASE + (uint8_t)(hud_ss / 10u);
     timer[4] = HUD_FONT_BASE + (uint8_t)(hud_ss % 10u);
-    set_win_tiles(15u, 0u, 5u, 1u, timer);
+    vram_queue_win(15u, 0u, 5u, 1u, timer);
 
     /* Update HP digit tiles (cols 3-5): 3 digits for 0-100 */
     {
@@ -149,7 +150,7 @@ void hud_render(void) BANKED {
         hp_digits[1] = HUD_FONT_BASE + (uint8_t)((h % 100u) / 10u);
         hp_digits[2] = HUD_FONT_BASE + (uint8_t)(h % 10u);
     }
-    set_win_tiles(3u, 0u, 3u, 1u, hp_digits);
+    vram_queue_win(3u, 0u, 3u, 1u, hp_digits);
 
     /* Update lap tiles (cols 6-8): "1/3" format */
     {
@@ -157,7 +158,7 @@ void hud_render(void) BANKED {
         lap_tiles[0] = HUD_FONT_BASE + hud_lap_current;
         lap_tiles[1] = HUD_FONT_BASE + HUD_TILE_SLASH;
         lap_tiles[2] = HUD_FONT_BASE + hud_lap_total;
-        set_win_tiles(6u, 0u, 3u, 1u, lap_tiles);
+        vram_queue_win(6u, 0u, 3u, 1u, lap_tiles);
     }
 
     hud_dirty = 0u;
