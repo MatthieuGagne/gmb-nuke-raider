@@ -114,6 +114,30 @@ void test_set_lap_after_render_sets_dirty_again(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
 }
 
+/* --- hud_set_hp with same value must NOT set dirty --- */
+
+void test_set_hp_same_value_no_dirty(void) {
+    /* After init, HP is PLAYER_MAX_HP and dirty is clear */
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+    /* Calling set_hp with the current value must not dirty */
+    hud_set_hp(PLAYER_MAX_HP);
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+}
+
+void test_set_hp_changed_value_sets_dirty(void) {
+    /* render to clear dirty after any prior update */
+    hud_render();
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+    /* change to a different value — must dirty */
+    hud_set_hp(50u);
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+    /* render to clear */
+    hud_render();
+    /* same value again — must NOT dirty */
+    hud_set_hp(50u);
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_seconds_zero);
@@ -129,5 +153,7 @@ int main(void) {
     RUN_TEST(test_set_hp_sets_dirty);
     RUN_TEST(test_set_lap_sets_dirty);
     RUN_TEST(test_set_lap_after_render_sets_dirty_again);
+    RUN_TEST(test_set_hp_same_value_no_dirty);
+    RUN_TEST(test_set_hp_changed_value_sets_dirty);
     return UNITY_END();
 }
