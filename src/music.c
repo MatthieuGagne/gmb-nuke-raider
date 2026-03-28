@@ -40,10 +40,12 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
-    uint8_t _saved_bank = CURRENT_BANK;
-    SWITCH_ROM(current_song_bank);
-    hUGE_dosound();
-    SWITCH_ROM(_saved_bank);
+    __critical {
+        uint8_t _saved_bank = CURRENT_BANK;
+        SWITCH_ROM(current_song_bank);
+        hUGE_dosound();
+        SWITCH_ROM(_saved_bank);
+    }
 }
 
 void vbl_sync(void) {

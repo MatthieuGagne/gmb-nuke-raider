@@ -106,8 +106,9 @@ void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
 #define BANKREF(x)
 #define BANKREF_EXTERN(x)
 #define BANK(x)          0u
-#define CURRENT_BANK     0u
-#define SWITCH_ROM(b)    ((void)(b))
+static uint8_t _current_bank_mock = 0;
+#define CURRENT_BANK     _current_bank_mock
+#define SWITCH_ROM(b)    (_current_bank_mock = (uint8_t)(b))
 typedef void (*int_handler)(void);
 #define VBL_IFLAG 0x01U
 #define LCD_IFLAG 0x02U
