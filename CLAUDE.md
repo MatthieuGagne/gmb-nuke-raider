@@ -94,7 +94,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, compilation errors. Banking questions → bank-pre-write/bank-post-build skills.
 - **`gb-c-optimizer`** — C code review for GBC performance/ROM size, anti-pattern detection, SDCC optimization.
-- **`gb-memory-validator`** — Thin wrapper (deprecated). Use `make memory-check` / the `gb-memory-validator` skill instead. Checks WRAM/VRAM/OAM via `tools/memory_check.py`.
+- **`gb-memory-validator`** — Documents WRAM/VRAM/OAM budget checks. **Now fires automatically** after every non-clean `make` via PostToolUse hook (`post_build_hook.py` runs `make memory-check`).
 - **`map-builder`** — End-to-end map creation: Tiled layout, TMX conversion pipeline, wiring generated C files into the game.
 - **`sprite-builder`** — End-to-end sprite creation: Aseprite source, PNG export, `png_to_tiles`, OAM slots, tile data loading, in-game rendering.
 
@@ -106,8 +106,8 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 - **`build`** — Build verification gate: compile the ROM and confirm no errors.
-- **`bank-pre-write`** — Hard gate before writing any `src/*.c`/`.h`. Validates manifest entry, pragma, SET_BANK safety. **Invoke before every write.**
-- **`bank-post-build`** — Hard gate after successful build. Validates .map symbol placements vs manifest, ROM bank budgets. **Invoke before every smoketest.**
+- **`bank-pre-write`** — Documents the manifest/pragma/SET_BANK checks. **Now fires automatically via PreToolUse hook** on every Write/Edit to `src/*.c`/`.h` — no manual invocation needed. Keep as fallback reference.
+- **`bank-post-build`** — Documents the post-build bank validation. **Now fires automatically via PostToolUse hook** after every non-clean `make` — no manual invocation needed. Keep as fallback reference.
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
 - **`prd`** — Create a GitHub issue with a PRD for a new feature.
 
@@ -130,7 +130,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 
 **GitHub issue links:** When the user pastes a GitHub issue URL (e.g. `https://github.com/.../issues/N`), first fetch the issue and check its **Files Impacted** or **Out of Scope** sections. If ALL touched files qualify as doc-only (`.md`, `.txt`, `.json` except `bank-manifest.json`, files under `.claude/skills/` or `.claude/agents/`), invoke the `doc-review` skill. Otherwise invoke `writing-plans`. Do not ask for confirmation.
 **TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill). **Early-exit behavior:** the Makefile uses `|| exit 1` — it stops at the first failing test binary (alphabetical order). Test binaries after the first failure do NOT run. Fix all failures starting from the earliest binary; re-run `make test` after each fix to reveal the next hidden failure.
-**Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` skill and `bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, both bank skills, `bank_check.py`, `gbdk-expert`, `gb-memory-validator`, and this file.
+**Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` hook (`tools/bank_check_hook.py`) and `bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, both bank skills, `bank_check.py`, `gbdk-expert`, `gb-memory-validator`, and this file.
 **Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
@@ -140,14 +140,14 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Always do a clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
-3. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix before continuing.
+3. `make memory-check` fires automatically via PostToolUse hook after step 2 — check the hook output; if any budget is FAIL or ERROR, stop and fix before continuing.
 4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
 5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
-**GB skill gates (mandatory):**
-- Before writing any `src/*.c` or `src/*.h` file → invoke `bank-pre-write` skill, then `gbdk-expert`
-- After a successful build, before smoketest → invoke `bank-post-build` skill, then `make memory-check` (gb-memory-validator skill)
+**GB skill gates:**
+- Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` skill for API questions
+- After a successful build → `bank-post-build` + `make memory-check` fire **automatically** via PostToolUse hook; no manual invocation needed
 - When debugging any runtime issue → invoke `emulicious-debug`
 
 **Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).

@@ -5,32 +5,6 @@ description: Use when creating, editing, or converting maps for Junk Runner — 
 
 # Map Expert
 
-## Overview
-
-Full reference for the Junk Runner map pipeline: Tiled authoring → Python conversion → GB hardware rendering.
-
-**Keep this skill current:** When you modify any tool in `tools/` or `assets/maps/`, add a new map tool, change the TMX schema, or add GB tilemap features — update the relevant section in the same PR. The skill is the source of truth for the pipeline.
-
-**Track pipeline:**
-```
-assets/maps/tileset.png   ←─ gen_tileset.py (or hand-drawn in Aseprite)
-         │
-         ▼
-tools/png_to_tiles.py  →  src/track_tiles.c  (2bpp C array)
-assets/maps/track.tmx  →  tools/tmx_to_c.py  →  src/track_map.c  (tile index array)
-```
-
-**Overmap pipeline (separate converter):**
-```
-assets/maps/overmap_tiles.aseprite  →  (Aseprite export)  →  assets/maps/overmap_tiles.png
-assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py  →  src/overmap_tiles.c
-assets/maps/overmap.tmx  →  tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h  →  src/overmap_map.c
-```
-
-Note: the overmap uses `tmx_to_array_c.py` (not `tmx_to_c.py`) and takes `config.h` as an extra arg.
-
----
-
 ## Quick Command Reference
 
 | Tool | Command | Notes |
@@ -59,6 +33,32 @@ Map dimensions: **40×36 tiles** (W×H).
 | 3 | Sand | White/dark-grey checkerboard |
 | 4 | Oil puddle | Black with grey center rect |
 | 5 | Boost stripes | Alternating row pattern |
+
+---
+
+## Overview
+
+Full reference for the Junk Runner map pipeline: Tiled authoring → Python conversion → GB hardware rendering.
+
+**Keep this skill current:** When you modify any tool in `tools/` or `assets/maps/`, add a new map tool, change the TMX schema, or add GB tilemap features — update the relevant section in the same PR. The skill is the source of truth for the pipeline.
+
+**Track pipeline:**
+```
+assets/maps/tileset.png   ←─ gen_tileset.py (or hand-drawn in Aseprite)
+         │
+         ▼
+tools/png_to_tiles.py  →  src/track_tiles.c  (2bpp C array)
+assets/maps/track.tmx  →  tools/tmx_to_c.py  →  src/track_map.c  (tile index array)
+```
+
+**Overmap pipeline (separate converter):**
+```
+assets/maps/overmap_tiles.aseprite  →  (Aseprite export)  →  assets/maps/overmap_tiles.png
+assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py  →  src/overmap_tiles.c
+assets/maps/overmap.tmx  →  tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h  →  src/overmap_map.c
+```
+
+Note: the overmap uses `tmx_to_array_c.py` (not `tmx_to_c.py`) and takes `config.h` as an extra arg.
 
 ---
 

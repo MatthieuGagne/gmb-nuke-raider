@@ -271,5 +271,31 @@
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v)",
       "Bash(PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 tools/bank_check_hook.py",
+            "statusMessage": "bank-pre-write check..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 tools/post_build_hook.py",
+            "statusMessage": "bank-post-build + memory-check..."
+          }
+        ]
+      }
+    ]
   }
 }
