@@ -2,6 +2,7 @@
 #include <gb/gb.h>
 #include "camera.h"
 #include "track.h"
+#include "vram_queue.h"
 
 volatile uint16_t cam_y;
 volatile uint8_t  cam_scy_shadow;
@@ -22,7 +23,7 @@ static void stream_row(uint8_t world_ty) {
     for (tx = 0u; tx < MAP_TILES_W; tx++) {
         row_buf[tx] = track_get_raw_tile(tx, world_ty);
     }
-    set_bkg_tiles(0u, vram_y, MAP_TILES_W, 1u, row_buf);
+    vram_queue_bkg(0u, vram_y, MAP_TILES_W, 1u, row_buf);
 }
 
 #define STREAM_BUF_SIZE 6u
@@ -46,9 +47,13 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED {
     cam_y = clamp_cam(player_world_y - 72, CAM_MAX_Y);
     first_row = (uint8_t)(cam_y >> 3u);
 
-    /* Preload only the 18 initially visible rows, not all 100 */
+    /* Preload only the 18 initially visible rows, not all 100.
+     * Display is OFF here so it is safe to flush the queue after each row —
+     * the 64-byte tile buffer holds only ~3 rows; flush between rows to avoid
+     * silent drops. */
     for (ty = first_row; ty < first_row + 18u && ty < MAP_TILES_H; ty++) {
         stream_row(ty);
+        vram_queue_flush();
     }
 
 }

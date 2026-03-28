@@ -2,11 +2,12 @@
 #include <gb/gb.h>
 #include "camera.h"
 #include "track.h"
+#include "vram_queue.h"
 
 extern int     mock_move_bkg_call_count;
 extern uint8_t mock_move_bkg_last_y;
 
-void setUp(void)    { mock_vram_clear(); }
+void setUp(void)    { mock_vram_clear(); vram_queue_init(); }
 void tearDown(void) {}
 
 /* --- camera_init: cam_y from player world Y ----------------------------- */
@@ -36,6 +37,7 @@ void test_camera_init_clamps_cam_y_to_max(void) {
 void test_camera_init_preloads_18_rows(void) {
     /* cam_y=8 -> first_row=1; preloads rows 1-18 = 18 set_bkg_tiles calls */
     camera_init(80, 80);
+    vram_queue_flush();  /* drain queue so set_bkg_tiles calls are counted */
     TEST_ASSERT_EQUAL_INT(18, mock_set_bkg_tiles_call_count);
 }
 
@@ -78,9 +80,11 @@ void test_camera_update_does_not_write_vram(void) {
 void test_camera_update_downward_buffers_bottom_row(void) {
     int count_before;
     camera_init(80, 80);   /* cam_y=8; visible rows 1-18 preloaded */
+    vram_queue_flush();    /* drain init writes so count_before is stable */
     count_before = mock_set_bkg_tiles_call_count;
     camera_update(80, 88); /* ncy=16 > cam_y=8 → buffers bottom row 19 */
     camera_flush_vram();
+    vram_queue_flush();    /* drain queued row so set_bkg_tiles is counted */
     TEST_ASSERT_GREATER_THAN_INT(count_before, mock_set_bkg_tiles_call_count);
 }
 
@@ -90,8 +94,10 @@ void test_camera_flush_streams_new_top_row(void) {
     /* cam_y=8 -> first_row=1; move up: cam_y=0, old_top=1, new_top=0 */
     camera_init(80, 80);
     camera_update(80, 72);  /* 72-72=0; cam_y->0, buffers row 0 */
+    vram_queue_flush();     /* drain any queued writes before taking snapshot */
     count_after_update = mock_set_bkg_tiles_call_count;
     camera_flush_vram();
+    vram_queue_flush();     /* drain queued row so set_bkg_tiles is counted */
     TEST_ASSERT_GREATER_THAN_INT(count_after_update, mock_set_bkg_tiles_call_count);
 }
 
