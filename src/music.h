@@ -39,4 +39,8 @@ void vbl_display_off(void);
  * vbl_sync(). Declared here so music.c can implement vbl_sync(). */
 extern volatile uint8_t frame_ready;
 
+#ifdef UNIT_TEST
+void music_vbl_isr_test_hook(void);
+#endif
+
 #endif /* MUSIC_H */

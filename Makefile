@@ -15,7 +15,7 @@ OBJS      := $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 UNITY_SRC    := tests/unity/src/unity.c
 TEST_SRCS    := $(wildcard tests/test_*.c)
-TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -Wall -Wextra
+TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -Wall -Wextra -DUNIT_TEST
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 

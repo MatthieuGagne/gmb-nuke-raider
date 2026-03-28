@@ -17,6 +17,13 @@
 
 static uint8_t current_song_bank = 0;
 
+static void music_vbl_isr(void) {
+    uint8_t _saved_bank = CURRENT_BANK;
+    SWITCH_ROM(current_song_bank);
+    hUGE_dosound();
+    SWITCH_ROM(_saved_bank);
+}
+
 void music_init(void) {
     NR52_REG = 0x80;  /* enable APU */
     NR51_REG = 0xFF;  /* route all channels to both speakers */
@@ -27,6 +34,7 @@ void music_init(void) {
           hUGE_init(&music_data_song);
           RESTORE_BANK(); }
     }
+    add_VBL(music_vbl_isr);
 }
 
 void music_start(uint8_t bank, const hUGESong_t *song) {
@@ -40,12 +48,8 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
-    __critical {
-        uint8_t _saved_bank = CURRENT_BANK;
-        SWITCH_ROM(current_song_bank);
-        hUGE_dosound();
-        SWITCH_ROM(_saved_bank);
-    }
+    /* no-op: hUGE_dosound() now runs in music_vbl_isr(), registered via add_VBL() */
+    (void)0;
 }
 
 void vbl_sync(void) {
@@ -61,3 +65,7 @@ void vbl_display_off(void) {
     music_tick();              /* tick music for this VBlank */
     LCDC_REG &= ~0x80U;       /* disable LCD — safe: we're in VBlank */
 }
+
+#ifdef UNIT_TEST
+void music_vbl_isr_test_hook(void) { music_vbl_isr(); }
+#endif

@@ -1,7 +1,13 @@
 #include "unity.h"
 #include "music.h"
 
-void setUp(void)    { frame_ready = 0; _current_bank_mock = 0; }
+extern uint8_t hUGE_dosound_call_count;
+
+void setUp(void) {
+    frame_ready = 0;
+    _current_bank_mock = 0;
+    hUGE_dosound_call_count = 0;
+}
 void tearDown(void) {}
 
 /* vbl_display_off() should consume the frame_ready flag (set it to 0).
@@ -52,11 +58,41 @@ void test_vbl_sync_drains_vbl_miss(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, frame_ready);
 }
 
+/* ISR saves and restores current bank */
+void test_music_vbl_isr_restores_bank(void) {
+    _current_bank_mock = 7u;
+    music_vbl_isr_test_hook();
+    TEST_ASSERT_EQUAL_UINT8(7u, _current_bank_mock);
+}
+
+/* ISR calls hUGE_dosound() exactly once */
+void test_music_vbl_isr_calls_dosound(void) {
+    music_vbl_isr_test_hook();
+    TEST_ASSERT_EQUAL_UINT8(1u, hUGE_dosound_call_count);
+}
+
+/* ISR does not touch frame_ready */
+void test_music_vbl_isr_does_not_touch_frame_ready(void) {
+    frame_ready = 0u;
+    music_vbl_isr_test_hook();
+    TEST_ASSERT_EQUAL_UINT8(0u, frame_ready);
+}
+
+/* music_tick() is now a no-op: does not call hUGE_dosound */
+void test_music_tick_is_noop(void) {
+    music_tick();
+    TEST_ASSERT_EQUAL_UINT8(0u, hUGE_dosound_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_vbl_display_off_consumes_frame_ready);
     RUN_TEST(test_music_tick_restores_bank);
     RUN_TEST(test_music_tick_does_not_clear_frame_ready);
     RUN_TEST(test_vbl_sync_drains_vbl_miss);
+    RUN_TEST(test_music_vbl_isr_restores_bank);
+    RUN_TEST(test_music_vbl_isr_calls_dosound);
+    RUN_TEST(test_music_vbl_isr_does_not_touch_frame_ready);
+    RUN_TEST(test_music_tick_is_noop);
     return UNITY_END();
 }
