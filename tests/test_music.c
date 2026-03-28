@@ -23,9 +23,26 @@ void test_music_tick_restores_bank(void) {
     TEST_ASSERT_EQUAL_UINT8(5, _current_bank_mock);
 }
 
+/* Contract: music_tick() must NOT modify frame_ready.
+ *
+ * In the main loop, after music_tick() returns, main.c checks:
+ *   if (frame_ready) continue;   // VBL fired during __critical — skip frame
+ *
+ * If music_tick() were to clear frame_ready, a genuine VBL miss would go
+ * undetected and the double-tick race would resume silently.
+ *
+ * Host-side mocks cannot simulate a mid-__critical VBL interrupt. The actual
+ * race condition is verified by Emulicious smoketest (run game past ~33s). */
+void test_music_tick_does_not_clear_frame_ready(void) {
+    frame_ready = 1;
+    music_tick();
+    TEST_ASSERT_EQUAL_UINT8(1u, frame_ready);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_vbl_display_off_consumes_frame_ready);
     RUN_TEST(test_music_tick_restores_bank);
+    RUN_TEST(test_music_tick_does_not_clear_frame_ready);
     return UNITY_END();
 }
