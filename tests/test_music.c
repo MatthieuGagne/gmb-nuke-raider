@@ -39,10 +39,24 @@ void test_music_tick_does_not_clear_frame_ready(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, frame_ready);
 }
 
+/* vbl_sync() must drain any VBL that fires during music_tick()'s __critical
+ * block. Without this drain, a caller looping on vbl_sync() would exit the
+ * next while(!frame_ready) immediately and double-tick its loop body.
+ *
+ * This test simulates the VBL-miss case by pre-setting frame_ready=1
+ * (as if the ISR fired during __critical), then verifies vbl_sync()
+ * leaves frame_ready=0 on return. */
+void test_vbl_sync_drains_vbl_miss(void) {
+    frame_ready = 1;   /* simulate: VBL fires, vbl_sync() starts waiting */
+    vbl_sync();        /* should consume it and drain any miss */
+    TEST_ASSERT_EQUAL_UINT8(0u, frame_ready);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_vbl_display_off_consumes_frame_ready);
     RUN_TEST(test_music_tick_restores_bank);
     RUN_TEST(test_music_tick_does_not_clear_frame_ready);
+    RUN_TEST(test_vbl_sync_drains_vbl_miss);
     return UNITY_END();
 }
