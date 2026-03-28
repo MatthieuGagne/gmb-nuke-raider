@@ -7,6 +7,7 @@
 #include "state_manager.h"
 #include "state_title.h"
 #include "music.h"
+#include "vram_queue.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -35,6 +36,7 @@ volatile uint8_t frame_ready = 0;
 
 static void vbl_isr(void) {
     move_bkg(0u, cam_scy_shadow);  /* apply shadow SCY at guaranteed VBlank start */
+    vram_queue_flush();
     frame_ready = 1;
 }
 
@@ -55,9 +57,7 @@ void main(void) {
     while (1) {
         while (!frame_ready);
         frame_ready = 0;
-        music_tick();
-        if (frame_ready) continue;   /* VBL fired during __critical — skip this frame */
-        input_update();           /* saves prev frame, reads joypad() */
+        input_update();
         state_manager_update();
     }
 }
