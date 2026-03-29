@@ -5,28 +5,7 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
-Check whether this conversation contains an approved design from a brainstorming session.
-
-> **Is there an approved design in this conversation?**
-> - **Yes** → proceed to draft the PRD below
-> - **No** → run the inline clarify+grill block below before drafting
-
-### Inline Clarify+Grill (when no prior design exists)
-
-Ask the user these questions **one at a time** — do not ask multiple at once:
-
-1. "What is the goal of this feature? (one sentence: what it does and why it matters for the game)"
-2. "What are the key requirements? (list the must-haves)"
-3. "What are the acceptance criteria? (how do you know it's done?)"
-4. "What is explicitly out of scope?"
-5. "Are there any GB hardware constraints to consider? (OAM budget, WRAM, VRAM, banking, SDCC limitations)"
-
-After collecting answers, do a **grill-me pass** inline — ask 2-3 probing questions one at a time to surface assumptions, edge cases, or risks. Examples:
-- "What happens when [edge case]?"
-- "Is [constraint] a hard requirement or a nice-to-have?"
-- "Have you considered [alternative approach]?"
-
-Once all questions are resolved, proceed to draft the PRD.
+If you have enough context to draft the PRD (from a brainstorming session or the user's description), proceed directly. If anything is unclear — goal, requirements, acceptance criteria, scope, or GB hardware constraints — ask targeted questions before drafting. Ask only what you actually need.
 
 ---
 
@@ -34,7 +13,7 @@ Create a new PRD as a GitHub issue.
 
 ## Steps
 
-1. **Draft the PRD content** from the brainstorming session or inline clarify+grill. Use this structure:
+1. **Draft the PRD content** from the brainstorming session or the user's description. Use this structure:
 
 ```
 ## Goal
