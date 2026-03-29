@@ -5,7 +5,9 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
-If you have enough context to draft the PRD (from a brainstorming session or the user's description), proceed directly. If anything is unclear — goal, requirements, acceptance criteria, scope, or GB hardware constraints — ask targeted questions before drafting. Ask only what you actually need.
+If there is an approved design from a brainstorming session, proceed directly to drafting.
+
+If not, invoke the `grill-me` skill before drafting — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed.
 
 ---
 

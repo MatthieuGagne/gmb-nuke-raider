@@ -15,7 +15,9 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ## Before You Begin
 
-If you have enough context to write the plan (from a brainstorming session, a GitHub issue, or the user's description), proceed directly. If anything is unclear — goal, requirements, acceptance criteria, scope, or GB hardware constraints — ask targeted questions before writing. Ask only what you actually need.
+If there is an approved design or a GitHub issue with a PRD in this conversation, proceed directly to writing the plan.
+
+If not, invoke the `grill-me` skill first — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed.
 
 **First action before anything else:** Pull and merge latest master into the current worktree branch:
 ```bash
