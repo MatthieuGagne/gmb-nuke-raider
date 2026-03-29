@@ -38,7 +38,7 @@ State the root cause concisely:
 - **Location:** function name + approximate line
 - **Cause:** one sentence describing what is wrong
 
-If the root cause cannot be determined from static analysis, note what emulator inspection is needed (invoke the `emulicious-debug` skill).
+If the root cause cannot be determined from static analysis, note what emulator inspection is needed (invoke the `emulicious-debug` agent via Agent tool).
 
 ## Step 4: Write the TDD Fix Plan
 
@@ -118,5 +118,5 @@ Report the issue URL to the user.
 ## Coherence Notes
 
 - This skill does NOT invoke `writing-plans` or `executing-plans` — the fix plan is embedded in the GitHub issue body and executed in a separate session.
-- If the root cause requires emulator inspection, invoke `emulicious-debug` in Step 3 before writing the fix plan.
+- If the root cause requires emulator inspection, invoke the `emulicious-debug` agent (Agent tool) in Step 3 before writing the fix plan.
 - The `bank-pre-write` gate is noted in the fix plan but enforced at execution time by `executing-plans` / `bank-pre-write` skill — not here.

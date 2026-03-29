@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+description: "Standalone exploration tool for turning ideas into designs — usable at any point in the dev cycle (PRD writing, plan writing, debugging, or standalone exploration). Explores user intent, requirements and design before implementation."
 ---
 
 # Brainstorming Ideas Into Designs
@@ -29,21 +29,13 @@ You MUST create a task for each of these items and complete them in order:
 4. **Present design** — in sections scaled to their complexity, get user approval after each section
    - **Design-It-Twice** (required for any new `src/*.c` module): invoke the `design-an-interface` skill (`Skill` tool, `skill: "design-an-interface"`) to spawn 4 parallel sub-agents each exploring a different design constraint; compare their results and choose the best
 5. **Invoke grill-me** — use the `grill-me` skill (`Skill` tool, `skill: "grill-me"`) to stress-test the approved design. `grill-me` will NOT re-invoke brainstorming — it produces a Resolved/Unresolved/Risk summary only. Continue only after that summary is generated.
-6. **Resolved / Unresolved / Deferred summary** — before calling `/prd`, output a short bullet list per category:
+6. **Resolved / Unresolved / Deferred summary** — output a short bullet list per category:
    - **Resolved:** decisions that are settled
    - **Unresolved:** open questions that must be answered before implementation begins
    - **Deferred:** items deliberately set aside (not blocking now)
    If Unresolved is non-empty, stop and resolve those questions before continuing.
-7. **PRD Content Gate (HARD STOP)** — Scan your full output from this session before calling `/prd`.
-   The PRD must contain **only** requirements and design decisions. Strip anything that qualifies as:
-   - Implementation details (function signatures, variable names, struct/array definitions)
-   - Code snippets (any fenced code block in C, Python, or pseudocode)
-   - File-level task breakdowns (e.g., "Step 1: write `src/foo.c`", numbered implementation steps)
-   If any of the above are found, **remove them now** before proceeding.
-   Only continue to step 8 after this scan is clean.
-8. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
-   Do NOT save a local design doc file. The GitHub issue IS the design doc.
-9. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
+
+**Brainstorming ends here.** After the resolved/unresolved/deferred summary is presented, the session is complete. The user will invoke `/prd` and `writing-plans` when they are ready — do not auto-invoke them.
 
 ## GB Constraint Checklist
 
@@ -68,8 +60,10 @@ digraph brainstorming {
     "Propose 2-3 approaches" [shape=box];
     "Present design sections + Design-It-Twice" [shape=box];
     "User approves design?" [shape=diamond];
-    "Create GitHub issue with /prd" [shape=box];
-    "Invoke writing-plans skill" [shape=doublecircle];
+    "Invoke grill-me skill" [shape=box];
+    "Resolved/Unresolved/Deferred summary" [shape=box];
+    "Unresolved items?" [shape=diamond];
+    "Done (user invokes /prd or writing-plans when ready)" [shape=doublecircle];
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -77,23 +71,12 @@ digraph brainstorming {
     "Present design sections + Design-It-Twice" -> "User approves design?";
     "User approves design?" -> "Present design sections + Design-It-Twice" [label="no, revise"];
     "User approves design?" -> "Invoke grill-me skill" [label="yes"];
-    "Invoke grill-me skill" [shape=box];
     "Invoke grill-me skill" -> "Resolved/Unresolved/Deferred summary";
-    "Resolved/Unresolved/Deferred summary" [shape=box];
-    "Unresolved items?" [shape=diamond];
     "Resolved/Unresolved/Deferred summary" -> "Unresolved items?";
     "Unresolved items?" -> "Ask clarifying questions" [label="yes, resolve first"];
-    "Unresolved items?" -> "PRD Content Gate" [label="no"];
-    "PRD Content Gate" [shape=box label="PRD Content Gate\n(strip impl details/code/task breakdowns)"];
-    "Implementation details found?" [shape=diamond];
-    "PRD Content Gate" -> "Implementation details found?";
-    "Implementation details found?" -> "PRD Content Gate" [label="yes, strip and re-scan"];
-    "Implementation details found?" -> "Create GitHub issue with /prd" [label="no, clean"];
-    "Create GitHub issue with /prd" -> "Invoke writing-plans skill";
+    "Unresolved items?" -> "Done (user invokes /prd or writing-plans when ready)" [label="no"];
 }
 ```
-
-**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
 
 ## The Process
 
@@ -118,17 +101,6 @@ digraph brainstorming {
   (minimal API, testability, caller ergonomics, GB efficiency); compare results, choose the best — document why
 - Work through the GB Constraint Checklist explicitly for any GBC feature
 - Be ready to go back and clarify if something doesn't make sense
-
-## After the Design
-
-**Documentation:**
-- Use `/prd` skill to create a GitHub issue with the design
-- Do NOT save a local `docs/plans/` file — the GitHub issue is the design doc
-- Share the issue URL with the user
-
-**Implementation:**
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
 
 ## Key Principles
 
