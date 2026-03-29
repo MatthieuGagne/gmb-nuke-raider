@@ -50,7 +50,8 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Overmap state | `src/state_overmap.c/.h`, `src/overmap_map.c`, `src/overmap_tiles.c` | World overmap navigation |
 | Hub state | `src/state_hub.c/.h`, `src/hub_data.c/.h` | City hub menu, NPC list, hub entry/exit |
 | Player | `src/player.c/.h`, `src/player_sprite.c` | Player movement, boundary checks, sprite rendering |
-| Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries |
+| Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries, checkpoint WRAM buffer |
+| Checkpoint | `src/checkpoint.c/.h` | Directional lap checkpoint enforcement; prevents lap farming on looping tracks |
 | Camera | `src/camera.c/.h` | Scrolling ring-buffer VRAM streaming, `move_bkg()` |
 | Sprite pool | `src/sprite_pool.c/.h` | OAM slot management |
 | Dialog | `src/dialog.c/.h`, `src/dialog_data.c/.h`, `src/dialog_arrow_sprite.c/.h`, `src/dialog_border_tiles.c/.h` | NPC conversation trees, branching choices, per-NPC flags, UI assets |

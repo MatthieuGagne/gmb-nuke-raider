@@ -37,7 +37,7 @@
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
-#define HUD_SCANLINE 128  /* pixel row where HUD window begins; used for player movement bounds */
+#define HUD_SCANLINE 128u /* pixel row where HUD window begins; used for player movement bounds */
 
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
@@ -63,6 +63,10 @@
 #define HUB_BORDER_TILE_SLOT   112u  /* BKG tile slots 112-119 (8 tiles) for dialog box border */
 #define HUB_PORTRAIT_BOX_W     6u    /* portrait box width in tiles (cols 0-5) */
 #define HUB_DIALOG_BOX_W       14u   /* dialog box width in tiles (cols 6-19) */
+
+/* Checkpoint pool ceiling — max checkpoints per track across all tracks */
+#define MAX_CHECKPOINTS 8u
+
 
 /* Projectile pool */
 #define MAX_PROJECTILES       8u

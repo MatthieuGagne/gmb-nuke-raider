@@ -3,6 +3,7 @@
 #include "track.h"
 #include "banking.h"
 #include "loader.h"
+#include "checkpoint.h"
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
 #define TILE_LUT_LEN 8u
@@ -28,6 +29,11 @@ static int16_t        active_start_x;
 static int16_t        active_start_y;
 static uint8_t        active_lap_count;
 
+/* WRAM checkpoint buffer — filled by load_checkpoints() (bank-0 loader) at track_select() time.
+ * Always accessed from WRAM; never read directly from ROM in banked code. */
+static CheckpointDef wram_checkpoints[MAX_CHECKPOINTS];
+static uint8_t       active_checkpoint_count = 0u;
+
 void track_select(uint8_t id) BANKED {
     active_track_id = id;
     if (id == 0u) {
@@ -41,6 +47,8 @@ void track_select(uint8_t id) BANKED {
         active_start_y   = track2_start_y;
         active_lap_count = 3u;
     }
+    /* Cross-bank copy — delegated to NONBANKED loader (bank 0) */
+    load_checkpoints(id, wram_checkpoints, &active_checkpoint_count);
 }
 
 uint8_t track_get_lap_count(void) BANKED { return active_lap_count; }
@@ -99,3 +107,6 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     if (tx >= MAP_TILES_W || ty >= MAP_TILES_H) return 0u;
     return active_map[(uint16_t)ty * MAP_TILES_W + tx] != 0u;
 }
+
+const CheckpointDef *track_get_checkpoints(void) BANKED { return wram_checkpoints; }
+uint8_t track_get_checkpoint_count(void) BANKED { return active_checkpoint_count; }

@@ -333,5 +333,47 @@ class TestTmxToCPrefix(unittest.TestCase):
         self.assertIn('const uint8_t track_map[', src)
 
 
+CHECKPOINT_TMX = MINIMAL_TMX.replace(
+    '</map>',
+    '''<objectgroup name="checkpoints">
+ <object x="32" y="100" width="20" height="16">
+  <properties>
+   <property name="index" value="0" type="int"/>
+   <property name="direction" value="S"/>
+  </properties>
+ </object>
+</objectgroup>
+</map>'''
+)
+
+
+class TestCheckpointParsing(unittest.TestCase):
+
+    def _convert(self, tmx_text):
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(tmx_text)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                return f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_checkpoint_array_emitted(self):
+        result = self._convert(CHECKPOINT_TMX)
+        self.assertIn('CheckpointDef', result)
+        self.assertIn('CHECKPOINT_DIR_S', result)
+        self.assertIn('checkpoint_count = 1', result)
+
+    def test_zero_checkpoints_backwards_compat(self):
+        result = self._convert(MINIMAL_TMX)   # no checkpoints layer
+        self.assertIn('checkpoint_count = 0', result)
+        self.assertIn('CheckpointDef', result)
+
+
 if __name__ == '__main__':
     unittest.main()

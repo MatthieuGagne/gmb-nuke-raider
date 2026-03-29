@@ -116,3 +116,11 @@ const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {
     /* row 98 */ 0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,
     /* row 99 */ 0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,
 };
+
+#include "checkpoint.h"
+
+BANKREF(track_checkpoints)
+const CheckpointDef track_checkpoints[1] = {
+    { 0, 0, 0, 0, 0, 0 },
+};
+const uint8_t track_checkpoint_count = 0;
