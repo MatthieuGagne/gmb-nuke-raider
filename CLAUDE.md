@@ -106,6 +106,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 - **`build`** — Build verification gate: compile the ROM and confirm no errors.
+- **`compare-prs`** — Parallel PR build comparison for regression debugging. Builds the current branch + historical PRs in isolated worktrees simultaneously, presents a summary table, and opens ROMs in Emulicious for side-by-side comparison. Referenced by `/debug` for "worked in PR X, broken now" hypotheses.
 - **`bank-pre-write`** — Documents the manifest/pragma/SET_BANK checks. **Now fires automatically via PreToolUse hook** on every Write/Edit to `src/*.c`/`.h` — no manual invocation needed. Keep as fallback reference.
 - **`bank-post-build`** — Documents the post-build bank validation. **Now fires automatically via PostToolUse hook** after every non-clean `make` — no manual invocation needed. Keep as fallback reference.
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
