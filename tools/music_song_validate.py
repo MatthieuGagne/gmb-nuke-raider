@@ -37,39 +37,43 @@ def validate(file_path):
             f"(hUGETracker exports use 255; adapted files use the assigned bank number)"
         )
 
-    # Check 2: BANKREF(name)
+    # Check 2: BANKREF(varname) must be present — extract varname
     bankref_match = re.search(r'\bBANKREF\((\w+)\)', content)
     if not bankref_match:
-        errors.append("ERROR: missing 'BANKREF(name)' — add 'BANKREF(your_song_name)' to the top")
-        return errors
+        errors.append(
+            f"ERROR: {file_path} missing BANKREF(varname) — "
+            f"add 'BANKREF(your_song_name)' after the #pragma bank line"
+        )
+        return errors  # can't check name consistency without varname
 
-    bankref_name = bankref_match.group(1)
+    varname = bankref_match.group(1)
 
-    # Check 3: const hUGESong_t name matches BANKREF name
+    # Check 3: const hUGESong_t varname must appear and match BANKREF name
     song_match = re.search(r'\bconst\s+hUGESong_t\s+(\w+)\s*=', content)
     if not song_match:
-        errors.append("ERROR: no 'const hUGESong_t <name> = ...' declaration found")
-    else:
-        song_name = song_match.group(1)
-        if song_name != bankref_name:
-            errors.append(
-                f"ERROR: variable name mismatch — BANKREF uses '{bankref_name}' "
-                f"but hUGESong_t variable is '{song_name}' — they must match"
-            )
+        errors.append(
+            f"ERROR: {file_path} missing 'const hUGESong_t {varname} = ...' definition"
+        )
+    elif song_match.group(1) != varname:
+        errors.append(
+            f"ERROR: {file_path} name mismatch — "
+            f"BANKREF uses '{varname}' but hUGESong_t is named '{song_match.group(1)}'"
+        )
 
     return errors
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: music_song_validate.py <song.c>", file=sys.stderr)
+    if len(sys.argv) < 2:
+        print("Usage: music_song_validate.py <song.c> [repo_root]", file=sys.stderr)
         sys.exit(1)
-    errors = validate(sys.argv[1])
+    file_path = sys.argv[1]
+    errors = validate(file_path)
     if errors:
         for e in errors:
             print(e, file=sys.stderr)
         sys.exit(1)
-    print(f"OK: {sys.argv[1]} — validated successfully")
+    print(f"music_song_validate: {file_path} OK")
     sys.exit(0)
 
 
