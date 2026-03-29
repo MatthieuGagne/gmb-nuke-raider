@@ -106,6 +106,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 - **`build`** — Build verification gate: compile the ROM and confirm no errors.
+- **`compare-prs`** — Parallel PR build comparison for regression debugging. Builds the current branch + historical PRs in isolated worktrees simultaneously, presents a summary table, and opens ROMs in Emulicious for side-by-side comparison. Referenced by `/debug` for "worked in PR X, broken now" hypotheses.
 - **`bank-pre-write`** — Documents the manifest/pragma/SET_BANK checks. **Now fires automatically via PreToolUse hook** on every Write/Edit to `src/*.c`/`.h` — no manual invocation needed. Keep as fallback reference.
 - **`bank-post-build`** — Documents the post-build bank validation. **Now fires automatically via PostToolUse hook** after every non-clean `make` — no manual invocation needed. Keep as fallback reference.
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
@@ -116,6 +117,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
 
 - **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
+- **`debug`** — Shadows superpowers:systematic-debugging; adds hypothesis-queue-first workflow (user approves queue before any code touch), mid-session interrupt mode, GBC instrumentation via `emulicious-debug`, `/compare-prs` reference for regression hypotheses, and 3-strikes halt rule (post findings to GitHub issue and stop).
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
 - **`brainstorming`** — Shadows superpowers:brainstorming; redirects step 5 from local file to `/prd` GitHub issue; adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
 - **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
