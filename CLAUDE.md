@@ -97,14 +97,14 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`gb-memory-validator`** — Documents WRAM/VRAM/OAM budget checks. **Now fires automatically** after every non-clean `make` via PostToolUse hook (`post_build_hook.py` runs `make memory-check`).
 - **`map-builder`** — End-to-end map creation: Tiled layout, TMX conversion pipeline, wiring generated C files into the game.
 - **`sprite-builder`** — End-to-end sprite creation: Aseprite source, PNG export, `png_to_tiles`, OAM slots, tile data loading, in-game rendering.
+- **`map-expert`** — Map pipeline reference: Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware. Use when creating or modifying maps. **Update this agent in the same PR** whenever the pipeline changes.
+- **`sprite-expert`** — Sprite pipeline reference: Aseprite authoring, `png_to_tiles.py`, sprite pool, OAM API, CGB palette for sprites, coordinate system. Use when creating or modifying sprites. **Update this agent in the same PR** whenever the sprite system changes.
+- **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
+- **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 
 ### Skills (in `.claude/skills/`, invoked with the Skill tool)
 
-- **`map-expert`** — Map pipeline reference: Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware. Use when creating or modifying maps. **Update this skill in the same PR** whenever the pipeline changes.
-- **`sprite-expert`** — Sprite pipeline reference: Aseprite authoring, `png_to_tiles.py`, sprite pool, OAM API, CGB palette for sprites, coordinate system. Use when creating or modifying sprites. **Update this skill in the same PR** whenever the sprite system changes.
 - **`aseprite`** — Aseprite CLI reference: all `--batch` flags, sprite sheet export, layer/tag filtering, color mode conversion, scripting. **ALWAYS invoke before running any `aseprite` command.**
-- **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
-- **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 - **`build`** — Build verification gate: compile the ROM and confirm no errors.
 - **`compare-prs`** — Parallel PR build comparison for regression debugging. Builds the current branch + historical PRs in isolated worktrees simultaneously, presents a summary table, and opens ROMs in Emulicious for side-by-side comparison. Referenced by `/debug` for "worked in PR X, broken now" hypotheses.
 - **`bank-pre-write`** — Documents the manifest/pragma/SET_BANK checks. **Now fires automatically via PreToolUse hook** on every Write/Edit to `src/*.c`/`.h` — no manual invocation needed. Keep as fallback reference.
@@ -117,9 +117,9 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
 
 - **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
-- **`debug`** — Shadows superpowers:systematic-debugging; adds hypothesis-queue-first workflow (user approves queue before any code touch), mid-session interrupt mode, GBC instrumentation via `emulicious-debug`, `/compare-prs` reference for regression hypotheses, and 3-strikes halt rule (post findings to GitHub issue and stop).
+- **`debug`** — Shadows superpowers:systematic-debugging; adds hypothesis-queue-first workflow (user approves queue before any code touch), mid-session interrupt mode, expert routing table (dispatches to `emulicious-debug`, `sprite-expert`, `map-expert`, `music-expert`, `gb-c-optimizer`, or `gbdk-expert` agents based on hypothesis type), `/compare-prs` reference for regression hypotheses, and 3-strikes halt rule (post findings to GitHub issue and stop).
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
-- **`brainstorming`** — Shadows superpowers:brainstorming; redirects step 5 from local file to `/prd` GitHub issue; adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
+- **`brainstorming`** — Shadows superpowers:brainstorming; standalone exploration tool that ends silently after resolved/unresolved/deferred summary (no auto-invocation of /prd or writing-plans); adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
 - **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
 - **`subagent-driven-development`** — Shadows superpowers:subagent-driven-development; adds worktree hard gate at top; injects bank-pre-write + gbdk-expert into implementer dispatch instructions; adds bank-post-build + gb-memory-validator + smoketest to post-build review step.
 - **`grill-me`** — New skill (adapted from mattpocock/skills); structured interview that stress-tests a plan; covers all 7 GB constraint areas (banking, OAM, WRAM, VRAM, SoA, SDCC, testability); ends with resolved/unresolved summary.
@@ -165,7 +165,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **GB skill gates:**
 - Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` skill for API questions
 - After a successful build → `bank-post-build` + `make memory-check` fire **automatically** via PostToolUse hook; no manual invocation needed
-- When debugging any runtime issue → invoke `emulicious-debug`
+- When debugging any runtime issue → invoke `emulicious-debug` agent (Agent tool)
 
 **Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).
 Examples of safe parallelism: multiple file audits; implementing loaders for independent systems (different output files); skill/agent doc updates (different files); read-only exploration.
