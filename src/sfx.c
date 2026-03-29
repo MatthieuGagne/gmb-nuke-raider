@@ -30,14 +30,14 @@ static uint8_t sfx_channel[MAX_SFX];  /* HW channel stolen (hUGE_channel_t value
 static uint8_t sfx_timer[MAX_SFX];    /* frames remaining */
 static uint8_t sfx_type[MAX_SFX];     /* sfx_defs[] index */
 
-void sfx_init(void) {
+void sfx_init(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_SFX; i++) {
         sfx_active[i] = 0u;
     }
 }
 
-void sfx_play(uint8_t sfx_id) {
+void sfx_play(uint8_t sfx_id) BANKED {
     const sfx_def_t *def;
     uint8_t i;
     if (sfx_id >= SFX_COUNT) return;  /* bounds guard — bad caller drops silently */
@@ -62,7 +62,7 @@ void sfx_play(uint8_t sfx_id) {
     /* Pool full — drop silently (no crash, no corruption) */
 }
 
-void sfx_update(void) {
+void sfx_update(void) BANKED {
     uint8_t i;
     uint8_t j;
     uint8_t ch;
@@ -93,7 +93,7 @@ void sfx_update(void) {
 
 /* --- Test-visible helpers ------------------------------------------------- */
 
-uint8_t sfx_active_count(void) {
+uint8_t sfx_active_count(void) BANKED {
     uint8_t i;
     uint8_t n = 0u;
     for (i = 0u; i < MAX_SFX; i++) {
@@ -102,6 +102,6 @@ uint8_t sfx_active_count(void) {
     return n;
 }
 
-uint8_t sfx_def_duration(uint8_t sfx_id) {
+uint8_t sfx_def_duration(uint8_t sfx_id) BANKED {
     return sfx_defs[sfx_id].duration;
 }
