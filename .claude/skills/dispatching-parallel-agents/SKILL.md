@@ -69,6 +69,22 @@ When a plan flags tasks as parallelizable (different output files, no shared sta
 
 **Batch size limit:** Max 3 concurrent implementers. More than 3 creates coordination overhead that exceeds the parallelism benefit.
 
+## Look-Ahead Batch Rule
+
+**Before firing ANY agent** — whether executing a formal plan or doing ad-hoc multi-step work — scan the next 1–2 steps:
+
+1. Do the next steps produce different output files?
+2. Do they have no sequential data dependency (step N+1 does not need step N's output)?
+
+If both are true: **batch them in the same message.** Do not run them sequentially out of habit.
+
+This rule applies to ALL sequential multi-step work — not just tasks flagged as parallelizable in a formal plan. Ad-hoc investigations, doc edits, read-only explorations, and review dispatches all qualify.
+
+**Example:**
+- About to run spec reviewer, about to run quality reviewer → same message.
+- About to read `src/player.c`, about to read `src/enemy.c` to understand a system → single Explore agent.
+- About to update `sprite-expert/SKILL.md`, about to update `map-expert/SKILL.md` → single message with two Edit calls.
+
 ## Red Flags
 
 These thoughts mean STOP and check this skill:
@@ -80,6 +96,7 @@ These thoughts mean STOP and check this skill:
 | "I'll dispatch the quality reviewer after the spec reviewer finishes" | Fire both in one message |
 | "These two tasks write different files, I'll run them sequentially" | They're parallelizable — single message |
 | "I'll let both implementers commit to the branch at once" | Race condition — coordinate |
+| "This is ad-hoc work, not a formal plan, so I don't need to parallelize" | Look-ahead batch rule applies to ALL multi-step work |
 
 ## Integration
 
