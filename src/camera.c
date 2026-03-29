@@ -11,17 +11,12 @@ volatile uint8_t  cam_scy_shadow;
 
 /* Write one full world row into the VRAM ring buffer.
  * VRAM y slot = world_ty % 32. MAP_TILES_W=20 <= 32: no X wrapping needed.
- * track_get_raw_tile() is BANKED — the trampoline handles bank switching safely.
- * Direct access to track_map[] is forbidden here (camera.c and track_map.c may
- * be in different autobanks). */
+ * track_fill_row() is BANKED — one trampoline for 20 tiles vs 20 trampolines
+ * previously. Reduces per-row cost from ~1000-2000 cycles to ~200 cycles. */
 static void stream_row(uint8_t world_ty) {
     static uint8_t row_buf[MAP_TILES_W];
-    uint8_t tx;
     uint8_t vram_y = world_ty & 31u;
-
-    for (tx = 0u; tx < MAP_TILES_W; tx++) {
-        row_buf[tx] = track_get_raw_tile(tx, world_ty);
-    }
+    track_fill_row(world_ty, row_buf);   /* 1 BANKED call — was 20 */
     set_bkg_tiles(0u, vram_y, MAP_TILES_W, 1u, row_buf);
 }
 
