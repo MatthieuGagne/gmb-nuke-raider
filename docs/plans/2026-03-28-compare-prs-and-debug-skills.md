@@ -4,7 +4,7 @@
 
 **Goal:** Add two new skills — `/compare-prs` (parallel PR build comparison for regression debugging) and `/debug` (structured hypothesis-driven debugging that shadows `systematic-debugging`).
 
-**Architecture:** Both are doc-only changes: shell script + skill SKILL.md files + CLAUDE.md updates. No `src/` C files are touched. The `/compare-prs` skill orchestrates subagents that each run `tools/compare_prs.sh <N>` in isolated worktrees. The `/debug` skill enforces a ranked hypothesis queue with hard rules (one variable per test, 3-strikes halt) and references both `emulicious-debug` and `/compare-prs` as instrumentation tools.
+**Architecture:** Both are doc-only changes: shell script + skill SKILL.md files + CLAUDE.md updates. No `src/` C files are touched. The `/compare-prs` skill orchestrates subagents that each run `tools/compare_prs.sh <N>` in isolated worktrees. The `/debug` skill enforces a ranked hypothesis queue with hard rules (one variable per test, 3-strikes halt) and references `emulicious-debug` and `/compare-prs` as instrumentation tools.
 
 **Tech Stack:** Bash (shell script), Markdown (skill files), `git worktree`, `gh pr checkout`, `GBDK_HOME=/home/mathdaman/gbdk make`
 
