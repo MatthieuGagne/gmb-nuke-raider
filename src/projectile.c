@@ -8,6 +8,7 @@
 #include "camera.h"
 #include "track.h"
 #include "config.h"
+#include "sfx.h"  /* sfx_play is NONBANKED (bank 0) — safe to call from any bank */
 BANKREF(projectile)
 
 /* ── SoA bullet pool ───────────────────────────────────────────────────── */
@@ -60,6 +61,7 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir) BANKED {
 
             set_sprite_tile(oam, PROJ_TILE_BASE);
             proj_cooldown_tick = PROJ_FIRE_COOLDOWN;
+            sfx_play(SFX_SHOOT);  /* fire SFX exactly once per actual projectile spawn */
             return;
         }
     }
