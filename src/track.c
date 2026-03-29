@@ -77,6 +77,19 @@ uint8_t track_get_raw_tile(uint8_t tx, uint8_t ty) BANKED {
     return active_map[(uint16_t)ty * MAP_TILES_W + tx];
 }
 
+void track_fill_row(uint8_t ty, uint8_t *buf) BANKED {
+    uint8_t tx;
+    uint16_t row_base;
+    if (ty >= MAP_TILES_H) {
+        for (tx = 0u; tx < MAP_TILES_W; tx++) buf[tx] = 0u;
+        return;
+    }
+    row_base = (uint16_t)ty * MAP_TILES_W;
+    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+        buf[tx] = active_map[row_base + tx];
+    }
+}
+
 uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     uint8_t tx;
     uint8_t ty;
