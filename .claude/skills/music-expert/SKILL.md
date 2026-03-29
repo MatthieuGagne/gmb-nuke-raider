@@ -56,10 +56,9 @@ In `music_init()`, update the `SET_BANK()` and `hUGE_init()` calls:
 ```c
 current_song_bank = BANK(your_song_name);
 __critical {
-    uint8_t _saved_bank = CURRENT_BANK;
-    SET_BANK(your_song_name);
-    hUGE_init(&your_song_name);
-    RESTORE_BANK();
+    { SET_BANK(your_song_name);
+      hUGE_init(&your_song_name);
+      RESTORE_BANK(); }
 }
 ```
 
