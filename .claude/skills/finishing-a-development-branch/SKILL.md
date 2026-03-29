@@ -70,7 +70,20 @@ Only continue to Step 3 when it passes.
 **Stop. Wait for explicit confirmation.**
 
 - If issues found: work with user to fix before continuing
-- If confirmed: Continue to Step 4
+- If confirmed: Continue to Step 3.5
+
+### Step 3.5: Update Docs Before PR
+
+Before presenting options, check what changed in this branch:
+
+**If any user-visible behavior changed** (new feature, changed controls, new screen, new module):
+→ Update the **Game Modules table** in `README.md` to reflect additions or changes.
+
+**If any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed**:
+→ Update `docs/dev-workflow.md` to reflect the change. The two documents are co-authoritative —
+  they must agree.
+
+If neither applies, skip this step and continue to Step 4.
 
 ### Step 4: Present Options
 
@@ -244,6 +257,7 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - Launch emulator from main repo's `build/` (may be stale)
 - Skip bank-post-build or `make memory-check` before smoketest
 - Clean up worktree immediately after PR creation (wait for merge confirmation)
+- Skip Step 3.5 when skills, agents, or CLAUDE.md were modified
 
 **Always:**
 - Work on a feature branch
@@ -254,6 +268,7 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - Launch Emulicious from worktree directory
 - Present exactly 3 options
 - Get typed confirmation for Option 3
+- Update `docs/dev-workflow.md` in the same PR as any skill/agent/CLAUDE.md change
 - After PR creation (Option 1): tell user the worktree path and ask them to confirm when merged
 - After merge confirmation: run git worktree remove → --force fallback → git worktree prune
 
