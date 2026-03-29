@@ -106,6 +106,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 - **`build`** — Build verification gate: compile the ROM and confirm no errors.
+- **`compare-prs`** — Parallel PR build comparison for regression debugging. Builds the current branch + historical PRs in isolated worktrees simultaneously, presents a summary table, and opens ROMs in Emulicious for side-by-side comparison. Referenced by `/debug` for "worked in PR X, broken now" hypotheses.
 - **`bank-pre-write`** — Documents the manifest/pragma/SET_BANK checks. **Now fires automatically via PreToolUse hook** on every Write/Edit to `src/*.c`/`.h` — no manual invocation needed. Keep as fallback reference.
 - **`bank-post-build`** — Documents the post-build bank validation. **Now fires automatically via PostToolUse hook** after every non-clean `make` — no manual invocation needed. Keep as fallback reference.
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
@@ -116,11 +117,27 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
 
 - **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
+- **`debug`** — Shadows superpowers:systematic-debugging; adds hypothesis-queue-first workflow (user approves queue before any code touch), mid-session interrupt mode, GBC instrumentation via `emulicious-debug`, `/compare-prs` reference for regression hypotheses, and 3-strikes halt rule (post findings to GitHub issue and stop).
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
 - **`brainstorming`** — Shadows superpowers:brainstorming; redirects step 5 from local file to `/prd` GitHub issue; adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
 - **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
 - **`subagent-driven-development`** — Shadows superpowers:subagent-driven-development; adds worktree hard gate at top; injects bank-pre-write + gbdk-expert into implementer dispatch instructions; adds bank-post-build + gb-memory-validator + smoketest to post-build review step.
 - **`grill-me`** — New skill (adapted from mattpocock/skills); structured interview that stress-tests a plan; covers all 7 GB constraint areas (banking, OAM, WRAM, VRAM, SoA, SDCC, testability); ends with resolved/unresolved summary.
+
+## Debugging Rules
+
+- **Shifted crash ≠ known issue**: If a fix moves a crash from time X to time Y (e.g. 24s → 33s), do NOT treat it as the same known bug. Investigate whether it is a different root cause before closing the loop.
+- **One variable per test**: Never make two changes between test runs. Instrument, build, observe, conclude — one hypothesis at a time.
+- **Worktree CWD**: Before every `make` or emulator launch, verify the current directory is the correct worktree directory (`pwd`). After any worktree cleanup, `cd` to a valid directory before running further commands.
+- **PR navigation**: When the user says "go back again", "next one", or any relative reference during sequential PR testing, state the exact PR number out loud and confirm before doing the checkout.
+
+## PRD vs Implementation Plan
+
+When the user asks for a brainstorm or PRD: stay at the **requirements and design level only**. Do not write implementation details, code snippets, or file-level task breakdowns. If the user wants an implementation plan they will explicitly ask for one.
+
+## Build & Test Rules
+
+- Always use a clean build (`make clean && GBDK_HOME=/home/mathdaman/gbdk make`) when testing historical PRs or comparing versions. Never assume a prior build is still valid.
 
 ## Workflow
 
