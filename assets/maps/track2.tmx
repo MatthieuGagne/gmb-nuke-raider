@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal" renderorder="right-down"
      width="20" height="100" tilewidth="8" tileheight="8"
-     nextlayerid="4" nextobjectid="3">
+     nextlayerid="5" nextobjectid="5">
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="20" height="100">
   <data encoding="csv">
@@ -112,5 +112,19 @@
  </objectgroup>
  <objectgroup id="3" name="finish">
   <object id="2" x="0" y="48" width="160" height="16"/>
+ </objectgroup>
+ <objectgroup id="4" name="checkpoints">
+  <object id="3" x="96" y="400" width="32" height="16">
+   <properties>
+    <property name="index" value="0" type="int"/>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
+  <object id="4" x="32" y="400" width="32" height="16">
+   <properties>
+    <property name="index" value="1" type="int"/>
+    <property name="direction" value="N"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>

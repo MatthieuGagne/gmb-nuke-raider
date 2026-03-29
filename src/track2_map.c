@@ -117,6 +117,11 @@ const uint8_t track2_map[MAP_TILES_H * MAP_TILES_W] = {
     /* row 99 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
 };
 
+#include "checkpoint.h"
+
 BANKREF(track2_checkpoints)
-const CheckpointDef track2_checkpoints[0] = {};
-const uint8_t track2_checkpoint_count = 0u;
+const CheckpointDef track2_checkpoints[2] = {
+    { 96, 400, 32, 16, 0, CHECKPOINT_DIR_S },
+    { 32, 400, 32, 16, 1, CHECKPOINT_DIR_N },
+};
+const uint8_t track2_checkpoint_count = 2;

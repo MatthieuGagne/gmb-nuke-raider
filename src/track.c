@@ -47,7 +47,7 @@ void track_select(uint8_t id) BANKED {
         active_start_y   = track2_start_y;
         active_lap_count = 3u;
     }
-    /* Cross-bank copy via NONBANKED loader (bank 0 may call SWITCH_ROM) */
+    /* Cross-bank copy — delegated to NONBANKED loader (bank 0) */
     load_checkpoints(id, wram_checkpoints, &active_checkpoint_count);
 }
 

@@ -78,6 +78,31 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
         raise ValueError("'finish' objectgroup has no objects")
     finish_tile_y = int(float(finish_obj.get('y'))) // 8
 
+    # Parse optional "checkpoints" objectgroup — missing = 0 checkpoints (backwards compat).
+    checkpoints_group = next(
+        (og for og in root.findall('objectgroup')
+         if og.get('name') == 'checkpoints'),
+        None
+    )
+    checkpoint_defs = []
+    if checkpoints_group is not None:
+        dir_map = {'N': 'CHECKPOINT_DIR_N', 'S': 'CHECKPOINT_DIR_S',
+                   'E': 'CHECKPOINT_DIR_E', 'W': 'CHECKPOINT_DIR_W'}
+        for obj in checkpoints_group.findall('object'):
+            props = {}
+            props_el = obj.find('properties')
+            if props_el is not None:
+                for p in props_el.findall('property'):
+                    props[p.get('name')] = p.get('value')
+            cx = int(float(obj.get('x')))
+            cy = int(float(obj.get('y')))
+            cw = int(float(obj.get('width',  '16')))
+            ch = int(float(obj.get('height', '16')))
+            idx = int(props.get('index', '0'))
+            direction = dir_map.get(props.get('direction', 'S'), 'CHECKPOINT_DIR_S')
+            checkpoint_defs.append((idx, cx, cy, cw, ch, direction))
+        checkpoint_defs.sort(key=lambda t: t[0])
+
     with open(out_path, 'w') as f:
         f.write(f"/* GENERATED — do not edit by hand."
                 f" Source: {tmx_path} */\n")
@@ -99,7 +124,22 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
             start = row * width
             vals  = ','.join(str(v) for v in tile_ids[start:start + width])
             f.write(f"    /* row {row:2d} */ {vals},\n")
+        f.write("};\n\n")
+        f.write('#include "checkpoint.h"\n\n')
+        f.write(f"BANKREF({prefix}_checkpoints)\n")
+        # SDCC (sm83) rejects empty array initializers — emit a 1-element placeholder
+        # when there are no checkpoints so the symbol exists for BANKREF resolution.
+        # The count=0 ensures load_checkpoints() never accesses the placeholder.
+        array_size = len(checkpoint_defs) if checkpoint_defs else 1
+        f.write(f"const CheckpointDef {prefix}_checkpoints[{array_size}]"
+                f" = {{\n")
+        if checkpoint_defs:
+            for idx, cx, cy, cw, ch, direction in checkpoint_defs:
+                f.write(f"    {{ {cx}, {cy}, {cw}, {ch}, {idx}, {direction} }},\n")
+        else:
+            f.write(f"    {{ 0, 0, 0, 0, 0, 0 }},\n")
         f.write("};\n")
+        f.write(f"const uint8_t {prefix}_checkpoint_count = {len(checkpoint_defs)};\n")
 
 
 if __name__ == '__main__':
