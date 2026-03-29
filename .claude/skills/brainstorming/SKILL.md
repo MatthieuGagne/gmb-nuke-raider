@@ -34,9 +34,16 @@ You MUST create a task for each of these items and complete them in order:
    - **Unresolved:** open questions that must be answered before implementation begins
    - **Deferred:** items deliberately set aside (not blocking now)
    If Unresolved is non-empty, stop and resolve those questions before continuing.
-7. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
+7. **PRD Content Gate (HARD STOP)** — Scan your full output from this session before calling `/prd`.
+   The PRD must contain **only** requirements and design decisions. Strip anything that qualifies as:
+   - Implementation details (function signatures, variable names, struct/array definitions)
+   - Code snippets (any fenced code block in C, Python, or pseudocode)
+   - File-level task breakdowns (e.g., "Step 1: write `src/foo.c`", numbered implementation steps)
+   If any of the above are found, **remove them now** before proceeding.
+   Only continue to step 8 after this scan is clean.
+8. **Create GitHub issue** — use `/prd` skill to create a GitHub issue with the design as a PRD.
    Do NOT save a local design doc file. The GitHub issue IS the design doc.
-8. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
+9. **Transition to implementation** — invoke the `writing-plans` skill (`Skill` tool, `skill: "writing-plans"`) to create the implementation plan
 
 ## GB Constraint Checklist
 
@@ -76,7 +83,12 @@ digraph brainstorming {
     "Unresolved items?" [shape=diamond];
     "Resolved/Unresolved/Deferred summary" -> "Unresolved items?";
     "Unresolved items?" -> "Ask clarifying questions" [label="yes, resolve first"];
-    "Unresolved items?" -> "Create GitHub issue with /prd" [label="no"];
+    "Unresolved items?" -> "PRD Content Gate" [label="no"];
+    "PRD Content Gate" [shape=box label="PRD Content Gate\n(strip impl details/code/task breakdowns)"];
+    "Implementation details found?" [shape=diamond];
+    "PRD Content Gate" -> "Implementation details found?";
+    "Implementation details found?" -> "PRD Content Gate" [label="yes, strip and re-scan"];
+    "Implementation details found?" -> "Create GitHub issue with /prd" [label="no, clean"];
     "Create GitHub issue with /prd" -> "Invoke writing-plans skill";
 }
 ```
