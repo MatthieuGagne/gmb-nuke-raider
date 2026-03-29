@@ -256,6 +256,20 @@ git commit -m "feat: add/update X"
 
 **Note for plan authors:** The `executing-plans` skill includes a final "Lessons Learned" step (Step 7) that runs after the smoketest passes. The implementer will ask the user whether any lessons should be captured as documentation updates (CLAUDE.md, memory, skills, or agents). No action is needed in the plan itself — this gate runs automatically at execution time.
 
+## Plan Self-Review Checklist (HARD STOP before presenting to user)
+
+Before offering the execution handoff, run this checklist. Fix any failures before proceeding.
+
+| # | Check | Pass criteria |
+|---|-------|---------------|
+| 1 | **No hardcoded values** | Every numeric constant, tile index, capacity, or coordinate is sourced from `config.h`, a Tiled export, or an explicit named constant — never a magic number |
+| 2 | **All tasks have explicit test criteria** | Every task states exactly how to verify it passes (command + expected output, or visual check description) |
+| 3 | **Parallel annotations complete** | Every task has `**Depends on:**` and `**Parallelizable with:**` filled in (not left as "none" without consideration) |
+| 4 | **Parallel Execution Groups tables present** | Every batch that precedes a Smoketest Checkpoint has a `#### Parallel Execution Groups` table |
+| 5 | **No implementation details leaked from brainstorming** | Plan contains file paths and task steps, not design narrative or requirement rationale (those belong in the GitHub issue) |
+
+If any check fails: fix the plan now, then re-run the checklist from the top.
+
 ## Execution Handoff
 
 After saving the plan, offer execution choice:
