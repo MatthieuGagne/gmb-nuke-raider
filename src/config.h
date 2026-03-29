@@ -71,4 +71,12 @@
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
 
+/* Debug ring buffer — headless PyBoy diagnostic (DEBUG=1 only).
+ * Fixed WRAM addresses in the last 66 bytes — well above static data (~0xC000-0xC242).
+ * Must stay in sync with DEBUG_LOG_ADDR / DEBUG_TICK_ADDR in tests/integration/helpers.py. */
+#define DEBUG_LOG_ADDR    0xDF80U  /* WRAM: ring buffer content (64 bytes) */
+#define DEBUG_LOG_SIZE    64U
+#define DEBUG_LOG_IDX     0xDFC0U  /* WRAM: ring buffer write index (1 byte) */
+#define DEBUG_TICK_ADDR   0xDFC1U  /* WRAM: music_tick() call counter (1 byte, wraps at 256) */
+
 #endif /* CONFIG_H */
