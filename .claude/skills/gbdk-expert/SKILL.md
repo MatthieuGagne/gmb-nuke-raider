@@ -7,7 +7,7 @@ description: "TRIGGER when: writing or editing any src/*.c or src/*.h file, usin
 
 ## Memory
 At the start of any GBDK-related task, read:
-`~/.claude/projects/-home-mathdaman-code-gmb-junk-runner/memory/gbdk-expert.md`
+`~/.claude/projects/-home-mathdaman-code-gmb-nuke-raider/memory/gbdk-expert.md`
 
 After completing the task, append any new bugs, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
 

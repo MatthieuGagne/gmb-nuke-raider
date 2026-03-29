@@ -94,7 +94,6 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, compilation errors. Banking questions → bank-pre-write/bank-post-build skills.
 - **`gb-c-optimizer`** — C code review for GBC performance/ROM size, anti-pattern detection, SDCC optimization.
-- **`gb-memory-validator`** — Thin wrapper (deprecated). Use `make memory-check` / the `gb-memory-validator` skill instead. Checks WRAM/VRAM/OAM via `tools/memory_check.py`.
 - **`map-builder`** — End-to-end map creation: Tiled layout, TMX conversion pipeline, wiring generated C files into the game.
 - **`sprite-builder`** — End-to-end sprite creation: Aseprite source, PNG export, `png_to_tiles`, OAM slots, tile data loading, in-game rendering.
 
@@ -143,9 +142,12 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates (mandatory):**
-- Before writing any `src/*.c` or `src/*.h` file → invoke `bank-pre-write` skill, then `gbdk-expert`
-- After a successful build, before smoketest → invoke `bank-post-build` skill, then `make memory-check` (gb-memory-validator skill)
-- When debugging any runtime issue → invoke `emulicious-debug`
+
+| When | Invoke |
+|------|--------|
+| Before writing any `src/*.c` or `src/*.h` | `bank-pre-write` skill, then `gbdk-expert` agent |
+| After successful build, before smoketest | `bank-post-build` skill, then `make memory-check` |
+| Any runtime crash, visual glitch, or unexpected behavior | `emulicious-debug` skill |
 
 **Parallel agents policy:** ALWAYS use parallel agents (multiple concurrent Agent tool calls in a single message) when tasks are independent and non-conflicting. Examples of safe parallelism: implementing separate files, running reviews on different files, dispatching spec + quality reviewers simultaneously. Do NOT parallelize when tasks write the same file, depend on each other's output, or share git state (e.g., multiple implementers committing to the same branch simultaneously).
 Examples of safe parallelism: multiple file audits; implementing loaders for independent systems (different output files); skill/agent doc updates (different files); read-only exploration.

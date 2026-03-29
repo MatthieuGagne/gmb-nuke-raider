@@ -125,7 +125,7 @@ Wrap tile data load similarly if `track_tile_data` is in a banked file.
 
 ```sh
 GBDK_HOME=/home/mathdaman/gbdk make
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
 ```
 
 Check:

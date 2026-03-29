@@ -60,7 +60,7 @@ python3 tools/png_to_tiles.py --bank <N> <tileset.png> <out.c> <array_name>
 ```
 
 **`--bank` is required.** Choose `N` based on the current ROM layout:
-- Check `build/junk-runner.map` after a build — find the `_CODE_N` section that has headroom for the asset data.
+- Check `build/nuke-raider.map` after a build — find the `_CODE_N` section that has headroom for the asset data.
 - Use `255` to let the autobanker place the asset; use an explicit bank number (e.g. `2`) to isolate large asset data that would overflow the autobank pool.
 - The Makefile rule for this asset must pass the same `--bank N` so regeneration never silently changes the bank assignment.
 
