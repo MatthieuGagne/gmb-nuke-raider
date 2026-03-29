@@ -81,7 +81,9 @@ digraph process {
     "More tasks?" -> "Dispatch implementer subagent" [label="yes"];
     "More tasks?" -> "Dispatch final code reviewer" [label="no"];
     "Dispatch final code reviewer" -> "bank-post-build + gb-memory-validator + smoketest";
-    "bank-post-build + gb-memory-validator + smoketest" -> "Use superpowers:finishing-a-development-branch";
+    "bank-post-build + gb-memory-validator + smoketest" -> "Pre-PR Gate";
+    "Pre-PR Gate" [shape=box label="Pre-PR Gate\n(make test + clean build +\nno removed includes + no hardcoded values)"];
+    "Pre-PR Gate" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
 
@@ -156,7 +158,20 @@ After all tasks are complete and the final code reviewer approves, run the post-
    ```
    Tell the user it's running. Wait for their confirmation before proceeding.
 
-Only after smoketest confirmed: use `superpowers:finishing-a-development-branch`.
+Only after smoketest confirmed, run the **Pre-PR Gate** before calling `finishing-a-development-branch`.
+
+## Pre-PR Gate (HARD STOP)
+
+Run after smoketest is confirmed and before pushing or creating a PR. All checks must pass.
+
+| # | Check | How to verify | On failure |
+|---|-------|---------------|------------|
+| 1 | **Full test suite passes** | `make test` → all tests PASS (no early-exit failures) | Fix failing test, re-run from scratch |
+| 2 | **Clean build succeeds** | `make clean && GBDK_HOME=/home/mathdaman/gbdk make` → zero errors | Fix compiler error before continuing |
+| 3 | **No header includes silently removed** | `git diff master...HEAD -- src/*.h` — every `#include` removal must be intentional and traceable to a task requirement | Restore removed include or justify removal in a commit comment |
+| 4 | **No hardcoded values introduced** | `git diff master...HEAD -- src/*.c src/*.h` — no magic numeric literals that should be constants in `config.h` | Replace with named constant, commit |
+
+If any check fails: fix and re-run from step 1 of this gate. Only proceed to `finishing-a-development-branch` after all four pass.
 
 ## Final Code Reviewer Dispatch
 
