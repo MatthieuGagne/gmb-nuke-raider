@@ -71,13 +71,31 @@ For each hypothesis in the queue:
 - Wait for implicit or explicit user go-ahead
 
 **Then:**
-1. Add instrumentation (use `emulicious-debug` skill for GBC runtime inspection)
+1. Add instrumentation (use `emulicious-debug` agent for GBC runtime inspection)
 2. Build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
 3. Run: launch ROM in Emulicious, observe output/behavior
 4. Conclude: one of:
    - **Confirmed** — hypothesis is the root cause, proceed to fix
    - **Ruled out** — add to ruled-out list, advance queue
    - **Inconclusive** — refine instrumentation, count as attempt
+
+---
+
+## Expert Routing
+
+When a hypothesis is **Confirmed** (or when instrumentation requires domain expertise), classify the hypothesis type and dispatch to the appropriate expert agent(s) using the Agent tool. Fire parallel agents when the routing table lists two agents.
+
+| Hypothesis type | Agent(s) to dispatch | Notes |
+|----------------|---------------------|-------|
+| Sprite / OAM / palette issue | `sprite-expert` agent + `emulicious-debug` agent | Parallel |
+| Map / tileset / BG rendering | `map-expert` agent + `emulicious-debug` agent | Parallel |
+| Music / audio | `music-expert` agent + `emulicious-debug` agent | Parallel |
+| Performance / ROM size / bank overrun | `gb-c-optimizer` agent + `bank-post-build` skill | Parallel |
+| Regression ("worked in PR X, broken now") | `compare-prs` skill | Sequential |
+| Runtime memory / registers / VRAM | `emulicious-debug` agent | Single |
+| Compile error / GBDK API misuse | `gbdk-expert` agent | Single |
+
+**Conflicting findings:** When parallel agents return contradictory conclusions, surface both findings to the user verbatim and ask for direction. Do NOT attempt to reconcile conflicting findings autonomously.
 
 ---
 
@@ -104,7 +122,7 @@ When triggered:
 
 ## Instrumentation Tools
 
-- **`emulicious-debug`** skill — step-through debugger, EMU_printf, memory/tile/sprite inspection, tracer, profiler
+- **`emulicious-debug`** agent — step-through debugger, EMU_printf, memory/tile/sprite inspection, tracer, profiler
 - **`/compare-prs <N>`** skill — for "worked in PR X, broken now" hypotheses: builds both, lets you compare ROMs and diffs side-by-side
 
 ---

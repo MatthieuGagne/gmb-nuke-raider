@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code. Starting from a raw idea with no prior design session? Invoke the brainstorming skill first — writing-plans requires a completed, approved design as input.
+description: Use when you have a spec or requirements for a multi-step task, before touching code. Can be used with or without a prior brainstorming session — runs an inline clarify+grill pass if no approved design exists.
 ---
 
 # Writing Plans
@@ -12,6 +12,31 @@ Write comprehensive implementation plans assuming the engineer has zero context 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+
+## Design Check
+
+Before proceeding, check whether this conversation contains an approved design or a GitHub issue with a PRD.
+
+> **Is there an approved design or PRD issue in this conversation?**
+> - **Yes** → proceed to write the plan
+> - **No** → run the inline clarify+grill block below first
+
+### Inline Clarify+Grill (when no prior design exists)
+
+Ask the user these questions **one at a time** — do not ask multiple at once:
+
+1. "What is the goal? (one sentence)"
+2. "What are the key requirements? (list the must-haves)"
+3. "What are the acceptance criteria?"
+4. "What is explicitly out of scope?"
+5. "Are there any GB hardware constraints? (OAM, WRAM, VRAM, banking, SDCC)"
+
+After collecting answers, do a **grill-me pass** inline — ask 2-3 probing questions one at a time to surface assumptions, edge cases, or risks. Examples:
+- "What happens when [edge case]?"
+- "Is [constraint] a hard requirement or a nice-to-have?"
+- "Have you considered [alternative approach]?"
+
+Once all questions are resolved, proceed to write the plan.
 
 **First action before anything else:** Pull and merge latest master into the current worktree branch:
 ```bash
@@ -272,7 +297,13 @@ If any check fails: fix the plan now, then re-run the checklist from the top.
 
 ## Execution Handoff
 
-After saving the plan, offer execution choice:
+After saving the plan, **present the full plan to the user**.
+
+<HARD-GATE>
+Do NOT offer execution options until the user gives an explicit affirmative approval (e.g., "yes", "looks good", "let's go", "proceed", or equivalent). Do not interpret silence or continued conversation as approval.
+</HARD-GATE>
+
+Only after explicit affirmative, offer execution choice:
 
 **"Plan complete and saved to `docs/plans/<filename>.md`. Two execution options:**
 
