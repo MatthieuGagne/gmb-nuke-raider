@@ -17,9 +17,14 @@ void test_debug_addresses_in_wram(void) {
     TEST_ASSERT_TRUE(DEBUG_TICK_ADDR <= 0xDFFFU);
 }
 
+void test_max_sfx_defined(void) {
+    TEST_ASSERT_EQUAL_UINT8(2u, MAX_SFX);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_debug_log_does_not_overlap_tick);
     RUN_TEST(test_debug_addresses_in_wram);
+    RUN_TEST(test_max_sfx_defined);
     return UNITY_END();
 }

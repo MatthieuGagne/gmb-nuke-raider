@@ -7,6 +7,7 @@
 #include "state_manager.h"
 #include "state_title.h"
 #include "music.h"
+#include "sfx.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -44,6 +45,7 @@ void main(void) {
     init_palettes();
     player_init();
     music_init();
+    sfx_init();
     add_VBL(vbl_isr);
     set_interrupts(VBL_IFLAG);
 
@@ -56,6 +58,7 @@ void main(void) {
         while (!frame_ready);
         frame_ready = 0;
         music_tick();
+        sfx_update();
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();
     }
