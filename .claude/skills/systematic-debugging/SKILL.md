@@ -94,6 +94,7 @@ When a hypothesis is **Confirmed** (or when instrumentation requires domain expe
 | Regression ("worked in PR X, broken now") | `compare-prs` skill | Sequential |
 | Runtime memory / registers / VRAM | `emulicious-debug` agent | Single |
 | Compile error / GBDK API misuse | `gbdk-expert` agent | Single |
+| Timing / WRAM state bug, user says "use headless" | `headless-debug` skill | Single — explicit opt-in only |
 
 **Conflicting findings:** When parallel agents return contradictory conclusions, surface both findings to the user verbatim and ask for direction. Do NOT attempt to reconcile conflicting findings autonomously.
 
@@ -124,6 +125,7 @@ When triggered:
 
 - **`emulicious-debug`** agent — step-through debugger, EMU_printf, memory/tile/sprite inspection, tracer, profiler
 - **`/compare-prs <N>`** skill — for "worked in PR X, broken now" hypotheses: builds both, lets you compare ROMs and diffs side-by-side
+- **`headless-debug`** skill — autonomous PyBoy loop for timing/WRAM bugs; invoke only when user explicitly requests headless debugging
 
 ---
 
