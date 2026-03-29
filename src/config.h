@@ -20,10 +20,10 @@
 #define DIALOG_ARROW_OAM_SLOT      4u  /* OAM slot 4 — hub dialog overflow indicator */
 
 /* Player physics — these will become per-gear values when gears are added */
-#define PLAYER_ACCEL      1
-#define PLAYER_FRICTION   1
-#define PLAYER_MAX_SPEED  3
-#define PLAYER_REVERSE_MAX_SPEED  2
+#define PLAYER_ACCEL      1u
+#define PLAYER_FRICTION   1u
+#define PLAYER_MAX_SPEED  3u
+#define PLAYER_REVERSE_MAX_SPEED  2u
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
