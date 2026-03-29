@@ -269,7 +269,11 @@
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestConfigHelpers -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestGenerateHubC -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v)",
-      "Bash(PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v)"
+      "Bash(PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check.TestCheckFile -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check -v 2>&1)",
+      "Bash(jq -e '.hooks.PreToolUse[] | select\\(.matcher == \"\"Write|Edit\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)",
+      "Bash(jq -e '.hooks.PostToolUse[] | select\\(.matcher == \"\"Bash\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)"
     ]
   },
   "hooks": {
