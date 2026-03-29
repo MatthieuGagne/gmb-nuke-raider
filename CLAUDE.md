@@ -117,6 +117,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 These live in `.claude/skills/` and take precedence over the global superpowers versions when invoked by name:
 
 - **`writing-plans`** — Shadows superpowers:writing-plans; adds GB C-file task template with bank-pre-write → gbdk-expert → write → build → bank-post-build hard gate sequence, plus a non-C task template.
+- **`debug`** — Shadows superpowers:systematic-debugging; adds hypothesis-queue-first workflow (user approves queue before any code touch), mid-session interrupt mode, GBC instrumentation via `emulicious-debug`, `/compare-prs` reference for regression hypotheses, and 3-strikes halt rule (post findings to GitHub issue and stop).
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
 - **`brainstorming`** — Shadows superpowers:brainstorming; redirects step 5 from local file to `/prd` GitHub issue; adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
 - **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
