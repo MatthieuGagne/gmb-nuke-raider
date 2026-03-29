@@ -19,6 +19,14 @@ Use this skill when you need to autonomously reproduce a runtime bug, observe st
 - Debug ROM built: `make build-debug` (compiles with `-DDEBUG`)
 - `tests/integration/helpers.py` exists (see GameSession API)
 
+**Before writing or extending any PyBoy script**, invoke the `pyboy` skill for the full raw API reference (constructor flags, memory access, input, screen, hooks, state management):
+
+```
+Skill tool → skill: "pyboy"
+```
+
+The `GameSession` wrapper below abstracts the most common operations. When you need something the wrapper doesn't expose (hooks, save/load state, tilemap, game wrappers), the `pyboy` skill has the raw API.
+
 ## The 5-Step Loop
 
 ### Step 1 — Reproduce
