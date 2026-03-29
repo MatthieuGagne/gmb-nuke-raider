@@ -5,9 +5,16 @@
 
 set -euo pipefail
 
+if [ -z "${1:-}" ]; then
+  echo "Usage: compare_prs.sh <PR_NUMBER>" >&2
+  exit 1
+fi
+
 PR="$1"
 WORKTREE_DIR="/tmp/pr-compare-${PR}"
 REPO_ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
+
+trap 'git -C "$REPO_ROOT" worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true' EXIT
 
 # Clean up any stale worktree for this PR
 if [ -d "$WORKTREE_DIR" ]; then
@@ -16,13 +23,12 @@ if [ -d "$WORKTREE_DIR" ]; then
 fi
 
 # Create worktree and checkout PR branch
-git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" HEAD 2>/dev/null
+git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" HEAD
 cd "$WORKTREE_DIR"
 
 # Fetch and checkout the PR branch into the worktree
 gh pr checkout "$PR" --repo MatthieuGagne/gmb-nuke-raider 2>/dev/null || {
   echo "ERROR: Could not checkout PR #${PR}" >&2
-  git -C "$REPO_ROOT" worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
   exit 1
 }
 
@@ -35,6 +41,7 @@ fi
 
 # Clean build
 if make clean && GBDK_HOME=/home/mathdaman/gbdk make; then
+  trap - EXIT
   echo "ROM:${WORKTREE_DIR}/build/nuke-raider.gb"
   exit 0
 else
