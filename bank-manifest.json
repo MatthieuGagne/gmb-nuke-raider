@@ -3,6 +3,7 @@
   "src/dialog.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog_arrow_sprite.c":   {"bank": 255, "reason": "autobank"},
   "src/dialog_border_tiles.c":   {"bank": 255, "reason": "autobank — no longer needs pinning after state_manager moved to bank 0"},
+  "src/damage.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog_data.c":           {"bank": 255, "reason": "autobank"},
   "src/hub_data.c":              {"bank": 0,   "reason": "bank-0 data, always mapped — no #pragma bank"},
   "src/loader.c":                {"bank": 0,   "reason": "NONBANKED VRAM loaders — only bank-0 code may call SWITCH_ROM"},
@@ -21,9 +22,14 @@
   "src/state_hub.c":             {"bank": 0,   "reason": "calls SET_BANK — must be HOME bank; no #pragma bank"},
   "src/state_manager.c":         {"bank": 0,   "reason": "state dispatch uses invoke(); must call SWITCH_ROM from bank 0"},
   "src/state_overmap.c":         {"bank": 0,   "reason": "calls SET_BANK — must be HOME bank; no #pragma bank"},
+  "src/state_game_over.c":       {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_playing.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_title.c":           {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
+  "src/lap.c":                   {"bank": 255, "reason": "autobank"},
   "src/track.c":                 {"bank": 255, "reason": "autobank"},
   "src/track_map.c":             {"bank": 255, "reason": "autobank"},
-  "src/track_tiles.c":           {"bank": 255, "reason": "autobank"}
+  "src/track2_map.c":            {"bank": 255, "reason": "autobank — generated from track2.tmx; independently autobanked from track_map.c"},
+  "src/track_tiles.c":           {"bank": 255, "reason": "autobank"},
+  "src/projectile.c":            {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
+  "src/bullet_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"}
 }

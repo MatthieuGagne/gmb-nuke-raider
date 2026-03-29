@@ -87,12 +87,18 @@ void test_tile_type_from_index_oil(void) {
 void test_tile_type_from_index_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
 }
+void test_tile_type_from_index_repair(void) {
+    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type_from_index(7));
+}
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
 }
-void test_finish_tile_is_road(void) {
-    /* tile index 6 (finish visual) must be classified as road — passable */
-    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(6));
+void test_finish_tile_is_finish(void) {
+    /* tile index 6 must now be TILE_FINISH (passable, triggers lap detection) */
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6));
+}
+void test_track_tile_data_count_is_8(void) {
+    TEST_ASSERT_EQUAL_UINT8(8u, track_tile_data_count);
 }
 
 /* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
@@ -121,11 +127,36 @@ void test_track_tile_type_boost(void) {
     /* tile (11,30) = tile_id 5 — placed in Task 4 */
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type(88, 240));
 }
+void test_track_tile_type_repair(void) {
+    /* tile (12,40) = tile_id 7 — repair pad placed in Task 4 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type(96, 320));
+}
 void test_track_tile_type_oob_x_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(160, 80));
 }
 void test_track_tile_type_negative_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(-1, 80));
+}
+
+/* track_fill_row: row contents match track_get_raw_tile() for each column */
+void test_track_fill_row_matches_get_raw_tile(void) {
+    uint8_t buf[MAP_TILES_W];
+    uint8_t tx;
+    track_fill_row(10u, buf);
+    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+        TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(tx, 10u), buf[tx]);
+    }
+}
+
+/* track_fill_row: OOB ty fills buffer with zeros */
+void test_track_fill_row_oob_ty_returns_zeros(void) {
+    uint8_t buf[MAP_TILES_W];
+    uint8_t tx;
+    for (tx = 0u; tx < MAP_TILES_W; tx++) buf[tx] = 0xFFu;
+    track_fill_row(MAP_TILES_H, buf);  /* ty = 100 = MAP_TILES_H: OOB */
+    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+        TEST_ASSERT_EQUAL_UINT8(0u, buf[tx]);
+    }
 }
 
 int main(void) {
@@ -147,15 +178,20 @@ int main(void) {
     RUN_TEST(test_tile_type_from_index_sand);
     RUN_TEST(test_tile_type_from_index_oil);
     RUN_TEST(test_tile_type_from_index_boost);
+    RUN_TEST(test_tile_type_from_index_repair);
     RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
-    RUN_TEST(test_finish_tile_is_road);
+    RUN_TEST(test_finish_tile_is_finish);
     RUN_TEST(test_track_tile_type_road);
     RUN_TEST(test_track_tile_type_wall);
     RUN_TEST(test_track_tile_type_dashes_is_road);
     RUN_TEST(test_track_tile_type_sand);
     RUN_TEST(test_track_tile_type_oil);
     RUN_TEST(test_track_tile_type_boost);
+    RUN_TEST(test_track_tile_type_repair);
     RUN_TEST(test_track_tile_type_oob_x_is_wall);
     RUN_TEST(test_track_tile_type_negative_is_wall);
+    RUN_TEST(test_track_tile_data_count_is_8);
+    RUN_TEST(test_track_fill_row_matches_get_raw_tile);
+    RUN_TEST(test_track_fill_row_oob_ty_returns_zeros);
     return UNITY_END();
 }

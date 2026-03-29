@@ -5,9 +5,9 @@ description: Use when executing implementation plans with independent tasks in t
 
 # Subagent-Driven Development
 
-Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
+Execute plan by dispatching fresh subagent per task, with parallel review after each: spec compliance reviewer and code quality reviewer fired simultaneously in a single message.
 
-**Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration
+**Core principle:** Fresh subagent per task + parallel two-reviewer dispatch (spec + quality simultaneously) = high quality, fast iteration
 
 ## HARD GATE: Worktree Required
 
@@ -55,12 +55,9 @@ digraph process {
         "Implementer asks questions?" [shape=diamond];
         "Answer questions" [shape=box];
         "Implementer implements, tests, commits, self-reviews" [shape=box];
-        "Dispatch spec reviewer" [shape=box];
-        "Spec compliant?" [shape=diamond];
-        "Implementer fixes spec gaps" [shape=box];
-        "Dispatch code quality reviewer" [shape=box];
-        "Quality approved?" [shape=diamond];
-        "Implementer fixes quality issues" [shape=box];
+        "Dispatch spec + quality reviewers in parallel (single message)" [shape=box];
+        "Both approved?" [shape=diamond];
+        "Implementer fixes failing review(s)" [shape=box];
         "Mark task complete" [shape=box];
     }
 
@@ -75,22 +72,31 @@ digraph process {
     "Implementer asks questions?" -> "Answer questions" [label="yes"];
     "Answer questions" -> "Dispatch implementer subagent";
     "Implementer asks questions?" -> "Implementer implements, tests, commits, self-reviews" [label="no"];
-    "Implementer implements, tests, commits, self-reviews" -> "Dispatch spec reviewer";
-    "Dispatch spec reviewer" -> "Spec compliant?";
-    "Spec compliant?" -> "Implementer fixes spec gaps" [label="no"];
-    "Implementer fixes spec gaps" -> "Dispatch spec reviewer" [label="re-review"];
-    "Spec compliant?" -> "Dispatch code quality reviewer" [label="yes"];
-    "Dispatch code quality reviewer" -> "Quality approved?";
-    "Quality approved?" -> "Implementer fixes quality issues" [label="no"];
-    "Implementer fixes quality issues" -> "Dispatch code quality reviewer" [label="re-review"];
-    "Quality approved?" -> "Mark task complete" [label="yes"];
+    "Implementer implements, tests, commits, self-reviews" -> "Dispatch spec + quality reviewers in parallel (single message)";
+    "Dispatch spec + quality reviewers in parallel (single message)" -> "Both approved?";
+    "Both approved?" -> "Implementer fixes failing review(s)" [label="no"];
+    "Implementer fixes failing review(s)" -> "Dispatch spec + quality reviewers in parallel (single message)" [label="re-review failing"];
+    "Both approved?" -> "Mark task complete" [label="yes"];
     "Mark task complete" -> "More tasks?";
     "More tasks?" -> "Dispatch implementer subagent" [label="yes"];
     "More tasks?" -> "Dispatch final code reviewer" [label="no"];
     "Dispatch final code reviewer" -> "bank-post-build + gb-memory-validator + smoketest";
-    "bank-post-build + gb-memory-validator + smoketest" -> "Use superpowers:finishing-a-development-branch";
+    "bank-post-build + gb-memory-validator + smoketest" -> "Pre-PR Gate";
+    "Pre-PR Gate" [shape=box label="Pre-PR Gate\n(make test + clean build +\nno removed includes + no hardcoded values)"];
+    "Pre-PR Gate" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
+
+## Parallel Reviewer Dispatch (mandatory)
+
+After every implementer commit, dispatch spec-compliance reviewer AND code-quality reviewer as **two concurrent Agent calls in a single message** (see `dispatching-parallel-agents` skill).
+
+- Wait for BOTH to return before acting
+- If spec fails: implementer fixes spec gaps → re-dispatch spec reviewer alone
+- If quality fails: implementer fixes quality issues → re-dispatch quality reviewer alone
+- If both fail: implementer fixes both → re-dispatch both in a single message
+- Both must pass before marking task complete
+- **Never** run spec reviewer first and quality reviewer second in separate messages — fire them together
 
 ## Implementer Dispatch Instructions
 
@@ -110,6 +116,27 @@ When dispatching the implementer subagent, include ALL of the following in the p
    > 2. Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE) — if any budget is FAIL or ERROR, stop and fix
    >
    > Follow TDD: write failing test first, make it pass, then build.
+
+## Parallel Implementer Batches
+
+When the plan's `#### Parallel Execution Groups` table marks a group as `(parallel)`, dispatch all tasks in that group as concurrent implementer agents in a single message. The group table is the **authoritative source** — do not re-analyze file dependencies at runtime.
+
+**How to read the group table:**
+- `(parallel)` group → dispatch all tasks in the group as concurrent implementers in one message
+- `(sequential)` group → dispatch one task at a time, waiting for completion before starting the next
+- No group table in plan → fall back to per-task `**Parallelizable with:**` annotations
+- Neither table nor annotations present → treat all tasks as sequential
+
+See `dispatching-parallel-agents` skill for full rules. Summary:
+1. Dispatch 2–3 implementers in one message (each writing different files, no shared git commits)
+2. Wait for ALL to complete and commit
+3. Dispatch spec + quality reviewers for the batch in a single parallel message
+4. Any failures → targeted fix → re-review
+5. All pass → mark batch complete, continue to next batch or final review
+
+**Batch size limit:** Max 3 concurrent implementers.
+
+**Red flag:** Do NOT parallelize tasks that share an output file or commit to the same branch simultaneously.
 
 ## Post-Build Review Step
 
@@ -131,7 +158,20 @@ After all tasks are complete and the final code reviewer approves, run the post-
    ```
    Tell the user it's running. Wait for their confirmation before proceeding.
 
-Only after smoketest confirmed: use `superpowers:finishing-a-development-branch`.
+Only after smoketest confirmed, run the **Pre-PR Gate** before calling `finishing-a-development-branch`.
+
+## Pre-PR Gate (HARD STOP)
+
+Run after smoketest is confirmed and before pushing or creating a PR. All checks must pass.
+
+| # | Check | How to verify | On failure |
+|---|-------|---------------|------------|
+| 1 | **Full test suite passes** | `make test` → all tests PASS (no early-exit failures) | Fix failing test, re-run from scratch |
+| 2 | **Clean build succeeds** | `make clean && GBDK_HOME=/home/mathdaman/gbdk make` → zero errors | Fix compiler error before continuing |
+| 3 | **No header includes silently removed** | `git diff master...HEAD -- src/*.h` — every `#include` removal must be intentional and traceable to a task requirement | Restore removed include or justify removal in a commit comment |
+| 4 | **No hardcoded values introduced** | `git diff master...HEAD -- src/*.c src/*.h` — no magic numeric literals that should be constants in `config.h` | Replace with named constant, commit |
+
+If any check fails: fix and re-run from step 1 of this gate. Only proceed to `finishing-a-development-branch` after all four pass.
 
 ## Final Code Reviewer Dispatch
 
@@ -169,6 +209,20 @@ Code reviewer: ✅ Approved
 
 [Mark Task 1 complete]
 
+Task 3 + Task 4: Parallel batch (Group A in Parallel Execution Groups table)
+
+[Read group table: Tasks 3 and 4 are (parallel) — different output files]
+[Dispatch implementer for Task 3 AND implementer for Task 4 in a single message]
+
+Implementer 3: [Implements Task 3, commits sha-abc]
+Implementer 4: [Implements Task 4, commits sha-def]
+
+[Dispatch spec reviewer + code quality reviewer in parallel for the batch]
+Spec reviewer: ✅ Both tasks spec compliant
+Code reviewer: ✅ Both approved
+
+[Mark Task 3 complete, Task 4 complete]
+
 ...
 
 [After all tasks]
@@ -187,13 +241,14 @@ Final reviewer: All requirements met
 - Skip worktree gate
 - Skip reviews (spec compliance OR code quality)
 - Proceed with unfixed issues
-- Dispatch multiple implementation subagents in parallel (conflicts)
+- Dispatch multiple implementation subagents in parallel when they share an output file or will commit to the branch simultaneously (race condition) — parallelizing tasks that write different files IS allowed (see dispatching-parallel-agents)
+- Run spec and quality reviewers sequentially when they can fire in a single parallel message (always fire them together)
+- Miss dispatching-parallel-agents skill before deciding on agent dispatch strategy
 - Make subagent read plan file (provide full text instead)
 - Skip scene-setting context (subagent needs to understand where task fits)
 - Ignore subagent questions (answer before letting them proceed)
 - Accept "close enough" on spec compliance
 - Skip review loops (reviewer found issues = implementer fixes = review again)
-- Start code quality review before spec compliance is ✅
 - Move to next task while either review has open issues
 - Skip bank-pre-write or gbdk-expert before any C write
 - Skip bank-post-build or gb-memory-validator in post-build review
@@ -206,6 +261,7 @@ Final reviewer: All requirements met
 - **superpowers:writing-plans** — creates the plan this skill executes
 - **superpowers:requesting-code-review** — code review template for reviewer subagents
 - **superpowers:finishing-a-development-branch** — complete development after all tasks
+- **dispatching-parallel-agents** — REQUIRED: consult before any agent dispatch decision (offload table, parallelize rules, reviewer pattern)
 
 **Subagents should use:**
 - **superpowers:test-driven-development** — subagents follow TDD for each task

@@ -26,7 +26,7 @@ def gid_to_tile_id(gid: int, firstgid: int) -> int:
     return gid - firstgid
 
 
-def tmx_to_c(tmx_path, out_path):
+def tmx_to_c(tmx_path, out_path, prefix='track'):
     tree = ET.parse(tmx_path)
     root = tree.getroot()
 
@@ -79,22 +79,22 @@ def tmx_to_c(tmx_path, out_path):
     finish_tile_y = int(float(finish_obj.get('y'))) // 8
 
     with open(out_path, 'w') as f:
-        f.write("/* GENERATED — do not edit by hand."
-                " Source: assets/maps/track.tmx */\n")
-        f.write("/* Regenerate: python3 tools/tmx_to_c.py"
-                " assets/maps/track.tmx src/track_map.c */\n")
+        f.write(f"/* GENERATED — do not edit by hand."
+                f" Source: {tmx_path} */\n")
+        f.write(f"/* Regenerate: python3 tools/tmx_to_c.py"
+                f" {tmx_path} {out_path} --prefix {prefix} */\n")
         f.write("#pragma bank 255\n")
         f.write('#include <gb/gb.h>\n')
         f.write('#include "track.h"\n')
         f.write('#include "banking.h"\n\n')
-        f.write(f"BANKREF(track_start_x)\n")
-        f.write(f"const int16_t track_start_x = {spawn_x};\n")
-        f.write(f"BANKREF(track_start_y)\n")
-        f.write(f"const int16_t track_start_y = {spawn_y};\n\n")
-        f.write(f"BANKREF(track_finish_line_y)\n")
-        f.write(f"const uint8_t track_finish_line_y = {finish_tile_y};\n\n")
-        f.write("BANKREF(track_map)\n")
-        f.write("const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {\n")
+        f.write(f"BANKREF({prefix}_start_x)\n")
+        f.write(f"const int16_t {prefix}_start_x = {spawn_x};\n")
+        f.write(f"BANKREF({prefix}_start_y)\n")
+        f.write(f"const int16_t {prefix}_start_y = {spawn_y};\n\n")
+        f.write(f"BANKREF({prefix}_finish_line_y)\n")
+        f.write(f"const uint8_t {prefix}_finish_line_y = {finish_tile_y};\n\n")
+        f.write(f"BANKREF({prefix}_map)\n")
+        f.write(f"const uint8_t {prefix}_map[MAP_TILES_H * MAP_TILES_W] = {{\n")
         for row in range(height):
             start = row * width
             vals  = ','.join(str(v) for v in tile_ids[start:start + width])
@@ -103,8 +103,10 @@ def tmx_to_c(tmx_path, out_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <track.tmx> <track_map.c>",
-              file=sys.stderr)
-        sys.exit(1)
-    tmx_to_c(sys.argv[1], sys.argv[2])
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('tmx_path')
+    parser.add_argument('out_path')
+    parser.add_argument('--prefix', default='track')
+    args = parser.parse_args()
+    tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)

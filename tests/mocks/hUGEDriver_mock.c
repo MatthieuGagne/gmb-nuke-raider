@@ -4,7 +4,8 @@
 #include "hUGEDriver.h"
 
 void hUGE_init(const hUGESong_t *song) { (void)song; }
-void hUGE_dosound(void) {}
+int hUGE_dosound_call_count = 0;
+void hUGE_dosound(void) { hUGE_dosound_call_count++; }
 void hUGE_mute_channel(enum hUGE_channel_t ch, enum hUGE_mute_t mute) {
     (void)ch; (void)mute;
 }

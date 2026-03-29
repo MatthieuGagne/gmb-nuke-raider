@@ -9,7 +9,7 @@ description: Use when creating a new map or track for Junk Runner — designing 
 
 Step-by-step guide to create a new map from scratch. Uses the Tiled → `tmx_to_c.py` → GB pipeline.
 
-**REQUIRED BACKGROUND:** Invoke the `map-expert` skill before writing any code — it has the full pipeline reference, GID rules, and GBDK API details.
+**REQUIRED BACKGROUND:** Use the `map-expert` agent (Agent tool) before writing any code — it has the full pipeline reference, GID rules, and GBDK API details.
 
 ---
 
@@ -150,6 +150,6 @@ Check:
 
 ## Cross-References
 
-- **`map-expert`** — Full pipeline reference, GID math, GBDK BG API, CGB attribute map
-- **`sprite-expert`** — For OAM sprites on top of the map
-- **`gbdk-expert`** — VBlank rules, LCDC register, set_bkg_data details
+- **`map-expert`** agent — Full pipeline reference, GID math, GBDK BG API, CGB attribute map
+- **`sprite-expert`** agent — For OAM sprites on top of the map
+- **`gbdk-expert`** agent — VBlank rules, LCDC register, set_bkg_data details

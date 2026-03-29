@@ -19,15 +19,22 @@ void test_dbg_str_compiles_and_runs(void) {
     TEST_PASS();
 }
 
+void test_dbg_tick_inc_compiles_and_runs(void) {
+    DBG_TICK_INC();
+    TEST_PASS();
+}
+
 void test_dbg_macros_empty_without_debug(void) {
     /* Undef DEBUG and guard so debug.h re-includes and gives empty macros */
 #undef DEBUG
 #undef DBG_INT
 #undef DBG_STR
+#undef DBG_TICK_INC
 #undef DEBUG_H
 #include "debug.h"
     DBG_INT("x", 1);
     DBG_STR("y");
+    DBG_TICK_INC();
     TEST_PASS();
 }
 
@@ -35,6 +42,7 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_dbg_int_compiles_and_runs);
     RUN_TEST(test_dbg_str_compiles_and_runs);
+    RUN_TEST(test_dbg_tick_inc_compiles_and_runs);
     RUN_TEST(test_dbg_macros_empty_without_debug);
     return UNITY_END();
 }

@@ -16,6 +16,7 @@
 #include "npc_drifter_portrait.h"
 #include "dialog_arrow_sprite.h"
 #include "dialog_border_tiles.h"
+#include "music.h"
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
@@ -278,13 +279,14 @@ static void hub_start_dialog(uint8_t npc_cursor) {
       dialog_start(npc_id, &npc_dialogs[npc_id]);
       RESTORE_BANK(); }
     sub_state = HUB_SUB_DIALOG;
-    wait_vbl_done(); /* sync to VBlank; writes complete well within ~1ms window */
+    vbl_display_off();         /* tick music + disable LCD in 1 VBlank */
     cls();
     load_portrait(npc_cursor);
     { SET_BANK(dialog_border_tiles);
       set_bkg_data(HUB_BORDER_TILE_SLOT, 8u, dialog_border_tiles);
       RESTORE_BANK(); }
     hub_render_dialog();
+    DISPLAY_ON;
 }
 
 static void update_menu(void) {
@@ -332,9 +334,10 @@ static void update_dialog(void) {
             dialog_page_start  = dialog_next_offset;
             dialog_cursor      = 0u;
             dialog_prev_cursor = 0u;
-            wait_vbl_done(); /* sync to VBlank; tile-map writes fit in ~1ms window */
+            vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
             cls();
             hub_render_dialog();
+            DISPLAY_ON;
         } else {
             /* last page — advance dialog node */
             more = dialog_advance(dialog_cursor);
@@ -343,14 +346,16 @@ static void update_dialog(void) {
             dialog_page_start  = 0u;
             dialog_next_offset = 0u;
             if (more) {
-                wait_vbl_done(); /* sync to VBlank; tile-map writes fit in ~1ms window */
+                vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
                 cls();
                 hub_render_dialog();
+                DISPLAY_ON;
             } else {
                 sub_state = HUB_SUB_MENU;
                 cursor    = 0u;
-                wait_vbl_done(); /* sync to VBlank; tile-map writes fit in ~1ms window */
+                vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
                 hub_render_menu();
+                DISPLAY_ON;
             }
         }
     }
@@ -371,12 +376,11 @@ static void enter(void) {
     move_sprite(0u, 0u, 0u);
     move_sprite(1u, 0u, 0u);
     move_sprite(DIALOG_ARROW_OAM_SLOT, 0u, 0u);
-    wait_vbl_done();
+    DISPLAY_OFF;
     { SET_BANK(dialog_arrow_tile_data);
       set_sprite_data(DIALOG_ARROW_TILE_BASE, dialog_arrow_tile_data_count, dialog_arrow_tile_data);
       RESTORE_BANK(); }
     set_sprite_tile(DIALOG_ARROW_OAM_SLOT, DIALOG_ARROW_TILE_BASE);
-    DISPLAY_OFF;
     cls();
     hub_render_menu();
     DISPLAY_ON;

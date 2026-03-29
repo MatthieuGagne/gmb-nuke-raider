@@ -4,3 +4,4 @@
  * This file provides them for all host-side test binaries. */
 uint8_t input     = 0;
 uint8_t prev_input = 0;
+volatile uint8_t frame_ready = 0;

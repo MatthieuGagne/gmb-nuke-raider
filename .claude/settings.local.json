@@ -2,6 +2,8 @@
   "permissions": {
     "allow": [
       "Read(**)",
+      "Glob(*)",
+      "Grep(*)",
       "Bash(git:*)",
       "Bash(xargs ls:*)",
       "Bash(make:*)",
@@ -28,6 +30,7 @@
       "Bash(gh issue:*)",
       "Bash(gh pr:*)",
       "Bash(grep:*)",
+      "Bash(echo:*)",
       "WebFetch(domain:gbdev.io)",
       "Bash(gcc:*)",
       "Bash(gh run:*)",
@@ -249,7 +252,82 @@
       "Bash(sudo sh:*)",
       "Bash(for n:*)",
       "Bash(gimp:*)",
-      "Bash(convert /home/mathdaman/Pictures/mushroom-cloud-1.jpg /home/mathdaman/Pictures/mushroom-cloud-1.png)"
+      "Bash(convert /home/mathdaman/Pictures/mushroom-cloud-1.jpg /home/mathdaman/Pictures/mushroom-cloud-1.png)",
+      "Skill(update-config)",
+      "Bash(python3 -c \":*)",
+      "Bash(ar tv:*)",
+      "Bash(ar t:*)",
+      "Bash(sdas --version)",
+      "Bash(xxd /tmp/gbdk_extract/___sdcc_bcall.o)",
+      "Bash(mkdir -p /tmp/gbdk_extract)",
+      "Bash(ar x:*)",
+      "Bash(do if:*)",
+      "Bash(then echo:*)",
+      "Bash(fi)",
+      "Bash(for wt:*)",
+      "Bash(echo \"=== $wt ===\")",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestValidation.test_three_choices_ok -v 2>&1)",
+      "Bash(aseprite --batch assets/sprites/player_car.aseprite --list-tags)",
+      "Bash(for skill:*)",
+      "Bash(aseprite:*)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestConfigHelpers -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_dialog_to_c.TestGenerateHubC -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c -v)",
+      "Bash(PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check.TestCheckFile -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check -v 2>&1)",
+      "Bash(jq -e '.hooks.PreToolUse[] | select\\(.matcher == \"\"Write|Edit\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)",
+      "Bash(jq -e '.hooks.PostToolUse[] | select\\(.matcher == \"\"Bash\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)",
+      "Bash(pip3 install:*)",
+      "WebFetch(domain:docs.pyboy.dk)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove /home/mathdaman/code/nuke-raider/.claude/worktrees/feat+issue-208-music-expert-rewrite)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list)",
+      "Bash(cp /tmp/wt_requirements.txt /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl/requirements.txt)",
+      "Bash(cp -r /tmp/wt_tests/integration /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl/tests/)",
+      "Bash(git -C /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl branch --show-current)",
+      "Bash(git -C /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl worktree list)",
+      "Bash(python3 -c \"import pyboy; print\\(''pyboy ok''\\)\")",
+      "Bash(python3 -c \"import tests.integration\")",
+      "Bash(python3 -c \"from tests.integration.helpers import GameSession; print\\(''ok''\\)\")",
+      "Bash(make build-debug:*)",
+      "Bash(git merge:*)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk make)",
+      "Bash(make memory-check:*)",
+      "Bash(python3 -c \"from tests.integration.helpers import GameSession; print\\(''GameSession ok''\\)\")",
+      "Bash(grep -v \"false\\\\|=\\\\s*$\\\\|Condition\\\\|Suspend\\\\|Log\\\\|Error\\\\|DataEx\\\\|BankSwap\")",
+      "Bash(pkill -f \"Emulicious.jar\")",
+      "Bash(kill -9 97673)",
+      "Bash(python3 tests/integration/diagnose_audio.py)",
+      "Bash(make bank-post-build:*)",
+      "Bash(git push:*)",
+      "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 tools/bank_check_hook.py",
+            "statusMessage": "bank-pre-write check..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 tools/post_build_hook.py",
+            "statusMessage": "bank-post-build + memory-check..."
+          }
+        ]
+      }
     ]
   }
 }

@@ -1,21 +1,16 @@
 ---
 name: emulicious-debug
 description: "TRIGGER when: any runtime crash, unexpected in-game behavior, visual glitch, wrong values at runtime, or need to inspect memory/tiles/sprites/palettes/ROM layout during execution. DO NOT TRIGGER when: the problem is a compile error (use gbdk-expert) or static code review (use gb-c-optimizer)."
+color: blue
 ---
 
-# Emulicious Debugging — Nuke Raider
+You are a Game Boy Color runtime debugger for the Nuke Raider game. You diagnose bugs using Emulicious and the GBDK EMU_printf facility. When invoked, determine the best instrumentation and inspection approach for the problem described, then guide or execute the debugging process.
 
-## Quick Start
+## Project Context
 
-```sh
-# Run ROM in Emulicious
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
-```
-
-**Further reading:**
-- [Emulicious homepage](https://emulicious.net/) — full feature documentation
-- [Emulicious Tracer posts](https://emulicious.net/tag/tracer/) — tracer tutorials and examples
-- [Debugging your GBDK-2020 game](https://laroldsretrogameyard.com/tutorials/gb/debugging-your-gbdk-2020-game/) — practical walkthrough
+- **ROM:** `build/nuke-raider.gb`
+- **Launch:** `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
+- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`
 
 ---
 
@@ -149,7 +144,7 @@ romusage build/nuke-raider.cdb -a
 
 ## Workflow: Debugging a Bug
 
-1. Add `EMU_printf` at the suspect location, rebuild (`/build`)
+1. Add `EMU_printf` at the suspect location, rebuild (`GBDK_HOME=/home/mathdaman/gbdk make`)
 2. Launch: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
 3. Observe console output; narrow the problem
 4. Set VS Code breakpoints at suspect line; use Step Over/Into to inspect variables

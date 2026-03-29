@@ -9,6 +9,7 @@
 #include "input.h"
 #include "player.h"
 #include "track.h"
+#include "camera.h"
 
 /* Tile and map data are generated from Aseprite/Tiled sources.
  * Edit assets/maps/overmap_tiles.aseprite in Aseprite or assets/maps/overmap.tmx
@@ -140,9 +141,9 @@ static void overmap_check_tile_effect(void) {
                 break;
             }
         }
-        player_set_pos(track_start_x, track_start_y);
-        player_reset_vel();
+        track_select(current_race_id);   /* wire up dispatch table before STATE_PLAYING */
         state_replace(&state_playing);
+        /* NOTE: player position is set in state_playing enter() via track_get_start_x/y() */
     }
 }
 
@@ -165,11 +166,13 @@ static void enter(void) {
     { SET_BANK(overmap_map);
       set_bkg_tiles(0u, 0u, OVERMAP_W, OVERMAP_H, overmap_map);
       RESTORE_BANK(); }
+    cam_scy_shadow = 0u;    /* reset shadow so VBL ISR keeps SCY=0 in overmap */
+    move_bkg(0u, 0u);      /* apply immediately for the first frame */
+    overmap_move_sprite();  /* pre-set OAM so first visible frame has car in correct position */
     DISPLAY_ON;
 
     SHOW_BKG;
     SHOW_SPRITES;
-    overmap_move_sprite();
 }
 
 static void update(void) {

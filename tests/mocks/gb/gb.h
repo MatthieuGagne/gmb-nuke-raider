@@ -42,6 +42,10 @@ static inline uint8_t joypad(void) { return 0; }
 #define SPRITES_8x8  ((void)0)
 #define SHOW_SPRITES ((void)0)
 
+/* Sprite prop flags */
+#define S_FLIPX 0x20U
+#define S_FLIPY 0x40U
+
 /* Sprite functions */
 static inline void set_sprite_data(uint8_t first_tile, uint8_t nb_tiles,
                                     const uint8_t *data) {
@@ -49,6 +53,9 @@ static inline void set_sprite_data(uint8_t first_tile, uint8_t nb_tiles,
 }
 static inline void set_sprite_tile(uint8_t nb, uint8_t tile) {
     (void)nb; (void)tile;
+}
+static inline void set_sprite_prop(uint8_t nb, uint8_t prop) {
+    (void)nb; (void)prop;
 }
 /* Tracked by mock_sprites.c */
 extern uint8_t mock_move_sprite_last_nb;
@@ -68,7 +75,10 @@ static inline void set_bkg_data(uint8_t first_tile, uint8_t nb_tiles,
                                  const uint8_t *data) {
     (void)first_tile; (void)nb_tiles; (void)data;
 }
-static inline void move_bkg(uint8_t x, uint8_t y) { (void)x; (void)y; }
+/* Declared in mock_bkg.c — linked in */
+extern int     mock_move_bkg_call_count;
+extern uint8_t mock_move_bkg_last_y;
+void move_bkg(uint8_t x, uint8_t y);
 
 /* Window layer stubs */
 #define SHOW_WIN    ((void)0)
@@ -96,8 +106,9 @@ void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
 #define BANKREF(x)
 #define BANKREF_EXTERN(x)
 #define BANK(x)          0u
-#define CURRENT_BANK     0u
-#define SWITCH_ROM(b)    ((void)(b))
+static uint8_t _current_bank_mock = 0;
+#define CURRENT_BANK     _current_bank_mock
+#define SWITCH_ROM(b)    (_current_bank_mock = (uint8_t)(b))
 typedef void (*int_handler)(void);
 #define VBL_IFLAG 0x01U
 #define LCD_IFLAG 0x02U

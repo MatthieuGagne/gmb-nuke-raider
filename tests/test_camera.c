@@ -3,6 +3,9 @@
 #include "camera.h"
 #include "track.h"
 
+extern int     mock_move_bkg_call_count;
+extern uint8_t mock_move_bkg_last_y;
+
 void setUp(void)    { mock_vram_clear(); }
 void tearDown(void) {}
 
@@ -45,11 +48,11 @@ void test_camera_update_cam_y_follows_player_up(void) {
     TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
-/* Upward-only: moving player down must NOT advance cam_y */
-void test_camera_update_cam_y_does_not_advance_downward(void) {
+/* Bidirectional: moving player DOWN also advances cam_y */
+void test_camera_update_cam_y_follows_player_down(void) {
     camera_init(80, 80);     /* cam_y = 8 */
-    camera_update(80, 200);  /* ncy=128 >= cam_y=8 -> no-op */
-    TEST_ASSERT_EQUAL_UINT16(8, cam_y);
+    camera_update(80, 200);  /* ncy = 200-72 = 128; cam_y -> 128 */
+    TEST_ASSERT_EQUAL_UINT16(128, cam_y);
 }
 
 /* cam_y never goes below 0 even when player is far above top of map */
@@ -71,14 +74,14 @@ void test_camera_update_does_not_write_vram(void) {
 
 /* --- camera_flush_vram: drains pending row streams --------------------- */
 
-/* Downward player movement must NOT buffer any rows (upward-only scroll) */
-void test_camera_update_downward_does_not_buffer_rows(void) {
-    int count_after_init;
-    camera_init(80, 80);
-    count_after_init = mock_set_bkg_tiles_call_count;
-    camera_update(80, 88);   /* ncy=16 >= cam_y=8 -> no-op */
+/* Bidirectional: moving player DOWN buffers new bottom row */
+void test_camera_update_downward_buffers_bottom_row(void) {
+    int count_before;
+    camera_init(80, 80);   /* cam_y=8; visible rows 1-18 preloaded */
+    count_before = mock_set_bkg_tiles_call_count;
+    camera_update(80, 88); /* ncy=16 > cam_y=8 → buffers bottom row 19 */
     camera_flush_vram();
-    TEST_ASSERT_EQUAL_INT(count_after_init, mock_set_bkg_tiles_call_count);
+    TEST_ASSERT_GREATER_THAN_INT(count_before, mock_set_bkg_tiles_call_count);
 }
 
 /* Crossing tile boundary upward -> flush writes exactly one new top row */
@@ -125,6 +128,51 @@ void test_camera_init_clears_stale_stream_buffer(void) {
     TEST_ASSERT_EQUAL_INT(count_after_reinit, mock_set_bkg_tiles_call_count);
 }
 
+/* --- camera_apply_scroll: shadow register (legacy ordering tests updated) */
+
+/* camera_apply_scroll() must update cam_scy_shadow with current cam_y */
+void test_camera_apply_scroll_sets_shadow_to_cam_y(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    mock_move_bkg_call_count = 0;
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(8u, cam_scy_shadow);
+}
+
+/* cam_scy_shadow reflects cam_y at the moment of the call */
+void test_camera_apply_scroll_shadow_matches_cam_y(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)cam_y, cam_scy_shadow);
+}
+
+/* Ordering: flush must write VRAM before apply_scroll captures cam_y.
+ * After update queues a row and flush runs, shadow must reflect new cam_y. */
+void test_camera_apply_scroll_reflects_post_flush_cam_y(void) {
+    camera_init(80, 80);           /* cam_y = 8 */
+    camera_update(80, 72);         /* cam_y -> 0, buffers row 0 */
+    camera_flush_vram();           /* writes row 0 to VRAM */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(0u, cam_scy_shadow);
+}
+
+/* --- camera_apply_scroll: shadow register (new behaviour) --------------- */
+
+/* camera_apply_scroll() must write cam_y into cam_scy_shadow, not move_bkg.
+ * The VBL ISR is responsible for applying the shadow to the hardware register. */
+void test_camera_apply_scroll_updates_shadow(void) {
+    camera_init(80, 80);   /* cam_y = 8 */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8(8u, cam_scy_shadow);
+}
+
+/* camera_apply_scroll() must NOT call move_bkg directly — that is the ISR's job. */
+void test_camera_apply_scroll_does_not_call_move_bkg(void) {
+    camera_init(80, 80);
+    mock_move_bkg_call_count = 0;
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_bkg_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -132,13 +180,18 @@ int main(void) {
     RUN_TEST(test_camera_init_clamps_cam_y_to_max);
     RUN_TEST(test_camera_init_preloads_18_rows);
     RUN_TEST(test_camera_update_cam_y_follows_player_up);
-    RUN_TEST(test_camera_update_cam_y_does_not_advance_downward);
+    RUN_TEST(test_camera_update_cam_y_follows_player_down);
     RUN_TEST(test_camera_update_cam_y_clamped_at_zero);
     RUN_TEST(test_camera_update_does_not_write_vram);
-    RUN_TEST(test_camera_update_downward_does_not_buffer_rows);
+    RUN_TEST(test_camera_update_downward_buffers_bottom_row);
     RUN_TEST(test_camera_flush_streams_new_top_row);
     RUN_TEST(test_camera_flush_clears_buffer);
     RUN_TEST(test_camera_flush_noop_on_empty_buffer);
     RUN_TEST(test_camera_init_clears_stale_stream_buffer);
+    RUN_TEST(test_camera_apply_scroll_sets_shadow_to_cam_y);
+    RUN_TEST(test_camera_apply_scroll_shadow_matches_cam_y);
+    RUN_TEST(test_camera_apply_scroll_reflects_post_flush_cam_y);
+    RUN_TEST(test_camera_apply_scroll_updates_shadow);
+    RUN_TEST(test_camera_apply_scroll_does_not_call_move_bkg);
     return UNITY_END();
 }

@@ -65,7 +65,7 @@ Only continue to Step 3 when it passes.
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
    ```
 
-4. Tell the user it's running and ask them to confirm it looks correct before proceeding.
+5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
 
 **Stop. Wait for explicit confirmation.**
 
@@ -114,13 +114,18 @@ EOF
 )"
 ```
 
-Then: Cleanup worktree (Step 6)
+After PR is created, report to the user:
+
+> "PR created: <URL>
+> When the PR is merged, let me know and I'll clean up the worktree at <worktree-path>."
+
+**Do NOT run Step 6 now.** Cleanup happens only after the user confirms the merge.
 
 #### Option 2: Keep As-Is
 
-Report: "Keeping branch <name>. Worktree preserved at <path>."
+Report: "Keeping branch `<name>`. Worktree preserved at `<path>`."
 
-**Don't cleanup worktree.**
+**Do NOT run Step 6.**
 
 #### Option 3: Discard
 
@@ -146,29 +151,52 @@ git worktree remove --force <worktree-path>
 git -C /home/mathdaman/code/gmb-nuke-raider branch -D <feature-branch>
 ```
 
+Then run Step 6 immediately.
+
 ### Step 6: Cleanup Worktree
 
-**For Options 1 and 3:**
+#### After merge confirmation (Option 1 only)
 
-Check if in worktree:
+Only run after the user explicitly confirms the PR was merged — **never preemptively**.
+
+**Step 6a: Confirm worktree exists**
 ```bash
-git worktree list | grep $(git branch --show-current)
+git worktree list | grep <branch-name>
 ```
+If not listed, skip removal (already gone).
 
-If yes:
+**Step 6b: Remove the worktree**
 ```bash
 git worktree remove <worktree-path>
 ```
+If that fails (e.g. dirty working tree), use `--force` and warn the user:
+```bash
+git worktree remove --force <worktree-path>
+# Warn: "Worktree had uncommitted changes — removed with --force."
+```
 
-**For Option 2:** Keep worktree.
+**Step 6c: Prune stale refs**
+```bash
+git worktree prune
+```
+
+Report: "Worktree at `<path>` removed and pruned."
+
+#### Immediately after discard confirmation (Option 3)
+
+Run the same Step 6a → 6b → 6c sequence immediately after the user types 'discard'.
+
+#### Option 2: Keep As-Is
+
+**Do NOT run Step 6.** Report: "Keeping branch `<name>`. Worktree preserved at `<path>`."
 
 ## Quick Reference
 
-| Option | Push | Keep Worktree | Cleanup Branch |
-|--------|------|---------------|----------------|
-| 1. Create PR | ✓ | - | - |
-| 2. Keep as-is | - | ✓ | - |
-| 3. Discard | - | - | ✓ (force) |
+| Option | Push | Cleanup Worktree | When |
+|--------|------|-----------------|------|
+| 1. Push and Create PR | ✓ | ✓ | After merge confirmed |
+| 2. Keep as-is | - | - | Never |
+| 3. Discard | - | ✓ | After 'discard' typed |
 
 ## Common Mistakes
 
@@ -187,6 +215,13 @@ git worktree remove <worktree-path>
 **Using bare `git merge master`**
 - **Problem:** Local master ref may be stale; silently merges old code
 - **Fix:** Always `git fetch origin && git merge origin/master`
+
+**`git worktree prune` fails when session CWD is the deleted worktree**
+- **Problem:** After `git worktree remove`, if the session's working directory was inside that worktree, `git worktree prune` (and bare `git` commands) fail with "Working directory no longer exists"
+- **Fix:** Use explicit `GIT_DIR` to target the main repo:
+  ```bash
+  GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
+  ```
 
 **Merging directly to main**
 - **Problem:** Bypasses review, violates branch policy
@@ -208,6 +243,7 @@ git worktree remove <worktree-path>
 - Reference `wasteland-racer.gb` (wrong ROM name)
 - Launch emulator from main repo's `build/` (may be stale)
 - Skip bank-post-build or `make memory-check` before smoketest
+- Clean up worktree immediately after PR creation (wait for merge confirmation)
 
 **Always:**
 - Work on a feature branch
@@ -218,7 +254,8 @@ git worktree remove <worktree-path>
 - Launch Emulicious from worktree directory
 - Present exactly 3 options
 - Get typed confirmation for Option 3
-- Clean up worktree for Options 1 & 3 only
+- After PR creation (Option 1): tell user the worktree path and ask them to confirm when merged
+- After merge confirmation: run git worktree remove → --force fallback → git worktree prune
 
 ## Integration
 

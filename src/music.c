@@ -14,6 +14,7 @@
 #include "hUGEDriver.h"
 #include "music_data.h"
 #include "music.h"
+#include "debug.h"
 
 static uint8_t current_song_bank = 0;
 
@@ -40,8 +41,24 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
-    uint8_t _saved_bank = CURRENT_BANK;
-    SWITCH_ROM(current_song_bank);
-    hUGE_dosound();
-    SWITCH_ROM(_saved_bank);
+    DBG_TICK_INC();  /* DEBUG=1 only: count calls for headless diagnostic */
+    __critical {
+        uint8_t _saved_bank = CURRENT_BANK;
+        SWITCH_ROM(current_song_bank);
+        hUGE_dosound();
+        SWITCH_ROM(_saved_bank);
+    }
+}
+
+void vbl_sync(void) {
+    while (!frame_ready);
+    frame_ready = 0;
+    music_tick();
+}
+
+void vbl_display_off(void) {
+    while (!frame_ready);      /* wait for VBlank start */
+    frame_ready = 0;
+    music_tick();              /* tick music for this VBlank */
+    LCDC_REG &= ~0x80U;       /* disable LCD — safe: we're in VBlank */
 }

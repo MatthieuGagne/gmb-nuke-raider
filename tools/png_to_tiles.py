@@ -34,6 +34,65 @@ def _parse_chunks(data):
             break
 
 
+def _paeth(a, b, c):
+    """Paeth predictor (PNG spec section 9.4)."""
+    p = a + b - c
+    pa = abs(p - a)
+    pb = abs(p - b)
+    pc = abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def _defilter_rows(raw, width, bytes_per_row):
+    """Apply PNG row filters to decompressed IDAT data.
+
+    raw: decompressed IDAT bytes (filter byte + data per row)
+    width: image width in pixels (unused here but documents intent)
+    bytes_per_row: number of data bytes per row (after filter byte)
+
+    Returns flat bytes of defiltered row data (no filter bytes).
+    PNG filter types: 0=None, 1=Sub, 2=Up, 3=Average, 4=Paeth
+    """
+    row_stride = 1 + bytes_per_row
+    n_rows = len(raw) // row_stride
+    out = bytearray()
+    prev = bytes(bytes_per_row)  # previous row (all zeros for first row)
+
+    for y in range(n_rows):
+        ftype = raw[y * row_stride]
+        row = bytearray(raw[y * row_stride + 1 : y * row_stride + 1 + bytes_per_row])
+
+        if ftype == 0:    # None
+            pass
+        elif ftype == 1:  # Sub
+            for i in range(1, bytes_per_row):
+                row[i] = (row[i] + row[i - 1]) & 0xFF
+        elif ftype == 2:  # Up
+            for i in range(bytes_per_row):
+                row[i] = (row[i] + prev[i]) & 0xFF
+        elif ftype == 3:  # Average
+            for i in range(bytes_per_row):
+                a = row[i - 1] if i > 0 else 0
+                row[i] = (row[i] + (a + prev[i]) // 2) & 0xFF
+        elif ftype == 4:  # Paeth
+            for i in range(bytes_per_row):
+                a = row[i - 1] if i > 0 else 0
+                b = prev[i]
+                c = prev[i - 1] if i > 0 else 0
+                row[i] = (row[i] + _paeth(a, b, c)) & 0xFF
+        else:
+            raise ValueError(f"Unknown PNG filter type {ftype} on row {y}")
+
+        out.extend(row)
+        prev = bytes(row)
+
+    return bytes(out)
+
+
 def _lum_to_index(r, g, b):
     """Convert RGB888 to GB palette index 0–3 (0=white, 3=black)."""
     L = (299 * r + 587 * g + 114 * b + 500) // 1000
@@ -66,13 +125,12 @@ def load_png_pixels(data):
     if color_type == 3 and bit_depth == 2:
         # 2-bit indexed: 4 pixels per byte, 2 bits each (MSB first)
         bytes_per_row = (width + 3) // 4  # rounded up
-        # Account for filter byte per row
-        row_stride = 1 + bytes_per_row
+        defiltered = _defilter_rows(raw, width, bytes_per_row)
         for y in range(height):
-            row_start = y * row_stride + 1  # +1 skip filter byte
+            row_start = y * bytes_per_row
             col = 0
             for bx in range(bytes_per_row):
-                byte = raw[row_start + bx]
+                byte = defiltered[row_start + bx]
                 for shift in (6, 4, 2, 0):
                     if col < width:
                         pixels.append((byte >> shift) & 3)
@@ -80,11 +138,12 @@ def load_png_pixels(data):
 
     elif color_type == 3 and bit_depth == 8:
         # 8-bit indexed: 1 byte per pixel, value is the palette index directly
-        row_stride = 1 + width
+        bytes_per_row = width
+        defiltered = _defilter_rows(raw, width, bytes_per_row)
         for y in range(height):
-            row_start = y * row_stride + 1  # +1 skip filter byte
+            row_start = y * bytes_per_row
             for x in range(width):
-                idx = raw[row_start + x]
+                idx = defiltered[row_start + x]
                 if idx > 3:
                     raise ValueError(
                         f"Indexed PNG has palette index {idx} at ({x},{y}) — max is 3. "
@@ -94,15 +153,16 @@ def load_png_pixels(data):
 
     elif color_type == 2 and bit_depth == 8:
         # 8-bit RGB: 3 bytes per pixel
-        row_stride = 1 + width * 3
+        bytes_per_row = width * 3
+        defiltered = _defilter_rows(raw, width, bytes_per_row)
         lum_set = set()
         rgb_rows = []
         for y in range(height):
-            row_start = y * row_stride + 1
+            row_start = y * bytes_per_row
             row = []
             for x in range(width):
                 off = row_start + x * 3
-                r, g, b = raw[off], raw[off + 1], raw[off + 2]
+                r, g, b = defiltered[off], defiltered[off + 1], defiltered[off + 2]
                 lum = (299 * r + 587 * g + 114 * b + 500) // 1000
                 lum_set.add(lum)
                 row.append((r, g, b))

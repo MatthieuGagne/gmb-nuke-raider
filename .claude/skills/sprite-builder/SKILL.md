@@ -9,7 +9,7 @@ description: Use when adding a new sprite type to Junk Runner — creating the A
 
 Step-by-step guide to add a new sprite from scratch. Uses the Aseprite → `png_to_tiles.py` → OAM pool pipeline.
 
-**REQUIRED BACKGROUND:** Invoke the `sprite-expert` skill before writing any code — it has the full API reference, OAM coordinate math, palette setup, and VBlank rules.
+**REQUIRED BACKGROUND:** Use the `sprite-expert` agent (Agent tool) before writing any code — it has the full API reference, OAM coordinate math, palette setup, and VBlank rules.
 
 **REQUIRED — Aseprite CLI:** ALWAYS invoke the **`aseprite`** skill before running any `aseprite` command. It has the complete flag reference and prevents common mistakes.
 
@@ -189,7 +189,7 @@ Check:
 
 ## Cross-References
 
-- **`sprite-expert`** — Full API reference, coordinate system details, pool internals, CGB palette registers
-- **`aseprite`** — Full Aseprite CLI reference: all flags, sprite sheet export, scripting, filtering
-- **`gbdk-expert`** — OAM hardware, PPU modes, VBlank timing, LCDC register
-- **`map-expert`** — Background tile pipeline (BG tiles are separate from sprite tiles)
+- **`sprite-expert`** agent — Full API reference, coordinate system details, pool internals, CGB palette registers
+- **`aseprite`** skill — Full Aseprite CLI reference: all flags, sprite sheet export, scripting, filtering
+- **`gbdk-expert`** agent — OAM hardware, PPU modes, VBlank timing, LCDC register
+- **`map-expert`** agent — Background tile pipeline (BG tiles are separate from sprite tiles)

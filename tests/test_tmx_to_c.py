@@ -302,5 +302,36 @@ class TestFinishLineParsing(unittest.TestCase):
                 os.unlink(out_path)
 
 
+class TestTmxToCPrefix(unittest.TestCase):
+
+    def _convert_prefix(self, tmx_text, prefix):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(tmx_text)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path, prefix=prefix)
+            with open(out_path) as f:
+                return f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_prefix_renames_symbols(self):
+        src = self._convert_prefix(MINIMAL_TMX, prefix='track2')
+        self.assertIn('const uint8_t track2_map[', src)
+        self.assertIn('const int16_t track2_start_x', src)
+        self.assertIn('const int16_t track2_start_y', src)
+        self.assertIn('const uint8_t track2_finish_line_y', src)
+        # Default "track_" prefix must NOT appear
+        self.assertNotIn('const uint8_t track_map[', src)
+
+    def test_default_prefix_is_track(self):
+        src = self._convert_prefix(MINIMAL_TMX, prefix='track')
+        self.assertIn('const uint8_t track_map[', src)
+
+
 if __name__ == '__main__':
     unittest.main()

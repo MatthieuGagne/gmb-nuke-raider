@@ -8,9 +8,12 @@
 /* OAM budget: player=2 (top+bottom half), slot 2=dialog_arrow HUD, remaining=13 for enemies/projectiles */
 #define MAX_SPRITES  16
 
-/* Sprite VRAM tile slots */
-#define PLAYER_TILE_BASE       0u  /* tiles 0-1: player car (2 tiles) */
-#define DIALOG_ARROW_TILE_BASE 2u  /* tile  2:   dialog overflow arrow (1 tile) */
+/* Sprite VRAM tile slots — player car occupies tiles 0-7 (4 direction sets × 2 tiles) */
+#define PLAYER_TILE_T          0u  /* tiles 0-1: T  / B facing (top+bot) */
+#define PLAYER_TILE_RT         2u  /* tiles 2-3: RT / LT facing (top+bot, LT uses FLIPX) */
+#define PLAYER_TILE_R          4u  /* tiles 4-5: R  / L  facing (top+bot, L  uses FLIPX) */
+#define PLAYER_TILE_RB         6u  /* tiles 6-7: RB / LB facing (top+bot, LB uses FLIPX) */
+#define DIALOG_ARROW_TILE_BASE 8u  /* tile  8:   dialog overflow arrow (moved from 2) */
 
 /* OAM slot assignments (fixed HUD sprites) */
 #define DIALOG_ARROW_OAM_SLOT  2u  /* OAM slot 2 — hub dialog overflow indicator */
@@ -24,14 +27,17 @@
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
 #define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
-#define PLAYER_HP        100 /* Damage system: starting HP (equals PLAYER_HP_MAX — full health) */
 #define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
+
+/* Damage system */
+#define PLAYER_MAX_HP              100u  /* max HP pool; 0 = dead */
+#define DAMAGE_REPAIR_AMOUNT       20u   /* HP restored by TILE_REPAIR */
+#define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
 
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
 #define HUD_SCANLINE 128  /* pixel row where HUD window begins; used for player movement bounds */
-#define PLAYER_HP_MAX 100
 
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
@@ -57,5 +63,20 @@
 #define HUB_BORDER_TILE_SLOT   112u  /* BKG tile slots 112-119 (8 tiles) for dialog box border */
 #define HUB_PORTRAIT_BOX_W     6u    /* portrait box width in tiles (cols 0-5) */
 #define HUB_DIALOG_BOX_W       14u   /* dialog box width in tiles (cols 6-19) */
+
+/* Projectile pool */
+#define MAX_PROJECTILES       8u
+#define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
+#define PROJ_SPEED            4u    /* px/frame; intentionally faster than PLAYER_MAX_SPEED */
+#define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
+#define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
+
+/* Debug ring buffer — headless PyBoy diagnostic (DEBUG=1 only).
+ * Fixed WRAM addresses in the last 66 bytes — well above static data (~0xC000-0xC242).
+ * Must stay in sync with DEBUG_LOG_ADDR / DEBUG_TICK_ADDR in tests/integration/helpers.py. */
+#define DEBUG_LOG_ADDR    0xDF80U  /* WRAM: ring buffer content (64 bytes) */
+#define DEBUG_LOG_SIZE    64U
+#define DEBUG_LOG_IDX     0xDFC0U  /* WRAM: ring buffer write index (1 byte) */
+#define DEBUG_TICK_ADDR   0xDFC1U  /* WRAM: music_tick() call counter (1 byte, wraps at 256) */
 
 #endif /* CONFIG_H */
