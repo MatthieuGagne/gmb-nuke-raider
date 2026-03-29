@@ -14,6 +14,9 @@ extern const uint8_t bullet_tile_data[];
 extern const uint8_t bullet_tile_data_count;
 BANKREF_EXTERN(bullet_tile_data)
 
+BANKREF_EXTERN(track_checkpoints)
+BANKREF_EXTERN(track2_checkpoints)
+
 void load_player_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(player_tile_data));
@@ -47,5 +50,28 @@ void load_track_start_pos(int16_t *x, int16_t *y) NONBANKED {
     SWITCH_ROM(BANK(track_start_x));
     *x = track_start_x;
     *y = track_start_y;
+    SWITCH_ROM(saved);
+}
+
+void load_checkpoints(uint8_t id, CheckpointDef *dst, uint8_t *count) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t n;
+    if (id == 0u) {
+        SWITCH_ROM(BANK(track_checkpoints));
+        n = track_checkpoint_count;
+        if (n > MAX_CHECKPOINTS) n = MAX_CHECKPOINTS;
+        for (i = 0u; i < n; i++) {
+            dst[i] = track_checkpoints[i];
+        }
+    } else {
+        SWITCH_ROM(BANK(track2_checkpoints));
+        n = track2_checkpoint_count;
+        if (n > MAX_CHECKPOINTS) n = MAX_CHECKPOINTS;
+        for (i = 0u; i < n; i++) {
+            dst[i] = track2_checkpoints[i];
+        }
+    }
+    *count = n;
     SWITCH_ROM(saved);
 }

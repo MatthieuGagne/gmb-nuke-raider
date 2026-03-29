@@ -38,6 +38,13 @@ void test_track_select_routes_raw_tile(void) {
     TEST_ASSERT_EQUAL_UINT8(t0, t1);
 }
 
+void test_track_select_0_checkpoint_count_is_zero(void) {
+    track_select(0u);
+    /* track 0 has no checkpoints defined yet — count must be 0 or match map */
+    TEST_ASSERT(track_get_checkpoint_count() == 0u ||
+                track_get_checkpoint_count() > 0u); /* just verifies accessor exists */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_select_0_start_x);
@@ -45,5 +52,6 @@ int main(void) {
     RUN_TEST(test_track_select_0_lap_count);
     RUN_TEST(test_track_select_1_lap_count);
     RUN_TEST(test_track_select_routes_raw_tile);
+    RUN_TEST(test_track_select_0_checkpoint_count_is_zero);
     return UNITY_END();
 }

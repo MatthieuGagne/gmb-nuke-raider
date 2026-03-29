@@ -21,10 +21,15 @@ void test_max_sfx_defined(void) {
     TEST_ASSERT_EQUAL_UINT8(2u, MAX_SFX);
 }
 
+void test_max_checkpoints_defined(void) {
+    TEST_ASSERT_EQUAL_UINT8(8u, MAX_CHECKPOINTS);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_debug_log_does_not_overlap_tick);
     RUN_TEST(test_debug_addresses_in_wram);
     RUN_TEST(test_max_sfx_defined);
+    RUN_TEST(test_max_checkpoints_defined);
     return UNITY_END();
 }
