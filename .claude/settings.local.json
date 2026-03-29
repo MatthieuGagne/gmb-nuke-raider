@@ -301,7 +301,8 @@
       "Bash(python3 tests/integration/diagnose_audio.py)",
       "Bash(make bank-post-build:*)",
       "Bash(git push:*)",
-      "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))"
+      "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))",
+      "Bash(read current working directory\" errors after worktree removal:*)"
     ]
   },
   "hooks": {
@@ -311,7 +312,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 tools/bank_check_hook.py",
+            "command": "python3 /home/mathdaman/code/nuke-raider/tools/bank_check_hook.py",
             "statusMessage": "bank-pre-write check..."
           }
         ]
@@ -323,7 +324,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 tools/post_build_hook.py",
+            "command": "python3 /home/mathdaman/code/nuke-raider/tools/post_build_hook.py",
             "statusMessage": "bank-post-build + memory-check..."
           }
         ]

@@ -187,23 +187,25 @@ Only run after the user explicitly confirms the PR was merged — **never preemp
 
 **Step 6a: Confirm worktree exists**
 ```bash
-git worktree list | grep <branch-name>
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list | grep <branch-name>
 ```
 If not listed, skip removal (already gone).
 
 **Step 6b: Remove the worktree**
+
+Always use explicit `GIT_DIR` — the session CWD may be inside or point to the deleted worktree, which causes bare `git` commands to fail:
 ```bash
-git worktree remove <worktree-path>
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove <worktree-path>
 ```
 If that fails (e.g. dirty working tree), use `--force` and warn the user:
 ```bash
-git worktree remove --force <worktree-path>
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force <worktree-path>
 # Warn: "Worktree had uncommitted changes — removed with --force."
 ```
 
 **Step 6c: Prune stale refs**
 ```bash
-git worktree prune
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
 ```
 
 Report: "Worktree at `<path>` removed and pruned."
