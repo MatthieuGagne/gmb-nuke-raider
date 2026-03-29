@@ -161,7 +161,7 @@ Document the OAM layout comment at the top of `config.h` so the budget stays aud
 
 ```sh
 GBDK_HOME=/home/mathdaman/gbdk make
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/junk-runner.gb
+java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
 ```
 
 Check:
