@@ -279,7 +279,24 @@
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove /home/mathdaman/code/nuke-raider/.claude/worktrees/feat+issue-208-music-expert-rewrite)",
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune)",
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list)",
-      "Bash(git merge:*)"
+      "Bash(cp /tmp/wt_requirements.txt /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl/requirements.txt)",
+      "Bash(cp -r /tmp/wt_tests/integration /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl/tests/)",
+      "Bash(git -C /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl branch --show-current)",
+      "Bash(git -C /home/mathdaman/code/nuke-raider/.claude/worktrees/feat-headless-debug-impl worktree list)",
+      "Bash(python3 -c \"import pyboy; print\\(''pyboy ok''\\)\")",
+      "Bash(python3 -c \"import tests.integration\")",
+      "Bash(python3 -c \"from tests.integration.helpers import GameSession; print\\(''ok''\\)\")",
+      "Bash(make build-debug:*)",
+      "Bash(git merge:*)",
+      "Bash(GBDK_HOME=/home/mathdaman/gbdk make)",
+      "Bash(make memory-check:*)",
+      "Bash(python3 -c \"from tests.integration.helpers import GameSession; print\\(''GameSession ok''\\)\")",
+      "Bash(grep -v \"false\\\\|=\\\\s*$\\\\|Condition\\\\|Suspend\\\\|Log\\\\|Error\\\\|DataEx\\\\|BankSwap\")",
+      "Bash(pkill -f \"Emulicious.jar\")",
+      "Bash(kill -9 97673)",
+      "Bash(python3 tests/integration/diagnose_audio.py)",
+      "Bash(make bank-post-build:*)",
+      "Bash(git push:*)"
     ]
   },
   "hooks": {

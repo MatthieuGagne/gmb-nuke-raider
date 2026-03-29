@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code. Can be used with or without a prior brainstorming session — runs an inline clarify+grill pass if no approved design exists.
+description: Use when you have a spec or requirements for a multi-step task, before touching code. Can be used with or without a prior brainstorming session.
 ---
 
 # Writing Plans
@@ -13,30 +13,11 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-## Design Check
+## Before You Begin
 
-Before proceeding, check whether this conversation contains an approved design or a GitHub issue with a PRD.
+If there is an approved design or a GitHub issue with a PRD in this conversation, proceed directly to writing the plan.
 
-> **Is there an approved design or PRD issue in this conversation?**
-> - **Yes** → proceed to write the plan
-> - **No** → run the inline clarify+grill block below first
-
-### Inline Clarify+Grill (when no prior design exists)
-
-Ask the user these questions **one at a time** — do not ask multiple at once:
-
-1. "What is the goal? (one sentence)"
-2. "What are the key requirements? (list the must-haves)"
-3. "What are the acceptance criteria?"
-4. "What is explicitly out of scope?"
-5. "Are there any GB hardware constraints? (OAM, WRAM, VRAM, banking, SDCC)"
-
-After collecting answers, do a **grill-me pass** inline — ask 2-3 probing questions one at a time to surface assumptions, edge cases, or risks. Examples:
-- "What happens when [edge case]?"
-- "Is [constraint] a hard requirement or a nice-to-have?"
-- "Have you considered [alternative approach]?"
-
-Once all questions are resolved, proceed to write the plan.
+If not, invoke the `grill-me` skill first — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed.
 
 **First action before anything else:** Pull and merge latest master into the current worktree branch:
 ```bash
