@@ -1,313 +1,304 @@
 # Music Expert — Junk Runner
 
-Use when working with hUGEDriver music integration, song data, APU registers, or audio for the Junk Runner GBC project.
+Use when working on any audio task: adding songs, debugging audio, writing SFX, or validating audio builds.
+
+> **Version pinning:** hUGETracker and hUGEDriver must match exactly. This project vendors **hUGEDriver v6.1.3**. Do not update one without the other — data format changes between versions produce silent corruption or crashes.
 
 ---
 
-## hUGEDriver v6.1.3 — Key Facts
+## Scenarios
 
-- **Source:** https://github.com/SuperDisk/hUGEDriver
-- **License:** Public domain
-- **Release zip:** `https://github.com/SuperDisk/hUGEDriver/releases/download/v6.1.3/hUGEDriver-6.1.3.zip`
-- **Vendored in this project:** `lib/hUGEDriver/include/hUGEDriver.h` + `lib/hUGEDriver/gbdk/hUGEDriver.lib`
+### Scenario 1: Adding a New Song
 
----
+**Trigger:** Adding or replacing a song in the game.
 
-## API
+**Step 1: Export from hUGETracker**
 
+Export as "GBDK .c" format. Use the hUGETracker version matching hUGEDriver v6.1.3.
+
+**Step 2: Add required declarations to the exported file**
+
+At the top of the exported `.c` file, add:
 ```c
-#include "hUGEDriver.h"
+#pragma bank 255
+#include <gb/gb.h>
+#include "banking.h"
+BANKREF(your_song_name)
+```
+Rename the exported `const hUGESong_t` variable to match the `BANKREF` name.
 
-// Initialize driver with a song. Call inside __critical.
-void hUGE_init(const hUGESong_t *song);
+**Step 3: Validate the export**
+```bash
+python3 tools/music_song_validate.py path/to/your_song.c
+```
+Expected: `OK: ... validated successfully`
 
-// Advance one tick. Call exactly once per VBlank.
-// hUGEDriver.lib is in bank 0 — always accessible.
-void hUGE_dosound(void);
+Fix all reported errors before continuing. Common errors and fixes:
+- `missing '#pragma bank 255'` → add it at line 1 of the file
+- `missing 'BANKREF(name)'` → add `BANKREF(your_song_name)` after the pragma
+- `variable name mismatch` → rename the `hUGESong_t` variable to match the `BANKREF` name
 
-// Mute/unmute individual channels
-void hUGE_mute_channel(enum hUGE_channel_t ch, enum hUGE_mute_t mute);
-// Channels: HT_CH1=0, HT_CH2, HT_CH3, HT_CH4
-// Mute:     HT_CH_PLAY=0, HT_CH_MUTE
+**Step 4: Copy the file into the project**
 
-// Jump to a pattern position
-void hUGE_set_position(unsigned char pattern);
+```bash
+cp path/to/your_song.c src/music_data.c   # replace existing, or add as new file
+```
 
-// Force wave channel to reload (needed if you externally modified wave RAM)
-void hUGE_reset_wave(void);   // sets hUGE_current_wave = 100
+**Step 5: Update `src/music_data.h`**
+```c
+BANKREF_EXTERN(your_song_name)
+extern const hUGESong_t your_song_name;
+```
 
-extern volatile unsigned char hUGE_current_wave;
-extern volatile unsigned char hUGE_mute_mask;
+**Step 6: Update `src/music.c`**
+
+In `music_init()`, update the `SET_BANK()` and `hUGE_init()` calls:
+```c
+current_song_bank = BANK(your_song_name);
+__critical {
+    uint8_t _saved_bank = CURRENT_BANK;
+    SET_BANK(your_song_name);
+    hUGE_init(&your_song_name);
+    RESTORE_BANK();
+}
+```
+
+**Step 7: Add to `bank-manifest.json`**
+
+If adding a new file (not replacing `src/music_data.c`), add an entry:
+```json
+"src/your_song.c": { "bank": 255, "reason": "music data — autobanked" }
+```
+
+**Step 8: Validate wiring**
+```bash
+python3 tools/music_wire_check.py
+```
+Expected: `music_wire_check: all consistent`
+
+Fix all errors before building. Common errors and fixes:
+- `BANKREF_EXTERN(name) but no extern const hUGESong_t name` → add the extern declaration to `music_data.h`
+- `name declared in music_data.h but no SET_BANK(name) in music.c` → add `SET_BANK(name)` call in `music_init()`
+- `bank-manifest.json missing entry for src/music_data.c` → add the entry
+
+**Step 9: Build**
+```bash
+GBDK_HOME=/home/mathdaman/gbdk make
 ```
 
 ---
 
-## APU Enable (required before hUGE_init)
+### Scenario 2: Debugging Audio
+
+**Trigger:** Music is silent, choppy, plays the wrong song, or audio causes a crash.
+
+**Diagnose in order:**
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| No sound at all | APU not enabled | Verify `NR52_REG = 0x80` is called before `hUGE_init` in `music_init()` |
+| Music doesn't loop | Wrong order table end marker in hUGETracker | Re-export with correct order count |
+| Crash after audio starts | `music_tick()` called from VBL ISR | Move `music_tick()` to main loop — see Banking Rules |
+| Wrong song plays | `SET_BANK()` references wrong song name | Run `python3 tools/music_wire_check.py` |
+| Music glitches on state transition | `SWITCH_ROM` called from ISR during song switch | Call `music_start()` from main loop only |
+| Silent channels after SFX | Channel left muted | Call `hUGE_mute_channel(HT_CHx, HT_CH_PLAY)` after SFX completes |
+| Ticking/popping on CH3 | Wave RAM corrupted on DMG re-trigger | Follow CH3 Wave RAM safe access procedure |
+
+**Runtime inspection in Emulicious:**
+- Open Audio tab → see channel waveforms and register values live
+- Set breakpoint at `music_tick` → confirm it is called once per frame
+- Watch panel: `hUGE_mute_mask` (which channels are muted), `current_song_bank`
+
+---
+
+### Scenario 3: Adding SFX
+
+**Trigger:** Playing a one-shot sound effect alongside music.
+
+hUGEDriver has no built-in SFX system. Route SFX through channel muting:
 
 ```c
-NR52_REG = 0x80;  /* bit7=1: enable sound system */
-NR51_REG = 0xFF;  /* route all 4 channels to both left and right */
-NR50_REG = 0x77;  /* max master volume: left=7, right=7 */
-```
-
----
-
-## hUGESong_t Struct
-
-```c
-typedef struct hUGESong_t {
-    unsigned char tempo;
-    const unsigned char * order_cnt;      /* pointer to order count byte */
-    const unsigned char ** order1;        /* CH1 pattern order table */
-    const unsigned char ** order2;        /* CH2 pattern order table */
-    const unsigned char ** order3;        /* CH3 pattern order table */
-    const unsigned char ** order4;        /* CH4 pattern order table */
-    const hUGEDutyInstr_t * duty_instruments;
-    const hUGEWaveInstr_t * wave_instruments;
-    const hUGENoiseInstr_t * noise_instruments;
-    const hUGERoutine_t ** routines;      /* NULL if no custom routines */
-    const unsigned char * waves;          /* 256-byte wave table */
-} hUGESong_t;
-```
-
-Songs are exported from hUGETracker as "GBDK .c" format. The project uses the hUGEDriver sample song as a placeholder (`src/music_data.c`).
-
----
-
-## CRITICAL: Banking Rule for music.c
-
-**`music.c` must NOT have `#pragma bank 255`.**
-
-`SET_BANK(var)` expands to inline `SWITCH_ROM(BANK(var))`. If `music_tick()` lived in a switched ROM bank (0x4000–0x7FFF), calling `SET_BANK` would remap that window to the data bank — the CPU's next instructions would come from the data bank's bytes → garbage execution.
-
-`music.c` stays in bank 0 (0x0000–0x3FFF, always accessible). Same pattern as `main.c`.
-
-`music_data.c` uses `#pragma bank 255` as normal — it only runs while its bank is switched in.
-
----
-
-## Version Pinning
-
-hUGETracker and hUGEDriver **must match exactly** (e.g., hUGETracker 1.0b10 requires hUGEDriver 1.0b10). The data format changes between versions — mismatches produce silent corruption or crashes. This project vendors v6.1.3; do not update one without the other.
-
----
-
-## Sound Effects (SFX)
-
-hUGEDriver has no built-in SFX system. Coordinate SFX via channel muting:
-
-```c
-// 1. Release a channel from driver control (0=CH1, 1=CH2, 2=CH3/wave, 3=CH4/noise)
+// 1. Release a channel from driver control
 hUGE_mute_channel(HT_CH2, HT_CH_MUTE);
 
 // 2. Play SFX on that channel using your SFX engine
 
-// 3. Restore channel to hUGEDriver
+// 3. Restore channel to hUGEDriver when SFX finishes
 hUGE_mute_channel(HT_CH2, HT_CH_PLAY);
 ```
 
-**Wave channel (CH3) special case:** If you write to wave RAM (FF30–FF3F) while CH3 is released, set:
+**Wave channel (CH3) — extra step required:**
 ```c
+// After releasing CH3, if you write to wave RAM (FF30–FF3F):
 hUGE_current_wave = HT_NO_WAVE;   // forces driver to reload waveform on restore
 ```
 
-Effects 5, 8, B, D, F continue to process even on muted channels.
+**Channel selection guidance:**
+- Prefer CH2 (pulse) for most SFX — simplest restore
+- CH4 (noise) for percussive/explosion SFX
+- CH3 (wave) for melodic SFX — has the most complex restore; follow CH3 Wave RAM safe access
+- CH1 carries sweep effects; releasing it stops any active sweep SFX from hUGEDriver
 
-**Compatible SFX engines:** VGM2GBSFX, CBT-FX, Libbet's SFX Engine.
-
----
-
-## Integration Pattern
-
-### music_data.c (banked)
-
-```c
-#pragma bank 255
-#include <gb/gb.h>
-#include <stddef.h>
-#include "banking.h"
-#include "hUGEDriver.h"
-
-BANKREF(music_data_song)
-
-/* ... all static pattern/instrument/wave arrays ... */
-
-const hUGESong_t music_data_song = {
-    2,                   /* tempo */
-    &order_cnt,
-    order1, order2, order3, order4,
-    duty_instruments,
-    wave_instruments,
-    noise_instruments,
-    NULL,                /* routines */
-    waves
-};
-```
-
-### music_data.h
-
-```c
-#ifndef MUSIC_DATA_H
-#define MUSIC_DATA_H
-#include <gb/gb.h>
-#include "banking.h"
-#include "hUGEDriver.h"
-
-BANKREF_EXTERN(music_data_song)
-extern const hUGESong_t music_data_song;
-#endif
-```
-
-### music.c (bank 0 — no #pragma)
-
-```c
-/* No #pragma bank 255 — see CRITICAL note above */
-#include <gb/gb.h>
-#include <gb/hardware.h>
-#include "banking.h"
-#include "hUGEDriver.h"
-#include "music_data.h"
-#include "music.h"
-
-void music_init(void) {
-    NR52_REG = 0x80;
-    NR51_REG = 0xFF;
-    NR50_REG = 0x77;
-    __critical {
-        { SET_BANK(music_data_song);
-          hUGE_init(&music_data_song);
-          RESTORE_BANK(); }
-    }
-}
-
-void music_tick(void) {
-    { SET_BANK(music_data_song);
-      hUGE_dosound();
-      RESTORE_BANK(); }
-}
-```
-
-### music.h
-
-```c
-#ifndef MUSIC_H
-#define MUSIC_H
-/* No BANKED — these functions are in bank 0 */
-void music_init(void);
-void music_tick(void);
-#endif
-```
-
-### main.c wiring
-
-```c
-#include "music.h"
-
-static void vbl_isr(void) {
-    frame_ready = 1;
-    move_bkg(0, (uint8_t)cam_y);
-    /* DO NOT call music_tick() here — see CRITICAL note below */
-}
-
-void main(void) {
-    DISPLAY_OFF;
-    init_palettes();
-    player_init();
-    music_init();          /* before add_VBL */
-    add_VBL(vbl_isr);
-    set_interrupts(VBL_IFLAG);
-    DISPLAY_ON;
-
-    while (1) {
-        while (!frame_ready);
-        frame_ready = 0;
-        music_tick();      /* once per VBL, safely in main context */
-        input_update();
-        state_manager_update();
-    }
-}
-```
-
-**CRITICAL — Never call `music_tick()` from a VBL ISR:**
-
-`music_tick()` calls `SET_BANK`/`SWITCH_ROM`, which is a two-step write:
-`_current_bank = b; rROMB0 = b`. If the ISR fires between these two writes while a
-BANKED function trampoline is in progress in the main loop, the shadow variable and
-MBC hardware disagree. `RESTORE_BANK` in the ISR then restores from the stale shadow
-value — corrupting bank state for the trampoline's epilogue. After several deep BANKED
-call sequences (e.g., repeated state transitions), the mismatched bank causes a crash.
-
-**Rule:** The VBL ISR does display work only (`move_bkg`, sprite updates). All
-`SET_BANK` activity — including `music_tick()` — runs in the main loop after
-`frame_ready = 0`. This preserves exactly-once-per-VBL timing without ISR bank hazards.
+**Notes:**
+- hUGE effects 5, 8, B, D, F continue processing on muted channels — factor into SFX timing
+- Compatible SFX engines: VGM2GBSFX, CBT-FX, Libbet's SFX Engine
 
 ---
 
-## Makefile Changes
+### Scenario 4: Validating a Build
 
-```makefile
-# Add to CFLAGS:
-CFLAGS := ... -Ilib/hUGEDriver/include
-
-# Add lib to the ROM link rule using -Wl-k / -Wl-l (NOT as a positional arg):
-$(TARGET): $(OBJS) | build
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
-```
-
-### CRITICAL: Do NOT pass hUGEDriver.lib as a positional argument
-
-```makefile
-# WRONG — bankpack will process the .lib, overwrite hUGEDriver.rel with just
-# the 68-byte ar symbol index, and _hUGE_init/_hUGE_dosound become undefined:
-$(LCC) ... $(OBJS) lib/hUGEDriver/gbdk/hUGEDriver.lib
-
-# CORRECT — route directly to sdldgb as a search-path library (bypasses bankpack):
-$(LCC) ... $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
-```
-
-`-Wl-k<dir>` adds a library search directory; `-Wl-l<name>` names the lib to link. This is the same pattern GBDK uses internally for `sm83.lib` and `gb.lib`.
-
----
-
-## Vendoring hUGEDriver (one-time setup)
+**Trigger:** Verifying audio is correctly wired after any change to music files.
 
 ```bash
-wget -q https://github.com/SuperDisk/hUGEDriver/releases/download/v6.1.3/hUGEDriver-6.1.3.zip \
-     -O /tmp/hUGEDriver.zip
-mkdir -p lib/hUGEDriver/include lib/hUGEDriver/gbdk
-unzip -j /tmp/hUGEDriver.zip include/hUGEDriver.h -d lib/hUGEDriver/include/
-unzip -j /tmp/hUGEDriver.zip gbdk/hUGEDriver.lib   -d lib/hUGEDriver/gbdk/
+# If a new song .c was added or modified:
+python3 tools/music_song_validate.py src/music_data.c
+
+# Cross-file consistency check (always run):
+python3 tools/music_wire_check.py
+
+# Build:
+GBDK_HOME=/home/mathdaman/gbdk make
+```
+
+Both scripts must exit 0 and the build must produce zero errors before treating audio as verified.
+
+---
+
+## Reference
+
+### hUGEDriver v6.1.3 API
+
+```c
+#include "hUGEDriver.h"
+
+void hUGE_init(const hUGESong_t *song);        // init driver with song; call inside __critical
+void hUGE_dosound(void);                        // advance one tick; call once per VBL
+void hUGE_mute_channel(enum hUGE_channel_t ch, enum hUGE_mute_t mute);
+void hUGE_set_position(unsigned char pattern);  // jump to pattern index in order table
+void hUGE_reset_wave(void);                     // force wave channel reload (sets current_wave=100)
+
+extern volatile unsigned char hUGE_current_wave;
+extern volatile unsigned char hUGE_mute_mask;
+
+// Channels: HT_CH1=0, HT_CH2=1, HT_CH3=2, HT_CH4=3
+// Mute:     HT_CH_PLAY=0, HT_CH_MUTE=1
 ```
 
 ---
 
-## Adapting a hUGETracker Export
+### hUGESong_t Struct
 
-1. Export song from hUGETracker as "GBDK .c" format
-2. Add to the top of the exported file:
-   ```c
-   #pragma bank 255
-   #include <gb/gb.h>
-   #include "banking.h"
-   BANKREF(your_song_name)
-   ```
-3. Rename the exported `const hUGESong_t ...` variable to match your `BANKREF` name
-4. Update `music_data.h` with `BANKREF_EXTERN` and `extern` declaration
-5. Update `music.c` to reference the new song name in `SET_BANK` and `hUGE_init`
+```c
+typedef struct hUGESong_t {
+    unsigned char tempo;
+    const unsigned char * order_cnt;       // pointer to order count byte
+    const unsigned char ** order1;         // CH1 pattern order table
+    const unsigned char ** order2;         // CH2 pattern order table
+    const unsigned char ** order3;         // CH3 pattern order table
+    const unsigned char ** order4;         // CH4 pattern order table
+    const hUGEDutyInstr_t * duty_instruments;
+    const hUGEWaveInstr_t * wave_instruments;
+    const hUGENoiseInstr_t * noise_instruments;
+    const hUGERoutine_t ** routines;       // NULL if no custom routines
+    const unsigned char * waves;           // 256-byte wave table
+} hUGESong_t;
+```
 
 ---
 
-## Placeholder Song Source
+### APU Enable (required before hUGE_init)
 
-The current placeholder uses the hUGEDriver sample song:
+```c
+NR52_REG = 0x80;  // bit7=1: enable APU
+NR51_REG = 0xFF;  // route all 4 channels to both speakers
+NR50_REG = 0x77;  // max master volume: left=7, right=7
 ```
-https://raw.githubusercontent.com/SuperDisk/hUGEDriver/master/gbdk_example/src/sample_song.c
-```
-68 orders, 40 patterns. Replace with a real composition when ready.
 
 ---
 
-## APU Register Map (FF10–FF3F)
+### Playback Control Patterns
+
+#### Pause / Resume
+
+```c
+// Pause — stop advancing song position AND silence all channels
+__critical { remove_VBL(hUGE_dosound); }
+hUGE_mute_channel(HT_CH1, HT_CH_MUTE);
+hUGE_mute_channel(HT_CH2, HT_CH_MUTE);
+hUGE_mute_channel(HT_CH3, HT_CH_MUTE);
+hUGE_mute_channel(HT_CH4, HT_CH_MUTE);
+
+// Resume
+hUGE_mute_channel(HT_CH1, HT_CH_PLAY);
+hUGE_mute_channel(HT_CH2, HT_CH_PLAY);
+hUGE_mute_channel(HT_CH3, HT_CH_PLAY);
+hUGE_mute_channel(HT_CH4, HT_CH_PLAY);
+__critical { add_VBL(hUGE_dosound); }
+```
+
+> **Project note:** This project calls `music_tick()` from the main loop (not `add_VBL`). For the main-loop pattern, add a `music_paused` flag and check it in `music_tick()` to skip `hUGE_dosound` when paused.
+>
+> Muting alone (without stopping the VBL/tick) silences audio but the driver still advances position. Use both mute + stop-tick if you need the song to resume from the same position.
+
+#### Song Switching
+
+`music_start()` is already implemented in `src/music.c`. Its pattern for reference:
+```c
+// 1. Mute all channels to silence immediately
+hUGE_mute_channel(HT_CH1, HT_CH_MUTE); /* ... all four channels */
+
+// 2. Store the new song's bank
+current_song_bank = bank;  // VBL wrapper reads this to SET_BANK before hUGE_dosound
+
+// 3. Init the new song inside __critical with manual bank switch
+__critical {
+    uint8_t _saved_bank = CURRENT_BANK;
+    SWITCH_ROM(bank);
+    hUGE_init(song);
+    SWITCH_ROM(_saved_bank);
+}
+
+// 4. Unmute all channels
+hUGE_mute_channel(HT_CH1, HT_CH_PLAY); /* ... all four channels */
+```
+
+#### Volume Fading
+
+No built-in API. Manipulate NR50/NR51 directly each frame:
+```c
+// volume: 0..7 (decrement/increment each frame for a fade)
+NR50_REG = AUDVOL_VOL_LEFT(volume) | AUDVOL_VOL_RIGHT(volume);
+// NR50 = 0 is still slightly audible — set NR51 = 0 to fully silence
+NR51_REG = (volume != 0) ? 0xFF : 0x00;
+```
+
+#### Position Jump
+
+```c
+hUGE_set_position(pattern_index);  // jump to pattern_index in the order table
+```
+
+---
+
+### Banking Rules (music-specific)
+
+**`music.c` must NOT have `#pragma bank 255`.**
+
+`SET_BANK(var)` / `SWITCH_ROM(b)` expands to inline code that remaps the 0x4000–0x7FFF window. If `music_tick()` lived in a switched bank, calling `SWITCH_ROM` inside it would remap the window the CPU is currently executing from — the CPU's next instructions come from the data bank's bytes → garbage execution → crash.
+
+`music.c` stays in bank 0 (0x0000–0x3FFF, always accessible). Bank 0 files must **omit** `#pragma bank` entirely.
+
+**Never call `music_tick()` from a VBL ISR.**
+
+`music_tick()` calls `SWITCH_ROM`, which is a two-step write: `_current_bank = b; rROMB0 = b`. If the ISR fires between these two writes while a BANKED function trampoline is in progress in the main loop, the shadow variable and MBC hardware disagree. `RESTORE_BANK` in the ISR then restores from the stale shadow value — corrupting bank state for the trampoline's epilogue. After several deep BANKED call sequences (e.g. repeated state transitions), the mismatched bank causes a crash.
+
+**Rule:** The VBL ISR does display work only (`move_bkg`, sprite updates). All `SWITCH_ROM` activity — including `music_tick()` — runs in the main loop after `frame_ready = 0`.
+
+---
+
+### APU Hardware Reference
+
+#### Register Map (FF10–FF3F)
 
 ```
 Name  Addr  Bits        Function
@@ -316,7 +307,7 @@ NR10  FF10  -PPP NSSS   CH1 sweep: pace, negate, shift
 NR11  FF11  DDLL LLLL   CH1 duty + length load (64-L)
 NR12  FF12  VVVV APPP   CH1 volume envelope: init vol, add, period
 NR13  FF13  FFFF FFFF   CH1 period low (write-only)
-NR14  FF14  TL-- -FFF   CH1 trigger, length enable, period high
+NR14  FF14  TL-- -FFF   CH1 trigger (bit7), length enable, period high
 
 NR21  FF16  DDLL LLLL   CH2 duty + length load
 NR22  FF17  VVVV APPP   CH2 volume envelope
@@ -341,14 +332,41 @@ NR52  FF26  P--- NW21   APU power (bit 7); channel active flags (read-only bits 
 FF30–FF3F               Wave RAM: 16 bytes = 32 four-bit samples (high nibble first)
 ```
 
-**Read-back mask (ORed with written value):**
-CH1: $80/$3F/$00/$FF/$BF — CH2: $FF/$3F/$00/$FF/$BF — CH3: $7F/$FF/$9F/$FF/$BF — CH4: $FF/$FF/$00/$00/$BF
+Read-back mask (ORed with written value):
+CH1: `$80/$3F/$00/$FF/$BF` — CH2: `$FF/$3F/$00/$FF/$BF` — CH3: `$7F/$FF/$9F/$FF/$BF` — CH4: `$FF/$FF/$00/$00/$BF`
 
----
+#### Trigger Event Atomics
 
-## APU Frame Sequencer
+Writing bit 7 of NRx4 atomically does all of the following in one cycle:
 
-Clocked at **512 Hz** off the DIV register (bit 4 falling edge). Drives modulation at lower rates:
+1. Channel enabled flag set
+2. Length counter: if zero, loaded to 64 (256 for CH3)
+3. Frequency timer reloaded with period
+4. Volume envelope timer + volume reloaded from NRx2
+5. CH4 LFSR: all bits set to 1
+6. CH3: position reset to 0; sample buffer NOT refilled (first wave nibble skipped until loop)
+7. CH1 sweep: frequency copied to shadow register, timer reloaded, overflow check run if shift ≠ 0
+
+**Critical:** If DAC is off at trigger time, the channel is immediately disabled again after trigger.
+- CH1/CH2/CH4: DAC is off when upper 5 bits of NRx2 are all zero
+- CH3: DAC is off when NR30 bit 7 = 0
+
+#### CH1 Sweep Shadow Register
+
+CH1 has a frequency shadow register used by the sweep unit. On trigger, the current period is copied into the shadow. The sweep unit reads from and writes back to the shadow; the actual NR13/NR14 period registers are only updated when the sweep unit runs. Writing NR13/NR14 during playback updates the real registers but not the shadow — the sweep unit will overwrite with the shadow value on next sweep step.
+
+#### Envelope DAC-Off Behavior
+
+A channel's DAC is controlled by NRx2 (bits 7–3 = initial volume + envelope direction). If all five bits are zero:
+- DAC is off
+- Triggering the channel immediately disables it again
+- The channel cannot produce sound regardless of other register values
+
+Always ensure `NRx2 & 0xF8 != 0` before triggering CH1/CH2/CH4.
+
+#### Frame Sequencer Off-by-One
+
+The 512 Hz frame sequencer is driven by the DIV register bit 4 falling edge. It steps 0–7 continuously:
 
 ```
 Step  Length Ctr  Vol Env  Sweep
@@ -365,60 +383,85 @@ Step  Length Ctr  Vol Env  Sweep
 Rate  256 Hz      64 Hz    128 Hz
 ```
 
+**Off-by-one hazard:** The step active at trigger time affects whether length/envelope timers are reloaded ±1 tick. Triggering during step 7 (envelope clock step) vs any other step produces slightly different initial envelope behavior. This causes subtle timing bugs when re-triggering channels rapidly (e.g. fast arpeggios). Not affected by CGB double-speed mode.
+
 **APU timing is NOT affected by CGB double-speed mode** — same rates regardless of CPU speed.
 
----
+#### NR43 Divisor Table (CH4 noise frequency)
 
-## APU Hardware Notes
+| Code | Divisor | Code | Divisor |
+|------|---------|------|---------|
+| 0    | 8       | 4    | 64      |
+| 1    | 16      | 5    | 80      |
+| 2    | 32      | 6    | 96      |
+| 3    | 48      | 7    | 112     |
 
-- `NR52_REG` (FF26) bit 7 = master on/off; turning off clears all APU registers (FF10–FF51) instantly. Wave RAM is unaffected.
-- `NR51_REG` (FF25) = channel panning; `0xFF` = all channels on both speakers.
-- `NR50_REG` (FF24) = master volume; `0x77` = max (7 left, 7 right). Bit 7/3 = Vin panning (ignore).
-- hUGEDriver uses CH1 (pulse+sweep), CH2 (pulse), CH3 (wave), CH4 (noise).
-- **DAC enable — CH1/CH2/CH4:** DAC on when `NRx2 & 0xF8 != 0` (init volume ≠ 0 or envelope direction = add). Channel is silenced when DAC is off regardless of trigger.
-- **DAC enable — CH3:** controlled by NR30 bit 7 exclusively.
-- Timer periods: CH1/CH2 = `(2048-freq)*4`; CH3 = `(2048-freq)*2`.
-- Envelope/sweep period 0 treated as 8.
-- CH4 noise LFSR: clock shift ≥ 14 → no clocks (silence). 7-bit mode (NR43 bit 3 = 1) → more tonal noise.
+Timer period = `divisor << clock_shift`. Clock shifts 14 or 15 produce no clocks (silence). LFSR width mode (`NR43 bit 3 = 1`) = 7-bit LFSR → more tonal/periodic noise.
 
----
+#### CGB Zombie Mode (NRx2 mid-playback writes)
 
-## CH3 Wave RAM — Safe Access Rules
+Writing NRx2 while a channel is active has unpredictable behavior on DMG that varies by hardware revision. The only reliably portable trick across all GB models:
 
-**DMG hardware only (not an issue on CGB):** Re-triggering CH3 while it is actively reading Wave RAM corrupts the first 4 bytes of Wave RAM.
+- Before trigger: write `(volume << 4) | 0x08` to NRx2 to set starting volume
+- During playback: write `0x08` to NRx2 to increment volume by 1
+
+Avoid all other mid-playback NRx2 manipulation unless targeting CGB only.
+
+#### CH3 Wave RAM — Safe Access Rules
+
+**DMG hardware only:** Re-triggering CH3 while it is actively reading Wave RAM corrupts the first 4 bytes of Wave RAM.
 
 Safe procedure for re-triggering CH3:
-1. Disable DAC: write 0 to NR30 (`NR30_REG = 0`)
+1. Disable DAC: `NR30_REG = 0`
 2. Write new Wave RAM data (FF30–FF3F)
-3. Re-enable DAC: write `0x80` to NR30
+3. Re-enable DAC: `NR30_REG = 0x80`
 4. Trigger: write trigger bit to NR34
 
-When NOT using hUGEDriver for CH3 (after `hUGE_mute_channel(HT_CH3, HT_CH_MUTE)`), follow this sequence to avoid corruption on real DMG hardware.
+When NOT using hUGEDriver for CH3 (after `hUGE_mute_channel(HT_CH3, HT_CH_MUTE)`), always follow this sequence to avoid corruption on real DMG hardware.
 
-Note: Wave RAM reads on DMG only work when the channel is actively reading that byte. CGB allows Wave RAM access any time.
-
----
-
-## Model Differences (DMG vs CGB)
+#### Model Differences (DMG vs CGB)
 
 | Behavior | DMG | CGB |
 |----------|-----|-----|
-| Wave RAM access while CH3 active | Read only works within a couple clocks of wave read | Any time |
-| CH3 retrigger without disabling NR30 | Corrupts first 4 bytes of wave RAM | Works normally |
-| Length counters at power-off | Preserved, can be written while off | Zero'd at power-on |
-| High-pass filter charge factor | 0.999958 | 0.998943 (MGB same as CGB) |
+| Wave RAM access while CH3 active | Only works within a few clocks of wave read | Any time |
+| CH3 retrigger without disabling NR30 | Corrupts first 4 bytes of Wave RAM | Works normally |
+| Length counters at power-off | Preserved | Zero'd at power-on |
+| High-pass filter charge factor | 0.999958 | 0.998943 |
 
 ---
 
-## Common Mistakes
+### Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
-| `#pragma bank 255` in `music.c` | Remove it — `music.c` must be in bank 0 |
-| `add_VBL(hUGE_dosound)` directly | Use a wrapper that calls `SET_BANK` first |
+| `#pragma bank 255` in `music.c` | Remove it — `music.c` must be in bank 0 (no `#pragma bank`) |
+| `add_VBL(hUGE_dosound)` directly | Use a wrapper that calls `SWITCH_ROM` first (or use `music_tick()` in main loop) |
 | Calling `hUGE_init` without `__critical` | Wrap in `__critical { ... }` |
 | Forgetting APU enable | Call `NR52_REG = 0x80` before `hUGE_init` |
 | `BANKED` on `music_init`/`music_tick` | Not needed — they're in bank 0 |
 | Passing `hUGEDriver.lib` as positional arg to lcc | Use `-Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib` — positional arg causes bankpack to corrupt the lib |
-| Accessing `hUGE_current_wave` to silence CH3 | Use `hUGE_mute_channel(HT_CH3, HT_CH_MUTE)` |
-| Calling `music_tick()` inside `vbl_isr()` | Call it in the main loop after `frame_ready = 0` — `SET_BANK` inside an ISR corrupts MBC shadow state when the ISR fires mid-trampoline, causing crashes after several deep BANKED call sequences |
+| Calling `music_tick()` inside `vbl_isr()` | Call it in the main loop after `frame_ready = 0` — `SWITCH_ROM` inside an ISR corrupts MBC shadow state, causing crashes after several deep BANKED call sequences |
+| Song variable name doesn't match BANKREF | Run `music_song_validate.py` — it catches this |
+| Inconsistency between music_data.h, music.c, or bank-manifest.json | Run `music_wire_check.py` — it catches cross-file mismatches |
+
+---
+
+### Makefile
+
+```makefile
+# Add to CFLAGS:
+CFLAGS := ... -Ilib/hUGEDriver/include
+
+# Link rule — route lib via -Wl-k/-Wl-l (NOT as positional arg):
+$(TARGET): $(OBJS) | build
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) \
+	    -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
+```
+
+`-Wl-k<dir>` adds a library search directory; `-Wl-l<name>` names the lib. Positional arg causes bankpack to process the `.lib` and overwrite `hUGEDriver.rel` with just the 68-byte ar symbol index — `_hUGE_init`/`_hUGE_dosound` become undefined.
+
+---
+
+### Version Pinning
+
+hUGETracker and hUGEDriver **must match exactly** (e.g. hUGETracker 1.0b10 requires hUGEDriver 1.0b10). The data format changes between versions — mismatches produce silent corruption or crashes. This project vendors **v6.1.3**. Do not update one without the other.
