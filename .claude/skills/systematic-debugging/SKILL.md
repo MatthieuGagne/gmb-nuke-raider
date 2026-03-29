@@ -1,5 +1,5 @@
 ---
-name: debug
+name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior — before proposing fixes. Enforces hypothesis-queue-first debugging with hard rules against fixation and cascading regressions. Shadows global systematic-debugging with GBC-specific tooling and a 3-strikes halt rule.
 ---
 
@@ -131,4 +131,4 @@ When triggered:
 
 - Motivation: the ~33s stall bug investigation spanned 5+ sessions. Claude fixated on music/order_cnt, introduced a worse crash (26s stall), and dismissed the new symptom as the known issue. This skill prevents all three failure modes.
 - Stateless across sessions — each invocation starts from what the user provides in Mode A
-- This skill shadows the global `systematic-debugging` skill for this project
+- This skill is the local `systematic-debugging` skill, shadowing the global superpowers version with GBC-specific tooling
