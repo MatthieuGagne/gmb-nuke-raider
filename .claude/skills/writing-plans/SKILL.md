@@ -15,10 +15,6 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ## Before You Begin
 
-If there is an approved design or a GitHub issue with a PRD in this conversation, proceed directly to writing the plan.
-
-If not, invoke the `grill-me` skill first — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed.
-
 **First action before anything else:** Pull and merge latest master into the current worktree branch:
 ```bash
 git fetch origin && git merge origin/master
@@ -28,6 +24,8 @@ Resolve any conflicts before proceeding.
 **Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+
+**Last step before writing:** Always invoke the `grill-me` skill — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed to writing the plan.
 
 ## Hard Gate Sequence
 
