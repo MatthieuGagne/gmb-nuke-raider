@@ -5,10 +5,6 @@ description: TRIGGER after every successful ROM build. Runs `make memory-check` 
 
 # GB Memory Validator Skill
 
-## When This Skill Triggers
-
-After a successful `make` — a fresh `build/nuke-raider.gb` exists and the build succeeded. Run the `bank-post-build` skill first for ROM bank budget checks.
-
 ## What to Do
 
 1. Announce: "Running `make memory-check` to validate WRAM/VRAM/OAM budgets."
