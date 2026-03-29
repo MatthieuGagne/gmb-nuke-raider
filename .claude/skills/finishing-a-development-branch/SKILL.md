@@ -9,7 +9,7 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 Guide completion of development work by presenting clear options and handling chosen workflow.
 
-**Core principle:** Verify tests → Bank gates → Smoketest → Present options → Execute choice → Clean up.
+**Core principle:** Verify tests → Merge master → Bank gates → Smoketest → Present options → Execute choice → Clean up.
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
@@ -36,22 +36,29 @@ Stop. Don't proceed to Step 2.
 
 **If tests pass:** Continue to Step 2.
 
-### Step 2: HARD GATE — bank-post-build
+### Step 2: Merge latest master (mandatory — always run this, even for doc-only branches)
+
+```bash
+git fetch origin && git merge origin/master
+```
+
+**If merge conflicts occur:** resolve them now, commit the merge, then continue. Do NOT push until the merge is clean. This is the step that catches divergence before it becomes a PR conflict.
+
+**If fast-forward or clean merge:** continue to Step 3.
+
+### Step 3: HARD GATE — bank-post-build
 
 **Run before the smoketest:**
 
 Invoke the `bank-post-build` skill. If it reports any FAIL, stop and fix before continuing.
 
-Only continue to Step 3 when it passes.
+Only continue to Step 4 when it passes.
 
-### Step 3: Smoketest in Emulicious
+### Step 4: Smoketest in Emulicious
 
-1. Fetch and merge latest master (from the **worktree** directory — never from the main repo):
-   ```bash
-   git fetch origin && git merge origin/master
-   ```
+**Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 5.
 
-2. Always do a clean build:
+1. Always do a clean build (master is already merged from Step 2):
    ```bash
    make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
@@ -70,9 +77,9 @@ Only continue to Step 3 when it passes.
 **Stop. Wait for explicit confirmation.**
 
 - If issues found: work with user to fix before continuing
-- If confirmed: Continue to Step 4
+- If confirmed: Continue to Step 5
 
-### Step 4: Present Options
+### Step 5: Present Options
 
 Present exactly these 3 options:
 
@@ -90,7 +97,7 @@ Which option?
 
 **Don't add explanation** — keep options concise.
 
-### Step 5: Execute Choice
+### Step 6: Execute Choice
 
 #### Option 1: Push and Create PR
 
@@ -151,9 +158,9 @@ git worktree remove --force <worktree-path>
 git -C /home/mathdaman/code/gmb-nuke-raider branch -D <feature-branch>
 ```
 
-Then run Step 6 immediately.
+Then run Step 7 immediately.
 
-### Step 6: Cleanup Worktree
+### Step 7: Cleanup Worktree
 
 #### After merge confirmation (Option 1 only)
 
@@ -244,13 +251,14 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - Launch emulator from main repo's `build/` (may be stale)
 - Skip bank-post-build or `make memory-check` before smoketest
 - Clean up worktree immediately after PR creation (wait for merge confirmation)
+- Push without running Step 2 — even doc-only branches can have conflicts
 
 **Always:**
 - Work on a feature branch
 - Integrate via PR only
 - Verify tests before offering options
 - Run bank-post-build + `make memory-check` before smoketest
-- Fetch + merge origin/master before smoketest rebuild
+- Fetch + merge origin/master at Step 2 — unconditionally, before any build or push
 - Launch Emulicious from worktree directory
 - Present exactly 3 options
 - Get typed confirmation for Option 3
@@ -261,7 +269,7 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 
 **Called by:**
 - **subagent-driven-development** (final step) — after all tasks complete
-- **executing-plans** (Step 6) — after all batches complete
+- **executing-plans** (Step 7) — after all batches complete
 
 **Pairs with:**
 - **using-git-worktrees** — cleans up worktree created by that skill
