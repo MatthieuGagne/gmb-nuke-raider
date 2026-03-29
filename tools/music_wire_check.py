@@ -9,6 +9,7 @@ Checks:
   2. Every name declared in src/music_data.h appears as BANK(name)
      in src/music.c
   3. src/bank-manifest.json has an entry for 'src/music_data.c'
+     and its bank is not 0
 
 Usage:
     python3 tools/music_wire_check.py [repo_root]
@@ -26,8 +27,12 @@ def check(repo_root='.'):
 
     # --- Parse src/music_data.h ---
     h_path = os.path.join(repo_root, 'src', 'music_data.h')
-    with open(h_path) as f:
-        h_content = f.read()
+    try:
+        with open(h_path) as f:
+            h_content = f.read()
+    except OSError as e:
+        errors.append(f"ERROR: cannot open '{h_path}': {e}")
+        return errors
 
     bankref_extern_names = set(re.findall(r'\bBANKREF_EXTERN\((\w+)\)', h_content))
     extern_song_names = set(re.findall(r'\bextern\s+const\s+hUGESong_t\s+(\w+)', h_content))
@@ -46,8 +51,12 @@ def check(repo_root='.'):
 
     # --- Parse src/music.c ---
     c_path = os.path.join(repo_root, 'src', 'music.c')
-    with open(c_path) as f:
-        c_content = f.read()
+    try:
+        with open(c_path) as f:
+            c_content = f.read()
+    except OSError as e:
+        errors.append(f"ERROR: cannot open '{c_path}': {e}")
+        return errors
 
     bank_names = set(re.findall(r'\bBANK\((\w+)\)', c_content))
 
@@ -61,13 +70,23 @@ def check(repo_root='.'):
 
     # --- Parse bank-manifest.json ---
     manifest_path = os.path.join(repo_root, 'bank-manifest.json')
-    with open(manifest_path) as f:
-        manifest = json.load(f)
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+    except OSError as e:
+        errors.append(f"ERROR: cannot open '{manifest_path}': {e}")
+        return errors
 
     # Check 3: bank-manifest.json must have an entry for src/music_data.c
+    # and it must not be assigned to bank 0
     if 'src/music_data.c' not in manifest:
         errors.append(
             "ERROR: bank-manifest.json is missing an entry for 'src/music_data.c'"
+        )
+    elif manifest['src/music_data.c']['bank'] == 0:
+        errors.append(
+            "ERROR: bank-manifest.json has 'src/music_data.c' assigned to bank 0 "
+            "— music data must be in a non-zero bank"
         )
 
     return errors
@@ -81,6 +100,7 @@ def main():
             print(e, file=sys.stderr)
         sys.exit(1)
     print("OK: music_data.h, music.c, and bank-manifest.json are consistent")
+    sys.exit(0)
 
 
 if __name__ == '__main__':

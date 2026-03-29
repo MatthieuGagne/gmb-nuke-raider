@@ -1,38 +1,47 @@
 #!/usr/bin/env python3
 """
-music_song_validate.py — validates a hUGETracker GBDK .c export.
-
-Checks:
-  1. File has '#pragma bank 255'
-  2. File has 'BANKREF(name)'
-  3. 'const hUGESong_t name = ...' variable name matches BANKREF name
+music_song_validate.py — validates a hUGETracker .c export before adding it to the project.
+Exits 0 on success, 1 if any check fails.
 
 Usage:
-    python3 tools/music_song_validate.py <song.c>
+    python3 tools/music_song_validate.py <song.c> [repo_root]
+    or imported as a module: music_song_validate.validate(file_path) -> list[str]
 
-Exits 0 on valid export, non-zero with error message on failure.
+Checks:
+    1. Any '#pragma bank N' must appear in first 5 lines
+    2. 'BANKREF(varname)' must be present — extracts varname
+    3. 'const hUGESong_t varname' must appear and varname must match BANKREF name
 """
 import re
 import sys
 
 
-def validate(path):
-    with open(path) as f:
-        content = f.read()
+def validate(file_path):
+    """Return list of error strings. Empty list means all clear."""
+    try:
+        with open(file_path) as f:
+            content = f.read()
+    except OSError as e:
+        return [f"ERROR: cannot open '{file_path}': {e}"]
 
     errors = []
 
-    # Check 1: #pragma bank 255
-    if '#pragma bank 255' not in content:
-        errors.append("ERROR: missing '#pragma bank 255' — add it to the top of the file")
+    lines = content.splitlines()
+    first_lines = lines[:5]
+
+    # Check 1: any #pragma bank N in first 5 lines
+    pragma_lines = [l for l in first_lines if re.match(r'#pragma bank \d+', l.strip())]
+    if not pragma_lines:
+        errors.append(
+            f"ERROR: {file_path} missing '#pragma bank N' in first 5 lines "
+            f"(hUGETracker exports use 255; adapted files use the assigned bank number)"
+        )
 
     # Check 2: BANKREF(name)
     bankref_match = re.search(r'\bBANKREF\((\w+)\)', content)
     if not bankref_match:
         errors.append("ERROR: missing 'BANKREF(name)' — add 'BANKREF(your_song_name)' to the top")
-        for e in errors:
-            print(e, file=sys.stderr)
-        return False
+        return errors
 
     bankref_name = bankref_match.group(1)
 
@@ -48,21 +57,20 @@ def validate(path):
                 f"but hUGESong_t variable is '{song_name}' — they must match"
             )
 
-    if errors:
-        for e in errors:
-            print(e, file=sys.stderr)
-        return False
-
-    print(f"OK: {path} — BANKREF({bankref_name}), #pragma bank 255, hUGESong_t {bankref_name}")
-    return True
+    return errors
 
 
 def main():
     if len(sys.argv) != 2:
         print("Usage: music_song_validate.py <song.c>", file=sys.stderr)
         sys.exit(1)
-    if not validate(sys.argv[1]):
+    errors = validate(sys.argv[1])
+    if errors:
+        for e in errors:
+            print(e, file=sys.stderr)
         sys.exit(1)
+    print(f"OK: {sys.argv[1]} — validated successfully")
+    sys.exit(0)
 
 
 if __name__ == '__main__':
