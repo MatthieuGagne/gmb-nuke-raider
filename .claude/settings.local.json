@@ -296,7 +296,8 @@
       "Bash(kill -9 97673)",
       "Bash(python3 tests/integration/diagnose_audio.py)",
       "Bash(make bank-post-build:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))"
     ]
   },
   "hooks": {
