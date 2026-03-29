@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """
-music_wire_check.py — validates music_data.h, music.c, and bank-manifest.json
-are mutually consistent.
-
-Checks:
-  1. Every BANKREF_EXTERN(name) in src/music_data.h has a matching
-     'extern const hUGESong_t name' in the same file
-  2. Every name declared in src/music_data.h appears as BANK(name)
-     in src/music.c
-  3. src/bank-manifest.json has an entry for 'src/music_data.c'
-     and its bank is not 0
+music_wire_check.py — validates mutual consistency of music_data.h, music.c,
+and bank-manifest.json.
+Exits 0 on success, 1 if any check fails.
 
 Usage:
     python3 tools/music_wire_check.py [repo_root]
+    or imported as a module: music_wire_check.check(repo_root) -> list[str]
 
-Exits 0 when consistent, non-zero with clear error on any mismatch.
+Checks:
+    1. src/music_data.h: BANKREF_EXTERN(name) and extern hUGESong_t name must match
+    2. src/music.c: SET_BANK(name) and hUGE_init(&name) must match name from check 1
+    3. bank-manifest.json: entry for src/music_data.c must exist, bank must not be 0
+    4. src/music.c must NOT contain #pragma bank
 """
 import json
 import os
@@ -58,15 +56,30 @@ def check(repo_root='.'):
         errors.append(f"ERROR: cannot open '{c_path}': {e}")
         return errors
 
-    bank_names = set(re.findall(r'\bBANK\((\w+)\)', c_content))
+    # Check 2: each declared song name has SET_BANK(name) and hUGE_init(&name) in music.c
+    set_bank_names = set(re.findall(r'\bSET_BANK\((\w+)\)', c_content))
+    huge_init_names = set(re.findall(r'\bhUGE_init\(&(\w+)\)', c_content))
 
-    # Check 2: each declared song name has a BANK(name) reference in music.c
     for name in bankref_extern_names:
-        if name not in bank_names:
+        if name not in set_bank_names:
             errors.append(
                 f"ERROR: '{name}' is declared in music_data.h "
-                f"but has no BANK({name}) call in music.c"
+                f"but has no SET_BANK({name}) call in music.c"
             )
+        if name not in huge_init_names:
+            errors.append(
+                f"ERROR: '{name}' is declared in music_data.h "
+                f"but has no hUGE_init(&{name}) call in music.c"
+            )
+
+    # Check 4: music.c must NOT contain #pragma bank (as a directive, not in comments)
+    if re.search(r'^\s*#pragma\s+bank', c_content, re.MULTILINE):
+        errors.append(
+            f"ERROR: {c_path} contains '#pragma bank' — "
+            f"music.c must be in bank 0 (no pragma). "
+            f"SET_BANK/SWITCH_ROM inside a banked file would remap instructions "
+            f"out from under itself."
+        )
 
     # --- Parse bank-manifest.json ---
     manifest_path = os.path.join(repo_root, 'bank-manifest.json')
@@ -99,7 +112,7 @@ def main():
         for e in errors:
             print(e, file=sys.stderr)
         sys.exit(1)
-    print("OK: music_data.h, music.c, and bank-manifest.json are consistent")
+    print("music_wire_check: all consistent")
     sys.exit(0)
 
 
