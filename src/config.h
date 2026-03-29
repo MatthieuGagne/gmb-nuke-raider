@@ -64,9 +64,6 @@
 #define HUB_PORTRAIT_BOX_W     6u    /* portrait box width in tiles (cols 0-5) */
 #define HUB_DIALOG_BOX_W       14u   /* dialog box width in tiles (cols 6-19) */
 
-/* SFX pool */
-#define MAX_SFX  2u  /* simultaneous one-shot SFX slots; both CH4 for v1 */
-
 /* Projectile pool */
 #define MAX_PROJECTILES       8u
 #define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
