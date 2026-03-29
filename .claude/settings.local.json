@@ -278,7 +278,8 @@
       "WebFetch(domain:docs.pyboy.dk)",
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove /home/mathdaman/code/nuke-raider/.claude/worktrees/feat+issue-208-music-expert-rewrite)",
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune)",
-      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list)"
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list)",
+      "Bash(git merge:*)"
     ]
   },
   "hooks": {
