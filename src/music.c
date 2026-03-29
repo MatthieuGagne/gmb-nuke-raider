@@ -17,6 +17,16 @@
 
 static uint8_t current_song_bank = 0;
 
+/* music_vbl_isr — called every VBL by the GBDK ISR chain.
+ * Runs with IME=0 (inside ISR) — no __critical wrapper needed.
+ * NONBANKED: must remain in bank 0 — never swapped out during dispatch. */
+static void music_vbl_isr(void) NONBANKED {
+    uint8_t _saved_bank = CURRENT_BANK;
+    SWITCH_ROM(current_song_bank);
+    hUGE_dosound();
+    SWITCH_ROM(_saved_bank);
+}
+
 void music_init(void) {
     NR52_REG = 0x80;  /* enable APU */
     NR51_REG = 0xFF;  /* route all channels to both speakers */
@@ -27,6 +37,7 @@ void music_init(void) {
           hUGE_init(&music_data_song);
           RESTORE_BANK(); }
     }
+    add_VBL(music_vbl_isr);   /* drive hUGE_dosound() from VBL ISR */
 }
 
 void music_start(uint8_t bank, const hUGESong_t *song) {
@@ -40,12 +51,8 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
-    __critical {
-        uint8_t _saved_bank = CURRENT_BANK;
-        SWITCH_ROM(current_song_bank);
-        hUGE_dosound();
-        SWITCH_ROM(_saved_bank);
-    }
+    /* no-op: hUGE_dosound() is now called from music_vbl_isr() registered
+     * in music_init(). This stub is kept for API compatibility. */
 }
 
 void vbl_sync(void) {

@@ -4,8 +4,9 @@
 #include <gb/gb.h>
 #include "hUGEDriver.h"
 
-/* music_init() — enable APU and start the default song. Call once in main()
- * before the game loop, after hardware init. */
+/* music_init() — enable APU, start the default song, and register the VBL ISR
+ * that calls hUGE_dosound() every frame. Call once in main() before the game
+ * loop, after hardware init. */
 void music_init(void);
 
 /* music_start() — switch to a different track at runtime.
@@ -13,8 +14,8 @@ void music_init(void);
  * song: pointer to the hUGESong_t in that bank. */
 void music_start(uint8_t bank, const hUGESong_t *song);
 
-/* music_tick() — advance the music driver by one tick. Call once per frame
- * in the main loop (not from vbl_isr). */
+/* music_tick() — no-op. hUGE_dosound() is now driven by a VBL ISR registered
+ * in music_init(). Kept for API compatibility. */
 void music_tick(void);
 
 /* vbl_sync() — wait for the next VBlank (via frame_ready flag), then call
