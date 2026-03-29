@@ -37,7 +37,7 @@
 #define MAP_TILES_W  20u
 #define MAP_TILES_H  100u
 
-#define HUD_SCANLINE 128  /* pixel row where HUD window begins; used for player movement bounds */
+#define HUD_SCANLINE 128u /* pixel row where HUD window begins; used for player movement bounds */
 
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
