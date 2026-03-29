@@ -67,6 +67,9 @@
 /* SFX pool */
 #define MAX_SFX  2u  /* simultaneous one-shot SFX slots; both CH4 for v1 */
 
+/* Checkpoint pool ceiling — max checkpoints per track across all tracks */
+#define MAX_CHECKPOINTS 8u
+
 /* Projectile pool */
 #define MAX_PROJECTILES       8u
 #define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
