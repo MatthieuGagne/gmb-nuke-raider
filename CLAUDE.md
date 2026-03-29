@@ -111,6 +111,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`bank-post-build`** — Documents the post-build bank validation. **Now fires automatically via PostToolUse hook** after every non-clean `make` — no manual invocation needed. Keep as fallback reference.
 - **`test`** — TDD red/green gate: run host-side unit tests with gcc + Unity.
 - **`prd`** — Create a GitHub issue with a PRD for a new feature.
+- **`headless-debug`** — Autonomous 5-step debug loop using PyBoy headless emulator — boot ROM, simulate inputs, read WRAM debug log, hypothesize, fix, verify. **Explicit opt-in only** — invoke when user says "use headless" or similar; requires `make build-debug` + `tests/integration/helpers.py`.
 
 ### Project-local shadows/extensions of global superpowers skills
 
