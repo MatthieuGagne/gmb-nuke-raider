@@ -273,7 +273,10 @@
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check.TestCheckFile -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_bank_check -v 2>&1)",
       "Bash(jq -e '.hooks.PreToolUse[] | select\\(.matcher == \"\"Write|Edit\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)",
-      "Bash(jq -e '.hooks.PostToolUse[] | select\\(.matcher == \"\"Bash\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)"
+      "Bash(jq -e '.hooks.PostToolUse[] | select\\(.matcher == \"\"Bash\"\"\\) | .hooks[] | select\\(.type == \"\"command\"\"\\) | .command' .claude/settings.local.json)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove /home/mathdaman/code/nuke-raider/.claude/worktrees/feat+issue-208-music-expert-rewrite)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list)"
     ]
   },
   "hooks": {
