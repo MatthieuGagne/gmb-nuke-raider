@@ -14,6 +14,7 @@
 #include "hUGEDriver.h"
 #include "music_data.h"
 #include "music.h"
+#include "debug.h"
 
 static uint8_t current_song_bank = 0;
 
@@ -40,6 +41,7 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
+    DBG_TICK_INC();  /* DEBUG=1 only: count calls for headless diagnostic */
     __critical {
         uint8_t _saved_bank = CURRENT_BANK;
         SWITCH_ROM(current_song_bank);
