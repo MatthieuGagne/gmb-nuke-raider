@@ -35,6 +35,24 @@ After completing a task, append any new bugs found, API gotchas, or confirmed pa
 - Hardware registers via `<gb/hardware.h>`
 
 ### Critical Patterns
+
+#### VBlank Frame Order
+
+All VRAM writes happen **immediately after** `wait_vbl_done()`, before any game logic:
+
+```
+wait_vbl_done()
+  → player_render()        // OAM
+  → camera_flush_vram()    // BG tile streams
+  → move_bkg(cam_x, cam_y) // scroll registers
+  → player_update()        // game logic
+  → camera_update()        // buffer new columns/rows
+```
+
+This order is enforced project-wide. VRAM writes (OAM + BG tiles + scroll registers) come
+first; game-state mutations happen after. Any new system that writes VRAM must insert its
+write call before `player_update()`.
+
 - Always wait for VBlank before writing to VRAM: use `wait_vbl_done()` or do writes in VBlank ISR
 - `set_bkg_data()` / `set_sprite_data()` must be called before `set_bkg_tiles()` / `move_sprite()`
 - CGB palette format: 5-bit RGB packed as `RGB(r,g,b)` macro (values 0–31)
