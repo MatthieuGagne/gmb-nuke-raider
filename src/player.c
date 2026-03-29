@@ -10,6 +10,7 @@
 #include "config.h"
 #include "damage.h"
 #include "projectile.h"
+#include "sfx.h"
 
 static int16_t px;
 static int16_t py;
@@ -76,20 +77,25 @@ void player_update(void) BANKED {
     terrain = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
     player_apply_physics(input, terrain);
 
-    /* Fire machine gun on Select (held + cooldown managed inside projectile module) */
+    /* Fire machine gun on A (held + cooldown managed inside projectile module).
+     * sfx_play(SFX_SHOOT) is called inside projectile_fire() — only fires when a
+     * projectile actually spawns (every PROJ_FIRE_COOLDOWN frames), not every frame. */
     if (KEY_PRESSED(J_A)) {
         uint8_t scr_x = (uint8_t)((int16_t)px + 8);
         uint8_t scr_y = (uint8_t)((int16_t)py - (int16_t)cam_y + 16);
         projectile_fire(scr_x, scr_y, player_dir);
     }
 
-    /* Apply X velocity — zero on wall/edge collision */
+    /* Apply X velocity — zero on wall/edge collision.
+     * SFX_HIT targets CH4; SFX_SHOOT (in projectile_fire) also targets CH4.
+     * Same-frame contention: last caller wins — HIT overwrites SHOOT if both fire. */
     new_px = (int16_t)(px + (int16_t)vx);
     if (new_px >= 0 && new_px <= 159 && corners_passable(new_px, py)) {
         px = new_px;
     } else {
         vx = 0;
         damage_apply(1u);
+        sfx_play(SFX_HIT);
     }
 
     /* Apply Y velocity — zero on wall/edge collision */
@@ -99,11 +105,23 @@ void player_update(void) BANKED {
     } else {
         vy = 0;
         damage_apply(1u);
+        sfx_play(SFX_HIT);
     }
 
-    /* Repair tile: heal HP when standing on a repair pad */
-    if (terrain == TILE_REPAIR) {
-        damage_heal(DAMAGE_REPAIR_AMOUNT);
+    /* Repair tile: heal HP when standing on a repair pad.
+     * SFX_HEAL plays only on the transition frame entering the tile — re-triggering
+     * every frame would restart the CH1 sweep unit and kill the rising arc effect. */
+    {
+        static uint8_t prev_on_repair = 0u;
+        if (terrain == TILE_REPAIR) {
+            damage_heal(DAMAGE_REPAIR_AMOUNT);
+            if (!prev_on_repair) {
+                sfx_play(SFX_HEAL);
+            }
+            prev_on_repair = 1u;
+        } else {
+            prev_on_repair = 0u;
+        }
     }
 }
 

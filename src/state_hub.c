@@ -17,6 +17,7 @@
 #include "dialog_arrow_sprite.h"
 #include "dialog_border_tiles.h"
 #include "music.h"
+#include "sfx.h"
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
@@ -329,6 +330,7 @@ static void update_dialog(void) {
         }
     }
     if (KEY_TICKED(J_A) || KEY_TICKED(J_START)) {
+        sfx_play(SFX_UI);
         if (dialog_next_offset != 0u) {
             /* advance to next page */
             dialog_page_start  = dialog_next_offset;
