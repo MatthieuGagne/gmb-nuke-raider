@@ -15,9 +15,25 @@ Guide completion of development work by presenting clear options and handling ch
 
 ## The Process
 
-### Step 1: Verify Tests
+### Step 1: Concurrent batch — fetch/merge + bank manifest review
 
-**Before presenting options, verify tests pass:**
+Run these two operations as a **concurrent batch** (dispatch in a single message / start both in parallel):
+
+**1a. Fetch and merge latest master** (mandatory — always run, even for doc-only branches):
+```bash
+git fetch origin && git merge origin/master
+```
+If merge conflicts occur: resolve them now, commit the merge, then continue. Do NOT push until the merge is clean.
+
+**1b. Bank manifest review** (parallel with 1a — read-only, no merge dependency):
+
+Check `bank-manifest.json` against `src/*.c` files in the branch: every `src/*.c` file must have an entry. Flag any missing entries as a blocker before proceeding.
+
+Wait for **both** 1a and 1b to complete before moving to Step 2.
+
+### Step 2: Verify Tests (sequential — must run against merged state)
+
+**Run after Step 1 completes** (tests must execute against the merged codebase):
 
 ```bash
 make test
@@ -32,19 +48,9 @@ Tests failing (<N> failures). Must fix before completing:
 Cannot proceed with merge/PR until tests pass.
 ```
 
-Stop. Don't proceed to Step 2.
+Stop. Don't proceed to Step 3.
 
-**If tests pass:** Continue to Step 2.
-
-### Step 2: Merge latest master (mandatory — always run this, even for doc-only branches)
-
-```bash
-git fetch origin && git merge origin/master
-```
-
-**If merge conflicts occur:** resolve them now, commit the merge, then continue. Do NOT push until the merge is clean. This is the step that catches divergence before it becomes a PR conflict.
-
-**If fast-forward or clean merge:** continue to Step 3.
+**If tests pass:** Continue to Step 3.
 
 ### Step 3: HARD GATE — bank-post-build
 
@@ -58,7 +64,7 @@ Only continue to Step 4 when it passes.
 
 **Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 5.
 
-1. Always do a clean build (master is already merged from Step 2):
+1. Always do a clean build (master is already merged from Step 1):
    ```bash
    make clean && GBDK_HOME=/home/mathdaman/gbdk make
    ```
@@ -265,14 +271,14 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - Skip bank-post-build or `make memory-check` before smoketest
 - Clean up worktree immediately after PR creation (wait for merge confirmation)
 - Skip Step 4.5 when skills, agents, or CLAUDE.md were modified
-- Push without running Step 2 — even doc-only branches can have conflicts
+- Push without running Step 1 (fetch/merge) — even doc-only branches can have conflicts
 
 **Always:**
 - Work on a feature branch
 - Integrate via PR only
 - Verify tests before offering options
 - Run bank-post-build + `make memory-check` before smoketest
-- Fetch + merge origin/master at Step 2 — unconditionally, before any build or push
+- Fetch + merge origin/master at Step 1 (concurrent with manifest review) — unconditionally, before any build or push
 - Launch Emulicious from worktree directory
 - Present exactly 3 options
 - Get typed confirmation for Option 3
