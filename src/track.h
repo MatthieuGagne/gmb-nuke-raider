@@ -56,4 +56,9 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;
  * BANKED — trampoline handles cross-bank dispatch safely. */
 uint8_t track_get_raw_tile(uint8_t tx, uint8_t ty) BANKED;
 
+/* Fills buf[0..MAP_TILES_W-1] with raw tile indices for world tile row ty.
+ * Zeros buf on OOB ty. One BANKED call replaces 20 serial track_get_raw_tile()
+ * calls in camera stream_row — reduces VBlank overrun risk. */
+void track_fill_row(uint8_t ty, uint8_t *buf) BANKED;
+
 #endif /* TRACK_H */

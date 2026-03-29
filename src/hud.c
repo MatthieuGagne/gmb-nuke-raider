@@ -164,6 +164,7 @@ void hud_render(void) BANKED {
 }
 
 void hud_set_hp(uint8_t hp) BANKED {
+    if (hp == hud_hp) return;
     hud_hp    = hp;
     hud_dirty = 1u;
 }

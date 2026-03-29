@@ -138,6 +138,27 @@ void test_track_tile_type_negative_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(-1, 80));
 }
 
+/* track_fill_row: row contents match track_get_raw_tile() for each column */
+void test_track_fill_row_matches_get_raw_tile(void) {
+    uint8_t buf[MAP_TILES_W];
+    uint8_t tx;
+    track_fill_row(10u, buf);
+    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+        TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(tx, 10u), buf[tx]);
+    }
+}
+
+/* track_fill_row: OOB ty fills buffer with zeros */
+void test_track_fill_row_oob_ty_returns_zeros(void) {
+    uint8_t buf[MAP_TILES_W];
+    uint8_t tx;
+    for (tx = 0u; tx < MAP_TILES_W; tx++) buf[tx] = 0xFFu;
+    track_fill_row(MAP_TILES_H, buf);  /* ty = 100 = MAP_TILES_H: OOB */
+    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+        TEST_ASSERT_EQUAL_UINT8(0u, buf[tx]);
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -170,5 +191,7 @@ int main(void) {
     RUN_TEST(test_track_tile_type_oob_x_is_wall);
     RUN_TEST(test_track_tile_type_negative_is_wall);
     RUN_TEST(test_track_tile_data_count_is_8);
+    RUN_TEST(test_track_fill_row_matches_get_raw_tile);
+    RUN_TEST(test_track_fill_row_oob_ty_returns_zeros);
     return UNITY_END();
 }
