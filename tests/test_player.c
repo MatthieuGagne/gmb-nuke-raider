@@ -61,15 +61,16 @@ void test_player_blocked_by_left_wall(void) {
     TEST_ASSERT_EQUAL_INT16(32, player_get_x());
 }
 
-/* Right wall: corner px+7=128 -> tile col 16 -> off-track */
-void test_player_blocked_by_right_wall(void) {
-    player_set_pos(120, 80);  /* rightmost safe: corner at 127 (col 15, road) */
+/* Right wall: 16px hitbox — right corner = px+15. Road ends before col 16 (x=128). */
+void test_player_blocked_by_right_wall_16px(void) {
+    /* px=112: right corner = 127 (col 15, road). Moving right: corner=128 -> off-track */
+    player_set_pos(112, 80);
     input = J_RIGHT | J_A;
-    player_update();          /* new_px=121 -> corner at 128 (col 16) -> off-track */
-    TEST_ASSERT_EQUAL_INT16(120, player_get_x());
+    player_update();
+    TEST_ASSERT_EQUAL_INT16(112, player_get_x());
 }
 
-/* --- screen X clamp [0, 159] ------------------------------------------- */
+/* --- screen X clamp [0, 144] (= 160-16) ----------------------------------- */
 
 void test_player_clamped_at_screen_left(void) {
     player_set_pos(0, 80);
@@ -78,14 +79,14 @@ void test_player_clamped_at_screen_left(void) {
     TEST_ASSERT_EQUAL_INT16(0, player_get_x());
 }
 
-void test_player_clamped_at_screen_right(void) {
-    player_set_pos(159, 80);
+void test_player_clamped_at_screen_right_16px(void) {
+    player_set_pos(144, 80);
     input = J_RIGHT | J_A;
-    player_update();          /* new_px=160 > 159 -> blocked */
-    TEST_ASSERT_EQUAL_INT16(159, player_get_x());
+    player_update();          /* new_px=145 > 144 -> blocked */
+    TEST_ASSERT_EQUAL_INT16(144, player_get_x());
 }
 
-/* --- map Y clamp [0, MAP_PX_H-8] ---------------------------------------- */
+/* --- map Y clamp [0, MAP_PX_H-16] ---------------------------------------- */
 
 /* Map-bounds clamp: player can now move below cam_y; track at (80,647) IS
  * passable (col 10, row 80 = road), so player moves freely to 647. */
@@ -96,38 +97,51 @@ void test_player_moves_below_old_screen_top(void) {
     TEST_ASSERT_EQUAL_INT16(647, player_get_y());
 }
 
-/* Map-bounds clamp: player can move above old HUD cutoff; track at (80,790)
- * IS passable (col 10, row 98 = road), so player moves freely to 790. */
-void test_player_moves_above_old_screen_bottom(void) {
-    player_set_pos(80, 791);
-    input = J_UP;             /* gas north: new_py=790, within map bounds -> allowed */
+/* Map-bounds clamp: 16px hitbox — bottom boundary is MAP_PX_H-16. */
+void test_player_clamped_at_bottom_map_bound_16px(void) {
+    player_set_pos(80, (int16_t)(MAP_PX_H - 16u));
+    input = J_DOWN;
+    player_update();          /* new_py = MAP_PX_H-15 > MAP_PX_H-16 -> blocked */
+    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 16u), player_get_y());
+}
+
+void test_player_moves_near_bottom_map_bound(void) {
+    /* MAP_PX_H-15: moving north sets new_py=MAP_PX_H-16, within bounds -> allowed */
+    player_set_pos(80, (int16_t)(MAP_PX_H - 15u));
+    input = J_UP;
     player_update();
-    TEST_ASSERT_EQUAL_INT16(790, player_get_y());
+    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 16u), player_get_y());
 }
 
 /* --- sprite slot count -------------------------------------------------- */
 
-void test_player_init_claims_two_sprite_slots(void) {
-    /* setUp called player_init(); it should have claimed slots 0 and 1.
-     * The next free slot must be 2. */
+void test_player_init_claims_four_sprite_slots(void) {
+    /* setUp called player_init(); it should have claimed slots 0-3.
+     * The next free slot must be 4. */
     uint8_t next = get_sprite();
-    TEST_ASSERT_EQUAL_UINT8(2u, next);
+    TEST_ASSERT_EQUAL_UINT8(4u, next);
 }
 
-/* --- two-sprite render -------------------------------------------------- */
+/* --- four-sprite render -------------------------------------------------- */
 
-void test_player_render_calls_move_sprite_twice(void) {
+void test_player_render_calls_move_sprite_four_times(void) {
     mock_move_sprite_reset();
     player_render();
-    TEST_ASSERT_EQUAL_INT(2, mock_move_sprite_call_count);
+    TEST_ASSERT_EQUAL_INT(4, mock_move_sprite_call_count);
 }
 
-void test_player_render_both_halves_aligned(void) {
-    /* Both halves must share the same X; bottom half must be exactly 8px lower. */
+void test_player_render_2x2_grid_layout(void) {
+    /* TL and BL share same X; TR and BR share same X = TL_x + 8.
+     * TL and TR share same Y; BL and BR share same Y = TL_y + 8. */
     mock_move_sprite_reset();
     player_render();
-    TEST_ASSERT_EQUAL_UINT8(mock_sprite_x[0], mock_sprite_x[1]);
-    TEST_ASSERT_EQUAL_UINT8(mock_sprite_y[0] + 8u, mock_sprite_y[1]);
+    /* Slots: 0=TL, 1=BL, 2=TR, 3=BR */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_x[0], mock_sprite_x[1]);           /* TL.x == BL.x */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_x[2], mock_sprite_x[3]);           /* TR.x == BR.x */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_x[0] + 8u, mock_sprite_x[2]);     /* TR.x == TL.x+8 */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_y[0], mock_sprite_y[2]);           /* TL.y == TR.y */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_y[1], mock_sprite_y[3]);           /* BL.y == BR.y */
+    TEST_ASSERT_EQUAL_UINT8(mock_sprite_y[0] + 8u, mock_sprite_y[1]);     /* BL.y == TL.y+8 */
 }
 
 /* ===== Gas / Brake / Facing tests (issue #132) ============================= */
@@ -172,9 +186,11 @@ void test_render_at_full_hp_calls_move_sprite_normally(void) {
     /* setUp calls damage_init → full HP */
     mock_move_sprite_reset();
     player_render();
-    /* Both halves must be placed on-screen (y > 0) */
+    /* All 4 OAM slots must be placed on-screen (y > 0) */
     TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[0]);
     TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[1]);
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[2]);
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[3]);
 }
 
 /* --- flicker: HP <= 2, frame counter bit 3 set = hide --- */
@@ -189,9 +205,11 @@ void test_render_at_low_hp_hides_on_flicker_frame(void) {
      * then 1 more (frame counter = 8, bit3 = 1: hidden) */
     for (i = 0u; i < 8u; i++) player_render();
     mock_move_sprite_reset();
-    player_render();  /* frame_counter == 8, bit3 set → hide */
+    player_render();  /* frame_counter == 8, bit3 set → hide all 4 slots */
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0]);
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[1]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[2]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[3]);
 }
 
 /* --- flicker: HP <= 2, frame counter bit 3 clear = visible --- */
@@ -204,6 +222,7 @@ void test_render_at_low_hp_visible_on_non_flicker_frame(void) {
     mock_move_sprite_reset();
     player_render();
     TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[0]);
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, mock_sprite_y[3]);
 }
 
 /* --- repair tile healing ------------------------------------------------ */
@@ -343,6 +362,67 @@ void test_player_dir_dy_south(void) {
     TEST_ASSERT_EQUAL_INT8(1, player_dir_dy(DIR_B));
 }
 
+/* --- direction → tile index mapping (16×16 2×2 grid) ------------------- */
+
+void test_dir_T_tile_tl_is_up_base(void) {
+    /* DIR_T: no flip, all 4 slots use PLAYER_TILE_UP_BASE + 0..3 */
+    mock_move_sprite_reset();
+    player_apply_physics(J_UP, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 0u, mock_sprite_tile[0]);
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 1u, mock_sprite_tile[1]);
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 2u, mock_sprite_tile[2]);
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 3u, mock_sprite_tile[3]);
+}
+
+void test_dir_B_tile_tl_is_up_bl_with_flipy(void) {
+    /* DIR_B = UP + FLIPY + row-swap: TL slot gets UP's BL tile, flip = S_FLIPY */
+    mock_move_sprite_reset();
+    player_apply_physics(J_DOWN, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 1u, mock_sprite_tile[0]); /* TL = UP BL */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 0u, mock_sprite_tile[1]); /* BL = UP TL */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 3u, mock_sprite_tile[2]); /* TR = UP BR */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 2u, mock_sprite_tile[3]); /* BR = UP TR */
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPY, mock_sprite_prop[0]);
+}
+
+void test_dir_L_tile_tl_is_right_tr_with_flipx(void) {
+    /* DIR_L = RIGHT + FLIPX + col-swap: TL slot gets RIGHT's TR tile, flip = S_FLIPX */
+    mock_move_sprite_reset();
+    player_apply_physics(J_LEFT, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 2u, mock_sprite_tile[0]); /* TL = R TR */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 3u, mock_sprite_tile[1]); /* BL = R BR */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 0u, mock_sprite_tile[2]); /* TR = R TL */
+    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 1u, mock_sprite_tile[3]); /* BR = R BL */
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
+}
+
+void test_dir_R_no_flip(void) {
+    player_apply_physics(J_RIGHT, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_prop[0]);
+}
+
+void test_dir_RB_no_flip(void) {
+    player_apply_physics(J_DOWN | J_RIGHT, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_prop[0]);
+}
+
+void test_dir_LB_flipx(void) {
+    player_apply_physics(J_DOWN | J_LEFT, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
+}
+
+void test_dir_LT_flipx(void) {
+    player_apply_physics(J_UP | J_LEFT, TILE_ROAD);
+    player_render();
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -351,14 +431,15 @@ int main(void) {
     RUN_TEST(test_player_update_moves_up);
     RUN_TEST(test_player_update_moves_down);
     RUN_TEST(test_player_blocked_by_left_wall);
-    RUN_TEST(test_player_blocked_by_right_wall);
+    RUN_TEST(test_player_blocked_by_right_wall_16px);
     RUN_TEST(test_player_clamped_at_screen_left);
-    RUN_TEST(test_player_clamped_at_screen_right);
+    RUN_TEST(test_player_clamped_at_screen_right_16px);
     RUN_TEST(test_player_moves_below_old_screen_top);
-    RUN_TEST(test_player_moves_above_old_screen_bottom);
-    RUN_TEST(test_player_init_claims_two_sprite_slots);
-    RUN_TEST(test_player_render_calls_move_sprite_twice);
-    RUN_TEST(test_player_render_both_halves_aligned);
+    RUN_TEST(test_player_clamped_at_bottom_map_bound_16px);
+    RUN_TEST(test_player_moves_near_bottom_map_bound);
+    RUN_TEST(test_player_init_claims_four_sprite_slots);
+    RUN_TEST(test_player_render_calls_move_sprite_four_times);
+    RUN_TEST(test_player_render_2x2_grid_layout);
     RUN_TEST(test_b_button_does_not_change_velocity);
     RUN_TEST(test_gas_while_facing_up_decreases_vy);
     RUN_TEST(test_gas_diagonal_dpad_applies_diagonal_vector);
@@ -395,5 +476,13 @@ int main(void) {
     RUN_TEST(test_player_dir_dx_west);
     RUN_TEST(test_player_dir_dy_north);
     RUN_TEST(test_player_dir_dy_south);
+    /* AC: direction → tile index and flip (16×16 2×2 grid) */
+    RUN_TEST(test_dir_T_tile_tl_is_up_base);
+    RUN_TEST(test_dir_B_tile_tl_is_up_bl_with_flipy);
+    RUN_TEST(test_dir_L_tile_tl_is_right_tr_with_flipx);
+    RUN_TEST(test_dir_R_no_flip);
+    RUN_TEST(test_dir_RB_no_flip);
+    RUN_TEST(test_dir_LB_flipx);
+    RUN_TEST(test_dir_LT_flipx);
     return UNITY_END();
 }

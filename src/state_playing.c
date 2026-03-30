@@ -16,6 +16,7 @@ BANKREF_EXTERN(state_playing)
 #include "state_game_over.h"
 #include "projectile.h"
 #include "lap.h"
+#include "checkpoint.h"
 
 static uint8_t finish_armed;   /* 1 = ready to detect finish; 0 = debounced */
 
@@ -30,6 +31,7 @@ static void enter(void) {
     finish_armed = 1u;
     DISPLAY_OFF;
     track_init();
+    checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
     camera_init(player_get_x(), player_get_y());
     hud_init();
     hud_set_lap(lap_get_current(), lap_get_total());
@@ -47,32 +49,49 @@ static void update(void) {
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
     /* Game logic phase: runs during active display */
     player_update();
-    projectile_update();
-    hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
-    camera_update(player_get_x(), player_get_y());
-    hud_update();
-    /* Death check */
-    if (damage_is_dead()) {
-        state_replace(&state_game_over);
-        return;
-    }
-    /* Finish line detection:
-     * - tile-type check replaces hardcoded Y-row
-     * - finish_armed debounces: clears on entry, re-arms on exit
-     * - vy > 0 guard: only count when moving downward (prevents AC3 backward crossing) */
+    /* Hoist position/velocity once — avoids repeated BANKED trampoline calls below */
     {
-        int16_t px = player_get_x();
-        int16_t py = player_get_y();
-        TileType ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
+        int16_t px   = player_get_x();
+        int16_t py   = player_get_y();
+        int8_t  pvx  = player_get_vx();
+        int8_t  pvy  = player_get_vy();
+        int16_t y_max;
+        TileType ct;
+        /* HUD boundary clamp: prevent car from entering HUD zone (screen Y >= HUD_SCANLINE).
+         * cam_y is the camera scroll offset; car is 16px tall (2 OAM slots).
+         * Cast safety: cam_y in [0,656], max sum = 656+128-16 = 768 < INT16_MAX. */
+        y_max = (int16_t)((uint16_t)cam_y + (uint16_t)HUD_SCANLINE - 16u);
+        if (py > y_max) {
+            py = y_max;
+            player_set_pos(px, py);
+        }
+        /* Checkpoint update — runs after player_update() and HUD clamp */
+        checkpoint_update(px, py, pvx, pvy);
+        projectile_update();
+        hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
+        camera_update(px, py);
+        hud_update();
+        /* Death check */
+        if (damage_is_dead()) {
+            state_replace(&state_game_over);
+            return;
+        }
+        /* Finish line detection:
+         * - tile-type check replaces hardcoded Y-row
+         * - finish_armed debounces: clears on entry, re-arms on exit
+         * - vy > 0 guard: only count when moving downward (prevents backward crossing)
+         * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
+        ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
-            if (finish_armed && player_get_vy() > 0) {
+            if (finish_armed && pvy > 0 && checkpoint_all_cleared()) {
                 finish_armed = 0u;
                 if (lap_advance()) {
                     /* Final lap complete — return to overmap */
                     state_replace(&state_overmap);
                     return;
                 }
-                /* Lap complete — update HUD; player continues naturally (no teleport) */
+                /* Lap complete — reset checkpoints for next lap, update HUD */
+                checkpoint_reset();
                 hud_set_lap(lap_get_current(), lap_get_total());
             }
         } else {

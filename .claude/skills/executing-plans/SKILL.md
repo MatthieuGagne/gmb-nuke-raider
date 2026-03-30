@@ -46,9 +46,15 @@ NEVER use `git merge master` alone — the local master ref may be stale. Resolv
 
 ### Step 4: Execute Batch
 
-**Default: first 3 tasks (or all remaining if fewer than 3)**
+**Before dispatching any task, read the parallel dispatch source of truth (priority order):**
 
-For each task:
+1. **Primary:** Find the `#### Parallel Execution Groups` table for the current batch in the plan. Dispatch all tasks in a `(parallel)` group as concurrent implementer Agent calls in a **single message** (max 3).
+2. **Fallback:** If no group table exists, scan each task's `**Parallelizable with:**` annotation. Batch tasks that name each other into a single message.
+3. **Last resort:** If neither exists, run tasks sequentially.
+
+**Batch atomicity rule (HARD):** If ANY implementer in a parallel group fails, halt the entire batch immediately. Passing implementers MUST discard their in-progress work — do NOT stage or commit partial results. Fix the failure, then re-dispatch the entire group from scratch.
+
+For each task (whether parallel or sequential):
 1. Mark as in_progress
 2. Follow each step exactly (plan has bite-sized steps)
 3. Before writing any `src/*.c` or `src/*.h` file:
@@ -150,6 +156,7 @@ Do not push or open the PR until you have received an explicit answer to this qu
 - bank-post-build gate after every build
 - Smoketest uses Emulicious, not mgba-qt
 - Merge command is `git fetch origin && git merge origin/master`
+- Parallel implementers: read `#### Parallel Execution Groups` table first; dispatch parallel groups as concurrent Agent calls (max 3); batch atomicity — if any fails, ALL discard and retry from scratch
 - Parallel reviewers: fire spec + quality in one message after each implementer commit (see dispatching-parallel-agents)
 - Explore agent: use for any codebase exploration > 2 files (see dispatching-parallel-agents)
 

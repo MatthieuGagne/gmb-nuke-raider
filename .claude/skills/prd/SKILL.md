@@ -5,9 +5,7 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
-If there is an approved design from a brainstorming session, proceed directly to drafting.
-
-If not, invoke the `grill-me` skill before drafting — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed.
+Always invoke the `grill-me` skill — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed to drafting.
 
 ---
 

@@ -30,6 +30,7 @@ extern const uint8_t track2_map[];
 extern const int16_t track2_start_x;
 extern const int16_t track2_start_y;
 
+#include "checkpoint.h"
 #include "banking.h"
 BANKREF_EXTERN(track_map)
 BANKREF_EXTERN(track_tile_data)
@@ -37,6 +38,12 @@ BANKREF_EXTERN(track_start_x)
 BANKREF_EXTERN(track_start_y)
 BANKREF_EXTERN(track2_map)
 BANKREF_EXTERN(track2_start_x)
+
+/* Checkpoint ROM tables — emitted by tmx_to_c.py into track_map.c / track2_map.c */
+extern const CheckpointDef track_checkpoints[];
+extern const uint8_t        track_checkpoint_count;
+extern const CheckpointDef track2_checkpoints[];
+extern const uint8_t        track2_checkpoint_count;
 
 /* --- TrackDesc dispatch table --- */
 
@@ -48,6 +55,9 @@ void track_select(uint8_t id) BANKED;
 uint8_t track_get_lap_count(void) BANKED;
 int16_t track_get_start_x(void) BANKED;
 int16_t track_get_start_y(void) BANKED;
+
+const CheckpointDef *track_get_checkpoints(void) BANKED;
+uint8_t              track_get_checkpoint_count(void) BANKED;
 
 void    track_init(void) BANKED;
 uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;
