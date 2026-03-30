@@ -302,7 +302,8 @@
       "Bash(make bank-post-build:*)",
       "Bash(git push:*)",
       "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))",
-      "Bash(read current working directory\" errors after worktree removal:*)"
+      "Bash(read current working directory\" errors after worktree removal:*)",
+      "Bash(wc -l /home/mathdaman/code/nuke-raider/tests/test_*.c /home/mathdaman/code/nuke-raider/tests/test_*.py)"
     ]
   },
   "hooks": {
