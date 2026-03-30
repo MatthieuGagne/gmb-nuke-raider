@@ -46,6 +46,8 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 
 Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
 
+**Integration test gate:** If the plan touches any game state (add/remove state, change overmap node positions, change state transition triggers, change hp/damage logic), add a task to update `tests/integration/test_regression.py`. Always ask the user before modifying or adding integration tests — do not auto-update them.
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
