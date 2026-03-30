@@ -122,7 +122,7 @@ void player_update(void) BANKED {
     if (KEY_PRESSED(J_A)) {
         uint8_t scr_x = (uint8_t)(px + 16);
         uint8_t scr_y = (uint8_t)(py - cam_y + 24);
-        projectile_fire(scr_x, scr_y, player_dir);
+        projectile_fire(scr_x, scr_y, player_dir, PROJ_OWNER_PLAYER);
     }
 
     /* Apply X velocity — zero on wall/edge collision.
