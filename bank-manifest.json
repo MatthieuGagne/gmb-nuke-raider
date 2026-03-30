@@ -33,5 +33,5 @@
   "src/track_tiles.c":           {"bank": 255, "reason": "autobank"},
   "src/projectile.c":            {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/bullet_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
-  "src/sfx.c":                   {"bank": 255, "reason": "autobank — called via invoke() in state handlers; bank-safe through state_manager.c"}
+  "src/sfx.c":                   {"bank": 0,   "reason": "NONBANKED — APU writes must not race with bank switches, same constraint as music.c"}
 }

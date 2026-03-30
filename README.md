@@ -57,6 +57,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Dialog | `src/dialog.c/.h`, `src/dialog_data.c/.h`, `src/dialog_arrow_sprite.c/.h`, `src/dialog_border_tiles.c/.h` | NPC conversation trees, branching choices, per-NPC flags, UI assets |
 | HUD | `src/hud.c/.h` | On-screen display elements |
 | Music | `src/music.c/.h`, `src/music_data.c/.h` | hUGEDriver music playback |
+| SFX | `src/sfx.c/.h` | One-shot sound effects: CH4 noise (SFX_SHOOT, SFX_HIT) and CH1 tone sweep (SFX_HEAL, SFX_UI); bank-0 NONBANKED |
 | NPC portraits | `src/npc_*_portrait.c/.h` | Per-NPC portrait tile data |
 | Loader | `src/loader.c/.h` | Bank-0 NONBANKED wrappers for VRAM asset loading |
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |

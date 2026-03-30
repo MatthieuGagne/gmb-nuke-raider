@@ -1,21 +1,27 @@
-/* src/sfx.h — one-shot SFX system */
+/* src/sfx.h — two-channel SFX system (CH1 + CH4), bank 0 NONBANKED */
 #ifndef SFX_H
 #define SFX_H
 
-#include <gb/gb.h>
 #include <stdint.h>
 
-/* SFX identifiers */
-#define SFX_EXPLOSION  0u
-#define SFX_PICKUP     1u
-#define SFX_COUNT      2u  /* total defined SFX; must match sfx_defs[] table size */
+typedef uint8_t sfx_id_t;
 
-void sfx_init(void) BANKED;
-void sfx_play(uint8_t sfx_id) BANKED;
-void sfx_update(void) BANKED;
+#define SFX_SHOOT  0u  /* CH4 noise burst  — player weapon fire */
+#define SFX_HIT    1u  /* CH4 noise hit    — wall/collision damage */
+#define SFX_HEAL   2u  /* CH1 rising sweep — repair pad heal */
+#define SFX_UI     3u  /* CH1 short blip   — hub dialog confirm */
+#define SFX_COUNT  4u  /* total IDs; must match sfx_defs[] table in sfx.c */
 
-/* Test-visible helpers — called only from tests; not wired into the game loop */
-uint8_t sfx_active_count(void) BANKED;
-uint8_t sfx_def_duration(uint8_t sfx_id) BANKED;
+void sfx_init(void);
+void sfx_play(sfx_id_t id);
+void sfx_tick(void);
+
+/* Test-visible helpers — never call from game code.
+ * sfx_ch1_id() / sfx_ch4_id() return SFX_COUNT (not a valid id) when idle. */
+uint8_t sfx_def_duration(sfx_id_t id);
+uint8_t sfx_ch1_timer(void);
+uint8_t sfx_ch4_timer(void);
+uint8_t sfx_ch1_id(void);
+uint8_t sfx_ch4_id(void);
 
 #endif /* SFX_H */

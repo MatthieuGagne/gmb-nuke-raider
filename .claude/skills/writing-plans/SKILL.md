@@ -268,11 +268,28 @@ Before offering the execution handoff, run this checklist. Fix any failures befo
 |---|-------|---------------|
 | 1 | **No hardcoded values** | Every numeric constant, tile index, capacity, or coordinate is sourced from `config.h`, a Tiled export, or an explicit named constant — never a magic number |
 | 2 | **All tasks have explicit test criteria** | Every task states exactly how to verify it passes (command + expected output, or visual check description) |
-| 3 | **Parallel annotations complete** | Every task has `**Depends on:**` and `**Parallelizable with:**` filled in (not left as "none" without consideration) |
+| 3 | **Parallel annotations justified** | Every task has `**Depends on:**` and `**Parallelizable with:**` filled in. Any `**Parallelizable with:** none` MUST be followed by a one-sentence justification (e.g., "writes same file as Task M", "requires Task M's output symbol"). An unjustified `none` is a plan defect. |
 | 4 | **Parallel Execution Groups tables present** | Every batch that precedes a Smoketest Checkpoint has a `#### Parallel Execution Groups` table |
 | 5 | **No implementation details leaked from brainstorming** | Plan contains file paths and task steps, not design narrative or requirement rationale (those belong in the GitHub issue) |
 
-If any check fails: fix the plan now, then re-run the checklist from the top.
+**Failure handling:**
+- Checks #1, #2, #4, #5 fail → fix the plan now and re-run the checklist from the top.
+- Check #3 fails (unjustified `none`) → do NOT silently fix. Present the plan WITH the Incomplete Warning block below, immediately after the plan header. The user decides whether to proceed or fix first.
+
+### Incomplete Warning Block (use when check #3 fails)
+
+```markdown
+> ⚠️ **Plan incomplete — unjustified parallelism annotations**
+>
+> The following tasks have `**Parallelizable with:** none` with no justification sentence:
+> - Task N: [task name]
+>
+> For each: either (a) identify tasks it can parallelize with and update the annotation,
+> or (b) add a one-sentence justification explaining why it cannot parallelize
+> (e.g., "writes same file as Task M", "requires Task M's output symbol").
+>
+> Proceed with the plan as-is, or fix these annotations first?
+```
 
 ## Execution Handoff
 

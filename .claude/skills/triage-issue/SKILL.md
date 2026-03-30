@@ -22,13 +22,22 @@ If the user has already described the bug, skip questions that are already answe
 
 ## Step 2: Explore the Codebase
 
-Before proposing a root cause, explore the code:
-- Find the relevant module (`src/<module>.c`) and its header
-- Identify which ROM bank the module is in (check `bank-manifest.json` or `#pragma bank` in the file)
-- Trace the execution path from input to symptom
-- Check for related tests in `tests/test_<module>.c`
+Before proposing a root cause, dispatch a **single Explore agent** (Agent tool, `subagent_type: "Explore"`) to investigate. Do NOT perform inline Read/Glob/Grep calls — offload the entire exploration to the agent.
 
-Ask one clarifying question at a time if the codebase exploration doesn't resolve ambiguity.
+The agent prompt MUST request all four fields in a structured return:
+
+```
+Investigate the bug described below and return EXACTLY these four fields:
+
+- **Module:** `src/<module>.c` (the primary file containing the defect)
+- **Bank:** N (from `bank-manifest.json` or `#pragma bank` in the file)
+- **Execution path:** function-call chain from the trigger (input/state change) to the symptom location
+- **Test file:** `tests/test_<module>.c` (or "none" if absent)
+
+Bug description: <paste symptom from Step 1>
+```
+
+Use the four-field response as input for Step 3. Ask one clarifying question at a time if the Explore agent's response does not resolve ambiguity.
 
 ## Step 3: Identify Root Cause
 

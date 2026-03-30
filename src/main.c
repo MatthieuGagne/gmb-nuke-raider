@@ -58,7 +58,7 @@ void main(void) {
         while (!frame_ready);
         frame_ready = 0;
         music_tick();
-        sfx_update();
+        sfx_tick();
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();
     }
