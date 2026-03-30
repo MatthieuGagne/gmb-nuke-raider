@@ -63,6 +63,12 @@ class GameSession:
             raise ValueError(f"Address 0x{addr:04X} outside WRAM range")
         return self._pyboy.memory[addr]
 
+    def write_wram(self, addr: int, value: int) -> None:
+        """Write one byte to WRAM (0xC000–0xDFFF)."""
+        if not (0xC000 <= addr <= 0xDFFF):
+            raise ValueError(f"Address 0x{addr:04X} outside WRAM range")
+        self._pyboy.memory[addr] = value & 0xFF
+
     def read_debug_log(self) -> list[str]:
         """Drain unread bytes from the WRAM ring buffer; return as lines."""
         idx = self.read_wram(DEBUG_LOG_IDX)
@@ -93,3 +99,24 @@ class GameSession:
 
     def __exit__(self, *_) -> None:
         self.close()
+
+
+def find_wram_sym_from_map(map_path: str, symbol: str) -> int:
+    """Parse build/nuke-raider.map for a WRAM symbol address.
+
+    SDCC emits static file-scope variables only in the .map file (not .noi).
+    Filters to WRAM range 0xC000–0xDFFF to avoid false matches.
+    Raises KeyError if symbol not found.
+    """
+    import re
+    pattern = re.compile(r'([0-9A-Fa-f]{4,8})\s+' + re.escape(symbol) + r'\b')
+    try:
+        with open(map_path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Map file not found: {map_path}. Run: make build-debug")
+    for m in pattern.finditer(content):
+        addr = int(m.group(1), 16)
+        if 0xC000 <= addr <= 0xDFFF:
+            return addr
+    raise KeyError(f"Symbol '{symbol}' not found in WRAM range in {map_path}")
