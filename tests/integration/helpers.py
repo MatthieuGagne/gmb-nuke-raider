@@ -101,6 +101,57 @@ class GameSession:
         self.close()
 
 
+def find_wram_read_in_fn(noi_path: str, rom_path: str, fn_symbol: str) -> int:
+    """Find the WRAM address read by a function, via ROM disassembly.
+
+    Parses the .noi debug-symbol file for fn_symbol's address, converts to a
+    physical ROM byte offset, then scans for 'LD A,(nn)' (opcode 0xFA) to
+    extract the WRAM address.
+
+    Useful for locating WRAM addresses of *static* file-scope variables, which
+    SDCC does not export to the .map symbol table.  Requires a debug ROM built
+    with `make build-debug` (produces both .gb and .noi).
+    """
+    import re
+
+    pattern = re.compile(r'DEF\s+' + re.escape(fn_symbol) + r'\s+0x([0-9A-Fa-f]+)')
+    try:
+        with open(noi_path) as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"NOI file not found: {noi_path}. Run: make build-debug")
+
+    m = pattern.search(content)
+    if not m:
+        raise KeyError(f"Symbol '{fn_symbol}' not found in {noi_path}")
+
+    noi_addr = int(m.group(1), 16)
+
+    # .noi address encoding: high 16 bits = bank number, low 16 bits = GB window
+    # address (0x4000–0x7FFF for banked banks).
+    # Physical ROM byte offset:
+    #   bank 0 → phys = gb_addr
+    #   bank N → phys = (N - 1) * 0x4000 + gb_addr
+    bank_num   = noi_addr >> 16
+    gb_addr    = noi_addr & 0xFFFF
+    phys_offset = gb_addr if bank_num == 0 else (bank_num - 1) * 0x4000 + gb_addr
+
+    with open(rom_path, 'rb') as f:
+        f.seek(phys_offset)
+        fn_bytes = f.read(32)
+
+    for i in range(len(fn_bytes) - 2):
+        if fn_bytes[i] == 0xFA:          # LD A, (nn) — absolute WRAM load
+            addr = fn_bytes[i + 1] | (fn_bytes[i + 2] << 8)
+            if 0xC000 <= addr <= 0xDFFF:
+                return addr
+
+    raise KeyError(
+        f"No 'LD A,(WRAM)' found in first 32 bytes of '{fn_symbol}' "
+        f"(ROM offset 0x{phys_offset:X})"
+    )
+
+
 def find_wram_sym_from_map(map_path: str, symbol: str) -> int:
     """Parse build/nuke-raider.map for a WRAM symbol address.
 
