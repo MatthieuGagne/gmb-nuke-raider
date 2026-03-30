@@ -6,6 +6,8 @@ uint8_t mock_move_sprite_last_y     = 0;
 int     mock_move_sprite_call_count = 0;
 uint8_t mock_sprite_x[40];
 uint8_t mock_sprite_y[40];
+uint8_t mock_sprite_tile[40];
+uint8_t mock_sprite_prop[40];
 
 void mock_move_sprite_reset(void) {
     uint8_t i;
@@ -14,8 +16,10 @@ void mock_move_sprite_reset(void) {
     mock_move_sprite_last_y     = 0;
     mock_move_sprite_call_count = 0;
     for (i = 0u; i < 40u; i++) {
-        mock_sprite_x[i] = 0u;
-        mock_sprite_y[i] = 0u;
+        mock_sprite_x[i]    = 0u;
+        mock_sprite_y[i]    = 0u;
+        mock_sprite_tile[i] = 0u;
+        mock_sprite_prop[i] = 0u;
     }
 }
 

@@ -55,10 +55,11 @@ void test_friction_decelerates_to_zero(void) {
 /* --- AC4: wall collision zeros vx, not vy ------------------------------- */
 
 /* Row 90 (y=720) road: cols 6-17 (x=48-143). Right wall at col 18 (x=144+).
- * Player at px=136: corner px+7=143 (col 17 = road).
- * Moving right (gas): new_px=137, corner=144 (col 18 = sand) → blocked → vx=0. */
+ * 16x16 hitbox: right corner = px+15.
+ * Player at px=128: corner px+15=143 (col 17 = road).
+ * Moving right (gas): new_px=129, corner=144 (col 18 = sand) → blocked → vx=0. */
 void test_wall_zeros_vx_not_vy(void) {
-    player_set_pos(136, 720);
+    player_set_pos(128, 720);
     input = J_RIGHT | J_UP;  /* face NE, gas → vx blocked by wall, vy moves */
     player_update();
     TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */

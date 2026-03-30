@@ -5,24 +5,25 @@
  * not AoS (struct arrays). See CLAUDE.md "Entity management" for rationale. */
 
 #define MAX_NPCS     6
-/* OAM budget: player=2 (top+bottom half), slot 2=dialog_arrow HUD, remaining=13 for enemies/projectiles */
+/* OAM budget: player=4 (2x2 grid), slot 4=dialog_arrow HUD, remaining=11 for projectiles */
 #define MAX_SPRITES  16
 
-/* Sprite VRAM tile slots — player car occupies tiles 0-7 (4 direction sets × 2 tiles) */
-#define PLAYER_TILE_T          0u  /* tiles 0-1: T  / B facing (top+bot) */
-#define PLAYER_TILE_RT         2u  /* tiles 2-3: RT / LT facing (top+bot, LT uses FLIPX) */
-#define PLAYER_TILE_R          4u  /* tiles 4-5: R  / L  facing (top+bot, L  uses FLIPX) */
-#define PLAYER_TILE_RB         6u  /* tiles 6-7: RB / LB facing (top+bot, LB uses FLIPX) */
-#define DIALOG_ARROW_TILE_BASE 8u  /* tile  8:   dialog overflow arrow (moved from 2) */
+/* Sprite VRAM tile slots — player car occupies tiles 0-15 (4 direction sets × 4 tiles each).
+ * png_to_tiles.py column-first order per 16x16 set: tile+0=TL, +1=BL, +2=TR, +3=BR. */
+#define PLAYER_TILE_UP_BASE        0u  /* tiles  0-3:  UP direction set        */
+#define PLAYER_TILE_RIGHT_BASE     4u  /* tiles  4-7:  RIGHT direction set      */
+#define PLAYER_TILE_UPRIGHT_BASE   8u  /* tiles  8-11: UP-RIGHT direction set   */
+#define PLAYER_TILE_DOWNRIGHT_BASE 12u /* tiles 12-15: DOWN-RIGHT direction set */
+#define DIALOG_ARROW_TILE_BASE    16u  /* tile  16:    dialog overflow arrow    */
 
-/* OAM slot assignments (fixed HUD sprites) */
-#define DIALOG_ARROW_OAM_SLOT  2u  /* OAM slot 2 — hub dialog overflow indicator */
+/* OAM slot assignments (fixed HUD sprites — after player's 4 pool slots 0-3) */
+#define DIALOG_ARROW_OAM_SLOT      4u  /* OAM slot 4 — hub dialog overflow indicator */
 
 /* Player physics — these will become per-gear values when gears are added */
-#define PLAYER_ACCEL      1
-#define PLAYER_FRICTION   1
-#define PLAYER_MAX_SPEED  3
-#define PLAYER_REVERSE_MAX_SPEED  2
+#define PLAYER_ACCEL      1u
+#define PLAYER_FRICTION   1u
+#define PLAYER_MAX_SPEED  3u
+#define PLAYER_REVERSE_MAX_SPEED  2u
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
@@ -70,7 +71,7 @@
 
 /* Projectile pool */
 #define MAX_PROJECTILES       8u
-#define PROJ_TILE_BASE        9u    /* VRAM sprite tile slot — after dialog arrow (8) */
+#define PROJ_TILE_BASE       17u    /* VRAM sprite tile slot — after dialog arrow (16) */
 #define PROJ_SPEED            4u    /* px/frame; intentionally faster than PLAYER_MAX_SPEED */
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */

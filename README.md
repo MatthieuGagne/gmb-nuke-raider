@@ -86,7 +86,7 @@ gmb-nuke-raider/
 │   ├── state_overmap.c/.h  # World overmap navigation state
 │   ├── state_hub.c/.h      # City hub menu state
 │   ├── player.c/.h         # Player movement and boundary checks
-│   ├── player_sprite.c     # Player OAM rendering (8×16 two-tile sprite)
+│   ├── player_sprite.c     # Player OAM rendering (16×16 four-tile 2×2 grid)
 │   ├── sprite_pool.c/.h    # OAM slot management
 │   ├── track.c/.h          # Track tile data and passability
 │   ├── track_map.c         # Generated tile map array (from Tiled)
