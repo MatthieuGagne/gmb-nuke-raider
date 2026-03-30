@@ -373,8 +373,11 @@ static void enter(void) {
     dialog_prev_cursor = 0u;
     dialog_page_start  = 0u;
     dialog_next_offset = 0u;
+    /* clear all 4 player OAM slots (player uses pool slots 0-3 for 2x2 grid) */
     move_sprite(0u, 0u, 0u);
     move_sprite(1u, 0u, 0u);
+    move_sprite(2u, 0u, 0u);
+    move_sprite(3u, 0u, 0u);
     move_sprite(DIALOG_ARROW_OAM_SLOT, 0u, 0u);
     DISPLAY_OFF;
     { SET_BANK(dialog_arrow_tile_data);
