@@ -61,7 +61,7 @@ Edit `src/*.c`, run `make build-debug`, re-run the exact same script. Compare ob
 
 ### Step 5 — Promote
 
-If the ad-hoc script is generally useful (reproducible scenario), extract it into `tests/integration/` with a clear docstring.
+If the ad-hoc script is generally useful (reproducible scenario), promote it into `tests/integration/test_regression.py` as a new test function — do not create a separate file unless the scenario is completely independent of the state traversal. Always ask the user before adding or modifying integration tests.
 
 ## WRAM debug addresses (must match src/config.h)
 
@@ -78,7 +78,34 @@ GameSession.boot(rom_path, headless=True)  # returns session
 session.advance(frames)                    # tick N frames
 session.press(["A", "START"], hold_frames=3)
 session.read_wram(addr)                    # int 0-255
+session.write_wram(addr, value)            # write one byte to WRAM
 session.read_debug_log()                   # list[str]
 session.screenshot("path.png")
 session.close()
 ```
+
+## WRAM Symbol Lookup
+
+`find_wram_sym_from_map(map_path, "_symbol")` — finds **non-static global** WRAM variables in the `.map` file.
+
+`find_wram_read_in_fn(noi_path, rom_path, "_getter_fn")` — finds **static** file-scope WRAM variables by disassembling a getter function from the ROM binary. Use this when SDCC doesn't export the variable name (all `static` vars). Requires `.noi` from `make build-debug`.
+
+```python
+from tests.integration.helpers import find_wram_read_in_fn, find_wram_sym_from_map
+
+# static var (e.g. `static uint8_t hp` in damage.c):
+hp_addr = find_wram_read_in_fn("build/nuke-raider.noi", "build/nuke-raider.gb", "_damage_get_hp")
+
+# non-static global (e.g. `uint8_t current_state`):
+state_addr = find_wram_sym_from_map("build/nuke-raider.map", "_current_state")
+```
+
+## Integration Regression Suite
+
+`tests/integration/test_regression.py::test_all_states` navigates every game state in one session. Run it after any fix that touches state transitions:
+
+```bash
+make test-integration
+```
+
+When promoting an ad-hoc script to a permanent test, add a new function to `test_regression.py` — do not create a new file unless the scenario is independent. Always ask the user before adding or modifying integration tests.
