@@ -5,8 +5,8 @@
  * not AoS (struct arrays). See CLAUDE.md "Entity management" for rationale. */
 
 #define MAX_NPCS     6
-/* OAM budget: player=4 (2x2 grid), slot 4=dialog_arrow HUD, remaining=11 for projectiles */
-#define MAX_SPRITES  16
+/* OAM budget: player=4, dialog_arrow=1 (fixed), projectiles≤8, turrets≤8; hardware cap=40 */
+#define MAX_SPRITES  28
 
 /* Sprite VRAM tile slots — player car occupies tiles 0-15 (4 direction sets × 4 tiles each).
  * png_to_tiles.py column-first order per 16x16 set: tile+0=TL, +1=BL, +2=TR, +3=BR. */
@@ -68,6 +68,13 @@
 /* Checkpoint pool ceiling — max checkpoints per track across all tracks */
 #define MAX_CHECKPOINTS 8u
 
+
+/* Enemy pool */
+#define MAX_ENEMIES           8u
+#define TURRET_TILE_BASE     18u    /* VRAM sprite tile slot — after bullet (17) */
+#define TURRET_FIRE_INTERVAL 60u    /* frames between shots */
+#define TURRET_HP             1u    /* hits to destroy */
+#define TURRET_HIT_RADIUS     4u    /* px radius for collision detection */
 
 /* Projectile pool */
 #define MAX_PROJECTILES       8u

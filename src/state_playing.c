@@ -17,6 +17,7 @@ BANKREF_EXTERN(state_playing)
 #include "projectile.h"
 #include "lap.h"
 #include "checkpoint.h"
+#include "enemy.h"
 
 static uint8_t finish_armed;   /* 1 = ready to detect finish; 0 = debounced */
 
@@ -27,6 +28,7 @@ static void enter(void) {
     player_reset_vel();
     damage_init();
     projectile_init();
+    enemy_init();
     lap_init(track_get_lap_count());
     finish_armed = 1u;
     DISPLAY_OFF;
@@ -44,6 +46,7 @@ static void update(void) {
     /* VBlank phase: all VRAM writes immediately after frame_ready */
     player_render();
     projectile_render();
+    enemy_render();
     hud_render();
     camera_flush_vram();
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
@@ -68,6 +71,7 @@ static void update(void) {
         /* Checkpoint update — runs after player_update() and HUD clamp */
         checkpoint_update(px, py, pvx, pvy);
         projectile_update();
+        enemy_update(px, py);
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
         hud_update();

@@ -97,8 +97,9 @@ void test_finish_tile_is_finish(void) {
     /* tile index 6 must now be TILE_FINISH (passable, triggers lap detection) */
     TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6));
 }
-void test_track_tile_data_count_is_8(void) {
-    TEST_ASSERT_EQUAL_UINT8(8u, track_tile_data_count);
+void test_track_tile_data_count_is_9(void) {
+    /* tileset has 9 tiles: wall, road, center-dash, sand, oil, boost, finish, repair, turret */
+    TEST_ASSERT_EQUAL_UINT8(9u, track_tile_data_count);
 }
 
 /* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
@@ -159,6 +160,21 @@ void test_track_fill_row_oob_ty_returns_zeros(void) {
     }
 }
 
+/* --- TILE_TURRET --------------------------------------------------------- */
+
+void test_tile_turret_type(void) {
+    /* Tileset index 8 must map to TILE_TURRET */
+    TEST_ASSERT_EQUAL_INT(TILE_TURRET, track_tile_type_from_index(8u));
+}
+
+void test_tile_turret_not_passable(void) {
+    /* TILE_TURRET must NOT be equal to TILE_ROAD, TILE_SAND, TILE_BOOST, or TILE_REPAIR */
+    TEST_ASSERT_NOT_EQUAL(TILE_ROAD,   TILE_TURRET);
+    TEST_ASSERT_NOT_EQUAL(TILE_SAND,   TILE_TURRET);
+    TEST_ASSERT_NOT_EQUAL(TILE_BOOST,  TILE_TURRET);
+    TEST_ASSERT_NOT_EQUAL(TILE_REPAIR, TILE_TURRET);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -190,8 +206,10 @@ int main(void) {
     RUN_TEST(test_track_tile_type_repair);
     RUN_TEST(test_track_tile_type_oob_x_is_wall);
     RUN_TEST(test_track_tile_type_negative_is_wall);
-    RUN_TEST(test_track_tile_data_count_is_8);
+    RUN_TEST(test_track_tile_data_count_is_9);
     RUN_TEST(test_track_fill_row_matches_get_raw_tile);
     RUN_TEST(test_track_fill_row_oob_ty_returns_zeros);
+    RUN_TEST(test_tile_turret_type);
+    RUN_TEST(test_tile_turret_not_passable);
     return UNITY_END();
 }
