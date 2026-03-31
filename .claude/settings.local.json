@@ -302,7 +302,10 @@
       "Bash(make bank-post-build:*)",
       "Bash(git push:*)",
       "Bash(find /home/mathdaman/code/nuke-raider/lib/hUGEDriver -type f \\\\\\(-name *.c -o -name *.s -o -name *.asm \\\\\\))",
-      "Bash(read current working directory\" errors after worktree removal:*)"
+      "Bash(read current working directory\" errors after worktree removal:*)",
+      "Bash(wc -l /home/mathdaman/code/nuke-raider/tests/test_*.c /home/mathdaman/code/nuke-raider/tests/test_*.py)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove /home/mathdaman/code/nuke-raider/.claude/worktrees/plan-issue-248-headless-regression)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force /home/mathdaman/code/nuke-raider/.claude/worktrees/plan-issue-248-headless-regression)"
     ]
   },
   "hooks": {
