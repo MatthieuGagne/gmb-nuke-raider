@@ -9,7 +9,7 @@ description: Use when implementation is complete, all tests pass, and you need t
 
 Guide completion of development work by presenting clear options and handling chosen workflow.
 
-**Core principle:** Verify tests → Merge master → Bank gates → Smoketest → Present options → Execute choice → Clean up.
+**Core principle:** Verify tests → Merge master → Bank gates → Headless tests → Smoketest → Present options → Execute choice → Clean up.
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
@@ -60,9 +60,17 @@ Invoke the `bank-post-build` skill. If it reports any FAIL, stop and fix before 
 
 Only continue to Step 4 when it passes.
 
-### Step 4: Smoketest in Emulicious
+### Step 4: Headless Integration Tests
 
-**Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 5.
+**Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 4.5.
+
+Invoke the `test-integration` skill. If it reports any failure, stop and fix before continuing.
+
+Only continue to Step 4.5 when it passes.
+
+### Step 4.5: Smoketest in Emulicious
+
+**Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 4.6.
 
 1. Always do a clean build (master is already merged from Step 1):
    ```bash
@@ -83,9 +91,9 @@ Only continue to Step 4 when it passes.
 **Stop. Wait for explicit confirmation.**
 
 - If issues found: work with user to fix before continuing
-- If confirmed: Continue to Step 4.5
+- If confirmed: Continue to Step 4.6
 
-### Step 4.5: Update Docs Before PR
+### Step 4.6: Update Docs Before PR
 
 Before presenting options, check what changed in this branch:
 
@@ -170,11 +178,14 @@ Wait for exact confirmation.
 If confirmed, remove the worktree first, then delete the branch from the main repo:
 
 ```bash
-# Step 1: Remove the worktree (from inside the worktree — git worktree remove works)
-git worktree remove --force <worktree-path>
+# Step 1: cd to main repo root (CWD may be inside the worktree)
+cd /home/mathdaman/code/nuke-raider
 
-# Step 2: Delete the branch from the main repo
-git -C /home/mathdaman/code/gmb-nuke-raider branch -D <feature-branch>
+# Step 2: Remove the worktree
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force <worktree-path>
+
+# Step 3: Delete the branch from the main repo
+git -C /home/mathdaman/code/nuke-raider branch -D <feature-branch>
 ```
 
 Then run Step 7 immediately.
@@ -191,10 +202,21 @@ GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code
 ```
 If not listed, skip removal (already gone).
 
-**Step 6b: Remove the worktree**
+**Step 6b: Exit the EnterWorktree session if still active**
 
-Always use explicit `GIT_DIR` — the session CWD may be inside or point to the deleted worktree, which causes bare `git` commands to fail:
+If the current session was started with `EnterWorktree` and is still inside this worktree, Claude Code will block all Bash commands once the directory is deleted. Use `ExitWorktree` first — it removes the directory, clears the session CWD, and returns to the main repo:
+```
+ExitWorktree(action="remove", discard_changes=true)
+```
+After `ExitWorktree` returns, skip to Step 6d — the worktree is already removed.
+
+If the session is NOT inside an active `EnterWorktree` context, continue to Step 6c.
+
+**Step 6c: cd to main repo root and remove the worktree**
+
+Always `cd` first — if the session CWD is inside the worktree and the directory is already deleted, `git` will panic with "Unable to read current working directory":
 ```bash
+cd /home/mathdaman/code/nuke-raider
 GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove <worktree-path>
 ```
 If that fails (e.g. dirty working tree), use `--force` and warn the user:
@@ -202,8 +224,15 @@ If that fails (e.g. dirty working tree), use `--force` and warn the user:
 GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force <worktree-path>
 # Warn: "Worktree had uncommitted changes — removed with --force."
 ```
+If `--force` also fails (directory already deleted from disk, stale git ref), clean up manually:
+```bash
+rm -rf <worktree-path>
+GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
+# Note: "Worktree directory was already gone — pruned stale ref."
+```
+Skip Step 6d in this case (prune already ran).
 
-**Step 6c: Prune stale refs**
+**Step 6d: Prune stale refs**
 ```bash
 GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
 ```
@@ -212,7 +241,7 @@ Report: "Worktree at `<path>` removed and pruned."
 
 #### Immediately after discard confirmation (Option 3)
 
-Run the same Step 6a → 6b → 6c sequence immediately after the user types 'discard'.
+Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user types 'discard'. Skip Step 6b if already at main repo root.
 
 #### Option 2: Keep As-Is
 
@@ -244,12 +273,17 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - **Problem:** Local master ref may be stale; silently merges old code
 - **Fix:** Always `git fetch origin && git merge origin/master`
 
-**`git worktree prune` fails when session CWD is the deleted worktree**
-- **Problem:** After `git worktree remove`, if the session's working directory was inside that worktree, `git worktree prune` (and bare `git` commands) fail with "Working directory no longer exists"
-- **Fix:** Use explicit `GIT_DIR` to target the main repo:
-  ```bash
-  GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
-  ```
+**Bash commands blocked with "Path does not exist" after merge**
+- **Problem:** Session was started with `EnterWorktree` and is still active inside the worktree — Claude Code blocks all Bash commands when the worktree directory is deleted
+- **Fix:** Use `ExitWorktree(action="remove", discard_changes=true)` first (Step 6b); it removes the directory and restores the session CWD
+
+**`git worktree remove` fails with "Unable to read current working directory"**
+- **Problem:** Session CWD is inside a deleted worktree (non-EnterWorktree case) — git calls `getcwd()` internally and panics
+- **Fix:** Always `cd /home/mathdaman/code/nuke-raider` before any `git worktree remove` command (Step 6c)
+
+**`git worktree remove --force` fails with "is not a working tree"**
+- **Problem:** The worktree directory was already deleted from disk, leaving a stale git ref
+- **Fix:** Fall back to `rm -rf <path> && git worktree prune` to clean up the stale ref
 
 **Merging directly to main**
 - **Problem:** Bypasses review, violates branch policy
@@ -286,7 +320,8 @@ Run the same Step 6a → 6b → 6c sequence immediately after the user types 'di
 - Get typed confirmation for Option 3
 - Update `docs/dev-workflow.md` in the same PR as any skill/agent/CLAUDE.md change
 - After PR creation (Option 1): tell user the worktree path and ask them to confirm when merged
-- After merge confirmation: run git worktree remove → --force fallback → git worktree prune
+- Run headless integration tests (`make test-integration`) before presenting options — mandatory for non-doc-only branches
+- After merge confirmation: cd to main repo root → git worktree remove → --force fallback → rm -rf + prune fallback → git worktree prune
 
 ## Integration
 
