@@ -39,7 +39,7 @@ void projectile_init(void) BANKED {
 
 /* ── fire ──────────────────────────────────────────────────────────────── */
 
-void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir) BANKED {
+void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t owner) BANKED {
     uint8_t i;
     uint8_t oam;
 
@@ -55,7 +55,7 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir) BANKED {
             proj_dx[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dx(dir));
             proj_dy[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dy(dir));
             proj_ttl[i]    = PROJ_MAX_TTL;
-            proj_owner[i]  = PROJ_OWNER_PLAYER;
+            proj_owner[i]  = owner;
             proj_oam[i]    = oam;
             proj_active[i] = 1u;
 
@@ -118,6 +118,46 @@ void projectile_render(void) BANKED {
             move_sprite(proj_oam[i], proj_x[i], proj_y[i]);
         }
     }
+}
+
+/* ── hit detection ─────────────────────────────────────────────────────── */
+
+uint8_t projectile_check_hit_player(uint8_t cx, uint8_t cy, uint8_t r) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_PROJECTILES; i++) {
+        int16_t dx, dy;
+        if (!proj_active[i]) continue;
+        if (proj_owner[i] != PROJ_OWNER_ENEMY) continue;
+        dx = (int16_t)proj_x[i] - (int16_t)cx;
+        dy = (int16_t)proj_y[i] - (int16_t)cy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if ((uint8_t)dx <= r && (uint8_t)dy <= r) {
+            proj_active[i] = 0u;
+            clear_sprite(proj_oam[i]);
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+uint8_t projectile_check_hit_enemy(uint8_t cx, uint8_t cy, uint8_t r) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_PROJECTILES; i++) {
+        int16_t dx, dy;
+        if (!proj_active[i]) continue;
+        if (proj_owner[i] != PROJ_OWNER_PLAYER) continue;
+        dx = (int16_t)proj_x[i] - (int16_t)cx;
+        dy = (int16_t)proj_y[i] - (int16_t)cy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if ((uint8_t)dx <= r && (uint8_t)dy <= r) {
+            proj_active[i] = 0u;
+            clear_sprite(proj_oam[i]);
+            return 1u;
+        }
+    }
+    return 0u;
 }
 
 /* ── test/debug accessors ─────────────────────────────────────────────── */

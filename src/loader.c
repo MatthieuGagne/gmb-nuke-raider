@@ -14,6 +14,10 @@ extern const uint8_t bullet_tile_data[];
 extern const uint8_t bullet_tile_data_count;
 BANKREF_EXTERN(bullet_tile_data)
 
+extern const uint8_t turret_tile_data[];
+extern const uint8_t turret_tile_data_count;
+BANKREF_EXTERN(turret_tile_data)
+
 BANKREF_EXTERN(track_checkpoints)
 BANKREF_EXTERN(track2_checkpoints)
 
@@ -42,6 +46,13 @@ void load_bullet_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(bullet_tile_data));
     set_sprite_data(PROJ_TILE_BASE, bullet_tile_data_count, bullet_tile_data);
+    SWITCH_ROM(saved);
+}
+
+void load_turret_tiles(void) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(BANK(turret_tile_data));
+    set_sprite_data(TURRET_TILE_BASE, turret_tile_data_count, turret_tile_data);
     SWITCH_ROM(saved);
 }
 

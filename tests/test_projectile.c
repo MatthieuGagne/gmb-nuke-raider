@@ -30,30 +30,30 @@ void test_projectile_init_no_active_slots(void) {
 
 /* Firing DIR_R from screen pos (80, 80) activates one slot */
 void test_projectile_fire_activates_one_slot(void) {
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
 }
 
 /* Starting position is preserved */
 void test_projectile_fire_sets_position(void) {
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     TEST_ASSERT_EQUAL_UINT8(80u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8(80u, projectile_get_y(0u));
 }
 
 /* A second fire within the cooldown window is ignored */
 void test_projectile_fire_respects_cooldown(void) {
-    projectile_fire(80u, 80u, DIR_R);
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
 }
 
 /* After PROJ_FIRE_COOLDOWN updates the cooldown expires and fire works again */
 void test_projectile_cooldown_expires(void) {
     uint8_t i;
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     for (i = 0u; i < PROJ_FIRE_COOLDOWN; i++) projectile_update();
-    projectile_fire(80u, 80u, DIR_T);   /* second bullet in new direction */
+    projectile_fire(80u, 80u, DIR_T, PROJ_OWNER_PLAYER);   /* second bullet in new direction */
     /* first bullet may have despawned already; at least 1 should be active */
     TEST_ASSERT_GREATER_THAN_UINT8(0u, projectile_count_active());
 }
@@ -62,7 +62,7 @@ void test_projectile_cooldown_expires(void) {
 
 /* DIR_R: after one update x should increase by PROJ_SPEED */
 void test_projectile_update_moves_east(void) {
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     projectile_update();
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(80u + PROJ_SPEED), projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8(80u, projectile_get_y(0u));  /* y unchanged */
@@ -70,7 +70,7 @@ void test_projectile_update_moves_east(void) {
 
 /* DIR_T: after one update y should decrease by PROJ_SPEED */
 void test_projectile_update_moves_north(void) {
-    projectile_fire(80u, 80u, DIR_T);
+    projectile_fire(80u, 80u, DIR_T, PROJ_OWNER_PLAYER);
     projectile_update();
     TEST_ASSERT_EQUAL_UINT8(80u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(80u - PROJ_SPEED), projectile_get_y(0u));
@@ -81,7 +81,7 @@ void test_projectile_update_moves_north(void) {
 /* Bullet at right edge (x >= 168) despawns on next update */
 void test_projectile_boundary_despawn_right(void) {
     /* Fire from near the right edge heading east; update will push it past 168 */
-    projectile_fire(165u, 80u, DIR_R);
+    projectile_fire(165u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     projectile_update();   /* 165 + 4 = 169 → past boundary */
     TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
 }
@@ -92,14 +92,14 @@ void test_projectile_boundary_despawn_right(void) {
  * With cam_y=576 (from setUp): world_y = scr_y+cam_y-16 = 80+576-16 = 640, ty=80.
  * scr(148,80) -> world_x=140 tx=17: passable. After +4 east: world_x=144 tx=18: wall (tile=0). */
 void test_projectile_wall_despawn(void) {
-    projectile_fire(148u, 80u, DIR_R);
+    projectile_fire(148u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     projectile_update();
     TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
 }
 
 /* Bullet on road does NOT despawn after one update (destination still passable). */
 void test_projectile_road_no_early_despawn(void) {
-    projectile_fire(80u, 80u, DIR_R);
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
     projectile_update();
     TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
 }
@@ -113,13 +113,53 @@ void test_projectile_pool_fills_to_max(void) {
     /* Prevent TTL expiry during this loop by using a slot count check before updates */
     for (i = 0u; i < MAX_PROJECTILES; i++) {
         /* Use positions spread apart so boundaries don't fire */
-        projectile_fire(80u, 80u, DIR_T);
+        projectile_fire(80u, 80u, DIR_T, PROJ_OWNER_PLAYER);
         /* Advance cooldown without advancing TTL-enough to despawn */
         for (j = 0u; j < PROJ_FIRE_COOLDOWN; j++) { /* just drain cooldown, TTL > cooldown so slots stay alive */ }
         /* Re-fire: cooldown expired, TTL not yet */
         /* In this simplified test we just verify no crash and count is <= MAX */
     }
     TEST_ASSERT_LESS_OR_EQUAL(MAX_PROJECTILES, projectile_count_active());
+}
+
+/* ── owner / hit-check ───────────────────────────────────────────────── */
+
+void test_projectile_fire_enemy_owner(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_ENEMY);
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
+}
+
+void test_check_hit_player_enemy_bullet(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_ENEMY);
+    /* Hit check at same position, radius 8 */
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_check_hit_player(80u, 80u, 8u));
+    /* Bullet consumed */
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
+}
+
+void test_check_hit_player_ignores_player_bullet(void) {
+    /* A player bullet must NOT trigger check_hit_player */
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_check_hit_player(80u, 80u, 8u));
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
+}
+
+void test_check_hit_enemy_player_bullet(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_check_hit_enemy(80u, 80u, 8u));
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_count_active());
+}
+
+void test_check_hit_enemy_ignores_enemy_bullet(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_ENEMY);
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_check_hit_enemy(80u, 80u, 8u));
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
+}
+
+void test_check_hit_miss(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_ENEMY);
+    /* Far away — no hit */
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_check_hit_player(20u, 20u, 4u));
 }
 
 int main(void) {
@@ -135,5 +175,11 @@ int main(void) {
     RUN_TEST(test_projectile_wall_despawn);
     RUN_TEST(test_projectile_road_no_early_despawn);
     RUN_TEST(test_projectile_pool_fills_to_max);
+    RUN_TEST(test_projectile_fire_enemy_owner);
+    RUN_TEST(test_check_hit_player_enemy_bullet);
+    RUN_TEST(test_check_hit_player_ignores_player_bullet);
+    RUN_TEST(test_check_hit_enemy_player_bullet);
+    RUN_TEST(test_check_hit_enemy_ignores_enemy_bullet);
+    RUN_TEST(test_check_hit_miss);
     return UNITY_END();
 }
