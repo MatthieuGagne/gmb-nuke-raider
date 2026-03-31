@@ -50,6 +50,8 @@
 #define OVERMAP_H            18u
 #define MAX_OVERMAP_DESTS    4u
 #define MAX_OVERMAP_HUBS     4u
+#define OVERMAP_CAR_TILE_BASE  18u  /* VRAM sprite tile slots 18–19: tile 18 = vertical (up/down), tile 19 = horizontal (left/right) */
+                                    /* Reuses slot 18 safely — turret only loads in STATE_PLAYING, overmap car only in STATE_OVERMAP */
 
 /* Overmap tile type indices (BKG tile data slots 0-N) */
 #define OVERMAP_TILE_BLANK    0u
