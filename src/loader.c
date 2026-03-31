@@ -5,6 +5,7 @@
 #include "player.h"
 #include "track.h"
 #include "config.h"
+#include "overmap_car_sprite.h"
 
 extern const uint8_t player_tile_data[];
 extern const uint8_t player_tile_data_count;
@@ -53,6 +54,17 @@ void load_turret_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(turret_tile_data));
     set_sprite_data(TURRET_TILE_BASE, turret_tile_data_count, turret_tile_data);
+    SWITCH_ROM(saved);
+}
+
+/* Loads overmap car tiles into VRAM sprite slots 18–19 (OVERMAP_CAR_TILE_BASE).
+   Must be called inside DISPLAY_OFF during STATE_OVERMAP enter() only.
+   Slot 18 is shared with TURRET_TILE_BASE — mutual exclusion enforced by
+   state machine: turret loads only in STATE_PLAYING, car loads only in STATE_OVERMAP. */
+void load_overmap_car_tiles(void) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(BANK(overmap_car_tile_data));
+    set_sprite_data(OVERMAP_CAR_TILE_BASE, overmap_car_tile_data_count, overmap_car_tile_data);
     SWITCH_ROM(saved);
 }
 
