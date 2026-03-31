@@ -202,16 +202,21 @@ GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code
 ```
 If not listed, skip removal (already gone).
 
-**Step 6b: cd to main repo root**
+**Step 6b: Exit the EnterWorktree session if still active**
 
-Always do this before any removal command. The session CWD may be inside the worktree — if that directory is already deleted, `git` will panic with "Unable to read current working directory":
+If the current session was started with `EnterWorktree` and is still inside this worktree, Claude Code will block all Bash commands once the directory is deleted. Use `ExitWorktree` first — it removes the directory, clears the session CWD, and returns to the main repo:
+```
+ExitWorktree(action="remove", discard_changes=true)
+```
+After `ExitWorktree` returns, skip to Step 6d — the worktree is already removed.
+
+If the session is NOT inside an active `EnterWorktree` context, continue to Step 6c.
+
+**Step 6c: cd to main repo root and remove the worktree**
+
+Always `cd` first — if the session CWD is inside the worktree and the directory is already deleted, `git` will panic with "Unable to read current working directory":
 ```bash
 cd /home/mathdaman/code/nuke-raider
-```
-
-**Step 6c: Remove the worktree**
-
-```bash
 GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove <worktree-path>
 ```
 If that fails (e.g. dirty working tree), use `--force` and warn the user:
@@ -268,9 +273,13 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 - **Problem:** Local master ref may be stale; silently merges old code
 - **Fix:** Always `git fetch origin && git merge origin/master`
 
+**Bash commands blocked with "Path does not exist" after merge**
+- **Problem:** Session was started with `EnterWorktree` and is still active inside the worktree — Claude Code blocks all Bash commands when the worktree directory is deleted
+- **Fix:** Use `ExitWorktree(action="remove", discard_changes=true)` first (Step 6b); it removes the directory and restores the session CWD
+
 **`git worktree remove` fails with "Unable to read current working directory"**
-- **Problem:** Session CWD is inside the worktree being removed — git calls `getcwd()` internally and panics when the directory is already deleted
-- **Fix:** Always `cd /home/mathdaman/code/nuke-raider` before any `git worktree remove` command (Step 6b)
+- **Problem:** Session CWD is inside a deleted worktree (non-EnterWorktree case) — git calls `getcwd()` internally and panics
+- **Fix:** Always `cd /home/mathdaman/code/nuke-raider` before any `git worktree remove` command (Step 6c)
 
 **`git worktree remove --force` fails with "is not a working tree"**
 - **Problem:** The worktree directory was already deleted from disk, leaving a stale git ref
