@@ -7,6 +7,7 @@
 #include "state_manager.h"
 #include "config.h"
 #include "input.h"
+#include "loader.h"
 #include "player.h"
 #include "track.h"
 #include "camera.h"
@@ -79,12 +80,31 @@ static uint8_t overmap_walkable(uint8_t tx, uint8_t ty) {
     return overmap_map[(uint16_t)ty * OVERMAP_W + tx] != OVERMAP_TILE_BLANK;
 }
 
+void overmap_car_props(uint8_t dir, uint8_t *tile, uint8_t *props) {
+    if (dir == J_LEFT) {
+        *tile  = (uint8_t)(OVERMAP_CAR_TILE_BASE + 1u); /* horizontal tile, no flip */
+        *props = 0u;
+    } else if (dir == J_RIGHT) {
+        *tile  = (uint8_t)(OVERMAP_CAR_TILE_BASE + 1u); /* horizontal tile + S_FLIPX */
+        *props = S_FLIPX;
+    } else if (dir == J_DOWN) {
+        *tile  = OVERMAP_CAR_TILE_BASE;                  /* vertical tile + S_FLIPY */
+        *props = S_FLIPY;
+    } else {                                              /* J_UP (default) */
+        *tile  = OVERMAP_CAR_TILE_BASE;                  /* vertical tile, no flip */
+        *props = 0u;
+    }
+}
+
 static void overmap_move_sprite(void) {
     /* OAM coords: screen_x = oam_x - 8, screen_y = oam_y - 16 */
     uint8_t sx = (uint8_t)(car_tx * 8u + 8u);
     uint8_t sy = (uint8_t)(car_ty * 8u + 16u);
+    uint8_t tile, props;
+    overmap_car_props(travel_dir, &tile, &props);
+    set_sprite_tile(0u, tile);
+    set_sprite_prop(0u, props);
     move_sprite(0u, sx, sy);
-    move_sprite(1u, sx, (uint8_t)(sy + 8u));
 }
 
 static uint8_t find_next_node(int8_t dx, int8_t dy, uint8_t *out_tx, uint8_t *out_ty) {
@@ -155,7 +175,7 @@ static void enter(void) {
       RESTORE_BANK(); }
     car_tx = overmap_hub_tx[0];
     car_ty = overmap_hub_ty[0];
-    traveling = 0u; travel_dir = 0u; travel_frame_count = 0u;
+    traveling = 0u; travel_dir = J_UP; travel_frame_count = 0u;
     dest_tx = 0u;   dest_ty = 0u;
 
     wait_vbl_done();
@@ -168,6 +188,9 @@ static void enter(void) {
       RESTORE_BANK(); }
     cam_scy_shadow = 0u;    /* reset shadow so VBL ISR keeps SCY=0 in overmap */
     move_bkg(0u, 0u);      /* apply immediately for the first frame */
+    load_overmap_car_tiles();          /* load 2 tiles into VRAM slots 18–19 */
+    { uint8_t i;                       /* hide all slots 1-39 — overmap uses slot 0 only */
+      for (i = 1u; i < 40u; i++) { move_sprite(i, 0u, 0u); } }
     overmap_move_sprite();  /* pre-set OAM so first visible frame has car in correct position */
     DISPLAY_ON;
 

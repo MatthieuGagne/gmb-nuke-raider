@@ -177,6 +177,10 @@ make export-sprites   # re-export all .aseprite → .png (requires aseprite in P
 make                  # regenerate all .c files if sources are newer, then build ROM
 ```
 
+> **Multi-frame sprites:** `--save-as` produces numbered files (`name1.png`, `name2.png`) for
+> multi-frame sprites — not a sheet. Use `--sheet --sheet-type horizontal` and add a specific
+> Makefile override rule. See the `sprite-expert` agent for the full pattern.
+
 See `docs/asset-pipeline.md` for the full pipeline including palette setup, tile encoding,
 and Aseprite authoring conventions.
 
