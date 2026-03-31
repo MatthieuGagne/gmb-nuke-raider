@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "state_overmap.h"
 #include "state_hub.h"
+#include "config.h"
 
 #include "input.h"
 
@@ -108,6 +109,34 @@ void test_travel_advances_one_tile_per_four_frames(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(overmap_get_spawn_tx() - 1u), overmap_get_car_tx()); /* moved at frame 4 */
 }
 
+void test_overmap_car_props_up(void) {
+    uint8_t tile, props;
+    overmap_car_props(J_UP, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_CAR_TILE_BASE, tile);
+    TEST_ASSERT_EQUAL_UINT8(0u, props);
+}
+
+void test_overmap_car_props_down(void) {
+    uint8_t tile, props;
+    overmap_car_props(J_DOWN, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(OVERMAP_CAR_TILE_BASE, tile);
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPY, props);
+}
+
+void test_overmap_car_props_left(void) {
+    uint8_t tile, props;
+    overmap_car_props(J_LEFT, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(OVERMAP_CAR_TILE_BASE + 1u), tile);
+    TEST_ASSERT_EQUAL_UINT8(0u, props);
+}
+
+void test_overmap_car_props_right(void) {
+    uint8_t tile, props;
+    overmap_car_props(J_RIGHT, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(OVERMAP_CAR_TILE_BASE + 1u), tile);
+    TEST_ASSERT_EQUAL_UINT8(S_FLIPX, props);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_car_starts_at_hub);
@@ -122,5 +151,9 @@ int main(void) {
     RUN_TEST(test_city_hub_tile_car_position_unchanged_after_enter);
     RUN_TEST(test_input_ignored_while_traveling);
     RUN_TEST(test_travel_advances_one_tile_per_four_frames);
+    RUN_TEST(test_overmap_car_props_up);
+    RUN_TEST(test_overmap_car_props_down);
+    RUN_TEST(test_overmap_car_props_left);
+    RUN_TEST(test_overmap_car_props_right);
     return UNITY_END();
 }
