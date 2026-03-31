@@ -68,9 +68,8 @@ void test_oil_does_not_increase_vx(void) {
 void test_oil_preserves_velocity_without_input(void) {
     int8_t entry_vx;
 
-    player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
-    player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
-    entry_vx = player_get_vx();   /* 2 (no x-friction while J_RIGHT held) */
+    player_apply_physics(J_RIGHT | J_A, TILE_ROAD);  /* gear1: vx=2 */
+    entry_vx = player_get_vx();   /* 2 — within gear1 max so oil gear-reset won't clamp */
 
     /* No input on oil — should not decelerate */
     player_apply_physics(0, TILE_OIL);
