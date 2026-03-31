@@ -11,6 +11,7 @@
 #include "damage.h"
 #include "projectile.h"
 #include "sfx.h"
+#include "enemy.h"
 
 static int16_t px;
 static int16_t py;
@@ -77,12 +78,19 @@ static const uint8_t DIR_FLIP[8] = {
     S_FLIPX, /* L  */
     S_FLIPX, /* LT */
 };
+/* Returns 1 if a live turret enemy occupies the tile at world pixel (wx, wy). */
+static uint8_t corner_active_turret(int16_t wx, int16_t wy) {
+    uint8_t tx = (uint8_t)((uint16_t)wx >> 3u);
+    uint8_t ty = (uint8_t)((uint16_t)wy >> 3u);
+    return (track_tile_type(wx, wy) == TILE_TURRET) && enemy_blocks_tile(tx, ty);
+}
+
 /* Returns 1 if all 4 corners of the 16×16 hitbox at (wx, wy) are on track. */
 static uint8_t corners_passable(int16_t wx, int16_t wy) {
-    return track_passable(wx,        wy) &&
-           track_passable(wx + 15,   wy) &&
-           track_passable(wx,        wy + 15) &&
-           track_passable(wx + 15,   wy + 15);
+    return track_passable(wx,        wy      ) && !corner_active_turret(wx,        wy      ) &&
+           track_passable(wx + 15,   wy      ) && !corner_active_turret(wx + 15,   wy      ) &&
+           track_passable(wx,        wy + 15 ) && !corner_active_turret(wx,        wy + 15 ) &&
+           track_passable(wx + 15,   wy + 15 ) && !corner_active_turret(wx + 15,   wy + 15 );
 }
 
 void player_init(void) BANKED {
