@@ -30,25 +30,25 @@ void test_player_init_sets_start_position(void) {
 void test_player_update_moves_left(void) {
     input = J_LEFT | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT16(87, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(86, player_get_x()); /* gear1 accel=2 */
 }
 
 void test_player_update_moves_right(void) {
     input = J_RIGHT | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT16(89, player_get_x());
+    TEST_ASSERT_EQUAL_INT16(90, player_get_x()); /* gear1 accel=2 */
 }
 
 void test_player_update_moves_up(void) {
     input = J_UP | J_A;
     player_update();
-    TEST_ASSERT_EQUAL_INT16(7, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(6, player_get_y()); /* gear1 accel=2 */
 }
 
 void test_player_update_moves_down(void) {
     input = J_DOWN;  /* face south + gas → moves south (+vy) */
     player_update();
-    TEST_ASSERT_EQUAL_INT16(9, player_get_y());
+    TEST_ASSERT_EQUAL_INT16(10, player_get_y()); /* gear1 accel=2 */
 }
 
 /* --- track collision (new map geometry) -------------------------------- */
@@ -93,8 +93,8 @@ void test_player_clamped_at_screen_right_16px(void) {
 void test_player_moves_below_old_screen_top(void) {
     player_set_pos(80, 648);  /* py == old cam_y: was blocked by screen clamp */
     input = J_UP | J_A;
-    player_update();          /* new_py=647 >= 0, passable -> allowed */
-    TEST_ASSERT_EQUAL_INT16(647, player_get_y());
+    player_update();          /* new_py=646 >= 0, passable -> allowed (gear1 accel=2) */
+    TEST_ASSERT_EQUAL_INT16(646, player_get_y());
 }
 
 /* Map-bounds clamp: 16px hitbox — bottom boundary is MAP_PX_H-16. */
@@ -106,11 +106,11 @@ void test_player_clamped_at_bottom_map_bound_16px(void) {
 }
 
 void test_player_moves_near_bottom_map_bound(void) {
-    /* MAP_PX_H-15: moving north sets new_py=MAP_PX_H-16, within bounds -> allowed */
+    /* MAP_PX_H-15: moving north with gear1 accel=2 → new_py=MAP_PX_H-17, within bounds -> allowed */
     player_set_pos(80, (int16_t)(MAP_PX_H - 15u));
     input = J_UP;
     player_update();
-    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 16u), player_get_y());
+    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 17u), player_get_y());
 }
 
 /* --- sprite slot count -------------------------------------------------- */
@@ -153,25 +153,25 @@ void test_b_button_does_not_change_velocity(void) {
     TEST_ASSERT_EQUAL_INT8(0, player_get_vy());
 }
 
-/* AC1: J_UP: face north + gas → vy = -1. */
+/* AC1: J_UP: face north + gas → vy = -2 (gear1 accel=2). */
 void test_gas_while_facing_up_decreases_vy(void) {
     player_apply_physics(J_UP, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
-/* UP+RIGHT=NE facing + gas: both axes get ACCEL simultaneously */
+/* UP+RIGHT=NE facing + gas: both axes get gear1 ACCEL=2 simultaneously */
 void test_gas_diagonal_dpad_applies_diagonal_vector(void) {
     player_apply_physics(J_RIGHT | J_UP, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
-/* Face south + gas = move south */
+/* Face south + gas = move south (gear1 accel=2) */
 void test_brake_while_stopped_facing_up_reverses_down(void) {
     player_apply_physics(J_DOWN, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(2, player_get_vy());
 }
 
 /* Gas east (vx=1), then gas south: friction on vx — must not reverse. */
@@ -273,60 +273,60 @@ void test_dir_no_dpad_keeps_last(void) {
 
 /* AC2: A + each facing direction applies correct velocity vector */
 
-/* DIR_T (North): dx=0, dy=-ACCEL → vx=0, vy=-1 */
+/* DIR_T (North): dx=0, dy=-ACCEL → vx=0, vy=-2 (gear1 accel=2) */
 void test_gas_facing_T_moves_north(void) {
     player_apply_physics(J_UP, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
-/* DIR_RT (NE): dx=+ACCEL, dy=-ACCEL → vx=1, vy=-1 */
+/* DIR_RT (NE): dx=+ACCEL, dy=-ACCEL → vx=2, vy=-2 (gear1 accel=2) */
 void test_gas_facing_RT_moves_northeast(void) {
     player_apply_physics(J_UP | J_RIGHT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
-/* DIR_R (East): dx=+ACCEL, dy=0 → vx=1, vy=0 */
+/* DIR_R (East): dx=+ACCEL, dy=0 → vx=2, vy=0 (gear1 accel=2) */
 void test_gas_facing_R_moves_east(void) {
     player_apply_physics(J_RIGHT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
 }
 
-/* DIR_RB (SE): dx=+ACCEL, dy=+ACCEL → vx=1, vy=1 */
+/* DIR_RB (SE): dx=+ACCEL, dy=+ACCEL → vx=2, vy=2 (gear1 accel=2) */
 void test_gas_facing_RB_moves_southeast(void) {
     player_apply_physics(J_DOWN | J_RIGHT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
 }
 
-/* DIR_B (South): dx=0, dy=+ACCEL → vx=0, vy=1 */
+/* DIR_B (South): dx=0, dy=+ACCEL → vx=0, vy=2 (gear1 accel=2) */
 void test_gas_facing_B_moves_south(void) {
     player_apply_physics(J_DOWN, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
 }
 
-/* DIR_LB (SW): dx=-ACCEL, dy=+ACCEL → vx=-1, vy=1 */
+/* DIR_LB (SW): dx=-ACCEL, dy=+ACCEL → vx=-2, vy=2 (gear1 accel=2) */
 void test_gas_facing_LB_moves_southwest(void) {
     player_apply_physics(J_DOWN | J_LEFT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8( 1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
 }
 
-/* DIR_L (West): dx=-ACCEL, dy=0 → vx=-1, vy=0 */
+/* DIR_L (West): dx=-ACCEL, dy=0 → vx=-2, vy=0 (gear1 accel=2) */
 void test_gas_facing_L_moves_west(void) {
     player_apply_physics(J_LEFT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
 }
 
-/* DIR_LT (NW): dx=-ACCEL, dy=-ACCEL → vx=-1, vy=-1 */
+/* DIR_LT (NW): dx=-ACCEL, dy=-ACCEL → vx=-2, vy=-2 (gear1 accel=2) */
 void test_gas_facing_LT_moves_northwest(void) {
     player_apply_physics(J_UP | J_LEFT, TILE_ROAD);
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-1, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
 /* No D-pad: direction preserved but no gas — velocity stays at zero */

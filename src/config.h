@@ -19,11 +19,16 @@
 /* OAM slot assignments (fixed HUD sprites — after player's 4 pool slots 0-3) */
 #define DIALOG_ARROW_OAM_SLOT      4u  /* OAM slot 4 — hub dialog overflow indicator */
 
-/* Player physics — these will become per-gear values when gears are added */
-#define PLAYER_ACCEL      1u
+/* Gear system — 3-gear auto-shift (Issue #252)
+ * Arrays initialized from these in player.c: GEAR_MAX_SPEED[3], GEAR_ACCEL[3]. */
+#define GEAR1_MAX_SPEED        2u
+#define GEAR1_ACCEL            2u
+#define GEAR2_MAX_SPEED        4u
+#define GEAR2_ACCEL            1u
+#define GEAR3_MAX_SPEED        6u
+#define GEAR3_ACCEL            1u
+#define GEAR_DOWNSHIFT_FRAMES  8u   /* consecutive frames below threshold before downshift */
 #define PLAYER_FRICTION   1u
-#define PLAYER_MAX_SPEED  3u
-#define PLAYER_REVERSE_MAX_SPEED  2u
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
 #define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
@@ -43,7 +48,7 @@
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
 #define TERRAIN_BOOST_DELTA        2u   /* vy kick per frame on boost pad */
-#define TERRAIN_BOOST_MAX_SPEED    8u   /* vy cap on boost pad — exceeds PLAYER_MAX_SPEED */
+#define TERRAIN_BOOST_MAX_SPEED    8u   /* vy cap on boost pad — exceeds gear 3 max speed (6) */
 
 /* Overmap layout constants */
 #define OVERMAP_W            20u
@@ -79,7 +84,7 @@
 /* Projectile pool */
 #define MAX_PROJECTILES       8u
 #define PROJ_TILE_BASE       17u    /* VRAM sprite tile slot — after dialog arrow (16) */
-#define PROJ_SPEED            4u    /* px/frame; intentionally faster than PLAYER_MAX_SPEED */
+#define PROJ_SPEED            4u    /* px/frame; intentionally faster than gear 1 max speed */
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
 
