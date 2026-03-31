@@ -56,15 +56,14 @@ NEVER use `git merge master` alone — the local master ref may be stale. Resolv
 
 For each task (whether parallel or sequential):
 1. Mark as in_progress
-2. Follow each step exactly (plan has bite-sized steps)
-3. Before writing any `src/*.c` or `src/*.h` file:
-   - Invoke `bank-pre-write` **skill** (HARD GATE — use the `Skill` tool)
-   - Invoke `gbdk-expert` **agent** (HARD GATE — use the `Agent` tool)
-4. After any successful build:
+2. Determine task type:
+   - **C task** (creates or modifies `src/*.c` or `src/*.h`): dispatch `gbdk-expert` agent (Agent tool) with prompt `"implement this task: <full task text from plan>"`. `gbdk-expert` owns the full TDD cycle, bank gates, build, and commit for this task.
+   - **Non-C task** (docs, Python, JSON, assets): follow each step exactly as written in the plan.
+3. After any successful build (C tasks only):
    - Invoke `bank-post-build` **skill** (HARD GATE — use the `Skill` tool)
    - Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE); if any budget is FAIL or ERROR, stop and fix before continuing
-5. Run verifications as specified
-6. Mark as completed
+4. Run verifications as specified
+5. Mark as completed
 
 **Parallel reviewer rule (within each batch):**
 After each task's implementer work is committed, dispatch spec and quality reviewers as two concurrent Agent calls in a single message (see `dispatching-parallel-agents` skill). Both must pass before marking the task complete.
@@ -152,7 +151,7 @@ Do not push or open the PR until you have received an explicit answer to this qu
 - Between batches: just report and wait
 - Stop when blocked, don't guess
 - Never start implementation on main/master branch
-- bank-pre-write + gbdk-expert gates before every C write
+- C tasks: dispatch gbdk-expert with "implement this task: …" — it owns TDD, bank gates, build, commit
 - bank-post-build gate after every build
 - Smoketest uses Emulicious, not mgba-qt
 - Merge command is `git fetch origin && git merge origin/master`
