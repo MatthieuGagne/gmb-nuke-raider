@@ -189,7 +189,8 @@ static void enter(void) {
     cam_scy_shadow = 0u;    /* reset shadow so VBL ISR keeps SCY=0 in overmap */
     move_bkg(0u, 0u);      /* apply immediately for the first frame */
     load_overmap_car_tiles();          /* load 2 tiles into VRAM slots 18–19 */
-    move_sprite(1u, 0u, 0u);          /* hide stale OAM slot 1 from prior state */
+    { uint8_t i;                       /* hide all slots 1-39 — overmap uses slot 0 only */
+      for (i = 1u; i < 40u; i++) { move_sprite(i, 0u, 0u); } }
     overmap_move_sprite();  /* pre-set OAM so first visible frame has car in correct position */
     DISPLAY_ON;
 
