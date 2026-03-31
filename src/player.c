@@ -17,6 +17,14 @@ static int16_t px;
 static int16_t py;
 static int8_t  vx;
 static int8_t  vy;
+
+/* Gear system state (Issue #252) */
+static uint8_t current_gear;    /* 0=gear1, 1=gear2, 2=gear3 */
+static uint8_t downshift_timer; /* hysteresis counter for downshift */
+
+static const uint8_t GEAR_MAX_SPEED[3] = {GEAR1_MAX_SPEED, GEAR2_MAX_SPEED, GEAR3_MAX_SPEED};
+static const uint8_t GEAR_ACCEL[3]     = {GEAR1_ACCEL, GEAR2_ACCEL, GEAR3_ACCEL};
+
 static uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
 static uint8_t player_flicker_tick;
 static player_dir_t player_dir = DIR_T;
@@ -108,6 +116,8 @@ void player_init(void) BANKED {
     load_track_start_pos(&px, &py);
     vx = 0;
     vy = 0;
+    current_gear    = 0u;
+    downshift_timer = 0u;
     player_dir = DIR_T;
     player_flicker_tick = 0u;
     SHOW_SPRITES;
@@ -141,6 +151,8 @@ void player_update(void) BANKED {
         px = new_px;
     } else {
         vx = 0;
+        current_gear    = 0u;
+        downshift_timer = 0u;
         damage_apply(1u);
         sfx_play(SFX_HIT);
     }
@@ -151,6 +163,8 @@ void player_update(void) BANKED {
         py = new_py;
     } else {
         vy = 0;
+        current_gear    = 0u;
+        downshift_timer = 0u;
         damage_apply(1u);
         sfx_play(SFX_HIT);
     }
@@ -206,7 +220,12 @@ int16_t player_get_y(void) BANKED  { return py; }
 int8_t  player_get_vx(void) BANKED { return vx; }
 int8_t  player_get_vy(void) BANKED { return vy; }
 
-void player_reset_vel(void) BANKED { vx = 0; vy = 0; }
+void player_reset_vel(void) BANKED {
+    vx = 0;
+    vy = 0;
+    current_gear    = 0u;
+    downshift_timer = 0u;
+}
 
 static player_dir_t decode_dir(uint8_t buttons) {
     if ((buttons & J_UP)   && (buttons & J_RIGHT)) return DIR_RT;
@@ -239,6 +258,8 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
     } else if (terrain == TILE_OIL) {
         fric_x = 0u;
         fric_y = 0u;
+        current_gear    = 0u;   /* gear resets immediately on oil */
+        downshift_timer = 0u;
     } else {
         fric_x = (gas && DIR_DX[player_dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
         fric_y = (gas && DIR_DY[player_dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
@@ -254,8 +275,8 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
     }
 
     if (gas) {
-        vx = (int8_t)(vx + (int8_t)((int8_t)PLAYER_ACCEL * DIR_DX[player_dir]));
-        vy = (int8_t)(vy + (int8_t)((int8_t)PLAYER_ACCEL * DIR_DY[player_dir]));
+        vx = (int8_t)(vx + (int8_t)((int8_t)GEAR_ACCEL[current_gear] * DIR_DX[player_dir]));
+        vy = (int8_t)(vy + (int8_t)((int8_t)GEAR_ACCEL[current_gear] * DIR_DY[player_dir]));
     }
 
     if (terrain == TILE_BOOST) {
@@ -263,10 +284,38 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
     }
 
     {
-        uint8_t max_speed = (terrain == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : PLAYER_MAX_SPEED;
+        uint8_t max_speed = (terrain == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED
+                                                    : GEAR_MAX_SPEED[current_gear];
+        uint8_t spd_x;
+        uint8_t spd_y;
+        uint8_t speed;
+
         if (vx >  (int8_t)max_speed) vx =  (int8_t)max_speed;
         if (vx < -(int8_t)max_speed) vx = -(int8_t)max_speed;
         if (vy >  (int8_t)max_speed) vy =  (int8_t)max_speed;
         if (vy < -(int8_t)max_speed) vy = -(int8_t)max_speed;
+
+        /* Gear shift: compute speed magnitude (no multiply, no stdlib abs) */
+        spd_x = (vx < 0) ? (uint8_t)(-vx) : (uint8_t)vx;
+        spd_y = (vy < 0) ? (uint8_t)(-vy) : (uint8_t)vy;
+        speed = (spd_x > spd_y) ? spd_x : spd_y;
+
+        /* Shift up: instantaneous when speed reaches current gear ceiling */
+        if (current_gear < 2u && speed >= GEAR_MAX_SPEED[current_gear]) {
+            current_gear++;
+            downshift_timer = 0u;
+        }
+        /* Shift down: hysteresis — must be below lower threshold for GEAR_DOWNSHIFT_FRAMES */
+        else if (current_gear > 0u) {
+            if (speed < GEAR_MAX_SPEED[current_gear - 1u]) {
+                downshift_timer++;
+                if (downshift_timer >= GEAR_DOWNSHIFT_FRAMES) {
+                    current_gear--;
+                    downshift_timer = 0u;
+                }
+            } else {
+                downshift_timer = 0u;
+            }
+        }
     }
 }
