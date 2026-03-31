@@ -22,34 +22,33 @@ void tearDown(void) {}
 /* --- AC1: acceleration reaches max speed -------------------------------- */
 
 /* Holding J_RIGHT | J_A: X friction is 0 while J_RIGHT pressed, so vx accumulates
- * by PLAYER_ACCEL each frame up to PLAYER_MAX_SPEED. */
+ * through gear1 (accel=2) then gear2 (accel=1) then gear3 (accel=1), reaching 6. */
 void test_accel_reaches_max_speed(void) {
     uint8_t i;
     input = J_RIGHT | J_A;
-    for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update();
-    TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
+    for (i = 0u; i < 5u; i++) player_update();
+    TEST_ASSERT_EQUAL_INT8(6, player_get_vx());
 }
 
 /* --- AC2: velocity capped at max speed ---------------------------------- */
 
-/* Additional frames beyond max do not exceed PLAYER_MAX_SPEED. */
+/* Extra frames beyond gear3 max do not exceed 6. */
 void test_accel_capped_at_max_speed(void) {
     uint8_t i;
     input = J_RIGHT | J_A;
-    for (i = 0; i <= PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update(); /* one extra */
-    TEST_ASSERT_EQUAL_INT8(PLAYER_MAX_SPEED, player_get_vx());
+    for (i = 0u; i < 6u; i++) player_update();
+    TEST_ASSERT_EQUAL_INT8(6, player_get_vx());
 }
 
 /* --- AC3: friction decelerates to zero ---------------------------------- */
 
-/* Releasing direction from vx=MAX_SPEED reaches vx==0 within
- * MAX_SPEED/FRICTION frames. */
+/* Releasing direction from vx=6 (gear3 max) reaches vx==0 in 6 friction frames. */
 void test_friction_decelerates_to_zero(void) {
     uint8_t i;
     input = J_RIGHT | J_A;
-    for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) player_update(); /* reach max */
+    for (i = 0u; i < 5u; i++) player_update();  /* reach gear3 max */
     input = 0;
-    for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_FRICTION; i++) player_update(); /* friction */
+    for (i = 0u; i < 6u; i++) player_update();  /* friction: 6→5→4→3→2→1→0 */
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
 }
 
@@ -64,7 +63,7 @@ void test_wall_zeros_vx_not_vy(void) {
     input = J_RIGHT | J_UP;  /* face NE, gas → vx blocked by wall, vy moves */
     player_update();
     TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */
-    TEST_ASSERT_EQUAL_INT8(-PLAYER_ACCEL,  player_get_vy()); /* UP still moves forward */
+    TEST_ASSERT_EQUAL_INT8(-2, player_get_vy()); /* gear1 accel=2 in UP direction */
 }
 
 /* --- AC5: wall collision zeros vy, not vx ------------------------------- */
@@ -80,15 +79,15 @@ void test_wall_zeros_vy_not_vx(void) {
 
 /* --- AC6: X and Y axes accumulate independently to max speed ----------- */
 
-/* NE facing + gas: both axes accumulate to PLAYER_MAX_SPEED independently. */
+/* NE facing + gas: both axes reach gear3 max (6) in 5 frames. */
 void test_x_and_y_axes_accumulate_independently(void) {
     uint8_t i;
-    input = J_RIGHT | J_UP;  /* face NE, gas → vx+1 and vy-1 per frame */
-    for (i = 0; i < PLAYER_MAX_SPEED / PLAYER_ACCEL; i++) {
+    input = J_RIGHT | J_UP;
+    for (i = 0u; i < 5u; i++) {
         player_update();
     }
-    TEST_ASSERT_EQUAL_INT8( PLAYER_MAX_SPEED, player_get_vx());
-    TEST_ASSERT_EQUAL_INT8(-PLAYER_MAX_SPEED, player_get_vy());
+    TEST_ASSERT_EQUAL_INT8( 6, player_get_vx());
+    TEST_ASSERT_EQUAL_INT8(-6, player_get_vy());
 }
 
 /* Player cannot move past map bottom boundary (MAP_PX_H-8 = 792).

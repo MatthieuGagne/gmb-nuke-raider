@@ -86,7 +86,7 @@ void test_boost_increases_vy_upward(void) {
     TEST_ASSERT_LESS_THAN_INT8(0, player_get_vy());
 }
 
-/* AC4: Boost is capped at TERRAIN_BOOST_MAX_SPEED, not PLAYER_MAX_SPEED */
+/* AC4: Boost is capped at TERRAIN_BOOST_MAX_SPEED, not gear max speed */
 void test_boost_capped_at_boost_max_speed(void) {
     uint8_t i;
     for (i = 0; i < 20u; i++) {
@@ -101,8 +101,8 @@ void test_boost_exceeds_normal_max_speed(void) {
     for (i = 0; i < 20u; i++) {
         player_apply_physics(J_UP, TILE_BOOST);
     }
-    /* vy should be more negative than -PLAYER_MAX_SPEED */
-    TEST_ASSERT_LESS_THAN_INT8(-(int8_t)PLAYER_MAX_SPEED, player_get_vy());
+    /* vy should be more negative than gear3 max speed (6) — boost exceeds gear cap */
+    TEST_ASSERT_LESS_THAN_INT8(-6, player_get_vy());
 }
 
 int main(void) {
