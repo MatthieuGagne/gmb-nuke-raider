@@ -5,6 +5,7 @@
 #include "../src/config.h"
 #include "player.h"
 #include "camera.h"
+#include "track.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
