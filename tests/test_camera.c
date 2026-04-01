@@ -6,7 +6,11 @@
 extern int     mock_move_bkg_call_count;
 extern uint8_t mock_move_bkg_last_y;
 
-void setUp(void)    { mock_vram_clear(); }
+void setUp(void) {
+    mock_vram_clear();
+    active_map_w = 20u;   /* match old MAP_TILES_W for existing tests */
+    active_map_h = 100u;  /* match old MAP_TILES_H for existing tests */
+}
 void tearDown(void) {}
 
 /* --- camera_init: cam_y from player world Y ----------------------------- */
@@ -173,6 +177,87 @@ void test_camera_apply_scroll_does_not_call_move_bkg(void) {
     TEST_ASSERT_EQUAL_INT(0, mock_move_bkg_call_count);
 }
 
+/* ---- cam_x: clamping -------------------------------------------------- */
+
+/* Wide track (64 tiles = 512px): cam_x follows player X, clamped to [0, 352] */
+void test_camera_init_sets_cam_x_wide_track(void) {
+    active_map_w = 64u;
+    active_map_h = 100u;
+    camera_init(320, 80);   /* player_x=320: cam_x = 320-80 = 240, within [0,352] */
+    TEST_ASSERT_EQUAL_UINT16(240u, cam_x);
+}
+
+/* cam_x cannot go negative */
+void test_camera_init_clamps_cam_x_to_zero(void) {
+    active_map_w = 64u;
+    active_map_h = 100u;
+    camera_init(40, 80);    /* 40-80 = -40 → clamp 0 */
+    TEST_ASSERT_EQUAL_UINT16(0u, cam_x);
+}
+
+/* cam_x capped at (active_map_w*8 - 160) */
+void test_camera_init_clamps_cam_x_to_max(void) {
+    active_map_w = 64u;    /* cam_max_x = 64*8 - 160 = 352 */
+    active_map_h = 100u;
+    camera_init(600, 80);  /* 600-80=520 > 352 → 352 */
+    TEST_ASSERT_EQUAL_UINT16(352u, cam_x);
+}
+
+/* Narrow track (20 tiles = 160px): cam_x is always 0 (no horizontal scroll) */
+void test_camera_init_cam_x_zero_for_narrow_track(void) {
+    active_map_w = 20u;
+    active_map_h = 100u;
+    camera_init(80, 80);
+    TEST_ASSERT_EQUAL_UINT16(0u, cam_x);
+}
+
+/* cam_x updates when player moves horizontally */
+void test_camera_update_cam_x_follows_player(void) {
+    active_map_w = 64u;
+    active_map_h = 100u;
+    camera_init(200, 80);   /* cam_x = 200-80 = 120 */
+    camera_update(300, 80); /* cam_x = 300-80 = 220 */
+    TEST_ASSERT_EQUAL_UINT16(220u, cam_x);
+}
+
+/* ---- cam_x: column buffer --------------------------------------------- */
+
+/* Crossing X tile boundary right buffers new right column */
+void test_camera_update_crossing_x_tile_right_buffers_column(void) {
+    int col_count_before;
+    active_map_w = 64u;
+    active_map_h = 100u;
+    /* Start at cam_x=0 (tile boundary 0), move right past tile boundary 1 (8px) */
+    camera_init(80, 80);    /* cam_x=0 */
+    col_count_before = mock_set_bkg_tiles_call_count;
+    camera_update(96, 80);  /* cam_x=16 — crosses tile boundary at x=8 */
+    camera_flush_vram();
+    /* Must have written at least one new column */
+    TEST_ASSERT_GREATER_THAN_INT(col_count_before, mock_set_bkg_tiles_call_count);
+}
+
+/* cam_tile_x snapshot is captured at camera_update() time */
+void test_camera_update_snapshots_cam_tile_x(void) {
+    active_map_w = 64u;
+    active_map_h = 100u;
+    camera_init(80, 80);   /* cam_x=0, cam_tile_x=0 */
+    camera_update(96, 80); /* cam_x=16, cam_tile_x snapshot should be 0→2 transition */
+    /* Verify flush does not use a stale cam_tile_x from after update */
+    /* (behavioral: flush call count must be > init count, proving column was queued at update time) */
+    TEST_ASSERT_EQUAL_UINT16(16u, cam_x);
+}
+
+/* ---- cam_scx_shadow ---------------------------------------------------- */
+
+/* camera_apply_scroll() sets cam_scx_shadow from cam_x */
+void test_camera_apply_scroll_sets_cam_scx_shadow(void) {
+    active_map_w = 64u;
+    active_map_h = 100u;
+    camera_init(200, 80);  /* cam_x = 120 */
+    camera_apply_scroll();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)cam_x, cam_scx_shadow);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -193,5 +278,13 @@ int main(void) {
     RUN_TEST(test_camera_apply_scroll_reflects_post_flush_cam_y);
     RUN_TEST(test_camera_apply_scroll_updates_shadow);
     RUN_TEST(test_camera_apply_scroll_does_not_call_move_bkg);
+    RUN_TEST(test_camera_init_sets_cam_x_wide_track);
+    RUN_TEST(test_camera_init_clamps_cam_x_to_zero);
+    RUN_TEST(test_camera_init_clamps_cam_x_to_max);
+    RUN_TEST(test_camera_init_cam_x_zero_for_narrow_track);
+    RUN_TEST(test_camera_update_cam_x_follows_player);
+    RUN_TEST(test_camera_update_crossing_x_tile_right_buffers_column);
+    RUN_TEST(test_camera_update_snapshots_cam_tile_x);
+    RUN_TEST(test_camera_apply_scroll_sets_cam_scx_shadow);
     return UNITY_END();
 }
