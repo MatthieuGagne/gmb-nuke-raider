@@ -1,6 +1,11 @@
 #include "unity.h"
 #include "track.h"
 
+#ifndef __SDCC
+/* Seam declared in track.h — set synthetic map for wide-map index math test */
+extern void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h);
+#endif
+
 void setUp(void)    {}
 void tearDown(void) {}
 
@@ -175,6 +180,70 @@ void test_tile_turret_not_passable(void) {
     TEST_ASSERT_NOT_EQUAL(TILE_REPAIR, TILE_TURRET);
 }
 
+/* ---- track_fill_col -------------------------------------------------- */
+
+/* Basic fill: column tx=10 is road (tile 1) in the straight section (rows 0-49).
+ * Uses real track_map data. active_map_w/h default to 20/100 from track.c. */
+void test_track_fill_col_road_column(void) {
+    uint8_t buf[3];
+    track_fill_col(10u, 0u, 3u, buf);
+    TEST_ASSERT_EQUAL_UINT8(1u, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(1u, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(1u, buf[2]);
+}
+
+/* OOB tx: tile x >= active_map_w (20) fills zeros */
+void test_track_fill_col_oob_tx(void) {
+    uint8_t buf[2];
+    buf[0] = 0xFFu; buf[1] = 0xFFu;
+    track_fill_col(25u, 0u, 2u, buf);  /* tx=25 >= active_map_w=20 */
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[1]);
+}
+
+/* OOB ty_start: tile y >= active_map_h (100) fills zeros */
+void test_track_fill_col_oob_ty(void) {
+    uint8_t buf[2];
+    buf[0] = 0xFFu; buf[1] = 0xFFu;
+    track_fill_col(10u, 100u, 2u, buf);  /* ty_start=100 >= active_map_h=100 */
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[1]);
+}
+
+/* Wide map: uint16_t index math — ty=9, w=32, tx=1 → index=9*32+1=289.
+ * Uses track_test_set_map() seam (added in Task 4, #ifndef __SDCC only). */
+void test_track_fill_col_wide_map_index_math(void) {
+    static uint8_t wide_map[10u * 32u];
+    uint8_t buf[1];
+    uint16_t i;
+    for (i = 0u; i < 10u * 32u; i++) wide_map[i] = (uint8_t)(i & 0xFFu);
+    track_test_set_map(wide_map, 32u, 10u);
+    track_fill_col(1u, 9u, 1u, buf);
+    TEST_ASSERT_EQUAL_UINT8(wide_map[9u * 32u + 1u], buf[0]);
+}
+
+/* track_fill_row_range: fills only the requested window */
+void test_track_fill_row_range_partial(void) {
+    uint8_t buf[3];
+    /* Row 10, starting at tx=9, 3 tiles. Track map row 10 cols 9-11:
+     * col 9 = tile 2 (centre-dash), col 10 = tile 1 (road), col 11 = tile 1 (road) */
+    track_fill_row_range(10u, 9u, 3u, buf);
+    TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(9u,  10u), buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(10u, 10u), buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(11u, 10u), buf[2]);
+}
+
+/* track_fill_row_range: OOB columns fill zeros */
+void test_track_fill_row_range_oob_col(void) {
+    uint8_t buf[3];
+    buf[0] = 0xFFu; buf[1] = 0xFFu; buf[2] = 0xFFu;
+    /* tx_start=19, count=3: tx=19 valid, tx=20 OOB, tx=21 OOB */
+    track_fill_row_range(10u, 19u, 3u, buf);
+    TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(19u, 10u), buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(0u, buf[2]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -211,5 +280,11 @@ int main(void) {
     RUN_TEST(test_track_fill_row_oob_ty_returns_zeros);
     RUN_TEST(test_tile_turret_type);
     RUN_TEST(test_tile_turret_not_passable);
+    RUN_TEST(test_track_fill_col_road_column);
+    RUN_TEST(test_track_fill_col_oob_tx);
+    RUN_TEST(test_track_fill_col_oob_ty);
+    RUN_TEST(test_track_fill_col_wide_map_index_math);
+    RUN_TEST(test_track_fill_row_range_partial);
+    RUN_TEST(test_track_fill_row_range_oob_col);
     return UNITY_END();
 }
