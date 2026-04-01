@@ -30,7 +30,7 @@ Each game system lives in `src/<system>.c` + `src/<system>.h`. Asset source file
 These apply to every feature, no matter how small.
 
 **Module structure:**
-- Each system gets its own `.c`/`.h` pair; new module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review before merge (catches AoS entity pools as an anti-pattern).
+- Each system gets its own `.c`/`.h` pair; new module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review and fix before merge (catches AoS entity pools as an anti-pattern).
 
 **Entity management:**
 - No singletons for things that could multiply. Use fixed-size pools with an `active` flag.
@@ -94,7 +94,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 ### Agents (in `.claude/agents/`, invoked with the Agent tool)
 
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, compilation errors. Banking questions → bank-pre-write/bank-post-build skills.
-- **`gb-c-optimizer`** — C code review for GBC performance/ROM size, anti-pattern detection, SDCC optimization.
+- **`gb-c-optimizer`** — C code review AND fix for GBC performance/ROM size, anti-pattern detection, SDCC optimization. In post-implementation contexts (executing-plans, subagent-driven-development), applies fixes directly; in plan-phase contexts (writing-plans), reports issues only.
 - **`gb-memory-validator`** — Documents WRAM/VRAM/OAM budget checks. **Now fires automatically** after every non-clean `make` via PostToolUse hook (`post_build_hook.py` runs `make memory-check`).
 - **`map-builder`** — End-to-end map creation: Tiled layout, TMX conversion pipeline, wiring generated C files into the game.
 - **`sprite-builder`** — End-to-end sprite creation: Aseprite source, PNG export, `png_to_tiles`, OAM slots, tile data loading, in-game rendering.
@@ -123,7 +123,7 @@ These live in `.claude/skills/` and take precedence over the global superpowers 
 - **`executing-plans`** — Shadows superpowers:executing-plans; adds worktree hard gate at step 1, bank-pre-write + gbdk-expert before every C write, bank-post-build after every build, exact Emulicious smoketest sequence.
 - **`brainstorming`** — Shadows superpowers:brainstorming; standalone exploration tool that ends silently after resolved/unresolved/deferred summary (no auto-invocation of /prd or writing-plans); adds GB constraint checklist (banking, OAM, WRAM, VRAM, SoA, SDCC, testability) and Design-It-Twice step for new modules.
 - **`finishing-a-development-branch`** — Shadows superpowers:finishing-a-development-branch; fixes emulator (Emulicious, not mgba-qt) and ROM name (nuke-raider.gb); adds bank-post-build + gb-memory-validator gates before smoketest; clarifies run-from-worktree-directory requirement.
-- **`subagent-driven-development`** — Shadows superpowers:subagent-driven-development; adds worktree hard gate at top; injects bank-pre-write + gbdk-expert into implementer dispatch instructions; adds bank-post-build + gb-memory-validator + smoketest to post-build review step.
+- **`subagent-driven-development`** — Shadows superpowers:subagent-driven-development; adds worktree hard gate at top; injects bank-pre-write + gbdk-expert + gb-c-optimizer review-and-fix into implementer dispatch instructions; adds bank-post-build + gb-memory-validator + smoketest to post-build review step.
 - **`grill-me`** — New skill (adapted from mattpocock/skills); structured interview that stress-tests a plan; covers all 7 GB constraint areas (banking, OAM, WRAM, VRAM, SoA, SDCC, testability); ends with resolved/unresolved summary.
 
 ## Debugging Rules

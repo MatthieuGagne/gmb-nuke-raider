@@ -54,7 +54,7 @@ When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatc
 4. `GBDK_HOME=/home/mathdaman/gbdk make` → ROM builds
 5. Invoke `bank-post-build` skill (hard gate)
 6. Run refactor checkpoint: "Does this generalize, or hard-coded for N=1?"
-7. Invoke `gb-c-optimizer` agent on new/modified C files
+7. Invoke `gb-c-optimizer` agent on new/modified C files — **review AND fix** (applies edits directly, then rebuilds to verify)
 8. Commit
 
 **Consultation mode** (API questions, hardware register questions): call `gbdk-expert` agent without the "implement this task:" prefix — it answers as normal.
