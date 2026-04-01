@@ -110,7 +110,7 @@ When dispatching the implementer subagent, include ALL of the following in the p
 
    > implement this task: <full task text from plan>
 
-   `gbdk-expert` owns the full TDD cycle, bank-pre-write gate, bank-post-build gate, build, and commit. Do NOT include separate gate instructions in the prompt — `gbdk-expert`'s own body enforces them.
+   `gbdk-expert` owns the full TDD cycle, bank-pre-write gate, bank-post-build gate, build, `gb-c-optimizer` review AND fix (fixes applied in-place before commit), and commit. Do NOT include separate gate instructions in the prompt — `gbdk-expert`'s own body enforces them.
 
    For non-C tasks, dispatch a general implementer with the task text as-is.
 
