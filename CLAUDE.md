@@ -167,7 +167,9 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates:**
-- Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` skill for API questions
+- Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` agent:
+  - **Consultation mode** (API questions): `"how do I set up CGB palettes"`, `"why is my sprite flickering"`
+  - **Implementation mode** (C implementation tasks): dispatch with `"implement this task: <full task text>"` — `gbdk-expert` writes the code applying all project constraints
 - After a successful build → `bank-post-build` + `make memory-check` fire **automatically** via PostToolUse hook; no manual invocation needed
 - When debugging any runtime issue → invoke `emulicious-debug` agent (Agent tool)
 

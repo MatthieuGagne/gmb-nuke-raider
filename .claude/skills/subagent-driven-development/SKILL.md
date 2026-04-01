@@ -104,18 +104,15 @@ When dispatching the implementer subagent, include ALL of the following in the p
 
 1. Full task text from the plan (do NOT make the subagent read the plan file)
 2. Scene-setting context (where this task fits in the overall feature)
-3. **Mandatory GB gate instructions:**
+3. **C task routing:**
 
-   > Before writing any `src/*.c` or `src/*.h` file:
-   > 1. Invoke the `bank-pre-write` **skill** (HARD GATE — use the `Skill` tool) — verify bank-manifest.json entry exists
-   > 2. Invoke the `gbdk-expert` **agent** (HARD GATE — use the `Agent` tool) — confirm API, data types, GBDK calls
-   > Only write the C file AFTER both gates pass.
-   >
-   > After any successful build:
-   > 1. Invoke the `bank-post-build` skill (HARD GATE) — verify bank placements and budgets
-   > 2. Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE) — if any budget is FAIL or ERROR, stop and fix
-   >
-   > Follow TDD: write failing test first, make it pass, then build.
+   If the task creates or modifies `src/*.c` or `src/*.h`, the implementer IS `gbdk-expert`. Dispatch the `gbdk-expert` agent (Agent tool) with:
+
+   > implement this task: <full task text from plan>
+
+   `gbdk-expert` owns the full TDD cycle, bank-pre-write gate, bank-post-build gate, build, and commit. Do NOT include separate gate instructions in the prompt — `gbdk-expert`'s own body enforces them.
+
+   For non-C tasks, dispatch a general implementer with the task text as-is.
 
 ## Parallel Implementer Batches
 
