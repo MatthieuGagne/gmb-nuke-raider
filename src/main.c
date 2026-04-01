@@ -35,7 +35,7 @@ static void init_palettes(void) {
 volatile uint8_t frame_ready = 0;
 
 static void vbl_isr(void) {
-    move_bkg(0u, cam_scy_shadow);  /* apply shadow SCY at guaranteed VBlank start */
+    move_bkg(cam_scx_shadow, cam_scy_shadow);  /* apply shadow SCX/SCY at VBlank start */
     frame_ready = 1;
 }
 
