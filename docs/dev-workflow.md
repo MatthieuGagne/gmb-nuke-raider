@@ -43,14 +43,21 @@ brainstorming skill
 
 ### TDD cycle (for C files)
 
-1. Write failing test in `tests/test_<module>.c` → `make test` → FAIL
+When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatch the `gbdk-expert` agent with:
+
+> `implement this task: <full task text from plan>`
+
+`gbdk-expert` owns the full cycle:
+1. Write failing test → `make test` → FAIL
 2. Invoke `bank-pre-write` skill (hard gate)
-3. Invoke `gbdk-expert` agent (hard gate)
-4. Write minimal implementation
-5. `make test` → PASS
-6. `GBDK_HOME=/home/mathdaman/gbdk make` → ROM builds
-7. Invoke `bank-post-build` skill (hard gate)
+3. Write minimal implementation → `make test` → PASS
+4. `GBDK_HOME=/home/mathdaman/gbdk make` → ROM builds
+5. Invoke `bank-post-build` skill (hard gate)
+6. Run refactor checkpoint: "Does this generalize, or hard-coded for N=1?"
+7. Invoke `gb-c-optimizer` agent on new/modified C files
 8. Commit
+
+**Consultation mode** (API questions, hardware register questions): call `gbdk-expert` agent without the "implement this task:" prefix — it answers as normal.
 
 ### Non-C tasks (docs, Python, JSON, assets)
 
@@ -176,6 +183,10 @@ src/<name>_sprite.c         src/track_tiles.c          src/track_map.c
 make export-sprites   # re-export all .aseprite → .png (requires aseprite in PATH)
 make                  # regenerate all .c files if sources are newer, then build ROM
 ```
+
+> **Multi-frame sprites:** `--save-as` produces numbered files (`name1.png`, `name2.png`) for
+> multi-frame sprites — not a sheet. Use `--sheet --sheet-type horizontal` and add a specific
+> Makefile override rule. See the `sprite-expert` agent for the full pattern.
 
 See `docs/asset-pipeline.md` for the full pipeline including palette setup, tile encoding,
 and Aseprite authoring conventions.

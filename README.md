@@ -58,7 +58,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | State manager | `src/state_manager.c/.h` | Game state transitions |
 | Title state | `src/state_title.c/.h` | Title screen |
 | Playing state | `src/state_playing.c/.h` | In-game state handler |
-| Overmap state | `src/state_overmap.c/.h`, `src/overmap_map.c`, `src/overmap_tiles.c` | World overmap navigation |
+| Overmap state | `src/state_overmap.c/.h`, `src/overmap_map.c`, `src/overmap_tiles.c`, `src/overmap_car_sprite.c/.h` | World overmap navigation; directional 8×8 car sprite (4 directions via flip flags) |
 | Hub state | `src/state_hub.c/.h`, `src/hub_data.c/.h` | City hub menu, NPC list, hub entry/exit |
 | Player | `src/player.c/.h`, `src/player_sprite.c` | Player movement, 3-gear auto-shifting acceleration, boundary checks, sprite rendering |
 | Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries, checkpoint WRAM buffer |

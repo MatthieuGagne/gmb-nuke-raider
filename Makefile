@@ -126,6 +126,17 @@ src/overmap_map.c: assets/maps/overmap.tmx tools/tmx_to_array_c.py
 
 $(TARGET): src/overmap_map.c
 
+# src/overmap_car_sprite.c is checked into git so CI works without Python/Aseprite.
+# Run `make src/overmap_car_sprite.c` to regenerate from updated PNG.
+# Note: overmap_car.png is a 2-frame sprite sheet (16x8) — override generic rule.
+assets/sprites/overmap_car.png: assets/sprites/overmap_car.aseprite
+	aseprite --batch $< --sheet $@ --sheet-type horizontal
+
+src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/overmap_car.png src/overmap_car_sprite.c overmap_car_tile_data
+
+$(TARGET): src/overmap_car_sprite.c
+
 test-tools:
 	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c -v
 

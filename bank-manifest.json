@@ -16,6 +16,7 @@
   "src/npc_mechanic_portrait.c": {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/npc_trader_portrait.c":   {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/overmap_map.c":           {"bank": 255, "reason": "autobank"},
+  "src/overmap_car_sprite.c":    {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/overmap_tiles.c":         {"bank": 255, "reason": "autobank"},
   "src/player.c":                {"bank": 255, "reason": "autobank"},
   "src/player_sprite.c":         {"bank": 255, "reason": "autobank"},
