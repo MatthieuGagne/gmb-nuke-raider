@@ -11,6 +11,14 @@ extern volatile uint16_t cam_y;
  * scanline is drawn, regardless of how long the main loop takes. */
 extern volatile uint8_t cam_scy_shadow;
 
+/* Current camera scroll X in world pixels. Range [0, (active_map_w*8)-160].
+ * uint16_t required: max 64-tile track = 512px - 160px viewport = 352. */
+extern volatile uint16_t cam_x;
+
+/* Shadow SCX register — set by camera_apply_scroll(), applied by VBL ISR.
+ * uint8_t: SCX hardware register is 8-bit; value wraps into 32-tile BG ring. */
+extern volatile uint8_t cam_scx_shadow;
+
 /* Call once when entering STATE_PLAYING (after track_init).
  * Preloads the 18 initially visible rows and sets cam_y. */
 void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED;

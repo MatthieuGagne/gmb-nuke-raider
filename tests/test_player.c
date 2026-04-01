@@ -4,12 +4,15 @@
 #include "player.h"
 #include "camera.h"
 #include "../src/damage.h"
+#include "../src/track.h"  /* active_map_h — runtime track height */
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
 void setUp(void) {
     input = 0;
     prev_input = 0;
+    active_map_w = 20u;   /* default: 20 tiles * 8px = 160px; max player x = 144 */
+    active_map_h = 100u;  /* default: 100 tiles * 8px = 800px */
     mock_vram_clear();
     mock_move_sprite_reset();
     camera_init(88, 8);  /* cam_y = 0 (clamped) */
@@ -70,7 +73,7 @@ void test_player_blocked_by_right_wall_16px(void) {
     TEST_ASSERT_EQUAL_INT16(112, player_get_x());
 }
 
-/* --- screen X clamp [0, 144] (= 160-16) ----------------------------------- */
+/* --- map X clamp [0, active_map_w*8-16] ----------------------------------- */
 
 void test_player_clamped_at_screen_left(void) {
     player_set_pos(0, 80);
@@ -80,13 +83,24 @@ void test_player_clamped_at_screen_left(void) {
 }
 
 void test_player_clamped_at_screen_right_16px(void) {
+    /* active_map_w=20: max px = 20*8-16 = 144 */
     player_set_pos(144, 80);
     input = J_RIGHT | J_A;
     player_update();          /* new_px=145 > 144 -> blocked */
     TEST_ASSERT_EQUAL_INT16(144, player_get_x());
 }
 
-/* --- map Y clamp [0, MAP_PX_H-16] ---------------------------------------- */
+void test_player_x_bound_uses_active_map_w(void) {
+    /* active_map_w=30: 30 tiles * 8px = 240px; max player x = 240 - 16 = 224 */
+    active_map_w = 30u;
+    active_map_h = 100u;
+    player_set_pos(224, 80);
+    input = J_RIGHT | J_A;
+    player_update();          /* new_px=225 > 224 -> blocked at 224 */
+    TEST_ASSERT_TRUE(player_get_x() <= (int16_t)(30u * 8u - 16u));
+}
+
+/* --- map Y clamp [0, active_map_h*8-16] ----------------------------------- */
 
 /* Map-bounds clamp: player can now move below cam_y; track at (80,647) IS
  * passable (col 10, row 80 = road), so player moves freely to 647. */
@@ -97,20 +111,22 @@ void test_player_moves_below_old_screen_top(void) {
     TEST_ASSERT_EQUAL_INT16(646, player_get_y());
 }
 
-/* Map-bounds clamp: 16px hitbox — bottom boundary is MAP_PX_H-16. */
+/* Map-bounds clamp: 16px hitbox — bottom boundary is active_map_h*8-16. */
 void test_player_clamped_at_bottom_map_bound_16px(void) {
-    player_set_pos(80, (int16_t)(MAP_PX_H - 16u));
+    int16_t map_px_h = (int16_t)((uint16_t)active_map_h * 8u);
+    player_set_pos(80, (int16_t)(map_px_h - 16));
     input = J_DOWN;
-    player_update();          /* new_py = MAP_PX_H-15 > MAP_PX_H-16 -> blocked */
-    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 16u), player_get_y());
+    player_update();          /* new_py = map_px_h-15 > map_px_h-16 -> blocked */
+    TEST_ASSERT_EQUAL_INT16((int16_t)(map_px_h - 16), player_get_y());
 }
 
 void test_player_moves_near_bottom_map_bound(void) {
-    /* MAP_PX_H-15: moving north with gear1 accel=2 → new_py=MAP_PX_H-17, within bounds -> allowed */
-    player_set_pos(80, (int16_t)(MAP_PX_H - 15u));
+    /* map_px_h-15: moving north with gear1 accel=2 → new_py=map_px_h-17, within bounds -> allowed */
+    int16_t map_px_h = (int16_t)((uint16_t)active_map_h * 8u);
+    player_set_pos(80, (int16_t)(map_px_h - 15));
     input = J_UP;
     player_update();
-    TEST_ASSERT_EQUAL_INT16((int16_t)(MAP_PX_H - 17u), player_get_y());
+    TEST_ASSERT_EQUAL_INT16((int16_t)(map_px_h - 17), player_get_y());
 }
 
 /* --- sprite slot count -------------------------------------------------- */
@@ -434,6 +450,7 @@ int main(void) {
     RUN_TEST(test_player_blocked_by_right_wall_16px);
     RUN_TEST(test_player_clamped_at_screen_left);
     RUN_TEST(test_player_clamped_at_screen_right_16px);
+    RUN_TEST(test_player_x_bound_uses_active_map_w);
     RUN_TEST(test_player_moves_below_old_screen_top);
     RUN_TEST(test_player_clamped_at_bottom_map_bound_16px);
     RUN_TEST(test_player_moves_near_bottom_map_bound);

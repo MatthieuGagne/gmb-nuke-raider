@@ -45,8 +45,8 @@ void enemy_init(void) BANKED {
         enemy_oam[i]    = SPRITE_POOL_INVALID;
     }
     load_turret_tiles();   /* NONBANKED in loader.c — safe to call from any bank */
-    for (ty = 0u; ty < MAP_TILES_H && count < MAX_ENEMIES; ty++) {
-        for (tx = 0u; tx < MAP_TILES_W && count < MAX_ENEMIES; tx++) {
+    for (ty = 0u; ty < active_map_h && count < MAX_ENEMIES; ty++) {
+        for (tx = 0u; tx < active_map_w && count < MAX_ENEMIES; tx++) {
             if (track_tile_type((int16_t)((uint16_t)tx * 8u),
                                 (int16_t)((uint16_t)ty * 8u)) == TILE_TURRET) {
                 _spawn_at(count, tx, ty);

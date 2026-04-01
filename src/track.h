@@ -19,9 +19,6 @@ typedef uint8_t TileType;
 TileType track_tile_type_from_index(uint8_t tile_idx) BANKED;
 TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED;
 
-#define MAP_PX_W  160u   /* MAP_TILES_W * 8 */
-#define MAP_PX_H  800u   /* MAP_TILES_H * 8 */
-
 extern const uint8_t track_tile_data[];
 extern const uint8_t track_tile_data_count;
 extern const int16_t track_start_x;
@@ -30,6 +27,11 @@ extern const uint8_t track_map[];
 extern const uint8_t track2_map[];
 extern const int16_t track2_start_x;
 extern const int16_t track2_start_y;
+
+/* Runtime track dimensions — set by load_track_header() at track_select() time.
+ * These replace the former compile-time MAP_TILES_W / MAP_TILES_H constants. */
+extern uint8_t active_map_w;
+extern uint8_t active_map_h;
 
 #include "checkpoint.h"
 #include "banking.h"
@@ -67,9 +69,23 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED;
  * BANKED — trampoline handles cross-bank dispatch safely. */
 uint8_t track_get_raw_tile(uint8_t tx, uint8_t ty) BANKED;
 
-/* Fills buf[0..MAP_TILES_W-1] with raw tile indices for world tile row ty.
+/* Fills buf[0..active_map_w-1] with raw tile indices for world tile row ty.
  * Zeros buf on OOB ty. One BANKED call replaces 20 serial track_get_raw_tile()
  * calls in camera stream_row — reduces VBlank overrun risk. */
 void track_fill_row(uint8_t ty, uint8_t *buf) BANKED;
+
+/* Fills buf[0..count-1] with raw tile indices for columns tx_start..tx_start+count-1
+ * of world tile row ty. Zeros buf entries for any OOB tile. BANKED. */
+void track_fill_row_range(uint8_t ty, uint8_t tx_start, uint8_t count, uint8_t *buf) BANKED;
+
+/* Fills buf[0..count-1] with raw tile indices for rows ty_start..ty_start+count-1
+ * of world tile column tx. Zeros buf entries for any OOB tile. BANKED. */
+void track_fill_col(uint8_t tx, uint8_t ty_start, uint8_t count, uint8_t *buf) BANKED;
+
+#ifndef __SDCC
+/* Test-only seam: inject a synthetic map without hardware (gcc host tests only).
+ * Never compiled into the GB ROM. */
+void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h);
+#endif
 
 #endif /* TRACK_H */

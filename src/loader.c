@@ -22,6 +22,9 @@ BANKREF_EXTERN(turret_tile_data)
 BANKREF_EXTERN(track_checkpoints)
 BANKREF_EXTERN(track2_checkpoints)
 
+extern uint8_t active_map_w;
+extern uint8_t active_map_h;
+
 void load_player_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(player_tile_data));
@@ -96,5 +99,19 @@ void load_checkpoints(uint8_t id, CheckpointDef *dst, uint8_t *count) NONBANKED 
         }
     }
     *count = n;
+    SWITCH_ROM(saved);
+}
+
+void load_track_header(uint8_t id) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    if (id == 0u) {
+        SWITCH_ROM(BANK(track_map));
+        active_map_w = track_map[0];
+        active_map_h = track_map[1];
+    } else {
+        SWITCH_ROM(BANK(track2_map));
+        active_map_w = track2_map[0];
+        active_map_h = track2_map[1];
+    }
     SWITCH_ROM(saved);
 }

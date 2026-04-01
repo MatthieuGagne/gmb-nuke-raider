@@ -90,12 +90,12 @@ void test_x_and_y_axes_accumulate_independently(void) {
     TEST_ASSERT_EQUAL_INT8(-6, player_get_vy());
 }
 
-/* Player cannot move past map bottom boundary (MAP_PX_H-8 = 792).
+/* Player cannot move past map bottom boundary (active_map_h*8 - 8 = 792).
  * Player at py=792: moving down → new_py=793 > 792 → map clamp blocks. */
 void test_y_clamped_at_map_bottom(void) {
     player_set_pos(88, 792);  /* py at map bottom boundary */
     input = J_DOWN;
-    player_update();           /* new_py=793 > MAP_PX_H-8=792 → blocked */
+    player_update();           /* new_py=793 > active_map_h*8-8=792 → blocked */
     TEST_ASSERT_TRUE(player_get_y() <= 792);
 }
 
