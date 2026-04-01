@@ -185,11 +185,13 @@ void test_tile_turret_not_passable(void) {
 /* Basic fill: column tx=10 is road (tile 1) in the straight section (rows 0-49).
  * Uses real track_map data. active_map_w/h default to 20/100 from track.c. */
 void test_track_fill_col_road_column(void) {
+    /* col 10, rows 0-2: row 0 has tile 2 (center dashes), rows 1-2 have tile 1 (road).
+     * Both 1 and 2 map to TILE_ROAD via the LUT; we assert the raw index. */
     uint8_t buf[3];
     track_fill_col(10u, 0u, 3u, buf);
-    TEST_ASSERT_EQUAL_UINT8(1u, buf[0]);
-    TEST_ASSERT_EQUAL_UINT8(1u, buf[1]);
-    TEST_ASSERT_EQUAL_UINT8(1u, buf[2]);
+    TEST_ASSERT_EQUAL_UINT8(2u, buf[0]);  /* row 0, col 10 = dashes tile */
+    TEST_ASSERT_EQUAL_UINT8(1u, buf[1]);  /* row 1, col 10 = road tile */
+    TEST_ASSERT_EQUAL_UINT8(1u, buf[2]);  /* row 2, col 10 = road tile */
 }
 
 /* OOB tx: tile x >= active_map_w (20) fills zeros */

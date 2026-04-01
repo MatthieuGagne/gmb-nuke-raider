@@ -157,9 +157,9 @@ void player_update(void) BANKED {
         sfx_play(SFX_HIT);
     }
 
-    /* Apply Y velocity — Y clamp: [0, MAP_PX_H - 16] */
+    /* Apply Y velocity — Y clamp: [0, active_map_h*8 - 16] */
     new_py = (int16_t)(py + (int16_t)vy);
-    if (new_py >= 0 && new_py <= (int16_t)(MAP_PX_H - 16u) && corners_passable(px, new_py)) {
+    if (new_py >= 0 && new_py <= (int16_t)((uint16_t)active_map_h * 8u - 16u) && corners_passable(px, new_py)) {
         py = new_py;
     } else {
         vy = 0;
