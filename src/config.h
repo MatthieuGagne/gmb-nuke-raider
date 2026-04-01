@@ -80,6 +80,9 @@
 /* Enemy pool */
 #define MAX_ENEMIES           8u
 #define TURRET_TILE_BASE     18u    /* VRAM sprite tile slot — after bullet (17) */
+#if OVERMAP_CAR_TILE_BASE != TURRET_TILE_BASE
+#error "OVERMAP_CAR_TILE_BASE and TURRET_TILE_BASE must be equal (both reuse VRAM sprite tile slot 18 in their respective states)"
+#endif
 #define TURRET_FIRE_INTERVAL 60u    /* frames between shots */
 #define TURRET_HP             1u    /* hits to destroy */
 #define TURRET_HIT_RADIUS     4u    /* px radius for collision detection */
