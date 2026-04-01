@@ -147,7 +147,7 @@ void player_update(void) BANKED {
      * SFX_HIT targets CH4; SFX_SHOOT (in projectile_fire) also targets CH4.
      * Same-frame contention: last caller wins — HIT overwrites SHOOT if both fire. */
     new_px = (int16_t)(px + (int16_t)vx);
-    if (new_px >= 0 && new_px <= 144 && corners_passable(new_px, py)) {
+    if (new_px >= 0 && new_px <= (int16_t)((uint16_t)active_map_w * 8u - 16u) && corners_passable(new_px, py)) {
         px = new_px;
     } else {
         vx = 0;

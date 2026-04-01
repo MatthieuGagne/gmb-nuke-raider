@@ -11,6 +11,8 @@
 void setUp(void) {
     input = 0;
     prev_input = 0;
+    active_map_w = 20u;   /* default: 20 tiles * 8px = 160px; max player x = 144 */
+    active_map_h = 100u;  /* default: 100 tiles * 8px = 800px */
     mock_vram_clear();
     mock_move_sprite_reset();
     camera_init(88, 8);  /* cam_y = 0 (clamped) */
@@ -71,7 +73,7 @@ void test_player_blocked_by_right_wall_16px(void) {
     TEST_ASSERT_EQUAL_INT16(112, player_get_x());
 }
 
-/* --- screen X clamp [0, 144] (= 160-16) ----------------------------------- */
+/* --- map X clamp [0, active_map_w*8-16] ----------------------------------- */
 
 void test_player_clamped_at_screen_left(void) {
     player_set_pos(0, 80);
@@ -81,10 +83,21 @@ void test_player_clamped_at_screen_left(void) {
 }
 
 void test_player_clamped_at_screen_right_16px(void) {
+    /* active_map_w=20: max px = 20*8-16 = 144 */
     player_set_pos(144, 80);
     input = J_RIGHT | J_A;
     player_update();          /* new_px=145 > 144 -> blocked */
     TEST_ASSERT_EQUAL_INT16(144, player_get_x());
+}
+
+void test_player_x_bound_uses_active_map_w(void) {
+    /* active_map_w=30: 30 tiles * 8px = 240px; max player x = 240 - 16 = 224 */
+    active_map_w = 30u;
+    active_map_h = 100u;
+    player_set_pos(224, 80);
+    input = J_RIGHT | J_A;
+    player_update();          /* new_px=225 > 224 -> blocked at 224 */
+    TEST_ASSERT_TRUE(player_get_x() <= (int16_t)(30u * 8u - 16u));
 }
 
 /* --- map Y clamp [0, active_map_h*8-16] ----------------------------------- */
@@ -437,6 +450,7 @@ int main(void) {
     RUN_TEST(test_player_blocked_by_right_wall_16px);
     RUN_TEST(test_player_clamped_at_screen_left);
     RUN_TEST(test_player_clamped_at_screen_right_16px);
+    RUN_TEST(test_player_x_bound_uses_active_map_w);
     RUN_TEST(test_player_moves_below_old_screen_top);
     RUN_TEST(test_player_clamped_at_bottom_map_bound_16px);
     RUN_TEST(test_player_moves_near_bottom_map_bound);
