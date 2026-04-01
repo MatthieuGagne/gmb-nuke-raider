@@ -61,9 +61,9 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Overmap state | `src/state_overmap.c/.h`, `src/overmap_map.c`, `src/overmap_tiles.c`, `src/overmap_car_sprite.c/.h` | World overmap navigation; directional 8×8 car sprite (4 directions via flip flags) |
 | Hub state | `src/state_hub.c/.h`, `src/hub_data.c/.h` | City hub menu, NPC list, hub entry/exit |
 | Player | `src/player.c/.h`, `src/player_sprite.c` | Player movement, 3-gear auto-shifting acceleration, boundary checks, sprite rendering |
-| Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries, checkpoint WRAM buffer |
+| Track | `src/track.c/.h`, `src/track_map.c`, `src/track_tiles.c` | Tile map data, passability queries, checkpoint WRAM buffer; per-track width/height read from 2-byte ROM header at `track_select()` time (`active_map_w`/`active_map_h`); max supported width: 64 tiles |
 | Checkpoint | `src/checkpoint.c/.h` | Directional lap checkpoint enforcement; prevents lap farming on looping tracks |
-| Camera | `src/camera.c/.h` | Scrolling ring-buffer VRAM streaming, `move_bkg()` |
+| Camera | `src/camera.c/.h` | 2D scrolling ring-buffer VRAM streaming; Y-axis row streaming + X-axis column streaming with BG-wrap split calls; 1 row + 1 column cap per VBlank; `move_bkg(cam_scx_shadow, cam_scy_shadow)` |
 | Sprite pool | `src/sprite_pool.c/.h` | OAM slot management |
 | Dialog | `src/dialog.c/.h`, `src/dialog_data.c/.h`, `src/dialog_arrow_sprite.c/.h`, `src/dialog_border_tiles.c/.h` | NPC conversation trees, branching choices, per-NPC flags, UI assets |
 | HUD | `src/hud.c/.h` | On-screen display elements |
