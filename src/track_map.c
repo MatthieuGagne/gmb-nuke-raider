@@ -14,7 +14,8 @@ BANKREF(track_finish_line_y)
 const uint8_t track_finish_line_y = 95;
 
 BANKREF(track_map)
-const uint8_t track_map[MAP_TILES_H * MAP_TILES_W] = {
+const uint8_t track_map[2002] = {
+    /* header */ 20, 100,
     /* row  0 */ 0,0,0,0,1,1,1,1,1,2,2,1,1,1,1,1,0,0,0,0,
     /* row  1 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
     /* row  2 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
