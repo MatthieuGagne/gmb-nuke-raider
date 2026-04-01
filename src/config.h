@@ -40,8 +40,9 @@
 #define DAMAGE_REPAIR_AMOUNT       20u   /* HP restored by TILE_REPAIR */
 #define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
 
-#define MAP_TILES_W  20u
-#define MAP_TILES_H  100u
+/* MAX_MAP_TILES_W: ROM-budget cap only — max track width supported by tmx_to_c.py.
+ * Runtime dimensions are in active_map_w / active_map_h (track.c). */
+#define MAX_MAP_TILES_W  64u
 
 #define HUD_SCANLINE 128u /* pixel row where HUD window begins; used for player movement bounds */
 

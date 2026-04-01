@@ -29,7 +29,7 @@ extern const int16_t track2_start_x;
 extern const int16_t track2_start_y;
 
 /* Runtime track dimensions — set by load_track_header() at track_select() time.
- * Replace compile-time MAP_TILES_W / MAP_TILES_H in all runtime code. */
+ * These replace the former compile-time MAP_TILES_W / MAP_TILES_H constants. */
 extern uint8_t active_map_w;
 extern uint8_t active_map_h;
 

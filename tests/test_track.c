@@ -53,12 +53,12 @@ void test_track_impassable_curve_right_sand(void) {
 
 /* --- off-track: bounds checks ------------------------------------------ */
 
-/* Beyond map width: tx = 20 >= MAP_TILES_W */
+/* Beyond map width: tx = 20 >= active_map_w (20) */
 void test_track_impassable_out_of_bounds_x(void) {
     TEST_ASSERT_EQUAL_UINT8(0, track_passable(160, 80));
 }
 
-/* Beyond map height: ty = 100 >= MAP_TILES_H */
+/* Beyond map height: ty = 100 >= active_map_h (100) */
 void test_track_impassable_out_of_bounds_y(void) {
     TEST_ASSERT_EQUAL_UINT8(0, track_passable(80, 800));
 }
@@ -146,21 +146,21 @@ void test_track_tile_type_negative_is_wall(void) {
 
 /* track_fill_row: row contents match track_get_raw_tile() for each column */
 void test_track_fill_row_matches_get_raw_tile(void) {
-    uint8_t buf[MAP_TILES_W];
+    uint8_t buf[20u];
     uint8_t tx;
     track_fill_row(10u, buf);
-    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+    for (tx = 0u; tx < 20u; tx++) {
         TEST_ASSERT_EQUAL_UINT8(track_get_raw_tile(tx, 10u), buf[tx]);
     }
 }
 
 /* track_fill_row: OOB ty fills buffer with zeros */
 void test_track_fill_row_oob_ty_returns_zeros(void) {
-    uint8_t buf[MAP_TILES_W];
+    uint8_t buf[20u];
     uint8_t tx;
-    for (tx = 0u; tx < MAP_TILES_W; tx++) buf[tx] = 0xFFu;
-    track_fill_row(MAP_TILES_H, buf);  /* ty = 100 = MAP_TILES_H: OOB */
-    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+    for (tx = 0u; tx < 20u; tx++) buf[tx] = 0xFFu;
+    track_fill_row(100u, buf);  /* ty = 100 = active_map_h (default): OOB */
+    for (tx = 0u; tx < 20u; tx++) {
         TEST_ASSERT_EQUAL_UINT8(0u, buf[tx]);
     }
 }
