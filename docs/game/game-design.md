@@ -401,7 +401,33 @@ Optimization:
 
 ---
 
-# 25. Development Roadmap
+# 25. Competitive Landscape
+
+**Top Competitor: Lunar Lancer**
+
+Lunar Lancer is the primary title we are competing against in the GB/GBC racing space. Key differentiators to maintain against Lunar Lancer:
+
+- Wasteland/post-apocalyptic tone vs. Lunar Lancer's sci-fi aesthetic
+- Mission-based structure with hub exploration vs. pure arcade racing
+- Vehicle upgrade depth and faction-driven narrative
+- Weapon combat integrated into the racing loop
+
+Design decisions should be evaluated against what Lunar Lancer offers. Where Lunar Lancer is strong, we either differentiate or outperform.
+
+**Other Competitors**
+
+| Title | Platform | Notes |
+|---|---|---|
+| Spy Hunter | GB | Vehicle combat + driving; our weapon system draws from this lineage |
+| Micro Machines | GB/GBC | Top-down racing benchmark on GB hardware; sets player expectation for controls |
+| RC Pro-Am | GB | Early GB racing classic; defines the genre baseline |
+| Contra: Operation C | GB | Action/run-and-gun reference; informs our combat pacing expectations |
+| Jurassic Park 2 | GB | Top-down open-world action on GB; relevant to our overmap/mission structure |
+| Super Off-Road | GB | Off-road racing with upgrades; direct analog to our vehicle progression system |
+
+---
+
+# 26. Development Roadmap
 
 Phase 1 — Prototype  
 - car physics  
