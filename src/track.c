@@ -94,8 +94,10 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
 void track_init(void) BANKED {
     if (active_track_id == 0u) {
         load_track_tiles();
-    } else {
+    } else if (active_track_id == 1u) {
         load_track2_tiles();
+    } else {
+        load_track3_tiles();
     }
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
