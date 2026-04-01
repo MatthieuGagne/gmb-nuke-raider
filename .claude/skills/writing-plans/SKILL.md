@@ -41,7 +41,7 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 | 6 | Build ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS) |
 | 7 | Invoke `bank-post-build` skill (HARD GATE) |
 | 8 | Refactor checkpoint ("breaks when N > 1?") |
-| 9 | Invoke `gb-c-optimizer` agent (HARD GATE) |
+| 9 | Invoke `gb-c-optimizer` agent (HARD GATE — validate only, report issues, do not apply fixes) |
 | 10 | Commit |
 
 Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
@@ -205,10 +205,10 @@ Ask: "Does this implementation generalize, or did I hard-code something that bre
 - If generalized: proceed.
 - If hard-coded and not fixing now: open a follow-up GitHub issue immediately before closing this task.
 
-**Step 10: HARD GATE — gb-c-optimizer**
+**Step 10: HARD GATE — gb-c-optimizer (validate only)**
 
 Invoke the `gb-c-optimizer` agent on the new/modified C files.
-Fix any AoS, performance, or ROM size issues before committing.
+Validate only — report issues, do not apply fixes. Any issues found will be applied during execution (executing-plans / subagent-driven-development phase).
 
 **Step 11: Commit**
 
