@@ -22,10 +22,15 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
 /* --- Track dispatch state --- */
 static uint8_t active_track_id;
 
+/* Runtime track dimensions — set by load_track_header() at track_select() time.
+ * Default to track 0 compile-time dimensions so calls work before track_select(). */
+uint8_t active_map_w = 20u;   /* default: track 0 width  — overwritten by load_track_header() */
+uint8_t active_map_h = 100u;  /* default: track 0 height — overwritten by load_track_header() */
+
 /* Active track parameters — copied from the selected track's descriptor
  * at track_select() time. Avoids cross-bank reads in hot-path accessors.
- * Default to track 0 so passable/raw_tile calls work before track_select(). */
-static const uint8_t *active_map     = track_map;
+ * active_map points PAST the 2-byte header so index math active_map[ty*w+tx] is correct. */
+static const uint8_t *active_map     = track_map + 2;
 static int16_t        active_start_x;
 static int16_t        active_start_y;
 static uint8_t        active_lap_count;
@@ -37,13 +42,14 @@ static uint8_t       active_checkpoint_count = 0u;
 
 void track_select(uint8_t id) BANKED {
     active_track_id = id;
+    load_track_header(id);   /* sets active_map_w / active_map_h via NONBANKED loader */
     if (id == 0u) {
-        active_map       = track_map;
+        active_map       = track_map + 2;
         active_start_x   = track_start_x;
         active_start_y   = track_start_y;
         active_lap_count = 1u;                /* track 1: single finish crossing */
     } else {
-        active_map       = track2_map;
+        active_map       = track2_map + 2;
         active_start_x   = track2_start_x;
         active_start_y   = track2_start_y;
         active_lap_count = 3u;
@@ -67,8 +73,8 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
     if (world_x < 0 || world_y < 0) return TILE_WALL;
     tx = (uint8_t)((uint16_t)world_x >> 3u);
     ty = (uint8_t)((uint16_t)world_y >> 3u);
-    if (tx >= MAP_TILES_W || ty >= MAP_TILES_H) return TILE_WALL;
-    return track_tile_type_from_index(active_map[(uint16_t)ty * MAP_TILES_W + tx]);
+    if (tx >= active_map_w || ty >= active_map_h) return TILE_WALL;
+    return track_tile_type_from_index(active_map[(uint16_t)ty * active_map_w + tx]);
 }
 
 void track_init(void) BANKED {
@@ -82,19 +88,19 @@ void track_init(void) BANKED {
 }
 
 uint8_t track_get_raw_tile(uint8_t tx, uint8_t ty) BANKED {
-    if (tx >= MAP_TILES_W || ty >= MAP_TILES_H) return 0u;
-    return active_map[(uint16_t)ty * MAP_TILES_W + tx];
+    if (tx >= active_map_w || ty >= active_map_h) return 0u;
+    return active_map[(uint16_t)ty * active_map_w + tx];
 }
 
 void track_fill_row(uint8_t ty, uint8_t *buf) BANKED {
     uint8_t tx;
     uint16_t row_base;
-    if (ty >= MAP_TILES_H) {
-        for (tx = 0u; tx < MAP_TILES_W; tx++) buf[tx] = 0u;
+    if (ty >= active_map_h) {
+        for (tx = 0u; tx < active_map_w; tx++) buf[tx] = 0u;
         return;
     }
-    row_base = (uint16_t)ty * MAP_TILES_W;
-    for (tx = 0u; tx < MAP_TILES_W; tx++) {
+    row_base = (uint16_t)ty * active_map_w;
+    for (tx = 0u; tx < active_map_w; tx++) {
         buf[tx] = active_map[row_base + tx];
     }
 }
@@ -105,9 +111,48 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     if (world_x < 0 || world_y < 0) return 0u;
     tx = (uint8_t)((uint16_t)world_x >> 3u);
     ty = (uint8_t)((uint16_t)world_y >> 3u);
-    if (tx >= MAP_TILES_W || ty >= MAP_TILES_H) return 0u;
-    return active_map[(uint16_t)ty * MAP_TILES_W + tx] != 0u;
+    if (tx >= active_map_w || ty >= active_map_h) return 0u;
+    return active_map[(uint16_t)ty * active_map_w + tx] != 0u;
 }
 
 const CheckpointDef *track_get_checkpoints(void) BANKED { return wram_checkpoints; }
 uint8_t track_get_checkpoint_count(void) BANKED { return active_checkpoint_count; }
+
+void track_fill_row_range(uint8_t ty, uint8_t tx_start, uint8_t count, uint8_t *buf) BANKED {
+    uint8_t i;
+    uint16_t row_base;
+    uint8_t tx;
+    if (ty >= active_map_h) {
+        for (i = 0u; i < count; i++) buf[i] = 0u;
+        return;
+    }
+    row_base = (uint16_t)ty * active_map_w;
+    for (i = 0u; i < count; i++) {
+        tx = tx_start + i;
+        buf[i] = (tx < active_map_w) ? active_map[row_base + tx] : 0u;
+    }
+}
+
+void track_fill_col(uint8_t tx, uint8_t ty_start, uint8_t count, uint8_t *buf) BANKED {
+    uint8_t i;
+    uint8_t ty;
+    if (tx >= active_map_w) {
+        for (i = 0u; i < count; i++) buf[i] = 0u;
+        return;
+    }
+    for (i = 0u; i < count; i++) {
+        ty = ty_start + i;
+        buf[i] = (ty < active_map_h)
+            ? active_map[(uint16_t)ty * active_map_w + tx]
+            : 0u;
+    }
+}
+
+#ifndef __SDCC
+/* Test-only seam — not compiled into the GB ROM. */
+void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h) {
+    active_map   = map;
+    active_map_w = w;
+    active_map_h = h;
+}
+#endif

@@ -119,7 +119,9 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
         f.write(f"BANKREF({prefix}_finish_line_y)\n")
         f.write(f"const uint8_t {prefix}_finish_line_y = {finish_tile_y};\n\n")
         f.write(f"BANKREF({prefix}_map)\n")
-        f.write(f"const uint8_t {prefix}_map[MAP_TILES_H * MAP_TILES_W] = {{\n")
+        total_bytes = 2 + width * height   # 2 header bytes + tile data
+        f.write(f"const uint8_t {prefix}_map[{total_bytes}] = {{\n")
+        f.write(f"    /* header */ {width}, {height},\n")
         for row in range(height):
             start = row * width
             vals  = ','.join(str(v) for v in tile_ids[start:start + width])
