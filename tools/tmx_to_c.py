@@ -43,6 +43,15 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
     tileset_el = root.find('tileset')
     firstgid = int(tileset_el.get('firstgid', '1')) if tileset_el is not None else 1
 
+    # Read map_type property (map-level custom properties)
+    map_type_val = 0  # default: TRACK_TYPE_RACE
+    map_props_el = root.find('properties')
+    if map_props_el is not None:
+        for p in map_props_el.findall('property'):
+            if p.get('name') == 'map_type':
+                val = p.get('value', 'race')
+                map_type_val = 0 if val == 'race' else 1
+
     raw      = data_el.text.strip()
     tile_ids = [gid_to_tile_id(int(x), firstgid) for x in raw.split(',') if x.strip()]
 
@@ -118,6 +127,8 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
         f.write(f"const int16_t {prefix}_start_y = {spawn_y};\n\n")
         f.write(f"BANKREF({prefix}_finish_line_y)\n")
         f.write(f"const uint8_t {prefix}_finish_line_y = {finish_tile_y};\n\n")
+        f.write(f"BANKREF({prefix}_map_type)\n")
+        f.write(f"const uint8_t {prefix}_map_type = {map_type_val}u;\n\n")
         f.write(f"BANKREF({prefix}_map)\n")
         total_bytes = 2 + width * height   # 2 header bytes + tile data
         f.write(f"const uint8_t {prefix}_map[{total_bytes}] = {{\n")
