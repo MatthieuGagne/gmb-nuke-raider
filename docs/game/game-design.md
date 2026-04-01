@@ -418,6 +418,8 @@ Design decisions should be evaluated against what Lunar Lancer offers. Where Lun
 
 | Title | Platform | Notes |
 |---|---|---|
+| Jackal | NES | Top-down vehicular combat with mission objectives and rescue mechanics; closest NES ancestor to our combat+driving loop |
+| Metal Gear 1 | NES | Top-down stealth/action with mission structure and narrative tension; sets the bar for story-driven top-down action on Nintendo hardware |
 | Spy Hunter | GB | Vehicle combat + driving; our weapon system draws from this lineage |
 | Micro Machines | GB/GBC | Top-down racing benchmark on GB hardware; sets player expectation for controls |
 | RC Pro-Am | GB | Early GB racing classic; defines the genre baseline |
