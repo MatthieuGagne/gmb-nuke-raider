@@ -308,6 +308,8 @@
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force /home/mathdaman/code/nuke-raider/.claude/worktrees/plan-issue-248-headless-regression)",
       "WebFetch(domain:www.mindstudio.ai)",
       "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove .claude/worktrees/issue-252-gear-system)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove .claude/worktrees/plan-issue-253-overmap-car-sprite)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove .claude/worktrees/plan-issue-259-gbdk-expert-implement-mode)",
       "Bash(cp /home/mathdaman/code/nuke-raider/docs/plans/2026-03-31-gbdk-expert-implement-mode.md /home/mathdaman/code/nuke-raider/.claude/worktrees/plan-issue-259-gbdk-expert-implement-mode/docs/plans/2026-03-31-gbdk-expert-implement-mode.md)",
       "Bash(rm /home/mathdaman/code/nuke-raider/docs/plans/2026-03-31-gbdk-expert-implement-mode.md)"
     ]
