@@ -1,6 +1,7 @@
 #pragma bank 255
 #include <gb/gb.h>
 #include "config.h"
+#include "track.h"
 #include "hud.h"
 
 /* --- Tile index constants --- */
@@ -65,14 +66,16 @@ static uint8_t  hud_mm;           /* cached minutes for display */
 static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
 static uint8_t  hud_lap_current;
 static uint8_t  hud_lap_total;
+static uint8_t  hud_map_type;     /* TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
 
 /* --- Public API --- */
 
-void hud_init(void) BANKED {
+void hud_init(uint8_t map_type, uint8_t lap_total) BANKED {
     static uint8_t row0[20];
     static uint8_t row1[20];
     uint8_t i;
 
+    hud_map_type    = map_type;
     hud_hp          = PLAYER_MAX_HP;
     hud_frame_tick  = 0u;
     hud_seconds     = 0u;
@@ -80,7 +83,7 @@ void hud_init(void) BANKED {
     hud_mm          = 0u;
     hud_ss          = 0u;
     hud_lap_current = 1u;
-    hud_lap_total   = 3u;
+    hud_lap_total   = lap_total;
 
     /* Load font tile patterns into BG/Win tile data starting at tile 128 */
     set_bkg_data(HUD_FONT_BASE, HUD_FONT_COUNT, hud_font_tiles);
@@ -93,9 +96,12 @@ void hud_init(void) BANKED {
     row0[3]  = HUD_FONT_BASE + 1u;                      /* hundreds: '1' */
     row0[4]  = HUD_FONT_BASE + 0u;                      /* tens:     '0' */
     row0[5]  = HUD_FONT_BASE + 0u;                      /* units:    '0' */
-    row0[6]  = HUD_FONT_BASE + 1u;                      /* lap current: '1' */
-    row0[7]  = HUD_FONT_BASE + HUD_TILE_SLASH;          /* '/' */
-    row0[8]  = HUD_FONT_BASE + 3u;                      /* lap total: '3' (default) */
+    if (hud_map_type != TRACK_TYPE_COMBAT) {
+        row0[6]  = HUD_FONT_BASE + 1u;                  /* lap current: '1' */
+        row0[7]  = HUD_FONT_BASE + HUD_TILE_SLASH;      /* '/' */
+        row0[8]  = HUD_FONT_BASE + hud_lap_total;       /* lap total */
+    }
+    /* cols 6-8 already filled with HUD_TILE_SPACE for combat (from the fill loop above) */
     row0[15] = HUD_FONT_BASE + 0u;             /* MM tens */
     row0[16] = HUD_FONT_BASE + 0u;             /* MM units */
     row0[17] = HUD_FONT_BASE + HUD_TILE_COLON;
@@ -151,8 +157,8 @@ void hud_render(void) BANKED {
     }
     set_win_tiles(3u, 0u, 3u, 1u, hp_digits);
 
-    /* Update lap tiles (cols 6-8): "1/3" format */
-    {
+    /* Update lap tiles (cols 6-8): "1/3" format — skipped for combat maps */
+    if (hud_map_type != TRACK_TYPE_COMBAT) {
         uint8_t lap_tiles[3];
         lap_tiles[0] = HUD_FONT_BASE + hud_lap_current;
         lap_tiles[1] = HUD_FONT_BASE + HUD_TILE_SLASH;

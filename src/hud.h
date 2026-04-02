@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* --- Public API --- */
-void    hud_init(void) BANKED;          /* call in state_playing enter(), display must be OFF */
+void    hud_init(uint8_t map_type, uint8_t lap_total) BANKED; /* call in state_playing enter(), display must be OFF */
 void    hud_update(void) BANKED;        /* call in game logic phase each frame */
 void    hud_render(void) BANKED;        /* call in VBlank phase — writes win tiles when dirty */
 void    hud_set_hp(uint8_t hp) BANKED;  /* wire to player damage system */

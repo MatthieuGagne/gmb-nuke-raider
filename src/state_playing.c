@@ -35,7 +35,7 @@ static void enter(void) {
     track_init();
     checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
     camera_init(player_get_x(), player_get_y());
-    hud_init();
+    hud_init(track_get_map_type(), track_get_lap_count());
     hud_set_lap(lap_get_current(), lap_get_total());
     camera_apply_scroll();
     player_render();
