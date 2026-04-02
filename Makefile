@@ -65,16 +65,17 @@ src/player_sprite.c: assets/sprites/player_car.png tools/png_to_tiles.py
 
 $(TARGET): src/player_sprite.c
 
-# NPC portraits use --bank 255 (autobank). state_hub.c (bank 0) calls SET_BANK to
-# load portrait tiles into VRAM. Bank-0 code may freely call SWITCH_ROM.
+# NPC portraits: mechanic and drifter are pinned to bank 2 (--bank 2) to relieve
+# bank-1 pressure after state_results was added (ROM_1 hit 100% with all at 255).
+# trader remains autobank (255). loader.c handles BANK(sym) switching for all.
 src/npc_mechanic_portrait.c: assets/sprites/npc_mechanic.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
+	python3 tools/png_to_tiles.py --bank 2 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
 
 src/npc_trader_portrait.c: assets/sprites/npc_trader.png tools/png_to_tiles.py
 	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
 
 src/npc_drifter_portrait.c: assets/sprites/npc_drifter.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 255 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
+	python3 tools/png_to_tiles.py --bank 2 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
 
 $(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter_portrait.c
 

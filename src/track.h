@@ -62,15 +62,28 @@ extern const uint8_t track3_map_type;
 
 /* --- TrackDesc dispatch table --- */
 
+/* Per-track ROM descriptor. Pointer fields reference extern consts from generated map files.
+ * Pointer initializers are used because extern const values are not C integer constant
+ * expressions and cannot appear directly in static struct initializers. */
+typedef struct {
+    const uint8_t  *map;        /* raw map data including 2-byte header */
+    const int16_t  *start_x;
+    const int16_t  *start_y;
+    uint8_t         lap_count;
+    const uint8_t  *map_type;   /* points to track_map_type / track2_map_type / track3_map_type */
+    uint16_t        reward;     /* scrap payout; TRACK1_REWARD / TRACK2_REWARD from config.h */
+} TrackDesc;
+
 /* Select active track before entering STATE_PLAYING.
  * Must be called from bank-0 code (state_overmap.c) via the BANKED trampoline. */
 void track_select(uint8_t id) BANKED;
 
 /* Accessors — read from active TrackDesc */
-uint8_t track_get_lap_count(void) BANKED;
-uint8_t track_get_map_type(void) BANKED;
-int16_t track_get_start_x(void) BANKED;
-int16_t track_get_start_y(void) BANKED;
+uint8_t  track_get_lap_count(void) BANKED;
+uint8_t  track_get_map_type(void) BANKED;
+int16_t  track_get_start_x(void) BANKED;
+int16_t  track_get_start_y(void) BANKED;
+uint16_t track_get_reward(void) BANKED;
 
 const CheckpointDef *track_get_checkpoints(void) BANKED;
 uint8_t              track_get_checkpoint_count(void) BANKED;
