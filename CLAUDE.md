@@ -162,8 +162,8 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Always do a clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
 3. `make memory-check` fires automatically via PostToolUse hook after step 2 — check the hook output; if any budget is FAIL or ERROR, stop and fix before continuing.
-4. Launch the ROM — do NOT ask permission, just run it immediately in the background: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb` (run from the worktree directory so the path resolves to the worktree's `build/`). NEVER launch from the main repo's `build/` — it may be stale.
-5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
+4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background from the worktree directory (NEVER from the main repo's `build/` — it may be stale): `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
+5. Ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
 **GB skill gates:**
@@ -196,7 +196,7 @@ Not safe to parallelize: writing the same file; multiple actors committing to th
 2. Edit doc file(s)
 3. Fetch + merge: `git fetch origin && git merge origin/master`
 4. Clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
-5. Smoketest: launch ROM in Emulicious, confirm no pre-existing breakage
+5. Smoketest: ask user for confirmation, then launch ROM in Emulicious if confirmed, confirm no pre-existing breakage
 6. Commit
 7. Push branch and create PR
 

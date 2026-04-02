@@ -125,6 +125,7 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 | Calling `set_sprite_data` outside VBlank | Wrap with `wait_vbl_done()` unless display is off |
 | Using 152/136 as max position | Visible bounds: oam_x ∈ [8,167], oam_y ∈ [16,159] |
 | Editing `src/*_sprite.c` by hand | Generated — edit the `.aseprite`, re-export, re-run `png_to_tiles.py` |
+| Using `--save-as` for a multi-frame sprite | Produces `name1.png`, `name2.png` — not a sheet. Use `--sheet --sheet-type horizontal` and add a specific Makefile rule override |
 | Hardcoding `uint8_t tile_data[] = {0xFF,0x00,...}` in `.c` | **NEVER** — every tile/sprite must have `.aseprite` → PNG → `png_to_tiles.py` pipeline |
 | Using palette index 0 for sprite pixels | Always transparent; use indices 1–3 |
 | Forgetting to check `SPRITE_POOL_INVALID` | `get_sprite()` returns `0xFF` when pool is full |
@@ -176,14 +177,26 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 | Asset | Source | PNG | Generated C |
 |-------|--------|-----|-------------|
 | Player car | `assets/sprites/player_car.aseprite` | `assets/sprites/player_car.png` | `src/player_sprite.c` |
+| Overmap car (2 frames: up + left) | `assets/sprites/overmap_car.aseprite` | `assets/sprites/overmap_car.png` (16×8 sheet) | `src/overmap_car_sprite.c` |
 | Track tileset (7 tiles: wall/road/dashes/sand/oil/boost/finish) | `assets/maps/tileset.aseprite` | `assets/maps/tileset.png` | `src/track_tiles.c` |
 | Overmap tiles (4 tiles: blank/road/hub/dest) | `assets/maps/overmap_tiles.aseprite` | `assets/maps/overmap_tiles.png` | `src/overmap_tiles.c` |
 
-**Aseprite CLI export (correct flag):**
+**Aseprite CLI export (single-frame sprites):**
 ```sh
 aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.png
 ```
 Note: `--export-type` is NOT a valid flag. Use `--save-as` with a `.png` extension.
+
+**Multi-frame sprites — CRITICAL:** `--save-as` with a multi-frame `.aseprite` produces **numbered files** (`name1.png`, `name2.png`, …), NOT a sprite sheet. For any sprite with more than 1 frame, use `--sheet` instead:
+```sh
+aseprite --batch assets/sprites/<name>.aseprite --sheet assets/sprites/<name>.png --sheet-type horizontal
+```
+The generic Makefile rule `assets/sprites/%.png: assets/sprites/%.aseprite` uses `--save-as` and **will produce wrong output** for multi-frame sprites. Add a specific override rule for any multi-frame sprite:
+```makefile
+assets/sprites/<name>.png: assets/sprites/<name>.aseprite
+	aseprite --batch $< --sheet $@ --sheet-type horizontal
+```
+Place this specific rule **before** the generic pattern rule, or anywhere (Make specific rules take precedence over pattern rules for the same target).
 
 **REQUIRED — Aseprite CLI:** ALWAYS invoke the **`aseprite`** skill before running any `aseprite` command. It has the complete flag reference and prevents common mistakes (e.g., `--export-type` is not a valid flag).
 

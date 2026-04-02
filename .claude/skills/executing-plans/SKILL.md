@@ -86,26 +86,9 @@ Based on feedback:
 
 After all tasks complete and verified, run the smoketest sequence:
 
-1. Fetch and merge latest master again (from the worktree directory) to ensure you're up to date before pushing:
-   ```bash
-   git fetch origin && git merge origin/master
-   ```
-   NEVER use `git merge master` alone — the local master ref may be stale.
+Follow the **Smoketest gate** sequence from CLAUDE.md (fetch+merge origin/master, clean build, memory-check hook, ask for confirmation before launching, wait for confirmation).
 
-2. Always do a clean build:
-   ```bash
-   make clean && GBDK_HOME=/home/mathdaman/gbdk make
-   ```
-
-3. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix before continuing.
-
-4. Launch the ROM immediately in the background (run from the worktree directory):
-   ```bash
-   java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
-   ```
-   Tell the user it's running and ask them to confirm it looks correct.
-
-5. Only after the user confirms:
+Only after the user confirms:
    - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
    - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
    - Follow that skill to verify tests, present options, execute choice.
