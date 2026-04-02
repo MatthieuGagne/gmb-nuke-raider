@@ -14,6 +14,8 @@ BANKREF_EXTERN(state_playing)
 #include "loader.h"
 #include "damage.h"
 #include "state_game_over.h"
+#include "state_results.h"
+#include "economy.h"
 #include "projectile.h"
 #include "lap.h"
 #include "checkpoint.h"
@@ -108,8 +110,13 @@ static void update(void) {
                     return;
                 }
                 if (lap_advance()) {
-                    /* Final lap complete — return to overmap */
-                    state_replace(&state_overmap);
+                    /* Final lap complete — award scrap and show results */
+                    {
+                        uint16_t reward = track_get_reward();
+                        state_results_set_earned(reward);
+                        economy_add_scrap(reward);
+                    }
+                    state_replace(&state_results);
                     return;
                 }
                 /* Lap complete — reset checkpoints for next lap, update HUD */
