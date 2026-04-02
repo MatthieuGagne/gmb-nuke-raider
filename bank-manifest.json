@@ -27,7 +27,7 @@
   "src/state_overmap.c":         {"bank": 0,   "reason": "calls SET_BANK — must be HOME bank; no #pragma bank"},
   "src/state_game_over.c":       {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_playing.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
-  "src/state_results.c":        {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
+  "src/state_results.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_title.c":           {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/lap.c":                   {"bank": 255, "reason": "autobank"},
   "src/track.c":                 {"bank": 255, "reason": "autobank"},
