@@ -3,6 +3,9 @@
      orientation="orthogonal" renderorder="right-down"
      width="20" height="100" tilewidth="8" tileheight="8"
      infinite="0" nextlayerid="4" nextobjectid="3">
+ <properties>
+  <property name="map_type" value="race"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="20" height="100">
   <data encoding="csv">
@@ -101,7 +104,7 @@
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,
-1,1,1,1,1,1,7,7,7,7,7,3,3,7,7,7,7,7,1,1,
+1,1,1,1,1,1,7,7,7,7,7,7,7,7,7,7,7,7,1,1,
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,
 1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,

@@ -21,6 +21,13 @@ BANKREF_EXTERN(turret_tile_data)
 
 BANKREF_EXTERN(track_checkpoints)
 BANKREF_EXTERN(track2_checkpoints)
+BANKREF_EXTERN(track3_checkpoints)
+
+extern const uint8_t track3_map[];
+BANKREF_EXTERN(track3_map)
+
+extern const CheckpointDef track3_checkpoints[];
+extern const uint8_t        track3_checkpoint_count;
 
 extern uint8_t active_map_w;
 extern uint8_t active_map_h;
@@ -40,6 +47,13 @@ void load_track_tiles(void) NONBANKED {
 }
 
 void load_track2_tiles(void) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    SWITCH_ROM(BANK(track_tile_data));
+    set_bkg_data(0, track_tile_data_count, track_tile_data);
+    SWITCH_ROM(saved);
+}
+
+void load_track3_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(track_tile_data));
     set_bkg_data(0, track_tile_data_count, track_tile_data);
@@ -90,12 +104,19 @@ void load_checkpoints(uint8_t id, CheckpointDef *dst, uint8_t *count) NONBANKED 
         for (i = 0u; i < n; i++) {
             dst[i] = track_checkpoints[i];
         }
-    } else {
+    } else if (id == 1u) {
         SWITCH_ROM(BANK(track2_checkpoints));
         n = track2_checkpoint_count;
         if (n > MAX_CHECKPOINTS) n = MAX_CHECKPOINTS;
         for (i = 0u; i < n; i++) {
             dst[i] = track2_checkpoints[i];
+        }
+    } else {
+        SWITCH_ROM(BANK(track3_checkpoints));
+        n = track3_checkpoint_count;
+        if (n > MAX_CHECKPOINTS) n = MAX_CHECKPOINTS;
+        for (i = 0u; i < n; i++) {
+            dst[i] = track3_checkpoints[i];
         }
     }
     *count = n;
@@ -108,10 +129,14 @@ void load_track_header(uint8_t id) NONBANKED {
         SWITCH_ROM(BANK(track_map));
         active_map_w = track_map[0];
         active_map_h = track_map[1];
-    } else {
+    } else if (id == 1u) {
         SWITCH_ROM(BANK(track2_map));
         active_map_w = track2_map[0];
         active_map_h = track2_map[1];
+    } else {
+        SWITCH_ROM(BANK(track3_map));
+        active_map_w = track3_map[0];
+        active_map_h = track3_map[1];
     }
     SWITCH_ROM(saved);
 }

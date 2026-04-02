@@ -102,4 +102,8 @@
 #define DEBUG_LOG_IDX     0xDFC0U  /* WRAM: ring buffer write index (1 byte) */
 #define DEBUG_TICK_ADDR   0xDFC1U  /* WRAM: music_tick() call counter (1 byte, wraps at 256) */
 
+/* Economy — scrap rewards per track */
+#define TRACK1_REWARD  50u
+#define TRACK2_REWARD 100u
+
 #endif /* CONFIG_H */

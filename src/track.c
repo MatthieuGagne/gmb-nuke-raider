@@ -5,6 +5,16 @@
 #include "loader.h"
 #include "checkpoint.h"
 
+extern const int16_t track3_start_x;
+extern const int16_t track3_start_y;
+extern const uint8_t track3_map[];
+
+static const TrackDesc track_table[] = {
+    { track_map,  &track_start_x,  &track_start_y,  1u, &track_map_type,  TRACK1_REWARD },
+    { track2_map, &track2_start_x, &track2_start_y, 3u, &track2_map_type, TRACK2_REWARD },
+    { track3_map, &track3_start_x, &track3_start_y, 1u, &track3_map_type, 0u           },
+};
+
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
 #define TILE_LUT_LEN 9u
 static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
@@ -21,6 +31,7 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
 
 /* --- Track dispatch state --- */
 static uint8_t active_track_id;
+static uint8_t active_map_type = 0u;
 
 /* Runtime track dimensions — set by load_track_header() at track_select() time.
  * Default to track 0 compile-time dimensions so calls work before track_select(). */
@@ -41,26 +52,24 @@ static CheckpointDef wram_checkpoints[MAX_CHECKPOINTS];
 static uint8_t       active_checkpoint_count = 0u;
 
 void track_select(uint8_t id) BANKED {
+    const TrackDesc *t;
     active_track_id = id;
-    load_track_header(id);   /* sets active_map_w / active_map_h via NONBANKED loader */
-    if (id == 0u) {
-        active_map       = track_map + 2;
-        active_start_x   = track_start_x;
-        active_start_y   = track_start_y;
-        active_lap_count = 1u;                /* track 1: single finish crossing */
-    } else {
-        active_map       = track2_map + 2;
-        active_start_x   = track2_start_x;
-        active_start_y   = track2_start_y;
-        active_lap_count = 3u;
-    }
-    /* Cross-bank copy — delegated to NONBANKED loader (bank 0) */
+    load_track_header(id);
+    t = &track_table[id];
+    active_map       = t->map + 2;
+    active_start_x   = *t->start_x;
+    active_start_y   = *t->start_y;
+    active_lap_count = t->lap_count;
+    active_map_type  = *t->map_type;
     load_checkpoints(id, wram_checkpoints, &active_checkpoint_count);
 }
 
-uint8_t track_get_lap_count(void) BANKED { return active_lap_count; }
-int16_t track_get_start_x(void)   BANKED { return active_start_x;   }
-int16_t track_get_start_y(void)   BANKED { return active_start_y;   }
+uint8_t  track_get_lap_count(void) BANKED { return active_lap_count; }
+uint8_t  track_get_map_type(void)  BANKED { return active_map_type;  }
+int16_t  track_get_start_x(void)   BANKED { return active_start_x;   }
+int16_t  track_get_start_y(void)   BANKED { return active_start_y;   }
+/* track_table is static const in this file; same bank guaranteed by #pragma bank 255 */
+uint16_t track_get_reward(void)    BANKED { return track_table[active_track_id].reward; }
 
 TileType track_tile_type_from_index(uint8_t tile_idx) BANKED {
     if (tile_idx >= TILE_LUT_LEN) return TILE_ROAD;
@@ -80,8 +89,10 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
 void track_init(void) BANKED {
     if (active_track_id == 0u) {
         load_track_tiles();
-    } else {
+    } else if (active_track_id == 1u) {
         load_track2_tiles();
+    } else {
+        load_track3_tiles();
     }
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;

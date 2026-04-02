@@ -2,9 +2,10 @@
 #include "unity.h"
 #include <gb/gb.h>
 #include "../src/config.h"
+#include "../src/track.h"
 #include "../src/hud.h"
 
-void setUp(void) { hud_init(); }
+void setUp(void) { hud_init(TRACK_TYPE_RACE, 3u); }
 void tearDown(void) {}
 
 /* --- After init: state is zeroed and dirty is clear --- */
@@ -138,6 +139,13 @@ void test_set_hp_changed_value_sets_dirty(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
 }
 
+/* --- Combat map: hud_init does not trigger mid-frame render --- */
+void test_hud_init_combat_mode_sets_map_type(void) {
+    hud_init(TRACK_TYPE_COMBAT, 1u);
+    /* After combat init, hud_is_dirty should be 0 (no mid-frame render triggered) */
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_seconds_zero);
@@ -155,5 +163,6 @@ int main(void) {
     RUN_TEST(test_set_lap_after_render_sets_dirty_again);
     RUN_TEST(test_set_hp_same_value_no_dirty);
     RUN_TEST(test_set_hp_changed_value_sets_dirty);
+    RUN_TEST(test_hud_init_combat_mode_sets_map_type);
     return UNITY_END();
 }

@@ -105,8 +105,14 @@ def find_wram_read_in_fn(noi_path: str, rom_path: str, fn_symbol: str) -> int:
     """Find the WRAM address read by a function, via ROM disassembly.
 
     Parses the .noi debug-symbol file for fn_symbol's address, converts to a
-    physical ROM byte offset, then scans for 'LD A,(nn)' (opcode 0xFA) to
-    extract the WRAM address.
+    physical ROM byte offset, then scans the first 64 bytes for two opcode
+    patterns that SDCC uses to read WRAM variables:
+
+      - 0xFA nn nn  'LD A, (nn)'    — 8-bit variable absolute load
+      - 0x21 nn nn  'LD HL, nn'     — 16-bit variable base-address load
+                    (followed by LD A,(HL+) / LD A,(HL) to read the value)
+
+    Returns the WRAM address of the variable (low byte for 16-bit vars).
 
     Useful for locating WRAM addresses of *static* file-scope variables, which
     SDCC does not export to the .map symbol table.  Requires a debug ROM built
@@ -138,17 +144,21 @@ def find_wram_read_in_fn(noi_path: str, rom_path: str, fn_symbol: str) -> int:
 
     with open(rom_path, 'rb') as f:
         f.seek(phys_offset)
-        fn_bytes = f.read(32)
+        fn_bytes = f.read(64)
 
     for i in range(len(fn_bytes) - 2):
-        if fn_bytes[i] == 0xFA:          # LD A, (nn) — absolute WRAM load
+        if fn_bytes[i] == 0xFA:          # LD A, (nn) — absolute WRAM load (8-bit var)
+            addr = fn_bytes[i + 1] | (fn_bytes[i + 2] << 8)
+            if 0xC000 <= addr <= 0xDFFF:
+                return addr
+        if fn_bytes[i] == 0x21:          # LD HL, nn — 16-bit var base-address load
             addr = fn_bytes[i + 1] | (fn_bytes[i + 2] << 8)
             if 0xC000 <= addr <= 0xDFFF:
                 return addr
 
     raise KeyError(
-        f"No 'LD A,(WRAM)' found in first 32 bytes of '{fn_symbol}' "
-        f"(ROM offset 0x{phys_offset:X})"
+        f"No 'LD A,(WRAM)' or 'LD HL,(WRAM)' found in first 64 bytes of "
+        f"'{fn_symbol}' (ROM offset 0x{phys_offset:X})"
     )
 
 

@@ -118,7 +118,12 @@ DEF _state_hub 0xBAB
 
 NOI_STATE_OVERFLOW = """\
 DEF _state_playing 0x17638
-DEF _state_title 0x24100
+DEF _state_title 0x34100
+"""
+
+NOI_STATE_IN_BANK2 = """\
+DEF _state_playing 0x17638
+DEF _state_results 0x24100
 """
 
 
@@ -130,13 +135,21 @@ class TestStateSymbols(unittest.TestCase):
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
-    def test_state_symbol_in_bank2_fail(self):
+    def test_state_symbol_in_bank3_fail(self):
+        """State symbols in bank 3+ are flagged — banks 0/1/2 are acceptable."""
         with tempfile.TemporaryDirectory() as d:
             make_repo(d, noi=NOI_STATE_OVERFLOW)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         bad = result['bad_state_symbols']
         self.assertEqual(len(bad), 1)
         self.assertIn('_state_title', bad[0][0])
+
+    def test_state_symbol_in_bank2_ok(self):
+        """State symbols in bank 2 are allowed — invoke() uses .bank field for safe dispatch."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_IN_BANK2)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
 
     def test_state_symbol_in_bank0_ok(self):
         noi = "DEF _state_hub 0xBAB\n"
