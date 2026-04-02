@@ -73,10 +73,15 @@ def _parse_noi(noi_path):
 
 
 def _check_state_symbols(symbols):
-    """Return list of (sym, hex_addr) for _state_* symbols in bank 2+ (addr >= 0x20000)."""
+    """Return list of (sym, hex_addr) for _state_* symbols in bank 3+ (addr >= 0x30000).
+
+    Banks 0, 1, and 2 are all acceptable for state callbacks — invoke() in state_manager.c
+    uses each State's .bank field for safe cross-bank dispatch regardless of which bank
+    the callback actually lives in.  Bank 2 is allowed to relieve bank-1 pressure.
+    """
     bad = []
     for sym, addr in symbols.items():
-        if sym.startswith('_state_') and addr >= 0x20000:
+        if sym.startswith('_state_') and addr >= 0x30000:
             bad.append((sym, hex(addr)))
     return bad
 
@@ -163,7 +168,7 @@ def _format_report(result):
         syms = ', '.join(f"{s} @ {a}" for s, a in result['bad_state_symbols'])
         lines.append(f"State symbols: FAIL — {syms}")
     else:
-        lines.append("State symbols: OK — all in bank 0/1")
+        lines.append("State symbols: OK — all in bank 0/1/2")
 
     if result['bank_sym_errors']:
         lines.append("__bank_ symbols: FAIL")
