@@ -32,8 +32,12 @@ src/track_map.c: assets/maps/track.tmx tools/tmx_to_c.py
 src/track2_map.c: assets/maps/track2.tmx tools/tmx_to_c.py
 	python3 tools/tmx_to_c.py assets/maps/track2.tmx src/track2_map.c --prefix track2
 
+src/track3_map.c: assets/maps/track3.tmx tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py assets/maps/track3.tmx src/track3_map.c --prefix track3
+
 # Ensure regeneration happens before ROM link if TMX is newer
 $(TARGET): src/track_map.c src/track2_map.c
+$(TARGET): src/track3_map.c
 
 # ── Aseprite → PNG export (requires aseprite in PATH) ─────────────────────────
 # .aseprite files are the canonical source. PNGs are checked in so CI works

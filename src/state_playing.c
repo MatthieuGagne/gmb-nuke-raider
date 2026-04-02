@@ -19,7 +19,19 @@ BANKREF_EXTERN(state_playing)
 #include "checkpoint.h"
 #include "enemy.h"
 
-static uint8_t finish_armed;   /* 1 = ready to detect finish; 0 = debounced */
+static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
+static uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
+
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
+finish_eval(uint8_t map_type, uint8_t armed, int8_t pvy, uint8_t cps_cleared) {
+    if (!armed || pvy <= 0) return 0u;
+    if (map_type == TRACK_TYPE_COMBAT) return 1u;
+    return cps_cleared;
+}
 
 static void enter(void) {
     int16_t sx = track_get_start_x();
@@ -30,12 +42,13 @@ static void enter(void) {
     projectile_init();
     enemy_init();
     lap_init(track_get_lap_count());
+    active_map_type_cache = track_get_map_type();
     finish_armed = 1u;
     DISPLAY_OFF;
     track_init();
     checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
     camera_init(player_get_x(), player_get_y());
-    hud_init();
+    hud_init(track_get_map_type(), track_get_lap_count());
     hud_set_lap(lap_get_current(), lap_get_total());
     camera_apply_scroll();
     player_render();
@@ -87,8 +100,13 @@ static void update(void) {
          * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
-            if (finish_armed && pvy > 0 && checkpoint_all_cleared()) {
+            if (finish_eval(active_map_type_cache, finish_armed, pvy,
+                            checkpoint_all_cleared())) {
                 finish_armed = 0u;
+                if (active_map_type_cache == TRACK_TYPE_COMBAT) {
+                    state_replace(&state_overmap);
+                    return;
+                }
                 if (lap_advance()) {
                     /* Final lap complete — return to overmap */
                     state_replace(&state_overmap);

@@ -13,6 +13,9 @@ const int16_t track_start_y = 8;
 BANKREF(track_finish_line_y)
 const uint8_t track_finish_line_y = 95;
 
+BANKREF(track_map_type)
+const uint8_t track_map_type = 0u;
+
 BANKREF(track_map)
 const uint8_t track_map[2002] = {
     /* header */ 20, 100,

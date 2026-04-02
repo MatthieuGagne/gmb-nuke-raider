@@ -2,6 +2,9 @@
 <map version="1.10" orientation="orthogonal" renderorder="right-down"
      width="20" height="100" tilewidth="8" tileheight="8"
      nextlayerid="5" nextobjectid="5">
+ <properties>
+  <property name="map_type" value="race"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="20" height="100">
   <data encoding="csv">

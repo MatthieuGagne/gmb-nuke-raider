@@ -16,6 +16,10 @@ typedef uint8_t TileType;
 #define TILE_FINISH  6u
 #define TILE_TURRET  7u
 
+/* Map type constants — emitted by tmx_to_c.py as track_map_type in generated files */
+#define TRACK_TYPE_RACE   0u
+#define TRACK_TYPE_COMBAT 1u
+
 TileType track_tile_type_from_index(uint8_t tile_idx) BANKED;
 TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED;
 
@@ -41,12 +45,20 @@ BANKREF_EXTERN(track_start_x)
 BANKREF_EXTERN(track_start_y)
 BANKREF_EXTERN(track2_map)
 BANKREF_EXTERN(track2_start_x)
+BANKREF_EXTERN(track_map_type)
+BANKREF_EXTERN(track2_map_type)
+BANKREF_EXTERN(track3_map_type)
 
 /* Checkpoint ROM tables — emitted by tmx_to_c.py into track_map.c / track2_map.c */
 extern const CheckpointDef track_checkpoints[];
 extern const uint8_t        track_checkpoint_count;
 extern const CheckpointDef track2_checkpoints[];
 extern const uint8_t        track2_checkpoint_count;
+
+/* Map type for each track — emitted by tmx_to_c.py into track[N]_map.c */
+extern const uint8_t track_map_type;
+extern const uint8_t track2_map_type;
+extern const uint8_t track3_map_type;
 
 /* --- TrackDesc dispatch table --- */
 
@@ -56,6 +68,7 @@ void track_select(uint8_t id) BANKED;
 
 /* Accessors — read from active TrackDesc */
 uint8_t track_get_lap_count(void) BANKED;
+uint8_t track_get_map_type(void) BANKED;
 int16_t track_get_start_x(void) BANKED;
 int16_t track_get_start_y(void) BANKED;
 

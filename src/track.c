@@ -5,6 +5,10 @@
 #include "loader.h"
 #include "checkpoint.h"
 
+extern const int16_t track3_start_x;
+extern const int16_t track3_start_y;
+extern const uint8_t track3_map[];
+
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
 #define TILE_LUT_LEN 9u
 static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
@@ -21,6 +25,7 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
 
 /* --- Track dispatch state --- */
 static uint8_t active_track_id;
+static uint8_t active_map_type = 0u;
 
 /* Runtime track dimensions — set by load_track_header() at track_select() time.
  * Default to track 0 compile-time dimensions so calls work before track_select(). */
@@ -47,18 +52,27 @@ void track_select(uint8_t id) BANKED {
         active_map       = track_map + 2;
         active_start_x   = track_start_x;
         active_start_y   = track_start_y;
-        active_lap_count = 1u;                /* track 1: single finish crossing */
-    } else {
+        active_lap_count = 1u;
+        active_map_type  = track_map_type;
+    } else if (id == 1u) {
         active_map       = track2_map + 2;
         active_start_x   = track2_start_x;
         active_start_y   = track2_start_y;
         active_lap_count = 3u;
+        active_map_type  = track2_map_type;
+    } else {
+        active_map       = track3_map + 2;
+        active_start_x   = track3_start_x;
+        active_start_y   = track3_start_y;
+        active_lap_count = 1u;
+        active_map_type  = track3_map_type;
     }
     /* Cross-bank copy — delegated to NONBANKED loader (bank 0) */
     load_checkpoints(id, wram_checkpoints, &active_checkpoint_count);
 }
 
 uint8_t track_get_lap_count(void) BANKED { return active_lap_count; }
+uint8_t track_get_map_type(void)  BANKED { return active_map_type;  }
 int16_t track_get_start_x(void)   BANKED { return active_start_x;   }
 int16_t track_get_start_y(void)   BANKED { return active_start_y;   }
 
@@ -80,8 +94,10 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
 void track_init(void) BANKED {
     if (active_track_id == 0u) {
         load_track_tiles();
-    } else {
+    } else if (active_track_id == 1u) {
         load_track2_tiles();
+    } else {
+        load_track3_tiles();
     }
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
