@@ -79,14 +79,14 @@ Only continue to Step 4.5 when it passes.
 
 3. Run `make memory-check` and report the output. If any budget is FAIL or ERROR, stop and fix before continuing.
 
-4. Launch the ROM immediately in the background (from the worktree directory so `build/` resolves
-   to the worktree's build output — NEVER from the main repo's `build/`):
+4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background
+   from the worktree directory (NEVER from the main repo's `build/` — it may be stale):
    ```bash
    # Run from the worktree directory (cd there first if needed)
    java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
    ```
 
-5. Tell the user it's running and ask them to confirm it looks correct before proceeding.
+5. Ask them to confirm it looks correct before proceeding.
 
 **Stop. Wait for explicit confirmation.**
 

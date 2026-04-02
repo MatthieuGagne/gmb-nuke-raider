@@ -141,19 +141,7 @@ After all tasks are complete and the final code reviewer approves, run the post-
 
 1. Run `make test` — if any tests fail, stop and fix before continuing
 2. Invoke `bank-post-build` skill — if FAIL, stop and fix
-3. Run smoketest sequence:
-   ```bash
-   # From the worktree directory
-   git fetch origin && git merge origin/master
-   # Always clean build before memory validator + smoketest
-   make clean && GBDK_HOME=/home/mathdaman/gbdk make
-   ```
-4. Run `make memory-check` (gb-memory-validator skill) — if any budget is FAIL or ERROR, stop and fix
-5. Launch:
-   ```bash
-   java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
-   ```
-   Tell the user it's running. Wait for their confirmation before proceeding.
+3. Follow the **Smoketest gate** sequence from CLAUDE.md (fetch+merge origin/master, clean build, memory-check hook, ask for confirmation before launching, wait for confirmation).
 
 Only after smoketest confirmed, run the **Pre-PR Gate** before calling `finishing-a-development-branch`.
 
