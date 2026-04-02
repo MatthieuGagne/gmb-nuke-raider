@@ -246,6 +246,23 @@ void test_track_fill_row_range_oob_col(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, buf[2]);
 }
 
+/* --- track_get_reward --- */
+
+void test_track1_reward(void) {
+    track_select(0u);
+    TEST_ASSERT_EQUAL_UINT16(TRACK1_REWARD, track_get_reward());
+}
+
+void test_track2_reward(void) {
+    track_select(1u);
+    TEST_ASSERT_EQUAL_UINT16(TRACK2_REWARD, track_get_reward());
+}
+
+void test_track3_reward_is_zero(void) {
+    track_select(2u);
+    TEST_ASSERT_EQUAL_UINT16(0u, track_get_reward());
+}
+
 /* --- track_get_map_type -------------------------------------------------- */
 
 void test_track_get_map_type_race_track0(void) {
@@ -308,5 +325,8 @@ int main(void) {
     RUN_TEST(test_track_get_map_type_race_track0);
     RUN_TEST(test_track_get_map_type_race_track1);
     RUN_TEST(test_track_get_map_type_combat_track2);
+    RUN_TEST(test_track1_reward);
+    RUN_TEST(test_track2_reward);
+    RUN_TEST(test_track3_reward_is_zero);
     return UNITY_END();
 }

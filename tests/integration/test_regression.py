@@ -77,3 +77,73 @@ def test_all_states(game_session: GameSession, map_path: str, rom_path: str, noi
     s.press(["START"])
     s.advance(5)
     # Full cycle complete — no exception raised means all states are stable.
+
+
+def test_race_finish_results_screen(rom_path: str, noi_path: str) -> None:
+    """STATE_PLAYING → STATE_RESULTS → STATE_OVERMAP regression.
+
+    Boots a dedicated headless session (independent of the shared game_session
+    fixture) to avoid state pollution from test_all_states.  Navigates to
+    track 1 (race type, 1 lap, 50-scrap reward) via the same hub→left path
+    used by test_all_states, drives south to the finish line, confirms the
+    results screen is reached via WRAM (economy_get_scrap() == 50), presses A
+    to continue, and confirms the overmap is reached without error.
+
+    Frame-count derivation:
+      Title boot + overmap entry: 60 + 1 + 10 frames.
+      Hub visit (UP nav + dwell + START): _HUB_NAV_FRAMES + 10 + 1 + 10.
+      Dest nav (LEFT): _PLAYING_NAV_FRAMES + _PLAYING_DWELL_FRAMES.
+      Driving south to finish line:
+        track1 start_y=8 (px), finish_line_y=95 (tile) → py target ≥ 756 px.
+        Distance: 756 − 8 = 748 px.  Gear-3 max speed = 6 px/frame.
+        Acceleration phase: ~6 frames.  Cruise: 748/6 ≈ 125 frames.
+        Empirical: py=718 at frame 200, finish at py=756 (38 px short).
+        Total: ~131 frames + 99-frame safety buffer = 230 frames held.
+    """
+    with GameSession.boot(rom_path, headless=True) as s:
+        # ── 1. Title screen ──────────────────────────────────────────────────
+        s.advance(_TITLE_BOOT_FRAMES)
+
+        # ── 2. Enter overmap ──────────────────────────────────────────────────
+        s.press(["START"])
+        s.advance(_OVERMAP_SETTLE)
+
+        # ── 3. Hub visit — sets car spawn via state_pop() re-entry ────────────
+        # Navigate UP to CITY_HUB, dwell, then START to pop back to overmap.
+        # On re-entry overmap.enter() sets car_tx/ty = hub spawn (9,8).
+        s.press(["UP"])
+        s.advance(_HUB_NAV_FRAMES)
+        s.advance(_HUB_DWELL_FRAMES)
+        s.press(["START"])
+        s.advance(_OVERMAP_SETTLE)
+
+        # ── 4. Navigate LEFT to track 1 race destination ──────────────────────
+        # From (9,8): LEFT → DEST at (2,8).  state_replace(&state_playing).
+        s.press(["LEFT"])
+        s.advance(_PLAYING_NAV_FRAMES)
+        s.advance(_PLAYING_DWELL_FRAMES)
+
+        # ── 5. Drive south to the finish line ────────────────────────────────
+        # Hold DOWN 230 frames — enough to reach tile row 95 (TILE_FINISH).
+        # finish_eval() fires: economy_add_scrap(50) → state_replace(&state_results).
+        # Empirical: py=718 at frame 200; finish at py=756 (~7 more frames needed).
+        s.press(["DOWN"], hold_frames=230)
+
+        # ── 6. Verify results screen via WRAM ────────────────────────────────
+        # economy_get_scrap() reads the static `player_scrap` WRAM variable.
+        # find_wram_read_in_fn locates it by disassembling the getter; the
+        # helper now handles both LD A,(nn) (8-bit) and LD HL,nn (16-bit) vars.
+        scrap_addr = find_wram_read_in_fn(noi_path, rom_path, "_economy_get_scrap")
+        scrap_val  = s.read_wram(scrap_addr)
+        assert scrap_val == 50, (
+            f"Expected scrap == 50 (TRACK1_REWARD) after crossing finish line, "
+            f"got {scrap_val}.  Finish line may not have been reached — "
+            f"check frame count or finish_line_y offset."
+        )
+
+        # ── 7. Press A to dismiss results → state_replace(&state_overmap) ────
+        # Advance 2 frames first so KEY_TICKED(J_A) latches cleanly.
+        s.advance(2)
+        s.press(["A"])
+        s.advance(_OVERMAP_SETTLE)
+        # No PyBoy exception means overmap was reached successfully.
