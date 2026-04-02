@@ -8,6 +8,7 @@
 #include "state_title.h"
 #include "music.h"
 #include "sfx.h"
+#include "economy.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -44,6 +45,7 @@ void main(void) {
 
     init_palettes();
     player_init();
+    economy_init();
     music_init();
     sfx_init();
     add_VBL(vbl_isr);

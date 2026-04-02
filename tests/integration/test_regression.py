@@ -134,7 +134,7 @@ def test_race_finish_results_screen(rom_path: str, noi_path: str) -> None:
         # find_wram_read_in_fn locates it by disassembling the getter; the
         # helper now handles both LD A,(nn) (8-bit) and LD HL,nn (16-bit) vars.
         scrap_addr = find_wram_read_in_fn(noi_path, rom_path, "_economy_get_scrap")
-        scrap_val  = s.read_wram(scrap_addr)
+        scrap_val  = s.read_wram(scrap_addr) | (s.read_wram(scrap_addr + 1) << 8)
         assert scrap_val == 50, (
             f"Expected scrap == 50 (TRACK1_REWARD) after crossing finish line, "
             f"got {scrap_val}.  Finish line may not have been reached — "

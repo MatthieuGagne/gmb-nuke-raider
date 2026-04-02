@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 #include "state_manager.h"
+#include "banking.h"
 
+BANKREF_EXTERN(state_results)
 extern const State state_results;
 
 void state_results_set_earned(uint16_t amount) BANKED;
