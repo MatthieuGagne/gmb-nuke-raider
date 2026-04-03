@@ -150,11 +150,14 @@ def test_race_finish_results_screen(rom_path: str, noi_path: str) -> None:
 
 
 def test_direct_left_race(rom_path: str, noi_path: str) -> None:
-    """STATE_OVERMAP → STATE_PLAYING via direct LEFT (no hub visit) — issue #275.
+    """Regression guard: STATE_OVERMAP → STATE_PLAYING via direct LEFT — issue #275.
 
-    Repro: title → overmap → LEFT → grey screen (DISPLAY_ON never fires).
-    Pass criterion: LCDC bit 7 is set (display on) after nav frames, proving
-    state_playing.enter() completed and DISPLAY_ON was called.
+    Verifies that pressing LEFT from the overmap hub (9,8) reaches the race
+    destination (2,8) and enters state_playing without stalling.
+
+    Root cause (fixed): state_manager stored raw pointers into banked ROM;
+    dereferencing without bank-switching yielded garbage fn ptrs → grey screen.
+    Fix: load_entry() caches {bank, enter, update, exit} in WRAM at push/replace.
 
     Navigation: spawn(9,8) → DEST(2,8) = 7 tiles LEFT.
     Frame budget: 7 * 4 + 5 = 33 frames (same as _PLAYING_NAV_FRAMES).
