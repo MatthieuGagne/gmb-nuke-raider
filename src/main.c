@@ -54,7 +54,7 @@ void main(void) {
     DISPLAY_ON;
 
     state_manager_init();
-    state_push(&state_title);
+    state_push(&state_title, BANK(state_title));
 
     while (1) {
         while (!frame_ready);

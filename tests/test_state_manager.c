@@ -44,13 +44,13 @@ void tearDown(void) {}
 
 /* push calls enter on the pushed state */
 void test_push_calls_enter(void) {
-    state_push(&state_a);
+    state_push(&state_a, 0);
     TEST_ASSERT_EQUAL_INT(1, calls_a_enter);
 }
 
 /* update calls the top state's update */
 void test_update_calls_top_state_update(void) {
-    state_push(&state_a);
+    state_push(&state_a, 0);
     state_manager_update();
     TEST_ASSERT_EQUAL_INT(1, calls_a_update);
     TEST_ASSERT_EQUAL_INT(0, calls_b_update);
@@ -58,8 +58,8 @@ void test_update_calls_top_state_update(void) {
 
 /* push a second state — update goes to the new top, not the base */
 void test_push_second_update_routes_to_top(void) {
-    state_push(&state_a);
-    state_push(&state_b);
+    state_push(&state_a, 0);
+    state_push(&state_b, 0);
     state_manager_update();
     TEST_ASSERT_EQUAL_INT(0, calls_a_update);
     TEST_ASSERT_EQUAL_INT(1, calls_b_update);
@@ -67,8 +67,8 @@ void test_push_second_update_routes_to_top(void) {
 
 /* pop: calls exit on top, then enter on resumed base state */
 void test_pop_calls_exit_then_base_enter(void) {
-    state_push(&state_a);
-    state_push(&state_b);
+    state_push(&state_a, 0);
+    state_push(&state_b, 0);
     /* reset counters after setup so we only measure the pop */
     calls_a_enter = 0;
     calls_b_exit  = 0;
@@ -85,8 +85,8 @@ void test_pop_calls_exit_then_base_enter(void) {
 
 /* pop: after popping modal, update routes back to base state */
 void test_pop_routes_update_to_base(void) {
-    state_push(&state_a);
-    state_push(&state_b);
+    state_push(&state_a, 0);
+    state_push(&state_b, 0);
     state_pop();
     calls_a_update = 0;
     calls_b_update = 0;
@@ -98,11 +98,11 @@ void test_pop_routes_update_to_base(void) {
 
 /* replace: calls exit on old top, enter on new top; depth unchanged */
 void test_replace_calls_exit_then_enter(void) {
-    state_push(&state_a);
+    state_push(&state_a, 0);
     calls_a_enter = 0;
     call_order_len = 0;
 
-    state_replace(&state_b);
+    state_replace(&state_b, 0);
 
     TEST_ASSERT_EQUAL_INT(1, calls_a_exit);
     TEST_ASSERT_EQUAL_INT(1, calls_b_enter);
@@ -113,8 +113,8 @@ void test_replace_calls_exit_then_enter(void) {
 
 /* replace: update routes to the new state, not the old one */
 void test_replace_routes_update_to_new_state(void) {
-    state_push(&state_a);
-    state_replace(&state_b);
+    state_push(&state_a, 0);
+    state_replace(&state_b, 0);
     calls_a_update = 0;
     calls_b_update = 0;
 
@@ -127,9 +127,9 @@ void test_replace_routes_update_to_new_state(void) {
  * corrupt the stack. The third push is silently ignored. */
 void test_push_beyond_capacity_is_safe(void) {
     static const State state_c = { 0, a_enter, a_update, a_exit }; /* reuse fns */
-    state_push(&state_a);
-    state_push(&state_b);
-    state_push(&state_c); /* depth already at max — must not crash */
+    state_push(&state_a, 0);
+    state_push(&state_b, 0);
+    state_push(&state_c, 0); /* depth already at max — must not crash */
 
     /* update must still work (routes to state_b, the last valid top) */
     calls_b_update = 0;

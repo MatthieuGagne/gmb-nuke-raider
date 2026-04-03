@@ -20,7 +20,7 @@ static void enter(void) {
 
 static void update(void) {
     if (KEY_TICKED(J_START)) {
-        state_replace(&state_overmap);
+        state_replace(&state_overmap, BANK(state_overmap));
     }
 }
 

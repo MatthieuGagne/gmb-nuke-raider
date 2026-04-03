@@ -4,6 +4,7 @@
 #include <gb/gb.h>
 #include "state_manager.h"
 
+BANKREF_EXTERN(state_hub)
 extern const State state_hub;
 
 /* Set to 1 by state_overmap when hub tile is entered.
