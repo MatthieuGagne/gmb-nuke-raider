@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "state_manager.h"
 
+BANKREF_EXTERN(state_playing)
 extern const State state_playing;
 
 #ifndef __SDCC

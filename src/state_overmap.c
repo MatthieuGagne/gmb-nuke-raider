@@ -16,6 +16,8 @@
  * Edit assets/maps/overmap_tiles.aseprite in Aseprite or assets/maps/overmap.tmx
  * in Tiled, then run `make` to regenerate src/overmap_tiles.c and src/overmap_map.c. */
 
+BANKREF(state_overmap)
+
 /* ── State ─────────────────────────────────────────────────────────────────── */
 static uint8_t car_tx;
 static uint8_t car_ty;

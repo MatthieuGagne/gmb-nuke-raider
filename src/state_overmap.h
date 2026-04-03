@@ -6,6 +6,7 @@
 #include "state_manager.h"
 #include "banking.h"
 
+BANKREF_EXTERN(state_overmap)
 extern const State state_overmap;
 extern uint8_t current_race_id;
 extern uint8_t current_hub_id;

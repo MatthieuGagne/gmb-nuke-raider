@@ -19,6 +19,8 @@
 #include "music.h"
 #include "sfx.h"
 
+BANKREF(state_hub)
+
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
 #define DIALOG_INNER_W 12u  /* inner text cols inside dialog box (cols 7-18) */

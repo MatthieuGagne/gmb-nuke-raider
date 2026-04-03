@@ -3,6 +3,7 @@
 
 #include "state_manager.h"
 
+BANKREF_EXTERN(state_game_over)
 extern const State state_game_over;
 
 #endif /* STATE_GAME_OVER_H */
