@@ -45,6 +45,29 @@ void test_track_select_0_checkpoint_count_is_zero(void) {
                 track_get_checkpoint_count() > 0u); /* just verifies accessor exists */
 }
 
+/* --- track_init() dispatches correct tile loader for each track --- */
+
+/* track_select(0) + track_init() must not crash (routes to load_track_tiles) */
+void test_track_init_track0_no_crash(void) {
+    track_select(0u);
+    track_init();
+    TEST_PASS();
+}
+
+/* track_select(1) + track_init() must not crash (routes to load_track2_tiles) */
+void test_track_init_track1_no_crash(void) {
+    track_select(1u);
+    track_init();
+    TEST_PASS();
+}
+
+/* track_select(2) + track_init() must not crash (routes to load_track3_tiles) */
+void test_track_init_track2_no_crash(void) {
+    track_select(2u);
+    track_init();
+    TEST_PASS();
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_select_0_start_x);
@@ -53,5 +76,8 @@ int main(void) {
     RUN_TEST(test_track_select_1_lap_count);
     RUN_TEST(test_track_select_routes_raw_tile);
     RUN_TEST(test_track_select_0_checkpoint_count_is_zero);
+    RUN_TEST(test_track_init_track0_no_crash);
+    RUN_TEST(test_track_init_track1_no_crash);
+    RUN_TEST(test_track_init_track2_no_crash);
     return UNITY_END();
 }

@@ -39,6 +39,7 @@ extern uint8_t active_map_h;
 
 #include "checkpoint.h"
 #include "banking.h"
+#include "loader.h"
 BANKREF_EXTERN(track_map)
 BANKREF_EXTERN(track_tile_data)
 BANKREF_EXTERN(track_start_x)
@@ -72,6 +73,7 @@ typedef struct {
     uint8_t         lap_count;
     const uint8_t  *map_type;   /* points to track_map_type / track2_map_type / track3_map_type */
     uint16_t        reward;     /* scrap payout; TRACK1_REWARD / TRACK2_REWARD from config.h */
+    void (*load_tiles)(void);   /* NONBANKED tile loader — called by track_init() */
 } TrackDesc;
 
 /* Select active track before entering STATE_PLAYING.
