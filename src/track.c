@@ -10,9 +10,9 @@ extern const int16_t track3_start_y;
 extern const uint8_t track3_map[];
 
 static const TrackDesc track_table[] = {
-    { track_map,  &track_start_x,  &track_start_y,  1u, &track_map_type,  TRACK1_REWARD },
-    { track2_map, &track2_start_x, &track2_start_y, 3u, &track2_map_type, TRACK2_REWARD },
-    { track3_map, &track3_start_x, &track3_start_y, 1u, &track3_map_type, 0u           },
+    { track_map,  &track_start_x,  &track_start_y,  1u, &track_map_type,  TRACK1_REWARD, load_track_tiles  },
+    { track2_map, &track2_start_x, &track2_start_y, 3u, &track2_map_type, TRACK2_REWARD, load_track2_tiles },
+    { track3_map, &track3_start_x, &track3_start_y, 1u, &track3_map_type, 0u,            load_track3_tiles },
 };
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
@@ -87,13 +87,7 @@ TileType track_tile_type(int16_t world_x, int16_t world_y) BANKED {
 }
 
 void track_init(void) BANKED {
-    if (active_track_id == 0u) {
-        load_track_tiles();
-    } else if (active_track_id == 1u) {
-        load_track2_tiles();
-    } else {
-        load_track3_tiles();
-    }
+    track_table[active_track_id].load_tiles();
     /* Tilemap loaded by camera_init() */
     SHOW_BKG;
 }
