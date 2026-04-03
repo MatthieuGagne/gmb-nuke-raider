@@ -147,3 +147,41 @@ def test_race_finish_results_screen(rom_path: str, noi_path: str) -> None:
         s.press(["A"])
         s.advance(_OVERMAP_SETTLE)
         # No PyBoy exception means overmap was reached successfully.
+
+
+def test_direct_left_race(rom_path: str, noi_path: str) -> None:
+    """STATE_OVERMAP → STATE_PLAYING via direct LEFT (no hub visit) — issue #275.
+
+    Repro: title → overmap → LEFT → grey screen (DISPLAY_ON never fires).
+    Pass criterion: LCDC bit 7 is set (display on) after nav frames, proving
+    state_playing.enter() completed and DISPLAY_ON was called.
+
+    Navigation: spawn(9,8) → DEST(2,8) = 7 tiles LEFT.
+    Frame budget: 7 * 4 + 5 = 33 frames (same as _PLAYING_NAV_FRAMES).
+    """
+    _LCDC_ADDR = 0xFF40
+    _LCDC_DISPLAY_ON = 0x80
+
+    with GameSession.boot(rom_path, headless=True) as s:
+        # ── 1. Title screen ──────────────────────────────────────────────────
+        s.advance(_TITLE_BOOT_FRAMES)
+
+        # ── 2. Enter overmap ──────────────────────────────────────────────────
+        s.press(["START"])
+        s.advance(_OVERMAP_SETTLE)
+        # Car is at hub spawn (9, 8). No hub visit.
+
+        # ── 3. Navigate LEFT directly to DEST (2, 8) ─────────────────────────
+        s.press(["LEFT"])
+        s.advance(_PLAYING_NAV_FRAMES)   # 7 tiles × 4 frames/tile + 5 settle
+        s.advance(_PLAYING_DWELL_FRAMES)
+
+        # ── 4. Assert display is on ───────────────────────────────────────────
+        # If state_playing.enter() stalled (grey screen), LCDC bit 7 stays 0.
+        # If it completed normally, DISPLAY_ON set bit 7 to 1.
+        lcdc = s._pyboy.memory[_LCDC_ADDR]
+        assert lcdc & _LCDC_DISPLAY_ON, (
+            f"Display is OFF after direct-left navigation (LCDC=0x{lcdc:02X}). "
+            f"state_playing.enter() stalled between DISPLAY_OFF and DISPLAY_ON. "
+            f"See issue #275."
+        )
