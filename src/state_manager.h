@@ -14,8 +14,8 @@ typedef struct {
 void state_manager_init(void);
 void state_manager_update(void);
 
-void state_push(const State *s);
+void state_push(const State *s, uint8_t bank);
 void state_pop(void);
-void state_replace(const State *s);
+void state_replace(const State *s, uint8_t bank);
 
 #endif
