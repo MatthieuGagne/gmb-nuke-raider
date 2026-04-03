@@ -22,7 +22,7 @@ static void enter(void) {
 
 static void update(void) {
     if (KEY_TICKED(J_START)) {
-        state_replace(&state_title);
+        state_replace(&state_title, BANK(state_title));
     }
 }
 

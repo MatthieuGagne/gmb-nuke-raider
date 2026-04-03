@@ -92,7 +92,7 @@ static void update(void) {
         hud_update();
         /* Death check */
         if (damage_is_dead()) {
-            state_replace(&state_game_over);
+            state_replace(&state_game_over, BANK(state_game_over));
             return;
         }
         /* Finish line detection:
@@ -106,7 +106,7 @@ static void update(void) {
                             checkpoint_all_cleared())) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
-                    state_replace(&state_overmap);
+                    state_replace(&state_overmap, BANK(state_overmap));
                     return;
                 }
                 if (lap_advance()) {
@@ -116,7 +116,7 @@ static void update(void) {
                         state_results_set_earned(reward);
                         economy_add_scrap(reward);
                     }
-                    state_replace(&state_results);
+                    state_replace(&state_results, BANK(state_results));
                     return;
                 }
                 /* Lap complete — reset checkpoints for next lap, update HUD */

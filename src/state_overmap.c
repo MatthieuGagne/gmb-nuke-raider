@@ -148,7 +148,7 @@ static void overmap_check_tile_effect(void) {
                 break;
             }
         }
-        state_push(&state_hub);
+        state_push(&state_hub, BANK(state_hub));
         overmap_hub_entered = 1u;
         return;
     }
@@ -164,7 +164,7 @@ static void overmap_check_tile_effect(void) {
             }
         }
         track_select(current_race_id);   /* wire up dispatch table before STATE_PLAYING */
-        state_replace(&state_playing);
+        state_replace(&state_playing, BANK(state_playing));
         /* NOTE: player position is set in state_playing enter() via track_get_start_x/y() */
     }
 }
