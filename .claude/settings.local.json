@@ -315,7 +315,17 @@
       "WebFetch(domain:hackernoon.com)",
       "Bash(mkdir -p /home/mathdaman/.claude/skills/explain)",
       "Bash(mv /home/mathdaman/.claude/plugins/superpowers/skills/explain/SKILL.md /home/mathdaman/.claude/skills/explain/SKILL.md)",
-      "Bash(rmdir /home/mathdaman/.claude/plugins/superpowers/skills/explain)"
+      "Bash(rmdir /home/mathdaman/.claude/plugins/superpowers/skills/explain)",
+      "Bash([ -f \"$STORE_PATH\" ])",
+      "Bash([ -f \"$STANDALONE_PATH\" ])",
+      "Bash(curl -L -o Terminess.zip \"https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Terminess.zip\")",
+      "Bash(curl -s \"https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest\")",
+      "Bash(curl -L -o Terminus.zip \"https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/Terminus.zip\")",
+      "Bash(mkdir -p Terminus-nf)",
+      "Bash(unzip -q Terminus.zip -d Terminus-nf)",
+      "Bash(mkdir -p \"/mnt/c/Users/mathd/AppData/Local/Microsoft/Windows/Fonts\")",
+      "Bash(cp /tmp/Terminus-nf/*.ttf \"/mnt/c/Users/mathd/AppData/Local/Microsoft/Windows/Fonts/\")",
+      "Bash(powershell.exe:*)"
     ]
   },
   "hooks": {
@@ -327,6 +337,17 @@
             "type": "command",
             "command": "python3 /home/mathdaman/code/nuke-raider/tools/bank_check_hook.py",
             "statusMessage": "bank-pre-write check..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar:*)",
+            "command": "sed -i 's/^WindowEmuliciousX=.*/WindowEmuliciousX=100/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowEmuliciousY=.*/WindowEmuliciousY=50/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerX=.*/WindowDebuggerX=100/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerY=.*/WindowDebuggerY=50/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerOpen=.*/WindowDebuggerOpen=false/' /home/mathdaman/.local/share/emulicious/Emulicious.ini 2>/dev/null || true",
+            "statusMessage": "Resetting Emulicious window position..."
           }
         ]
       }
