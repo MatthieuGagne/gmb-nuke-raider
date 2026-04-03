@@ -131,6 +131,8 @@ static void update(void) {
 
 static void sp_exit(void) {
     HIDE_WIN;
+    cam_scx_shadow = 0u;
+    cam_scy_shadow = 0u;
 }
 
 const State state_playing = { BANK(state_playing), enter, update, sp_exit };
