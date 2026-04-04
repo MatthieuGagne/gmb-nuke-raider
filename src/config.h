@@ -103,6 +103,7 @@
 #define DEBUG_TICK_ADDR   0xDFC1U  /* WRAM: music_tick() call counter (1 byte, wraps at 256) */
 
 /* Economy — scrap rewards per track */
+#define NUM_TRACKS     3u
 #define TRACK1_REWARD  50u
 #define TRACK2_REWARD 100u
 

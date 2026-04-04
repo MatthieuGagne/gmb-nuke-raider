@@ -297,6 +297,21 @@ void test_track_get_id_returns_2_after_select_2(void) {
     TEST_ASSERT_EQUAL_UINT8(2u, track_get_id());
 }
 
+/* --- track_select bounds guard (issue #273) ------------------------------ */
+
+/* Out-of-bounds id must clamp to 0, not index into undefined memory */
+void test_track_select_oob_clamps_to_0(void) {
+    track_select(1u);  /* set a non-zero baseline */
+    track_select(NUM_TRACKS);  /* id == 3 is out of range */
+    TEST_ASSERT_EQUAL_UINT8(0u, track_get_id());
+}
+
+void test_track_select_large_id_clamps_to_0(void) {
+    track_select(1u);
+    track_select(255u);
+    TEST_ASSERT_EQUAL_UINT8(0u, track_get_id());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -348,5 +363,7 @@ int main(void) {
     RUN_TEST(test_track_get_id_returns_0_after_select_0);
     RUN_TEST(test_track_get_id_returns_1_after_select_1);
     RUN_TEST(test_track_get_id_returns_2_after_select_2);
+    RUN_TEST(test_track_select_oob_clamps_to_0);
+    RUN_TEST(test_track_select_large_id_clamps_to_0);
     return UNITY_END();
 }

@@ -1,5 +1,6 @@
 #pragma bank 255
 #include <gb/gb.h>
+#include "config.h"
 #include "track.h"
 #include "banking.h"
 #include "loader.h"
@@ -53,6 +54,7 @@ static uint8_t       active_checkpoint_count = 0u;
 
 void track_select(uint8_t id) BANKED {
     const TrackDesc *t;
+    if (id >= NUM_TRACKS) id = 0u;
     active_track_id = id;
     load_track_header(id);
     t = &track_table[id];
