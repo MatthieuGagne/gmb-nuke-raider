@@ -2,7 +2,7 @@
 <map version="1.10" tiledversion="1.10.0"
      orientation="orthogonal" renderorder="right-down"
      width="20" height="100" tilewidth="8" tileheight="8"
-     infinite="0" nextlayerid="4" nextobjectid="3">
+     infinite="0" nextlayerid="5" nextobjectid="6">
  <properties>
   <property name="map_type" value="race"/>
  </properties>
@@ -118,5 +118,16 @@
  </objectgroup>
  <objectgroup id="3" name="finish">
   <object id="2" x="0" y="760" width="160" height="8"/>
+ </objectgroup>
+ <objectgroup id="4" name="turrets">
+  <object id="3" name="turret" x="32" y="176">
+   <point/>
+  </object>
+  <object id="4" name="turret" x="120" y="376">
+   <point/>
+  </object>
+  <object id="5" name="turret" x="40" y="576">
+   <point/>
+  </object>
  </objectgroup>
 </map>
