@@ -70,6 +70,7 @@ int16_t  track_get_start_x(void)   BANKED { return active_start_x;   }
 int16_t  track_get_start_y(void)   BANKED { return active_start_y;   }
 /* track_table is static const in this file; same bank guaranteed by #pragma bank 255 */
 uint16_t track_get_reward(void)    BANKED { return track_table[active_track_id].reward; }
+uint8_t  track_get_id(void)        BANKED { return active_track_id; }
 
 TileType track_tile_type_from_index(uint8_t tile_idx) BANKED {
     if (tile_idx >= TILE_LUT_LEN) return TILE_ROAD;
