@@ -35,6 +35,14 @@ src/track2_map.c: assets/maps/track2.tmx tools/tmx_to_c.py
 src/track3_map.c: assets/maps/track3.tmx tools/tmx_to_c.py
 	python3 tools/tmx_to_c.py assets/maps/track3.tmx src/track3_map.c --prefix track3
 
+# Generate shared NPC extern header — included by src/track.h.
+# Checked into git so CI works without Python/Tiled.
+src/track_npc_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --emit-header src/track_npc_externs.h \
+	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
+
+$(TARGET): src/track_npc_externs.h
+
 # Ensure regeneration happens before ROM link if TMX is newer
 $(TARGET): src/track_map.c src/track2_map.c
 $(TARGET): src/track3_map.c
