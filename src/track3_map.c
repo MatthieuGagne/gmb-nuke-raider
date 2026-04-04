@@ -55,9 +55,17 @@ const CheckpointDef track3_checkpoints[1] = {
 };
 const uint8_t track3_checkpoint_count = 0;
 
-BANKREF(track3_turret_count)
-const uint8_t track3_turret_count = 0u;
-BANKREF(track3_turret_tx)
-const uint8_t track3_turret_tx[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
-BANKREF(track3_turret_ty)
-const uint8_t track3_turret_ty[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+BANKREF(track3_npc_count)
+const uint8_t track3_npc_count = 0u;
+
+BANKREF(track3_npc_tx)
+const uint8_t track3_npc_tx[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+
+BANKREF(track3_npc_ty)
+const uint8_t track3_npc_ty[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+
+BANKREF(track3_npc_type)
+const uint8_t track3_npc_type[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+
+BANKREF(track3_npc_dir)
+const uint8_t track3_npc_dir[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };

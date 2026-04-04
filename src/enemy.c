@@ -12,7 +12,8 @@
 /* SoA enemy pool — tile coordinates + cached OAM x (never changes for turrets) */
 static uint8_t enemy_tx[MAX_ENEMIES];
 static uint8_t enemy_ty[MAX_ENEMIES];
-static uint8_t enemy_type[MAX_ENEMIES];    /* reserved for future type (patrol = 1, etc.) */
+static uint8_t enemy_type[MAX_ENEMIES];    /* NPC_TYPE_* value set at spawn */
+static uint8_t enemy_dir[MAX_ENEMIES];     /* stored at spawn; ignored for turrets (fire toward player) */
 static uint8_t enemy_hp[MAX_ENEMIES];
 static uint8_t enemy_active[MAX_ENEMIES];
 static uint8_t enemy_timer[MAX_ENEMIES];
@@ -21,10 +22,11 @@ static uint8_t enemy_oam_x[MAX_ENEMIES];  /* cached OAM x = tx*8+8 — turrets n
 
 /* ---- internal helpers ---- */
 
-static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty) {
+static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty, uint8_t type, uint8_t dir) {
     enemy_tx[i]     = tx;
     enemy_ty[i]     = ty;
-    enemy_type[i]   = 0u;   /* 0 = TURRET (only type for now) */
+    enemy_type[i]   = type;
+    enemy_dir[i]    = dir;
     enemy_hp[i]     = TURRET_HP;
     enemy_active[i] = 1u;
     enemy_timer[i]  = TURRET_FIRE_INTERVAL;
@@ -45,9 +47,12 @@ void enemy_init(void) BANKED {
         enemy_oam[i]    = SPRITE_POOL_INVALID;
     }
     load_turret_tiles();
-    load_turret_positions(track_get_id(), enemy_tx, enemy_ty, &count);
+    load_npc_positions(track_get_id(),
+                       enemy_tx, enemy_ty,
+                       enemy_type, enemy_dir,
+                       &count);
     for (i = 0u; i < count; i++) {
-        _spawn_at(i, enemy_tx[i], enemy_ty[i]);
+        _spawn_at(i, enemy_tx[i], enemy_ty[i], enemy_type[i], enemy_dir[i]);
     }
 }
 
@@ -63,7 +68,7 @@ uint8_t enemy_spawn(uint8_t tx, uint8_t ty) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_ENEMIES; i++) {
         if (!enemy_active[i]) {
-            _spawn_at(i, tx, ty);
+            _spawn_at(i, tx, ty, NPC_TYPE_TURRET, DIR_NONE);
             return 1u;
         }
     }
@@ -179,3 +184,8 @@ uint8_t enemy_count_active(void) BANKED {
     }
     return count;
 }
+
+#ifndef __SDCC
+uint8_t enemy_get_type(uint8_t i) { return enemy_type[i]; }
+uint8_t enemy_get_dir(uint8_t i)  { return enemy_dir[i]; }
+#endif
