@@ -128,3 +128,10 @@ const CheckpointDef track_checkpoints[1] = {
     { 0, 0, 0, 0, 0, 0 },
 };
 const uint8_t track_checkpoint_count = 0;
+
+BANKREF(track_turret_count)
+const uint8_t track_turret_count = 3u;
+BANKREF(track_turret_tx)
+const uint8_t track_turret_tx[8] = { 4u, 15u, 5u, 0u, 0u, 0u, 0u, 0u };
+BANKREF(track_turret_ty)
+const uint8_t track_turret_ty[8] = { 22u, 47u, 72u, 0u, 0u, 0u, 0u, 0u };

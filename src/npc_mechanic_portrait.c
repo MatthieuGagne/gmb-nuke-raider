@@ -3,10 +3,9 @@
 #include <stdint.h>
 #include "banking.h"
 
-/* Bank reference: BANKREF(name) emits a CODE stub; bankpack rewrites
-   ___bank_name to the actual assigned bank at link time.
-   Required for autobank (255) so BANK(name) returns the real bank. */
-BANKREF(npc_mechanic_portrait)
+/* Bank reference: volatile __at(2) hardcodes bank number 2.
+   Correct for explicit bank assignment where BANK(sym) = N. */
+volatile __at(2) uint8_t __bank_npc_mechanic_portrait;
 
 const uint8_t npc_mechanic_portrait[] = {
     /* tile 0 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

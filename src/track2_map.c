@@ -129,3 +129,10 @@ const CheckpointDef track2_checkpoints[2] = {
     { 32, 400, 32, 16, 1, CHECKPOINT_DIR_N },
 };
 const uint8_t track2_checkpoint_count = 2;
+
+BANKREF(track2_turret_count)
+const uint8_t track2_turret_count = 0u;
+BANKREF(track2_turret_tx)
+const uint8_t track2_turret_tx[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+BANKREF(track2_turret_ty)
+const uint8_t track2_turret_ty[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
