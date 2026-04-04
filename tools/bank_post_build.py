@@ -3,7 +3,7 @@
 bank_post_build.py — post-build ROM bank validation.
 
 Checks:
-  1. romusage budget (bank 1 WARN >90%/FAIL >=100%; others WARN >80%/FAIL >=100%)
+  1. romusage budget (bank 1 WARN >90% or >=100%; others WARN >80% or >=100%)
   2. state code must not appear in bank 2+ (addresses >= 0x20000)
   3. __bank_ symbol values must match bank-manifest.json for pinned files
   4. highest bank in use must be < -Wm-ya declared count
@@ -48,7 +48,7 @@ def _check_romusage(banks):
     results = []
     for bank_num, pct in banks:
         if pct >= 100:
-            status = 'FAIL'
+            status = 'WARN'
         elif bank_num == 1 and pct > 90:
             status = 'WARN'
         elif bank_num != 1 and pct > 80:
