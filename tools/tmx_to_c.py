@@ -241,11 +241,65 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
         f.write(f"const uint8_t {prefix}_npc_dir[8] = {{ {fmt_arr(npc_dir)} }};\n")
 
 
+def emit_npc_header(out_path, tmx_paths):
+    """Generate src/track_npc_externs.h with extern declarations for all tracks.
+
+    tmx_paths: list of TMX file paths in track order (track, track2, track3).
+    Prefixes are derived: first path → 'track', rest → 'track2', 'track3', etc.
+    """
+    prefixes = []
+    for i, p in enumerate(tmx_paths):
+        prefixes.append('track' if i == 0 else f'track{i + 1}')
+
+    lines = [
+        '/* GENERATED — do not edit by hand. Regenerate with:',
+        ' *   python3 tools/tmx_to_c.py --emit-header src/track_npc_externs.h \\',
+        ' *     assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx',
+        ' */',
+        '#ifndef TRACK_NPC_EXTERNS_H',
+        '#define TRACK_NPC_EXTERNS_H',
+        '',
+        '#include <stdint.h>',
+        '#include "banking.h"',
+        '',
+    ]
+
+    for prefix in prefixes:
+        lines += [
+            f'extern const uint8_t  {prefix}_npc_count;',
+            f'extern const uint8_t  {prefix}_npc_tx[];',
+            f'extern const uint8_t  {prefix}_npc_ty[];',
+            f'extern const uint8_t  {prefix}_npc_type[];',
+            f'extern const uint8_t  {prefix}_npc_dir[];',
+            f'BANKREF_EXTERN({prefix}_npc_count)',
+            f'BANKREF_EXTERN({prefix}_npc_tx)',
+            f'BANKREF_EXTERN({prefix}_npc_ty)',
+            f'BANKREF_EXTERN({prefix}_npc_type)',
+            f'BANKREF_EXTERN({prefix}_npc_dir)',
+            '',
+        ]
+
+    lines += ['#endif /* TRACK_NPC_EXTERNS_H */']
+
+    with open(out_path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('tmx_path')
-    parser.add_argument('out_path')
-    parser.add_argument('--prefix', default='track')
-    args = parser.parse_args()
-    tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)
+    import sys
+
+    if '--emit-header' in sys.argv:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--emit-header', metavar='OUT_H', required=True,
+                            help='Generate src/track_npc_externs.h from all TMX inputs')
+        parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
+        args = parser.parse_args()
+        emit_npc_header(args.emit_header, args.tmx)
+    else:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('tmx_path')
+        parser.add_argument('out_path')
+        parser.add_argument('--prefix', default='track')
+        args = parser.parse_args()
+        tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)
