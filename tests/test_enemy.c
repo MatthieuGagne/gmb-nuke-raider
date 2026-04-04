@@ -58,8 +58,17 @@ void test_enemy_timer_does_not_fire_early(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, enemy_count_active());
 }
 
+void test_npc_type_constants_defined(void) {
+    /* Compile-time presence; verify values match tmx_to_c.py NPC_TYPE_MAP */
+    TEST_ASSERT_EQUAL_UINT8(0u, NPC_TYPE_TURRET);
+    TEST_ASSERT_EQUAL_UINT8(1u, NPC_TYPE_CAR);
+    TEST_ASSERT_EQUAL_UINT8(2u, NPC_TYPE_PEDESTRIAN);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, DIR_NONE);
+}
+
 int main(void) {
     UNITY_BEGIN();
+    RUN_TEST(test_npc_type_constants_defined);
     RUN_TEST(test_enemy_pool_empty_after_init);
     RUN_TEST(test_enemy_spawn_and_active);
     RUN_TEST(test_enemy_blocks_tile_active);

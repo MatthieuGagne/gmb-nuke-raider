@@ -77,6 +77,14 @@
 #define MAX_CHECKPOINTS 8u
 
 
+/* NPC type constants — must match NPC_TYPE_MAP in tools/tmx_to_c.py */
+#define NPC_TYPE_TURRET      0u
+#define NPC_TYPE_CAR         1u
+#define NPC_TYPE_PEDESTRIAN  2u
+
+/* Sentinel: NPC has no fixed facing direction (fires/moves based on runtime logic) */
+#define DIR_NONE             0xFFu
+
 /* Enemy pool */
 #define MAX_ENEMIES           8u
 #define TURRET_TILE_BASE     18u    /* VRAM sprite tile slot — after bullet (17) */
