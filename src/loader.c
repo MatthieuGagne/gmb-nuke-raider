@@ -140,3 +140,46 @@ void load_track_header(uint8_t id) NONBANKED {
     }
     SWITCH_ROM(saved);
 }
+
+void load_turret_positions(uint8_t id,
+                            uint8_t *out_tx,
+                            uint8_t *out_ty,
+                            uint8_t *out_count) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t n;
+    if (id == 1u) {
+        SWITCH_ROM(BANK(track2_turret_count));
+        n = track2_turret_count;
+        for (i = 0u; i < n; i++) {
+            out_tx[i] = track2_turret_tx[i];
+            out_ty[i] = track2_turret_ty[i];
+        }
+    } else if (id == 2u) {
+        SWITCH_ROM(BANK(track3_turret_count));
+        n = track3_turret_count;
+        for (i = 0u; i < n; i++) {
+            out_tx[i] = track3_turret_tx[i];
+            out_ty[i] = track3_turret_ty[i];
+        }
+    } else {
+        SWITCH_ROM(BANK(track_turret_count));
+        n = track_turret_count;
+        for (i = 0u; i < n; i++) {
+            out_tx[i] = track_turret_tx[i];
+            out_ty[i] = track_turret_ty[i];
+        }
+    }
+    *out_count = n;
+    SWITCH_ROM(saved);
+}
+
+#ifdef __SDCC
+void load_bkg_row(uint8_t vram_x, uint8_t vram_y,
+                  uint8_t count, const uint8_t *tiles) NONBANKED {
+    uint8_t i;
+    volatile uint8_t *dst = (volatile uint8_t *)
+        (0x9800u + ((uint16_t)(vram_y & 31u) << 5u) + (vram_x & 31u));
+    for (i = 0u; i < count; i++) dst[i] = tiles[i];
+}
+#endif /* __SDCC */
