@@ -5,8 +5,9 @@
 #include "player.h"    /* player_dir_t */
 #include "config.h"
 
-/* Initialise enemy pool by scanning the active tilemap for TILE_TURRET.
- * Call after track data is loaded and before the first frame. */
+/* Initialise enemy pool from pre-computed turret positions in ROM.
+ * Reads track_get_id() to select the correct per-track array.
+ * Must be called after track_select(). */
 void    enemy_init(void) BANKED;
 
 /* Zero the pool without map scan — host-test helper only. */

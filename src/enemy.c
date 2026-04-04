@@ -38,21 +38,16 @@ static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty) {
 /* ---- public API ---- */
 
 void enemy_init(void) BANKED {
-    uint8_t i, tx, ty;
+    uint8_t i;
     uint8_t count = 0u;
     for (i = 0u; i < MAX_ENEMIES; i++) {
         enemy_active[i] = 0u;
         enemy_oam[i]    = SPRITE_POOL_INVALID;
     }
-    load_turret_tiles();   /* NONBANKED in loader.c — safe to call from any bank */
-    for (ty = 0u; ty < active_map_h && count < MAX_ENEMIES; ty++) {
-        for (tx = 0u; tx < active_map_w && count < MAX_ENEMIES; tx++) {
-            if (track_tile_type((int16_t)((uint16_t)tx * 8u),
-                                (int16_t)((uint16_t)ty * 8u)) == TILE_TURRET) {
-                _spawn_at(count, tx, ty);
-                count++;
-            }
-        }
+    load_turret_tiles();
+    load_turret_positions(track_get_id(), enemy_tx, enemy_ty, &count);
+    for (i = 0u; i < count; i++) {
+        _spawn_at(i, enemy_tx[i], enemy_ty[i]);
     }
 }
 
