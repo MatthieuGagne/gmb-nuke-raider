@@ -13,6 +13,9 @@ import xml.etree.ElementTree as ET
 # Top 4 bits of a 32-bit GID encode H/V/D flip and hex rotation — never tile data.
 GID_CLEAR_FLAGS = 0x0FFFFFFF
 
+# Must match MAX_ENEMIES in src/config.h
+MAX_TURRETS = 8
+
 
 def gid_to_tile_id(gid: int, firstgid: int) -> int:
     """Convert a Tiled GID to a 0-indexed GB tile ID.
@@ -24,6 +27,31 @@ def gid_to_tile_id(gid: int, firstgid: int) -> int:
         return 0
     gid &= GID_CLEAR_FLAGS
     return gid - firstgid
+
+
+def parse_turret_objects(root):
+    """Extract turret spawn tile coords from the 'turrets' object layer.
+
+    Objects must be named 'turret' and snapped to an 8px tile grid.
+    Returns a list of (tx, ty) tuples capped at MAX_TURRETS.
+    """
+    turrets = []
+    turret_group = next(
+        (og for og in root.findall('objectgroup')
+         if og.get('name') == 'turrets'),
+        None
+    )
+    if turret_group is not None:
+        for obj in turret_group.findall('object'):
+            if obj.get('name') == 'turret':
+                px = int(float(obj.get('x', 0)))
+                py = int(float(obj.get('y', 0)))
+                turrets.append((px // 8, py // 8))
+    if len(turrets) > MAX_TURRETS:
+        print(f"WARNING: {len(turrets)} turret objects found; "
+              f"capped at {MAX_TURRETS} (MAX_ENEMIES in config.h)")
+        turrets = turrets[:MAX_TURRETS]
+    return turrets
 
 
 def tmx_to_c(tmx_path, out_path, prefix='track'):
@@ -112,6 +140,11 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
             checkpoint_defs.append((idx, cx, cy, cw, ch, direction))
         checkpoint_defs.sort(key=lambda t: t[0])
 
+    turrets = parse_turret_objects(root)
+    turret_count = len(turrets)
+    tx_vals = [f'{t[0]}u' for t in turrets] + ['0u'] * (MAX_TURRETS - turret_count)
+    ty_vals = [f'{t[1]}u' for t in turrets] + ['0u'] * (MAX_TURRETS - turret_count)
+
     with open(out_path, 'w') as f:
         f.write(f"/* GENERATED — do not edit by hand."
                 f" Source: {tmx_path} */\n")
@@ -153,6 +186,14 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
             f.write(f"    {{ 0, 0, 0, 0, 0, 0 }},\n")
         f.write("};\n")
         f.write(f"const uint8_t {prefix}_checkpoint_count = {len(checkpoint_defs)};\n")
+        f.write(f"\nBANKREF({prefix}_turret_count)\n")
+        f.write(f"const uint8_t {prefix}_turret_count = {turret_count}u;\n")
+        f.write(f"BANKREF({prefix}_turret_tx)\n")
+        f.write(f"const uint8_t {prefix}_turret_tx[{MAX_TURRETS}] = "
+                f"{{ {', '.join(tx_vals)} }};\n")
+        f.write(f"BANKREF({prefix}_turret_ty)\n")
+        f.write(f"const uint8_t {prefix}_turret_ty[{MAX_TURRETS}] = "
+                f"{{ {', '.join(ty_vals)} }};\n")
 
 
 if __name__ == '__main__':

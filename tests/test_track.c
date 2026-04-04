@@ -280,6 +280,23 @@ void test_track_get_map_type_combat_track2(void) {
     TEST_ASSERT_EQUAL_UINT8(TRACK_TYPE_COMBAT, track_get_map_type());
 }
 
+/* --- track_get_id -------------------------------------------------------- */
+
+void test_track_get_id_returns_0_after_select_0(void) {
+    track_select(0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, track_get_id());
+}
+
+void test_track_get_id_returns_1_after_select_1(void) {
+    track_select(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, track_get_id());
+}
+
+void test_track_get_id_returns_2_after_select_2(void) {
+    track_select(2u);
+    TEST_ASSERT_EQUAL_UINT8(2u, track_get_id());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -328,5 +345,8 @@ int main(void) {
     RUN_TEST(test_track1_reward);
     RUN_TEST(test_track2_reward);
     RUN_TEST(test_track3_reward_is_zero);
+    RUN_TEST(test_track_get_id_returns_0_after_select_0);
+    RUN_TEST(test_track_get_id_returns_1_after_select_1);
+    RUN_TEST(test_track_get_id_returns_2_after_select_2);
     return UNITY_END();
 }

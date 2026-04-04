@@ -42,6 +42,40 @@ void test_load_checkpoints_id2_returns_zero_count(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, count);  /* track3 has no checkpoints */
 }
 
+void test_load_turret_positions_id0_returns_count(void) {
+    uint8_t tx[8], ty[8], count = 99u;
+    load_turret_positions(0u, tx, ty, &count);
+    TEST_ASSERT_EQUAL_UINT8(3u, count);
+}
+
+void test_load_turret_positions_id1_returns_count(void) {
+    uint8_t tx[8], ty[8], count = 99u;
+    load_turret_positions(1u, tx, ty, &count);
+    TEST_ASSERT_EQUAL_UINT8(0u, count);
+}
+
+void test_load_turret_positions_id2_returns_count(void) {
+    uint8_t tx[8], ty[8], count = 99u;
+    load_turret_positions(2u, tx, ty, &count);
+    TEST_ASSERT_EQUAL_UINT8(0u, count);
+}
+
+void test_load_bkg_row_increments_mock_count(void) {
+    uint8_t tiles[4] = { 1u, 2u, 3u, 4u };
+    int before = mock_load_bkg_row_call_count;
+    load_bkg_row(0u, 0u, 4u, tiles);
+    TEST_ASSERT_EQUAL_INT(before + 1, mock_load_bkg_row_call_count);
+}
+
+void test_load_bkg_row_writes_to_mock_vram(void) {
+    uint8_t tiles[3] = { 5u, 6u, 7u };
+    mock_vram_clear();
+    load_bkg_row(2u, 1u, 3u, tiles);
+    TEST_ASSERT_EQUAL_UINT8(5u, mock_vram[1u * 32u + 2u]);
+    TEST_ASSERT_EQUAL_UINT8(6u, mock_vram[1u * 32u + 3u]);
+    TEST_ASSERT_EQUAL_UINT8(7u, mock_vram[1u * 32u + 4u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -49,5 +83,10 @@ int main(void) {
     RUN_TEST(test_load_track_start_pos_writes_to_out_params);
     RUN_TEST(test_load_track_header_id2_is_callable);
     RUN_TEST(test_load_checkpoints_id2_returns_zero_count);
+    RUN_TEST(test_load_turret_positions_id0_returns_count);
+    RUN_TEST(test_load_turret_positions_id1_returns_count);
+    RUN_TEST(test_load_turret_positions_id2_returns_count);
+    RUN_TEST(test_load_bkg_row_increments_mock_count);
+    RUN_TEST(test_load_bkg_row_writes_to_mock_vram);
     return UNITY_END();
 }

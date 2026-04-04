@@ -50,6 +50,30 @@ BANKREF_EXTERN(track_map_type)
 BANKREF_EXTERN(track2_map_type)
 BANKREF_EXTERN(track3_map_type)
 
+/* Per-track turret spawn arrays — emitted by tmx_to_c.py into *_map.c */
+extern const uint8_t  track_turret_count;
+extern const uint8_t  track_turret_tx[8];
+extern const uint8_t  track_turret_ty[8];
+BANKREF_EXTERN(track_turret_count)
+BANKREF_EXTERN(track_turret_tx)
+BANKREF_EXTERN(track_turret_ty)
+
+extern const uint8_t  track2_turret_count;
+extern const uint8_t  track2_turret_tx[8];
+extern const uint8_t  track2_turret_ty[8];
+BANKREF_EXTERN(track2_turret_count)
+BANKREF_EXTERN(track2_turret_tx)
+BANKREF_EXTERN(track2_turret_ty)
+
+extern const uint8_t  track3_turret_count;
+extern const uint8_t  track3_turret_tx[8];
+extern const uint8_t  track3_turret_ty[8];
+BANKREF_EXTERN(track3_turret_count)
+BANKREF_EXTERN(track3_turret_tx)
+BANKREF_EXTERN(track3_turret_ty)
+
+uint8_t track_get_id(void) BANKED;
+
 /* Checkpoint ROM tables — emitted by tmx_to_c.py into track_map.c / track2_map.c */
 extern const CheckpointDef track_checkpoints[];
 extern const uint8_t        track_checkpoint_count;

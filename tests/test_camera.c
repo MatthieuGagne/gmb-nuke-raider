@@ -5,6 +5,7 @@
 
 extern int     mock_move_bkg_call_count;
 extern uint8_t mock_move_bkg_last_y;
+extern int     mock_load_bkg_row_call_count;
 
 void setUp(void) {
     mock_vram_clear();
@@ -38,9 +39,16 @@ void test_camera_init_clamps_cam_y_to_max(void) {
 /* --- camera_init: preloads exactly 18 rows, not all 100 ----------------- */
 
 void test_camera_init_preloads_18_rows(void) {
-    /* cam_y=8 -> first_row=1; preloads rows 1-18 = 18 set_bkg_tiles calls */
-    camera_init(80, 80);
-    TEST_ASSERT_EQUAL_INT(18, mock_set_bkg_tiles_call_count);
+    /* camera_init() must use load_bkg_row() (display-off direct write),
+     * NOT set_bkg_tiles() (which polls VBlank). */
+    mock_vram_clear();
+    active_map_w = 20u;
+    active_map_h = 100u;
+    camera_init(88, 8);
+    /* cam_y=8 -> first_row=1; preloads rows 1-18 = 18 load_bkg_row calls */
+    TEST_ASSERT_EQUAL_INT(18, mock_load_bkg_row_call_count);
+    /* Must NOT call set_bkg_tiles during init (no VBlank stall) */
+    TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tiles_call_count);
 }
 
 /* --- camera_update: bidirectional centering camera --------------------- */

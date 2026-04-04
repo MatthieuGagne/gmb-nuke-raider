@@ -59,6 +59,11 @@ For each task (whether parallel or sequential):
 2. Determine task type:
    - **C task** (creates or modifies `src/*.c` or `src/*.h`): dispatch `gbdk-expert` agent (Agent tool) with prompt `"implement this task: <full task text from plan>"`. `gbdk-expert` owns the full TDD cycle, bank gates, build, `gb-c-optimizer` review AND fix (fixes applied in-place before commit), and commit for this task.
    - **Non-C task** (docs, Python, JSON, assets): follow each step exactly as written in the plan.
+2a. **Post-dispatch commit verification (all implementer agents):** After the agent returns, run:
+   ```bash
+   git log --oneline -1
+   ```
+   Confirm the expected commit is present. **Never trust the agent's return message alone as proof of a commit** — the agent may return only its final step's output (e.g. a review) without confirming the commit landed. If the commit is missing, re-dispatch the entire task from scratch.
 3. After any successful build (C tasks only):
    - Invoke `bank-post-build` **skill** (HARD GATE — use the `Skill` tool)
    - Run `make memory-check` via the `gb-memory-validator` **skill** (HARD GATE); if any budget is FAIL or ERROR, stop and fix before continuing
@@ -135,6 +140,7 @@ Do not push or open the PR until you have received an explicit answer to this qu
 - Stop when blocked, don't guess
 - Never start implementation on main/master branch
 - C tasks: dispatch gbdk-expert with "implement this task: …" — it owns TDD, bank gates, build, commit
+- After every implementer dispatch: run `git log --oneline -1` to verify commit landed — agent return message is not proof
 - bank-post-build gate after every build
 - Smoketest uses Emulicious, not mgba-qt
 - Merge command is `git fetch origin && git merge origin/master`
