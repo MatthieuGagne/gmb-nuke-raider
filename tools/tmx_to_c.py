@@ -13,8 +13,23 @@ import xml.etree.ElementTree as ET
 # Top 4 bits of a 32-bit GID encode H/V/D flip and hex rotation — never tile data.
 GID_CLEAR_FLAGS = 0x0FFFFFFF
 
-# Must match MAX_ENEMIES in src/config.h
-MAX_TURRETS = 8
+# NPC type → numeric constant. Must match NPC_TYPE_* in src/config.h.
+NPC_TYPE_MAP = {
+    "turret":     0,
+    "car":        1,
+    "pedestrian": 2,
+}
+
+# dir string → numeric constant. Must match player_dir_t in src/player.h.
+# DIR_T=0 (N), DIR_R=2 (E), DIR_B=4 (S), DIR_L=6 (W). Absent = 0xFF (DIR_NONE).
+DIR_MAP = {
+    "N": 0,
+    "E": 2,
+    "S": 4,
+    "W": 6,
+}
+DIR_NONE = 0xFF
+MAX_NPCS = 8  # Must match MAX_ENEMIES in src/config.h.
 
 
 def gid_to_tile_id(gid: int, firstgid: int) -> int:
@@ -29,29 +44,51 @@ def gid_to_tile_id(gid: int, firstgid: int) -> int:
     return gid - firstgid
 
 
-def parse_turret_objects(root):
-    """Extract turret spawn tile coords from the 'turrets' object layer.
+def parse_npc_objects(root):
+    """Extract NPC spawn data from the 'enemies' object layer.
 
-    Objects must be named 'turret' and snapped to an 8px tile grid.
-    Returns a list of (tx, ty) tuples capped at MAX_TURRETS.
+    Each object must be snapped to an 8px tile grid.
+    Object 'name' field selects NPC type (must be a key in NPC_TYPE_MAP).
+    Optional 'dir' custom property selects fixed facing direction (N/S/E/W);
+    absent dir defaults to DIR_NONE (0xFF) — type-specific behavior at runtime.
+
+    Returns a list of (tx, ty, type_val, dir_val) tuples capped at MAX_NPCS.
+    Raises ValueError on unknown NPC name or unknown dir string.
     """
-    turrets = []
-    turret_group = next(
-        (og for og in root.findall('objectgroup')
-         if og.get('name') == 'turrets'),
-        None
-    )
-    if turret_group is not None:
-        for obj in turret_group.findall('object'):
-            if obj.get('name') == 'turret':
-                px = int(float(obj.get('x', 0)))
-                py = int(float(obj.get('y', 0)))
-                turrets.append((px // 8, py // 8))
-    if len(turrets) > MAX_TURRETS:
-        print(f"WARNING: {len(turrets)} turret objects found; "
-              f"capped at {MAX_TURRETS} (MAX_ENEMIES in config.h)")
-        turrets = turrets[:MAX_TURRETS]
-    return turrets
+    npcs = []
+    for og in root.findall('objectgroup'):
+        if og.get('name') != 'enemies':
+            continue
+        for obj in og.findall('object'):
+            name = obj.get('name', '')
+            if name not in NPC_TYPE_MAP:
+                raise ValueError(
+                    f"Unknown NPC name '{name}' in enemies layer. "
+                    f"Valid names: {list(NPC_TYPE_MAP.keys())}"
+                )
+            type_val = NPC_TYPE_MAP[name]
+            # Parse optional 'dir' custom property
+            dir_val = DIR_NONE
+            props = obj.find('properties')
+            if props is not None:
+                for prop in props.findall('property'):
+                    if prop.get('name') == 'dir':
+                        raw = prop.get('value', '')
+                        if raw not in DIR_MAP:
+                            raise ValueError(
+                                f"Unknown dir value '{raw}' on object '{name}'. "
+                                f"Valid values: {list(DIR_MAP.keys())}"
+                            )
+                        dir_val = DIR_MAP[raw]
+            px = float(obj.get('x', 0))
+            py = float(obj.get('y', 0))
+            tx = int(px) // 8
+            ty = int(py) // 8
+            npcs.append((tx, ty, type_val, dir_val))
+            if len(npcs) >= MAX_NPCS:
+                break
+        break  # only process first 'enemies' layer
+    return npcs
 
 
 def tmx_to_c(tmx_path, out_path, prefix='track'):
@@ -140,10 +177,16 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
             checkpoint_defs.append((idx, cx, cy, cw, ch, direction))
         checkpoint_defs.sort(key=lambda t: t[0])
 
-    turrets = parse_turret_objects(root)
-    turret_count = len(turrets)
-    tx_vals = [f'{t[0]}u' for t in turrets] + ['0u'] * (MAX_TURRETS - turret_count)
-    ty_vals = [f'{t[1]}u' for t in turrets] + ['0u'] * (MAX_TURRETS - turret_count)
+    npcs = parse_npc_objects(root)
+    npc_count = len(npcs)
+
+    def fmt_arr(values):
+        return ', '.join(f'{v}u' for v in values)
+
+    npc_tx   = [t[0] for t in npcs] + [0] * (MAX_NPCS - npc_count)
+    npc_ty   = [t[1] for t in npcs] + [0] * (MAX_NPCS - npc_count)
+    npc_type = [t[2] for t in npcs] + [0] * (MAX_NPCS - npc_count)
+    npc_dir  = [t[3] for t in npcs] + [0] * (MAX_NPCS - npc_count)
 
     with open(out_path, 'w') as f:
         f.write(f"/* GENERATED — do not edit by hand."
@@ -186,21 +229,77 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
             f.write(f"    {{ 0, 0, 0, 0, 0, 0 }},\n")
         f.write("};\n")
         f.write(f"const uint8_t {prefix}_checkpoint_count = {len(checkpoint_defs)};\n")
-        f.write(f"\nBANKREF({prefix}_turret_count)\n")
-        f.write(f"const uint8_t {prefix}_turret_count = {turret_count}u;\n")
-        f.write(f"BANKREF({prefix}_turret_tx)\n")
-        f.write(f"const uint8_t {prefix}_turret_tx[{MAX_TURRETS}] = "
-                f"{{ {', '.join(tx_vals)} }};\n")
-        f.write(f"BANKREF({prefix}_turret_ty)\n")
-        f.write(f"const uint8_t {prefix}_turret_ty[{MAX_TURRETS}] = "
-                f"{{ {', '.join(ty_vals)} }};\n")
+        f.write(f"\nBANKREF({prefix}_npc_count)\n")
+        f.write(f"const uint8_t {prefix}_npc_count = {npc_count}u;\n\n")
+        f.write(f"BANKREF({prefix}_npc_tx)\n")
+        f.write(f"const uint8_t {prefix}_npc_tx[8] = {{ {fmt_arr(npc_tx)} }};\n\n")
+        f.write(f"BANKREF({prefix}_npc_ty)\n")
+        f.write(f"const uint8_t {prefix}_npc_ty[8] = {{ {fmt_arr(npc_ty)} }};\n\n")
+        f.write(f"BANKREF({prefix}_npc_type)\n")
+        f.write(f"const uint8_t {prefix}_npc_type[8] = {{ {fmt_arr(npc_type)} }};\n\n")
+        f.write(f"BANKREF({prefix}_npc_dir)\n")
+        f.write(f"const uint8_t {prefix}_npc_dir[8] = {{ {fmt_arr(npc_dir)} }};\n")
+
+
+def emit_npc_header(out_path, tmx_paths):
+    """Generate src/track_npc_externs.h with extern declarations for all tracks.
+
+    tmx_paths: list of TMX file paths in track order (track, track2, track3).
+    Prefixes are derived: first path → 'track', rest → 'track2', 'track3', etc.
+    """
+    prefixes = []
+    for i, p in enumerate(tmx_paths):
+        prefixes.append('track' if i == 0 else f'track{i + 1}')
+
+    lines = [
+        '/* GENERATED — do not edit by hand. Regenerate with:',
+        ' *   python3 tools/tmx_to_c.py --emit-header src/track_npc_externs.h \\',
+        ' *     assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx',
+        ' */',
+        '#ifndef TRACK_NPC_EXTERNS_H',
+        '#define TRACK_NPC_EXTERNS_H',
+        '',
+        '#include <stdint.h>',
+        '#include "banking.h"',
+        '',
+    ]
+
+    for prefix in prefixes:
+        lines += [
+            f'extern const uint8_t  {prefix}_npc_count;',
+            f'extern const uint8_t  {prefix}_npc_tx[];',
+            f'extern const uint8_t  {prefix}_npc_ty[];',
+            f'extern const uint8_t  {prefix}_npc_type[];',
+            f'extern const uint8_t  {prefix}_npc_dir[];',
+            f'BANKREF_EXTERN({prefix}_npc_count)',
+            f'BANKREF_EXTERN({prefix}_npc_tx)',
+            f'BANKREF_EXTERN({prefix}_npc_ty)',
+            f'BANKREF_EXTERN({prefix}_npc_type)',
+            f'BANKREF_EXTERN({prefix}_npc_dir)',
+            '',
+        ]
+
+    lines += ['#endif /* TRACK_NPC_EXTERNS_H */']
+
+    with open(out_path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
 
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('tmx_path')
-    parser.add_argument('out_path')
-    parser.add_argument('--prefix', default='track')
-    args = parser.parse_args()
-    tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)
+    import sys
+
+    if '--emit-header' in sys.argv:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--emit-header', metavar='OUT_H', required=True,
+                            help='Generate src/track_npc_externs.h from all TMX inputs')
+        parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
+        args = parser.parse_args()
+        emit_npc_header(args.emit_header, args.tmx)
+    else:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('tmx_path')
+        parser.add_argument('out_path')
+        parser.add_argument('--prefix', default='track')
+        args = parser.parse_args()
+        tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)

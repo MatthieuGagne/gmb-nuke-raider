@@ -42,21 +42,21 @@ void test_load_checkpoints_id2_returns_zero_count(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, count);  /* track3 has no checkpoints */
 }
 
-void test_load_turret_positions_id0_returns_count(void) {
-    uint8_t tx[8], ty[8], count = 99u;
-    load_turret_positions(0u, tx, ty, &count);
+void test_load_npc_positions_id0_returns_count(void) {
+    uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
+    load_npc_positions(0u, tx, ty, type, dir, &count);
     TEST_ASSERT_EQUAL_UINT8(3u, count);
 }
 
-void test_load_turret_positions_id1_returns_count(void) {
-    uint8_t tx[8], ty[8], count = 99u;
-    load_turret_positions(1u, tx, ty, &count);
+void test_load_npc_positions_id1_returns_count(void) {
+    uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
+    load_npc_positions(1u, tx, ty, type, dir, &count);
     TEST_ASSERT_EQUAL_UINT8(0u, count);
 }
 
-void test_load_turret_positions_id2_returns_count(void) {
-    uint8_t tx[8], ty[8], count = 99u;
-    load_turret_positions(2u, tx, ty, &count);
+void test_load_npc_positions_id2_returns_count(void) {
+    uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
+    load_npc_positions(2u, tx, ty, type, dir, &count);
     TEST_ASSERT_EQUAL_UINT8(0u, count);
 }
 
@@ -83,9 +83,9 @@ int main(void) {
     RUN_TEST(test_load_track_start_pos_writes_to_out_params);
     RUN_TEST(test_load_track_header_id2_is_callable);
     RUN_TEST(test_load_checkpoints_id2_returns_zero_count);
-    RUN_TEST(test_load_turret_positions_id0_returns_count);
-    RUN_TEST(test_load_turret_positions_id1_returns_count);
-    RUN_TEST(test_load_turret_positions_id2_returns_count);
+    RUN_TEST(test_load_npc_positions_id0_returns_count);
+    RUN_TEST(test_load_npc_positions_id1_returns_count);
+    RUN_TEST(test_load_npc_positions_id2_returns_count);
     RUN_TEST(test_load_bkg_row_increments_mock_count);
     RUN_TEST(test_load_bkg_row_writes_to_mock_vram);
     return UNITY_END();

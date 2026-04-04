@@ -375,5 +375,152 @@ class TestCheckpointParsing(unittest.TestCase):
         self.assertIn('CheckpointDef', result)
 
 
+# Fixture: map with two enemies (one with dir, one without)
+TMX_WITH_ENEMIES = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="10" tilewidth="8" tileheight="8"
+     nextlayerid="6" nextobjectid="7">
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="3" height="10">
+  <data encoding="csv">
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="8" y="72"><point/></object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="8" width="24" height="8"/>
+ </objectgroup>
+ <objectgroup id="4" name="enemies">
+  <object id="3" name="turret" x="16" y="16"><point/></object>
+  <object id="4" name="turret" x="8" y="32">
+   <properties>
+    <property name="dir" value="N"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+</map>
+"""
+
+# Fixture: enemy with unknown name → should raise ValueError
+TMX_UNKNOWN_NPC = TMX_WITH_ENEMIES.replace('name="turret" x="16"', 'name="bus" x="16"')
+
+
+class TestEnemiesLayer(unittest.TestCase):
+
+    def _convert_enemies(self, tmx_text, prefix='track'):
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(tmx_text)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path, prefix=prefix)
+            with open(out_path) as f:
+                return f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_npc_count_emitted(self):
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        self.assertIn('track_npc_count = 2u', result)
+
+    def test_npc_tx_array_emitted(self):
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        # object at x=16 → tx=2; object at x=8 → tx=1
+        self.assertIn('track_npc_tx[8]', result)
+        self.assertIn('2u', result)
+        self.assertIn('1u', result)
+
+    def test_npc_type_turret_is_zero(self):
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        self.assertIn('track_npc_type[8]', result)
+        # both objects are turrets → type=0
+        self.assertIn('track_npc_type[8] = { 0u, 0u,', result)
+
+    def test_npc_dir_absent_is_0xff(self):
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        self.assertIn('track_npc_dir[8]', result)
+        # first object has no dir → 0xFF; second has dir=N → 0 (DIR_T)
+        self.assertIn('track_npc_dir[8] = { 255u, 0u,', result)
+
+    def test_npc_dir_n_maps_to_dir_t(self):
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        # Second object has dir=N → DIR_T=0
+        self.assertIn('0u', result)
+
+    def test_npc_dir_s_maps_to_dir_b(self):
+        tmx = TMX_WITH_ENEMIES.replace('value="N"', 'value="S"')
+        result = self._convert_enemies(tmx)
+        self.assertIn('track_npc_dir[8] = { 255u, 4u,', result)
+
+    def test_npc_dir_e_maps_to_dir_r(self):
+        tmx = TMX_WITH_ENEMIES.replace('value="N"', 'value="E"')
+        result = self._convert_enemies(tmx)
+        self.assertIn('track_npc_dir[8] = { 255u, 2u,', result)
+
+    def test_npc_dir_w_maps_to_dir_l(self):
+        tmx = TMX_WITH_ENEMIES.replace('value="N"', 'value="W"')
+        result = self._convert_enemies(tmx)
+        self.assertIn('track_npc_dir[8] = { 255u, 6u,', result)
+
+    def test_unknown_npc_name_raises(self):
+        with self.assertRaises(ValueError):
+            self._convert_enemies(TMX_UNKNOWN_NPC)
+
+    def test_missing_enemies_layer_gives_zero_count(self):
+        result = self._convert_enemies(MINIMAL_TMX)
+        self.assertIn('track_npc_count = 0u', result)
+
+    def test_turret_arrays_not_emitted(self):
+        # Old turret_tx/ty/count arrays must NOT appear in output
+        result = self._convert_enemies(TMX_WITH_ENEMIES)
+        self.assertNotIn('turret_tx', result)
+        self.assertNotIn('turret_ty', result)
+        self.assertNotIn('turret_count', result)
+
+
+class TestEmitHeader(unittest.TestCase):
+
+    def test_emit_header_contains_track_externs(self):
+        """--emit-header generates extern declarations for all three tracks."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write three minimal TMX files (only track.tmx has enemies)
+            tmx_paths = []
+            for name in ['track', 'track2', 'track3']:
+                path = os.path.join(tmpdir, f'{name}.tmx')
+                with open(path, 'w') as f:
+                    f.write(TMX_WITH_ENEMIES if name == 'track' else MINIMAL_TMX)
+                tmx_paths.append(path)
+            header_path = os.path.join(tmpdir, 'track_npc_externs.h')
+            conv.emit_npc_header(header_path, tmx_paths)
+            with open(header_path) as f:
+                content = f.read()
+        self.assertIn('GENERATED', content)
+        self.assertIn('extern const uint8_t  track_npc_count', content)
+        self.assertIn('extern const uint8_t  track2_npc_count', content)
+        self.assertIn('extern const uint8_t  track3_npc_count', content)
+        self.assertIn('BANKREF_EXTERN(track_npc_count)', content)
+        self.assertIn('BANKREF_EXTERN(track_npc_tx)', content)
+        self.assertIn('BANKREF_EXTERN(track_npc_ty)', content)
+        self.assertIn('BANKREF_EXTERN(track_npc_type)', content)
+        self.assertIn('BANKREF_EXTERN(track_npc_dir)', content)
+        self.assertIn('#ifndef TRACK_NPC_EXTERNS_H', content)
+        self.assertIn('#endif', content)
+
+
 if __name__ == '__main__':
     unittest.main()

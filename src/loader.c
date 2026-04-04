@@ -141,33 +141,41 @@ void load_track_header(uint8_t id) NONBANKED {
     SWITCH_ROM(saved);
 }
 
-void load_turret_positions(uint8_t id,
-                            uint8_t *out_tx,
-                            uint8_t *out_ty,
-                            uint8_t *out_count) NONBANKED {
+void load_npc_positions(uint8_t id,
+                         uint8_t *out_tx,
+                         uint8_t *out_ty,
+                         uint8_t *out_type,
+                         uint8_t *out_dir,
+                         uint8_t *out_count) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     uint8_t i;
     uint8_t n;
     if (id == 1u) {
-        SWITCH_ROM(BANK(track2_turret_count));
-        n = track2_turret_count;
+        SWITCH_ROM(BANK(track2_npc_count));
+        n = track2_npc_count;
         for (i = 0u; i < n; i++) {
-            out_tx[i] = track2_turret_tx[i];
-            out_ty[i] = track2_turret_ty[i];
+            out_tx[i]   = track2_npc_tx[i];
+            out_ty[i]   = track2_npc_ty[i];
+            out_type[i] = track2_npc_type[i];
+            out_dir[i]  = track2_npc_dir[i];
         }
     } else if (id == 2u) {
-        SWITCH_ROM(BANK(track3_turret_count));
-        n = track3_turret_count;
+        SWITCH_ROM(BANK(track3_npc_count));
+        n = track3_npc_count;
         for (i = 0u; i < n; i++) {
-            out_tx[i] = track3_turret_tx[i];
-            out_ty[i] = track3_turret_ty[i];
+            out_tx[i]   = track3_npc_tx[i];
+            out_ty[i]   = track3_npc_ty[i];
+            out_type[i] = track3_npc_type[i];
+            out_dir[i]  = track3_npc_dir[i];
         }
     } else {
-        SWITCH_ROM(BANK(track_turret_count));
-        n = track_turret_count;
+        SWITCH_ROM(BANK(track_npc_count));
+        n = track_npc_count;
         for (i = 0u; i < n; i++) {
-            out_tx[i] = track_turret_tx[i];
-            out_ty[i] = track_turret_ty[i];
+            out_tx[i]   = track_npc_tx[i];
+            out_ty[i]   = track_npc_ty[i];
+            out_type[i] = track_npc_type[i];
+            out_dir[i]  = track_npc_dir[i];
         }
     }
     *out_count = n;
