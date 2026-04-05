@@ -59,7 +59,7 @@ const uint8_t track_map[2002] = {
     /* row 37 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
     /* row 38 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
     /* row 39 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
-    /* row 40 */ 0,0,0,0,1,1,1,1,1,2,2,1,7,1,1,1,0,0,0,0,
+    /* row 40 */ 0,0,0,0,1,1,1,1,1,2,2,1,1,1,1,1,0,0,0,0,
     /* row 41 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
     /* row 42 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
     /* row 43 */ 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
@@ -143,3 +143,15 @@ const uint8_t track_npc_type[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_dir)
 const uint8_t track_npc_dir[8] = { 255u, 255u, 255u, 0u, 0u, 0u, 0u, 0u };
+
+BANKREF(track_powerup_count)
+const uint8_t track_powerup_count = 1u;
+
+BANKREF(track_powerup_tx)
+const uint8_t track_powerup_tx[4] = { 12u, 0u, 0u, 0u };
+
+BANKREF(track_powerup_ty)
+const uint8_t track_powerup_ty[4] = { 40u, 0u, 0u, 0u };
+
+BANKREF(track_powerup_type)
+const uint8_t track_powerup_type[4] = { 0u, 0u, 0u, 0u };

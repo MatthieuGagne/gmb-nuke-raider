@@ -35,6 +35,15 @@ void load_npc_positions(uint8_t id,
                          uint8_t *out_dir,
                          uint8_t *out_count) NONBANKED;
 
+/* Copies powerup spawn arrays for track `id` (0=track, 1=track2, 2=track3).
+ * Output buffers must be at least MAX_POWERUPS bytes each.
+ * out_type receives POWERUP_TYPE_* values. */
+void load_powerup_positions(uint8_t id,
+                             uint8_t *out_tx,
+                             uint8_t *out_ty,
+                             uint8_t *out_type,
+                             uint8_t *out_count) NONBANKED;
+
 /* Writes a single row of BG tiles directly to VRAM tilemap at (vram_x, vram_y).
  * vram_x and vram_y wrap mod 32. Must be called during VBlank or DISPLAY_OFF. */
 void load_bkg_row(uint8_t vram_x, uint8_t vram_y,

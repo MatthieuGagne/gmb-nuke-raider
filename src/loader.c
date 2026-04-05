@@ -23,6 +23,8 @@ BANKREF_EXTERN(track_checkpoints)
 BANKREF_EXTERN(track2_checkpoints)
 BANKREF_EXTERN(track3_checkpoints)
 
+#include "track_powerup_externs.h"
+
 extern const uint8_t track3_map[];
 BANKREF_EXTERN(track3_map)
 
@@ -176,6 +178,46 @@ void load_npc_positions(uint8_t id,
             out_ty[i]   = track_npc_ty[i];
             out_type[i] = track_npc_type[i];
             out_dir[i]  = track_npc_dir[i];
+        }
+    }
+    *out_count = n;
+    SWITCH_ROM(saved);
+}
+
+void load_powerup_positions(uint8_t id,
+                             uint8_t *out_tx,
+                             uint8_t *out_ty,
+                             uint8_t *out_type,
+                             uint8_t *out_count) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t n;
+    if (id == 1u) {
+        SWITCH_ROM(BANK(track2_powerup_count));
+        n = track2_powerup_count;
+        if (n > MAX_POWERUPS) n = MAX_POWERUPS;
+        for (i = 0u; i < n; i++) {
+            out_tx[i]   = track2_powerup_tx[i];
+            out_ty[i]   = track2_powerup_ty[i];
+            out_type[i] = track2_powerup_type[i];
+        }
+    } else if (id == 2u) {
+        SWITCH_ROM(BANK(track3_powerup_count));
+        n = track3_powerup_count;
+        if (n > MAX_POWERUPS) n = MAX_POWERUPS;
+        for (i = 0u; i < n; i++) {
+            out_tx[i]   = track3_powerup_tx[i];
+            out_ty[i]   = track3_powerup_ty[i];
+            out_type[i] = track3_powerup_type[i];
+        }
+    } else {
+        SWITCH_ROM(BANK(track_powerup_count));
+        n = track_powerup_count;
+        if (n > MAX_POWERUPS) n = MAX_POWERUPS;
+        for (i = 0u; i < n; i++) {
+            out_tx[i]   = track_powerup_tx[i];
+            out_ty[i]   = track_powerup_ty[i];
+            out_type[i] = track_powerup_type[i];
         }
     }
     *out_count = n;

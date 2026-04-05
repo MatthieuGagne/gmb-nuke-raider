@@ -31,6 +31,13 @@ DIR_MAP = {
 DIR_NONE = 0xFF
 MAX_NPCS = 8  # Must match MAX_ENEMIES in src/config.h.
 
+# Powerup type → numeric constant. Must match POWERUP_TYPE_* in src/config.h.
+POWERUP_TYPE_MAP = {
+    "heal": 0,
+}
+
+MAX_POWERUPS = 4  # Must match MAX_POWERUPS in src/config.h.
+
 
 def gid_to_tile_id(gid: int, firstgid: int) -> int:
     """Convert a Tiled GID to a 0-indexed GB tile ID.
@@ -91,7 +98,40 @@ def parse_npc_objects(root):
     return npcs
 
 
-def tmx_to_c(tmx_path, out_path, prefix='track'):
+def parse_powerup_objects(root):
+    """Extract powerup spawn data from the 'powerups' object layer.
+
+    Each object must be snapped to an 8px tile grid.
+    Object 'name' field selects powerup type (must be a key in POWERUP_TYPE_MAP).
+
+    Returns a list of (tx, ty, type_val) tuples capped at MAX_POWERUPS.
+    Missing 'powerups' objectgroup returns an empty list (backwards compat).
+    Raises ValueError on unknown powerup name.
+    """
+    powerups = []
+    for og in root.findall('objectgroup'):
+        if og.get('name') != 'powerups':
+            continue
+        for obj in og.findall('object'):
+            name = obj.get('name', '')
+            if name not in POWERUP_TYPE_MAP:
+                raise ValueError(
+                    f"Unknown powerup name '{name}' in powerups layer. "
+                    f"Valid names: {list(POWERUP_TYPE_MAP.keys())}"
+                )
+            type_val = POWERUP_TYPE_MAP[name]
+            px = float(obj.get('x', 0))
+            py = float(obj.get('y', 0))
+            tx = int(px) // 8
+            ty = int(py) // 8
+            powerups.append((tx, ty, type_val))
+            if len(powerups) >= MAX_POWERUPS:
+                break
+        break  # only process first 'powerups' layer
+    return powerups
+
+
+def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None):
     tree = ET.parse(tmx_path)
     root = tree.getroot()
 
@@ -180,6 +220,9 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
     npcs = parse_npc_objects(root)
     npc_count = len(npcs)
 
+    powerups = parse_powerup_objects(root)
+    powerup_count = len(powerups)
+
     def fmt_arr(values):
         return ', '.join(f'{v}u' for v in values)
 
@@ -187,6 +230,10 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
     npc_ty   = [t[1] for t in npcs] + [0] * (MAX_NPCS - npc_count)
     npc_type = [t[2] for t in npcs] + [0] * (MAX_NPCS - npc_count)
     npc_dir  = [t[3] for t in npcs] + [0] * (MAX_NPCS - npc_count)
+
+    pw_tx   = [p[0] for p in powerups] + [0] * (MAX_POWERUPS - powerup_count)
+    pw_ty   = [p[1] for p in powerups] + [0] * (MAX_POWERUPS - powerup_count)
+    pw_type = [p[2] for p in powerups] + [0] * (MAX_POWERUPS - powerup_count)
 
     with open(out_path, 'w') as f:
         f.write(f"/* GENERATED — do not edit by hand."
@@ -239,6 +286,14 @@ def tmx_to_c(tmx_path, out_path, prefix='track'):
         f.write(f"const uint8_t {prefix}_npc_type[8] = {{ {fmt_arr(npc_type)} }};\n\n")
         f.write(f"BANKREF({prefix}_npc_dir)\n")
         f.write(f"const uint8_t {prefix}_npc_dir[8] = {{ {fmt_arr(npc_dir)} }};\n")
+        f.write(f"\nBANKREF({prefix}_powerup_count)\n")
+        f.write(f"const uint8_t {prefix}_powerup_count = {powerup_count}u;\n\n")
+        f.write(f"BANKREF({prefix}_powerup_tx)\n")
+        f.write(f"const uint8_t {prefix}_powerup_tx[{MAX_POWERUPS}] = {{ {fmt_arr(pw_tx)} }};\n\n")
+        f.write(f"BANKREF({prefix}_powerup_ty)\n")
+        f.write(f"const uint8_t {prefix}_powerup_ty[{MAX_POWERUPS}] = {{ {fmt_arr(pw_ty)} }};\n\n")
+        f.write(f"BANKREF({prefix}_powerup_type)\n")
+        f.write(f"const uint8_t {prefix}_powerup_type[{MAX_POWERUPS}] = {{ {fmt_arr(pw_type)} }};\n")
 
 
 def emit_npc_header(out_path, tmx_paths):
@@ -285,11 +340,60 @@ def emit_npc_header(out_path, tmx_paths):
         f.write('\n'.join(lines) + '\n')
 
 
+def emit_powerup_header(out_path, tmx_paths):
+    """Generate src/track_powerup_externs.h with extern declarations for all tracks.
+
+    tmx_paths: list of TMX file paths in track order (track, track2, track3).
+    Prefixes are derived: first path → 'track', rest → 'track2', 'track3', etc.
+    """
+    prefixes = []
+    for i, p in enumerate(tmx_paths):
+        prefixes.append('track' if i == 0 else f'track{i + 1}')
+
+    lines = [
+        '/* GENERATED — do not edit by hand. Regenerate with:',
+        ' *   python3 tools/tmx_to_c.py --emit-powerup-header src/track_powerup_externs.h \\',
+        ' *     assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx',
+        ' */',
+        '#ifndef TRACK_POWERUP_EXTERNS_H',
+        '#define TRACK_POWERUP_EXTERNS_H',
+        '',
+        '#include <stdint.h>',
+        '#include "banking.h"',
+        '',
+    ]
+
+    for prefix in prefixes:
+        lines += [
+            f'extern const uint8_t  {prefix}_powerup_count;',
+            f'extern const uint8_t  {prefix}_powerup_tx[];',
+            f'extern const uint8_t  {prefix}_powerup_ty[];',
+            f'extern const uint8_t  {prefix}_powerup_type[];',
+            f'BANKREF_EXTERN({prefix}_powerup_count)',
+            f'BANKREF_EXTERN({prefix}_powerup_tx)',
+            f'BANKREF_EXTERN({prefix}_powerup_ty)',
+            f'BANKREF_EXTERN({prefix}_powerup_type)',
+            '',
+        ]
+
+    lines += ['#endif /* TRACK_POWERUP_EXTERNS_H */']
+
+    with open(out_path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
 if __name__ == '__main__':
     import argparse
     import sys
 
-    if '--emit-header' in sys.argv:
+    if '--emit-powerup-header' in sys.argv:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--emit-powerup-header', metavar='OUT_H', required=True,
+                            help='Generate src/track_powerup_externs.h from all TMX inputs')
+        parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
+        args = parser.parse_args()
+        emit_powerup_header(args.emit_powerup_header, args.tmx)
+    elif '--emit-header' in sys.argv:
         parser = argparse.ArgumentParser()
         parser.add_argument('--emit-header', metavar='OUT_H', required=True,
                             help='Generate src/track_npc_externs.h from all TMX inputs')

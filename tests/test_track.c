@@ -134,8 +134,9 @@ void test_track_tile_type_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type(88, 240));
 }
 void test_track_tile_type_repair(void) {
-    /* tile (12,40) = tile_id 7 — repair pad placed in Task 4 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type(96, 320));
+    /* tile (12,40) was heal pad (GID 8) — now road (GID 2) after Task 6 powerup migration.
+     * The heal pad is now tracked via the 'powerups' TMX objectgroup, not a BG tile. */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type(96, 320));
 }
 void test_track_tile_type_oob_x_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(160, 80));
