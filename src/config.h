@@ -37,7 +37,6 @@
 
 /* Damage system */
 #define PLAYER_MAX_HP              100u  /* max HP pool; 0 = dead */
-#define DAMAGE_REPAIR_AMOUNT       20u   /* HP restored by TILE_REPAIR */
 #define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
 
 /* Powerup system */

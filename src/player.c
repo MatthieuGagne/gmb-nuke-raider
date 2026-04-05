@@ -171,21 +171,6 @@ void player_update(void) BANKED {
         sfx_play(SFX_HIT);
     }
 
-    /* Repair tile: heal HP when standing on a repair pad.
-     * SFX_HEAL plays only on the transition frame entering the tile — re-triggering
-     * every frame would restart the CH1 sweep unit and kill the rising arc effect. */
-    {
-        static uint8_t prev_on_repair = 0u;
-        if (terrain == TILE_REPAIR) {
-            damage_heal(DAMAGE_REPAIR_AMOUNT);
-            if (!prev_on_repair) {
-                sfx_play(SFX_HEAL);
-            }
-            prev_on_repair = 1u;
-        } else {
-            prev_on_repair = 0u;
-        }
-    }
 }
 
 void player_render(void) BANKED {

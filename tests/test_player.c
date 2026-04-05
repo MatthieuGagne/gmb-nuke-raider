@@ -250,7 +250,7 @@ void test_heal_call_restores_hp(void) {
     damage_init();
     damage_apply(21u);                             /* hp = PLAYER_MAX_HP - 21 = 79 */
     for (i = 0u; i < DAMAGE_INVINCIBILITY_FRAMES; i++) damage_tick();
-    damage_heal(DAMAGE_REPAIR_AMOUNT);             /* hp += 20 → 99 */
+    damage_heal(20u);                              /* hp += 20 → 99 */
     TEST_ASSERT_EQUAL_UINT8(PLAYER_MAX_HP - 1u, damage_get_hp());
 }
 

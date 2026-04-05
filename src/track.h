@@ -12,9 +12,7 @@ typedef uint8_t TileType;
 #define TILE_SAND   2u
 #define TILE_OIL    3u
 #define TILE_BOOST  4u
-#define TILE_REPAIR 5u
-#define TILE_FINISH  6u
-#define TILE_TURRET  7u
+#define TILE_FINISH 6u
 
 /* Map type constants — emitted by tmx_to_c.py as track_map_type in generated files */
 #define TRACK_TYPE_RACE   0u
