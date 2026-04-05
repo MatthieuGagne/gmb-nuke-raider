@@ -67,7 +67,7 @@ void load_bullet_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
-void load_turret_tiles(void) NONBANKED {
+void load_object_sprites(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(turret_tile_data));
     set_sprite_data(TURRET_TILE_BASE, turret_tile_data_count, turret_tile_data);
