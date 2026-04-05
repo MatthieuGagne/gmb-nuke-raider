@@ -162,6 +162,31 @@ void test_check_hit_miss(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, projectile_check_hit_player(20u, 20u, 4u));
 }
 
+/* ── cooldown ownership ───────────────────────────────────────────────── */
+
+/* Enemy shots are not gated by proj_cooldown_tick.
+ * Two PROJ_OWNER_ENEMY fires in the same frame must both succeed. */
+void test_projectile_enemy_bypasses_cooldown(void) {
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_ENEMY);
+    projectile_fire(80u, 80u, DIR_L, PROJ_OWNER_ENEMY);
+    TEST_ASSERT_EQUAL_UINT8(2u, projectile_count_active());
+}
+
+/* Player cooldown is not polluted by an enemy shot fired first. */
+void test_projectile_player_cooldown_unaffected_by_enemy_shot(void) {
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_ENEMY);
+    /* Player fires immediately after enemy — should succeed (cooldown not set by enemy) */
+    projectile_fire(80u, 80u, DIR_T, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(2u, projectile_count_active());
+}
+
+/* Player cooldown is still enforced for rapid player fire. */
+void test_projectile_player_cooldown_still_applies(void) {
+    projectile_fire(80u, 80u, DIR_R, PROJ_OWNER_PLAYER);
+    projectile_fire(80u, 80u, DIR_L, PROJ_OWNER_PLAYER);  /* within cooldown */
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_projectile_init_no_active_slots);
@@ -181,5 +206,8 @@ int main(void) {
     RUN_TEST(test_check_hit_enemy_player_bullet);
     RUN_TEST(test_check_hit_enemy_ignores_enemy_bullet);
     RUN_TEST(test_check_hit_miss);
+    RUN_TEST(test_projectile_enemy_bypasses_cooldown);
+    RUN_TEST(test_projectile_player_cooldown_unaffected_by_enemy_shot);
+    RUN_TEST(test_projectile_player_cooldown_still_applies);
     return UNITY_END();
 }

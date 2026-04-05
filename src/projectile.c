@@ -43,7 +43,8 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t own
     uint8_t i;
     uint8_t oam;
 
-    if (proj_cooldown_tick > 0u) return;   /* still cooling down */
+    /* Cooldown applies to player only — enemy turrets fire on their own timers */
+    if (owner == PROJ_OWNER_PLAYER && proj_cooldown_tick > 0u) return;
 
     for (i = 0u; i < MAX_PROJECTILES; i++) {
         if (!proj_active[i]) {
@@ -60,7 +61,9 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t own
             proj_active[i] = 1u;
 
             set_sprite_tile(oam, PROJ_TILE_BASE);
-            proj_cooldown_tick = PROJ_FIRE_COOLDOWN;
+            if (owner == PROJ_OWNER_PLAYER) {
+                proj_cooldown_tick = PROJ_FIRE_COOLDOWN;
+            }
             sfx_play(SFX_SHOOT);  /* fire SFX exactly once per actual projectile spawn */
             return;
         }
