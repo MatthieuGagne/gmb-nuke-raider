@@ -29,7 +29,7 @@ static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty, uint8_t type, uint8_t d
     enemy_dir[i]    = dir;
     enemy_hp[i]     = TURRET_HP;
     enemy_active[i] = 1u;
-    enemy_timer[i]  = TURRET_FIRE_INTERVAL;
+    enemy_timer[i]  = 0u;
     enemy_oam_x[i]  = (uint8_t)((uint16_t)tx * 8u + 8u);  /* OAM x cached once */
     enemy_oam[i]    = get_sprite();
     if (enemy_oam[i] != SPRITE_POOL_INVALID) {
@@ -186,6 +186,7 @@ uint8_t enemy_count_active(void) BANKED {
 }
 
 #ifndef __SDCC
-uint8_t enemy_get_type(uint8_t i) { return enemy_type[i]; }
-uint8_t enemy_get_dir(uint8_t i)  { return enemy_dir[i]; }
+uint8_t enemy_get_type(uint8_t i)  { return enemy_type[i]; }
+uint8_t enemy_get_dir(uint8_t i)   { return enemy_dir[i]; }
+uint8_t enemy_get_timer(uint8_t i) { return enemy_timer[i]; }
 #endif
