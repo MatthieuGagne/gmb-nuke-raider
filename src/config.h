@@ -120,4 +120,31 @@
 #define TRACK1_REWARD  50u
 #define TRACK2_REWARD 100u
 
+/* ---------- Loadout ---------- */
+#define LOADOUT_NUM_FIELDS   4u   /* CAR, ARMOR, WEAPON1, WEAPON2 */
+#define LOADOUT_OPTIONS_PER_FIELD 2u
+
+#define LOADOUT_FIELD_CAR     0u
+#define LOADOUT_FIELD_ARMOR   1u
+#define LOADOUT_FIELD_WEAPON1 2u
+#define LOADOUT_FIELD_WEAPON2 3u
+
+#define LOADOUT_DEFAULT_CAR     0u   /* VIPER */
+#define LOADOUT_DEFAULT_ARMOR   0u   /* LIGHT */
+#define LOADOUT_DEFAULT_WEAPON1 0u   /* CANNON */
+#define LOADOUT_DEFAULT_WEAPON2 0u   /* ROCKET */
+
+#ifndef LOADOUT_STRINGS_DEFINED
+#define LOADOUT_STRINGS_DEFINED
+static const char * const LOADOUT_CAR_NAMES[]     = {"VIPER",  "TANK"  };
+static const char * const LOADOUT_ARMOR_NAMES[]   = {"LIGHT",  "HEAVY" };
+static const char * const LOADOUT_WEAPON1_NAMES[] = {"CANNON", "LASER" };
+static const char * const LOADOUT_WEAPON2_NAMES[] = {"ROCKET", "MINE"  };
+static const char * const LOADOUT_FIELD_LABELS[]  = {"CAR", "ARMOR", "WEAPON1", "WEAPON2"};
+static const char * const * const LOADOUT_OPTION_NAMES[LOADOUT_NUM_FIELDS] = {
+    LOADOUT_CAR_NAMES, LOADOUT_ARMOR_NAMES,
+    LOADOUT_WEAPON1_NAMES, LOADOUT_WEAPON2_NAMES
+};
+#endif
+
 #endif /* CONFIG_H */
