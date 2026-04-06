@@ -325,7 +325,12 @@
       "Bash(unzip -q Terminus.zip -d Terminus-nf)",
       "Bash(mkdir -p \"/mnt/c/Users/mathd/AppData/Local/Microsoft/Windows/Fonts\")",
       "Bash(cp /tmp/Terminus-nf/*.ttf \"/mnt/c/Users/mathd/AppData/Local/Microsoft/Windows/Fonts/\")",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree:*)",
+      "Bash(xargs -I{} git push origin --delete \"{}\")",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c.TestTmxToC.test_defines_track_map_array -v)",
+      "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c.TestEnemiesLayer -v)",
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider-issue-285/.git git:*)"
     ]
   },
   "hooks": {
@@ -345,8 +350,8 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar:*)",
             "command": "sed -i 's/^WindowEmuliciousX=.*/WindowEmuliciousX=100/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowEmuliciousY=.*/WindowEmuliciousY=50/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerX=.*/WindowDebuggerX=100/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerY=.*/WindowDebuggerY=50/' /home/mathdaman/.local/share/emulicious/Emulicious.ini && sed -i 's/^WindowDebuggerOpen=.*/WindowDebuggerOpen=false/' /home/mathdaman/.local/share/emulicious/Emulicious.ini 2>/dev/null || true",
+            "if": "Bash(java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar:*)",
             "statusMessage": "Resetting Emulicious window position..."
           }
         ]
