@@ -25,6 +25,9 @@ uint8_t overmap_get_car_ty(void);
 uint8_t overmap_get_spawn_tx(void);
 uint8_t overmap_get_spawn_ty(void);
 
+/* Called by state_prerace before popping back to overmap to preserve car position */
+void overmap_set_returning(void);
+
 /* Direction → tile/prop mapping — pure function, testable host-side */
 void overmap_car_props(uint8_t dir, uint8_t *tile, uint8_t *props);
 
