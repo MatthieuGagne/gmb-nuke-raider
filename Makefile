@@ -43,6 +43,14 @@ src/track_npc_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/map
 
 $(TARGET): src/track_npc_externs.h
 
+# Generate shared powerup extern header — included by src/loader.c.
+# Checked into git so CI works without Python/Tiled.
+src/track_powerup_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --emit-powerup-header src/track_powerup_externs.h \
+	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
+
+$(TARGET): src/track_powerup_externs.h
+
 # Ensure regeneration happens before ROM link if TMX is newer
 $(TARGET): src/track_map.c src/track2_map.c
 $(TARGET): src/track3_map.c

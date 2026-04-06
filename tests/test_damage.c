@@ -133,14 +133,14 @@ void test_heal_caps_at_max(void) {
 
 void test_heal_exact_to_max(void) {
     damage_apply(2u);
-    damage_heal(DAMAGE_REPAIR_AMOUNT);
+    damage_heal(20u);
     TEST_ASSERT_EQUAL_UINT8(PLAYER_MAX_HP, damage_get_hp());
 }
 
 void test_heal_from_zero_restores_hp(void) {
     damage_apply(PLAYER_MAX_HP);        /* hp → 0 */
-    damage_heal(DAMAGE_REPAIR_AMOUNT);
-    TEST_ASSERT_EQUAL_UINT8(DAMAGE_REPAIR_AMOUNT, damage_get_hp());
+    damage_heal(20u);
+    TEST_ASSERT_EQUAL_UINT8(20u, damage_get_hp());
 }
 
 void test_heal_zero_amount_no_effect(void) {

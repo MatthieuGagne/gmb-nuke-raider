@@ -50,12 +50,25 @@ void test_enemy_direction_to_player_up_left(void) {
     /* turret pixel = (80, 80); player at (0,0): dx=-80, dy=-80 → DIR_LT */
 }
 
-void test_enemy_timer_does_not_fire_early(void) {
+void test_enemy_timer_fires_on_first_frame(void) {
     enemy_spawn(10u, 20u);
-    /* Timer starts at TURRET_FIRE_INTERVAL; should not fire until it reaches 0 */
-    /* We test indirectly: no crash and active count unchanged after partial tick */
-    enemy_tick_timers();   /* 1 frame */
+    /* Timer starts at 0 — fires on the very first update; active count unchanged */
+    enemy_tick_timers();   /* 1 frame — timer was already 0, stays 0 until fire */
     TEST_ASSERT_EQUAL_UINT8(1u, enemy_count_active());
+}
+
+void test_enemy_timer_zero_at_spawn(void) {
+    enemy_spawn(10u, 20u);
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(0u));
+}
+
+void test_enemy_three_turrets_timer_all_zero(void) {
+    enemy_spawn(4u, 22u);
+    enemy_spawn(15u, 47u);
+    enemy_spawn(5u, 72u);
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(2u));
 }
 
 void test_enemy_spawn_sets_type_turret(void) {
@@ -88,7 +101,9 @@ int main(void) {
     RUN_TEST(test_enemy_direction_to_player_down);
     RUN_TEST(test_enemy_direction_to_player_down_right);
     RUN_TEST(test_enemy_direction_to_player_up_left);
-    RUN_TEST(test_enemy_timer_does_not_fire_early);
+    RUN_TEST(test_enemy_timer_fires_on_first_frame);
+    RUN_TEST(test_enemy_timer_zero_at_spawn);
+    RUN_TEST(test_enemy_three_turrets_timer_all_zero);
     RUN_TEST(test_enemy_spawn_sets_type_turret);
     RUN_TEST(test_enemy_spawn_sets_dir_none);
     return UNITY_END();

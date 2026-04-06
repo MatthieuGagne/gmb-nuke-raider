@@ -92,8 +92,15 @@ void test_tile_type_from_index_oil(void) {
 void test_tile_type_from_index_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
 }
-void test_tile_type_from_index_repair(void) {
-    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type_from_index(7));
+/* After LUT shrink: tile indices 7 and 8 are OOB → road (passable).
+ * tile_data_count stays 9 — tileset PNG unchanged; only LUT shrank. */
+void test_tile_lut_len_is_7(void) {
+    /* Tile index 6 = TILE_FINISH — last valid LUT entry */
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6u));
+    /* Tile index 7 = OOB → treated as road */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(7u));
+    /* Tile index 8 = OOB → treated as road */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(8u));
 }
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
@@ -103,7 +110,8 @@ void test_finish_tile_is_finish(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6));
 }
 void test_track_tile_data_count_is_9(void) {
-    /* tileset has 9 tiles: wall, road, center-dash, sand, oil, boost, finish, repair, turret */
+    /* tileset PNG still has 9 tiles (wall, road, center-dash, sand, oil, boost, finish,
+     * repair-gfx, turret-gfx); LUT shrunk to 7 — indices 7-8 no longer placed in maps. */
     TEST_ASSERT_EQUAL_UINT8(9u, track_tile_data_count);
 }
 
@@ -134,8 +142,9 @@ void test_track_tile_type_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type(88, 240));
 }
 void test_track_tile_type_repair(void) {
-    /* tile (12,40) = tile_id 7 — repair pad placed in Task 4 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_REPAIR, track_tile_type(96, 320));
+    /* tile (12,40) was heal pad (GID 8) — now road (GID 2) after Task 6 powerup migration.
+     * The heal pad is now tracked via the 'powerups' TMX objectgroup, not a BG tile. */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type(96, 320));
 }
 void test_track_tile_type_oob_x_is_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type(160, 80));
@@ -163,21 +172,6 @@ void test_track_fill_row_oob_ty_returns_zeros(void) {
     for (tx = 0u; tx < 20u; tx++) {
         TEST_ASSERT_EQUAL_UINT8(0u, buf[tx]);
     }
-}
-
-/* --- TILE_TURRET --------------------------------------------------------- */
-
-void test_tile_turret_type(void) {
-    /* Tileset index 8 must map to TILE_TURRET */
-    TEST_ASSERT_EQUAL_INT(TILE_TURRET, track_tile_type_from_index(8u));
-}
-
-void test_tile_turret_not_passable(void) {
-    /* TILE_TURRET must NOT be equal to TILE_ROAD, TILE_SAND, TILE_BOOST, or TILE_REPAIR */
-    TEST_ASSERT_NOT_EQUAL(TILE_ROAD,   TILE_TURRET);
-    TEST_ASSERT_NOT_EQUAL(TILE_SAND,   TILE_TURRET);
-    TEST_ASSERT_NOT_EQUAL(TILE_BOOST,  TILE_TURRET);
-    TEST_ASSERT_NOT_EQUAL(TILE_REPAIR, TILE_TURRET);
 }
 
 /* ---- track_fill_col -------------------------------------------------- */
@@ -331,7 +325,7 @@ int main(void) {
     RUN_TEST(test_tile_type_from_index_sand);
     RUN_TEST(test_tile_type_from_index_oil);
     RUN_TEST(test_tile_type_from_index_boost);
-    RUN_TEST(test_tile_type_from_index_repair);
+    RUN_TEST(test_tile_lut_len_is_7);
     RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
     RUN_TEST(test_finish_tile_is_finish);
     RUN_TEST(test_track_tile_type_road);
@@ -346,8 +340,6 @@ int main(void) {
     RUN_TEST(test_track_tile_data_count_is_9);
     RUN_TEST(test_track_fill_row_matches_get_raw_tile);
     RUN_TEST(test_track_fill_row_oob_ty_returns_zeros);
-    RUN_TEST(test_tile_turret_type);
-    RUN_TEST(test_tile_turret_not_passable);
     RUN_TEST(test_track_fill_col_road_column);
     RUN_TEST(test_track_fill_col_oob_tx);
     RUN_TEST(test_track_fill_col_oob_ty);

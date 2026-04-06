@@ -86,11 +86,13 @@ static const uint8_t DIR_FLIP[8] = {
     S_FLIPX, /* L  */
     S_FLIPX, /* LT */
 };
-/* Returns 1 if a live turret enemy occupies the tile at world pixel (wx, wy). */
+/* Returns 1 if a live turret enemy occupies the tile at world pixel (wx, wy).
+ * BG layer is terrain-only at turret positions (Task 1); the enemy active flag
+ * is the sole source of truth for dynamic blocking. */
 static uint8_t corner_active_turret(int16_t wx, int16_t wy) {
     uint8_t tx = (uint8_t)((uint16_t)wx >> 3u);
     uint8_t ty = (uint8_t)((uint16_t)wy >> 3u);
-    return (track_tile_type(wx, wy) == TILE_TURRET) && enemy_blocks_tile(tx, ty);
+    return enemy_blocks_tile(tx, ty);
 }
 
 /* Returns 1 if all 4 corners of the 16×16 hitbox at (wx, wy) are on track. */
@@ -169,21 +171,6 @@ void player_update(void) BANKED {
         sfx_play(SFX_HIT);
     }
 
-    /* Repair tile: heal HP when standing on a repair pad.
-     * SFX_HEAL plays only on the transition frame entering the tile — re-triggering
-     * every frame would restart the CH1 sweep unit and kill the rising arc effect. */
-    {
-        static uint8_t prev_on_repair = 0u;
-        if (terrain == TILE_REPAIR) {
-            damage_heal(DAMAGE_REPAIR_AMOUNT);
-            if (!prev_on_repair) {
-                sfx_play(SFX_HEAL);
-            }
-            prev_on_repair = 1u;
-        } else {
-            prev_on_repair = 0u;
-        }
-    }
 }
 
 void player_render(void) BANKED {

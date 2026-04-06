@@ -20,6 +20,7 @@ BANKREF_EXTERN(state_playing)
 #include "lap.h"
 #include "checkpoint.h"
 #include "enemy.h"
+#include "powerup.h"
 
 static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
 static uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
@@ -43,6 +44,7 @@ static void enter(void) {
     damage_init();
     projectile_init();
     enemy_init();
+    powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
     finish_armed = 1u;
@@ -62,6 +64,7 @@ static void update(void) {
     player_render();
     projectile_render();
     enemy_render();
+    powerup_render();
     hud_render();
     camera_flush_vram();
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
@@ -87,6 +90,7 @@ static void update(void) {
         checkpoint_update(px, py, pvx, pvy);
         projectile_update();
         enemy_update(px, py);
+        powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
         hud_update();

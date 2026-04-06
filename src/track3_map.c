@@ -69,3 +69,15 @@ const uint8_t track3_npc_type[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track3_npc_dir)
 const uint8_t track3_npc_dir[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+
+BANKREF(track3_powerup_count)
+const uint8_t track3_powerup_count = 0u;
+
+BANKREF(track3_powerup_tx)
+const uint8_t track3_powerup_tx[4] = { 0u, 0u, 0u, 0u };
+
+BANKREF(track3_powerup_ty)
+const uint8_t track3_powerup_ty[4] = { 0u, 0u, 0u, 0u };
+
+BANKREF(track3_powerup_type)
+const uint8_t track3_powerup_type[4] = { 0u, 0u, 0u, 0u };

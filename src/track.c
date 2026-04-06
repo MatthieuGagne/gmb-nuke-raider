@@ -17,7 +17,7 @@ static const TrackDesc track_table[] = {
 };
 
 /* Tile index → TileType lookup table — static const is linked into ROM by SDCC on sm83 */
-#define TILE_LUT_LEN 9u
+#define TILE_LUT_LEN 7u
 static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_WALL,   /* 0: off-road */
     TILE_ROAD,   /* 1: road */
@@ -26,8 +26,8 @@ static const uint8_t tile_type_lut[TILE_LUT_LEN] = {
     TILE_OIL,    /* 4: oil puddle */
     TILE_BOOST,  /* 5: boost pad */
     TILE_FINISH, /* 6: finish line — triggers lap detection */
-    TILE_REPAIR, /* 7: repair pad */
-    TILE_TURRET, /* 8: turret emplacement — impassable while active */
+    /* Indices 7-8 (formerly repair, turret) removed — no longer placed in maps.
+     * track_tile_type_from_index() returns TILE_ROAD for OOB indices. */
 };
 
 /* --- Track dispatch state --- */

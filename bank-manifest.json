@@ -39,5 +39,6 @@
   "src/bullet_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/sfx.c":                   {"bank": 0,   "reason": "NONBANKED — APU writes must not race with bank switches, same constraint as music.c"},
   "src/enemy.c":                 {"bank": 255, "reason": "autobank — gameplay module called via invoke() in state_manager.c"},
-  "src/turret_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"}
+  "src/turret_sprite.c":         {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
+  "src/powerup.c":               {"bank": 255, "reason": "autobank — gameplay module called via invoke() in state_manager.c"}
 }
