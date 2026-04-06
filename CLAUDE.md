@@ -98,7 +98,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`gb-memory-validator`** — Documents WRAM/VRAM/OAM budget checks. **Now fires automatically** after every non-clean `make` via PostToolUse hook (`post_build_hook.py` runs `make memory-check`).
 - **`map-expert`** — Autonomous map agent: executes end-to-end map creation pipeline AND holds domain knowledge (Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware). Use when creating or modifying maps. **Update this agent in the same PR** whenever the pipeline changes.
 - **`sprite-expert`** — Autonomous sprite agent: Aseprite pipeline, `png_to_tiles.py`, OAM management, CGB palettes, coordinate system, and end-to-end execution checklist with self-correction retry loop. Use when creating or modifying sprites. **Update this agent in the same PR** whenever the sprite system changes.
-- **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
+- **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage. Appends a machine-readable `\`\`\`json` block as the last element of every response (schema: `bank`, `address`, `symptom`, `registers[]`, `stack_trace`, `hypothesis`; unknown fields emit `null`).
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
 
 ### Skills (in `.claude/skills/`, invoked with the Skill tool)
