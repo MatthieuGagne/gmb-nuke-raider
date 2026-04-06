@@ -55,12 +55,16 @@ def test_all_states(game_session: GameSession, map_path: str, rom_path: str, noi
     s.press(["START"])
     s.advance(_OVERMAP_SETTLE)
 
-    # ── 5. Playing ───────────────────────────────────────────────────────────
+    # ── 5. Pre-race menu + Playing ───────────────────────────────────────────
     # One LEFT press → find_next_node(-1,0) jumps to DEST at (2,8).
     # Travel: 7 tiles × 4 frames/tile = 28 frames. Add _SETTLE buffer.
     s.press(["LEFT"])
     s.advance(_PLAYING_NAV_FRAMES)
-    # state_replace(&state_playing) fires automatically on arrival.
+    # state_push(&state_prerace) fires on arrival — navigate DOWN×4 to START row, A to launch.
+    for _ in range(4):
+        s.press(["DOWN"])
+        s.advance(1)
+    s.press(["A"])
     s.advance(_PLAYING_DWELL_FRAMES)
 
     # ── 6. Game over ─────────────────────────────────────────────────────────
@@ -117,17 +121,23 @@ def test_race_finish_results_screen(rom_path: str, noi_path: str) -> None:
         s.press(["START"])
         s.advance(_OVERMAP_SETTLE)
 
-        # ── 4. Navigate LEFT to track 1 race destination ──────────────────────
-        # From (9,8): LEFT → DEST at (2,8).  state_replace(&state_playing).
+        # ── 4. Navigate LEFT to track 1 race destination + prerace menu ────────
+        # From (9,8): LEFT → DEST at (2,8).  state_push(&state_prerace).
         s.press(["LEFT"])
         s.advance(_PLAYING_NAV_FRAMES)
+        # Prerace menu: DOWN×4 to START row, A to launch state_playing.
+        for _ in range(4):
+            s.press(["DOWN"])
+            s.advance(1)
+        s.press(["A"])
         s.advance(_PLAYING_DWELL_FRAMES)
 
         # ── 5. Drive south to the finish line ────────────────────────────────
-        # Hold DOWN 230 frames — enough to reach tile row 95 (TILE_FINISH).
+        # Hold DOWN 260 frames — enough to reach tile row 95 (TILE_FINISH).
         # finish_eval() fires: economy_add_scrap(50) → state_replace(&state_results).
         # Empirical: py=718 at frame 200; finish at py=756 (~7 more frames needed).
-        s.press(["DOWN"], hold_frames=230)
+        # +30 frame buffer added after prerace menu state was introduced (issue #290).
+        s.press(["DOWN"], hold_frames=260)
 
         # ── 6. Verify results screen via WRAM ────────────────────────────────
         # economy_get_scrap() reads the static `player_scrap` WRAM variable.
@@ -174,9 +184,14 @@ def test_direct_left_race(rom_path: str, noi_path: str) -> None:
         s.advance(_OVERMAP_SETTLE)
         # Car is at hub spawn (9, 8). No hub visit.
 
-        # ── 3. Navigate LEFT directly to DEST (2, 8) ─────────────────────────
+        # ── 3. Navigate LEFT directly to DEST (2, 8) + prerace menu ─────────
         s.press(["LEFT"])
         s.advance(_PLAYING_NAV_FRAMES)   # 7 tiles × 4 frames/tile + 5 settle
+        # Prerace menu: DOWN×4 to START row, A to launch state_playing.
+        for _ in range(4):
+            s.press(["DOWN"])
+            s.advance(1)
+        s.press(["A"])
         s.advance(_PLAYING_DWELL_FRAMES)
 
         # ── 4. Assert display is on ───────────────────────────────────────────

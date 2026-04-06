@@ -3,6 +3,7 @@
 #include "banking.h"
 #include "state_overmap.h"
 #include "state_playing.h"
+#include "state_prerace.h"
 #include "state_hub.h"
 #include "state_manager.h"
 #include "config.h"
@@ -36,6 +37,7 @@ static uint8_t overmap_city_hub_count;
 
 #define TRAVEL_FRAMES_PER_TILE 4u   /* file-local tuning — not in config.h */
 
+static uint8_t om_returning;        /* 1=returning from prerace — preserve car position */
 static uint8_t traveling;           /* 0=idle, 1=animating */
 static uint8_t travel_dir;          /* J_LEFT/J_RIGHT/J_UP/J_DOWN bitmask */
 static uint8_t travel_frame_count;  /* counts down to 0 before each tile step */
@@ -163,11 +165,12 @@ static void overmap_check_tile_effect(void) {
                 break;
             }
         }
-        track_select(current_race_id);   /* wire up dispatch table before STATE_PLAYING */
-        state_replace(&state_playing, BANK(state_playing));
-        /* NOTE: player position is set in state_playing enter() via track_get_start_x/y() */
+        track_select(current_race_id);   /* wire up dispatch table before STATE_PRERACE */
+        state_push(&state_prerace, BANK(state_prerace));
     }
 }
+
+void overmap_set_returning(void) { om_returning = 1u; }
 
 /* ── State callbacks ─────────────────────────────────────────────────────────── */
 static void enter(void) {
@@ -175,8 +178,11 @@ static void enter(void) {
     { SET_BANK(overmap_map);
       overmap_scan_map();
       RESTORE_BANK(); }
-    car_tx = overmap_hub_tx[0];
-    car_ty = overmap_hub_ty[0];
+    if (!om_returning) {
+        car_tx = overmap_hub_tx[0];
+        car_ty = overmap_hub_ty[0];
+    }
+    om_returning = 0u;
     traveling = 0u; travel_dir = J_UP; travel_frame_count = 0u;
     dest_tx = 0u;   dest_ty = 0u;
 

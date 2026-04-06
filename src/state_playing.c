@@ -110,7 +110,7 @@ static void update(void) {
                             checkpoint_all_cleared())) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
-                    state_replace(&state_overmap, BANK(state_overmap));
+                    state_pop();
                     return;
                 }
                 if (lap_advance()) {

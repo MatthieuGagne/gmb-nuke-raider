@@ -98,6 +98,9 @@ extern int mock_load_bkg_row_call_count;
 void mock_vram_clear(void);
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles);
+static inline void set_bkg_tile_xy(uint8_t x, uint8_t y, uint8_t tile) {
+    (void)x; (void)y; (void)tile;
+}
 
 /* ISR infrastructure mocks */
 #define NONBANKED

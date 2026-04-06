@@ -9,6 +9,7 @@
 #include "music.h"
 #include "sfx.h"
 #include "economy.h"
+#include "loadout.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -46,6 +47,7 @@ void main(void) {
     init_palettes();
     player_init();
     economy_init();
+    loadout_init();   /* set loadout defaults before first state push */
     music_init();
     sfx_init();
     add_VBL(vbl_isr);

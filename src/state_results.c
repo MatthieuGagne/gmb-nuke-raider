@@ -32,7 +32,7 @@ static void enter(void) {
 
 static void update(void) {
     if (KEY_TICKED(J_A)) {
-        state_replace(&state_overmap, BANK(state_overmap));
+        state_pop();
     }
 }
 
