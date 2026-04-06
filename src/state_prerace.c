@@ -8,6 +8,7 @@
 #include "state_playing.h"
 #include "loadout.h"
 #include "config.h"
+#include "input.h"
 
 BANKREF(state_prerace)
 
@@ -19,13 +20,20 @@ static uint8_t pr_cursor;
 static void pr_render(void) {
     uint8_t i;
     uint8_t vals[PR_CONFIG_ROWS];
+    uint8_t tx, ty;
 
     vals[0] = loadout_get_car();
     vals[1] = loadout_get_armor();
     vals[2] = loadout_get_weapon1();
     vals[3] = loadout_get_weapon2();
 
-    cls();
+    /* Clear only the 18 visible BG rows — cls() writes all 32 rows and corrupts
+     * rows 18-31 that camera_init() does not restore, breaking track tilemap. */
+    for (ty = 0u; ty < 18u; ty++) {
+        for (tx = 0u; tx < 20u; tx++) {
+            set_bkg_tile_xy(tx, ty, 0x00u);  /* GBDK console: space = tile 0 (ASCII 0x20 - 0x20 offset) */
+        }
+    }
     gotoxy(6u, 0u);
     printf("LOADOUT");
 
@@ -59,14 +67,13 @@ static void enter(void) {
 }
 
 static void update(void) {
-    uint8_t joy = joypad();
     uint8_t changed = 0u;
 
-    if (joy & J_UP) {
+    if (KEY_TICKED(J_UP)) {
         if (pr_cursor > 0u) { pr_cursor--; changed = 1u; }
-    } else if (joy & J_DOWN) {
+    } else if (KEY_TICKED(J_DOWN)) {
         if (pr_cursor < (uint8_t)(PR_ROWS - 1u)) { pr_cursor++; changed = 1u; }
-    } else if ((joy & J_LEFT) && pr_cursor < PR_CONFIG_ROWS) {
+    } else if (KEY_TICKED(J_LEFT) && pr_cursor < PR_CONFIG_ROWS) {
         switch (pr_cursor) {
             case 0u: loadout_cycle_car(-1);     break;
             case 1u: loadout_cycle_armor(-1);   break;
@@ -75,7 +82,7 @@ static void update(void) {
             default: break;
         }
         changed = 1u;
-    } else if ((joy & J_RIGHT) && pr_cursor < PR_CONFIG_ROWS) {
+    } else if (KEY_TICKED(J_RIGHT) && pr_cursor < PR_CONFIG_ROWS) {
         switch (pr_cursor) {
             case 0u: loadout_cycle_car(1);     break;
             case 1u: loadout_cycle_armor(1);   break;
@@ -84,7 +91,7 @@ static void update(void) {
             default: break;
         }
         changed = 1u;
-    } else if (joy & J_A) {
+    } else if (KEY_TICKED(J_A)) {
         if (pr_cursor == 4u) {
             state_replace(&state_playing, BANK(state_playing));
             return;
@@ -93,7 +100,7 @@ static void update(void) {
             state_pop();
             return;
         }
-    } else if (joy & J_B) {
+    } else if (KEY_TICKED(J_B)) {
         overmap_set_returning();
         state_pop();
         return;
