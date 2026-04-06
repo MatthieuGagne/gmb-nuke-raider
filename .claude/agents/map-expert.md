@@ -1,6 +1,6 @@
 ---
 name: map-expert
-description: "Use when creating, editing, or converting maps for Nuke Raider — Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles, gen_tileset), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
+description: "Use when creating a new map, editing an existing map, or running the map conversion pipeline for Nuke Raider — executes end-to-end autonomously. Also use for: Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles, gen_tileset), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
 color: green
 ---
 
@@ -63,6 +63,70 @@ assets/maps/overmap.tmx  →  tools/tmx_to_array_c.py assets/maps/overmap.tmx sr
 ```
 
 Note: the overmap uses `tmx_to_array_c.py` (not `tmx_to_c.py`) and takes `config.h` as an extra arg.
+
+---
+
+## Execution Checklist
+
+On any error in the steps below, follow the **Self-Correction Policy** section.
+
+### Track Map
+
+1. **Tileset** — draw or extend `assets/maps/tileset.png` in Aseprite or a pixel editor. Export as PNG.
+2. **Convert tileset to tiles:**
+   ```bash
+   python3 tools/png_to_tiles.py --bank 255 assets/maps/tileset.png src/track_tiles.c track_tiles
+   ```
+3. **Paint map in Tiled** — open `assets/maps/track.tmx`, paint the `Track` layer (CSV encoding). Ensure an `<objectgroup name="start">` with one spawn object exists.
+4. **Convert map:**
+   ```bash
+   python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c
+   ```
+5. **Wire into game** — `extern`-declare generated symbols in the relevant `.c` file; load tile data then tilemap during VBlank.
+6. **OAM sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **`sprite-expert`** agent.
+7. **Build & smoketest** — use the `build` skill, launch in Emulicious, confirm map renders and player spawns correctly.
+
+### Overmap
+
+1. **Tileset** — edit `assets/maps/overmap_tiles.aseprite` in Aseprite. Export as PNG:
+   ```bash
+   aseprite -b assets/maps/overmap_tiles.aseprite --save-as assets/maps/overmap_tiles.png
+   ```
+2. **Convert tileset to tiles:**
+   ```bash
+   python3 tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tiles
+   ```
+3. **Paint map in Tiled** — open `assets/maps/overmap.tmx`, update the layer as needed (CSV encoding).
+4. **Convert map** (note: different converter and extra `config.h` arg):
+   ```bash
+   python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
+   ```
+5. **Wire into game** — `extern`-declare generated symbols; load tile data then tilemap during VBlank.
+6. **OAM sprites on the map** — delegate to the **`sprite-expert`** agent if needed.
+7. **Build & smoketest** — use the `build` skill, launch in Emulicious, confirm overmap renders correctly.
+
+---
+
+## Self-Correction Policy
+
+When any pipeline step fails, apply this policy:
+
+1. **Identify the failed step** — do not restart the full checklist; retry only the step that failed.
+2. **Retry up to 3 attempts** — each attempt may adjust command flags or fix an intermediate file based on error output.
+3. **On 3rd failure — halt and surface:**
+   - Present all 3 error outputs in full.
+   - Cross-reference the **Common Mistakes** table for the most likely root cause.
+   - Wait for human instruction before proceeding.
+
+### Error Patterns to Watch
+
+| Signal | What to check |
+|--------|---------------|
+| Non-zero exit from `make` | Compiler errors in generated `.c` files; check array size/type mismatches |
+| Non-zero exit from `tmx_to_c.py` or `png_to_tiles.py` | Missing input file, bad TMX encoding, wrong argument count |
+| Missing generated `.c` output file | Converter exited 0 but wrote nothing — check output path argument |
+| Tile count mismatch | PNG dimensions not a multiple of 8; tileset row/column count changed |
+| Tiled validation errors | Missing `start` objectgroup, wrong layer name, non-CSV encoding |
 
 ---
 
