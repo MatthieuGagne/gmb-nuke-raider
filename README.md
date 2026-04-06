@@ -31,17 +31,6 @@ Unit tests compile with `gcc` — no hardware or emulator needed:
 make test
 ```
 
-### Integration tests (headless emulator)
-
-Boots the debug ROM in [PyBoy](https://pyboy.dk/) and navigates all game states in one session:
-
-```bash
-pip install pyboy          # one-time setup
-make test-integration      # builds debug ROM + runs pytest
-```
-
-See `tests/integration/README.md` for full details.
-
 ## Running
 
 ```sh
