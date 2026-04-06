@@ -19,7 +19,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check dialog_data build-debug test-integration
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check dialog_data build-debug
 
 all: $(TARGET)
 
@@ -170,9 +170,6 @@ memory-check:
 
 build-debug:
 	DEBUG=1 GBDK_HOME=/home/mathdaman/gbdk $(MAKE) clean all
-
-test-integration: build-debug
-	python3 -m pytest tests/integration/ -v
 
 clean:
 	rm -rf build/
