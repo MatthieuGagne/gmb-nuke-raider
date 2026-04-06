@@ -62,10 +62,6 @@
 #define OVERMAP_CAR_TILE_BASE  18u  /* VRAM sprite tile slots 18–19: tile 18 = vertical (up/down), tile 19 = horizontal (left/right) */
                                     /* Reuses slot 18 safely — turret only loads in STATE_PLAYING, overmap car only in STATE_OVERMAP */
 
-/* Overmap entity pool ceilings — must be >= number of each marker type in overmap.tmx */
-#define MAX_OVERMAP_DESTS    4u   /* max OVERMAP_TILE_DEST markers on the overmap */
-#define MAX_OVERMAP_HUBS     2u   /* max OVERMAP_TILE_CITY_HUB markers on the overmap */
-
 /* Overmap tile type indices (BKG tile data slots 0-N) */
 #define OVERMAP_TILE_BLANK    0u
 #define OVERMAP_TILE_ROAD     1u
