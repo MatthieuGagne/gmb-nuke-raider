@@ -18,6 +18,9 @@ extern const uint8_t overmap_tile_data_count;
 
 BANKREF_EXTERN(overmap_map)
 extern const uint8_t overmap_map[];
+extern const uint8_t overmap_id_map[];    /* combined dest/city-hub id map; 0xFF = no id */
+extern const uint8_t overmap_hub_spawn_tx;
+extern const uint8_t overmap_hub_spawn_ty;
 
 /* Accessors used by unit tests */
 uint8_t overmap_get_car_tx(void);

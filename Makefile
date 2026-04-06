@@ -139,8 +139,8 @@ src/overmap_tiles.c: assets/maps/overmap_tiles.png tools/png_to_tiles.py
 $(TARGET): src/overmap_tiles.c
 
 # src/overmap_map.c is checked into git so CI works without Python/Tiled.
-src/overmap_map.c: assets/maps/overmap.tmx tools/tmx_to_array_c.py
-	python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
+src/overmap_map.c: assets/maps/overmap.tmx tools/overmap_to_c.py
+	python3 tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c
 
 $(TARGET): src/overmap_map.c
 
