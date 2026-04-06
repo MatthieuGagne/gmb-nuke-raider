@@ -50,7 +50,9 @@ static void pr_render(void) {
 }
 
 static void enter(void) {
+    uint8_t i;
     pr_cursor = 0u;
+    for (i = 0u; i < 40u; i++) { move_sprite(i, 0u, 0u); }
     DISPLAY_OFF;
     pr_render();
     DISPLAY_ON;
