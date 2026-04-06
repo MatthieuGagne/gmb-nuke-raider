@@ -25,6 +25,18 @@ BANKREF(state_hub)
 #define HUB_SUB_DIALOG 1u
 #define DIALOG_INNER_W 12u  /* inner text cols inside dialog box (cols 7-18) */
 
+/* Clear only the 18 visible BG rows (0-17). cls() clears all 32 rows and
+ * corrupts rows 18-31 that camera_init() does not restore, breaking the
+ * track tilemap on overmap return. Must be called under DISPLAY_OFF. */
+static void clear_visible_rows(void) {
+    uint8_t tx, ty;
+    for (ty = 0u; ty < 18u; ty++) {
+        for (tx = 0u; tx < 20u; tx++) {
+            set_bkg_tile_xy(tx, ty, 0x00u);
+        }
+    }
+}
+
 uint8_t overmap_hub_entered = 0u;
 
 static uint8_t           sub_state;
@@ -45,7 +57,7 @@ uint8_t hub_get_sub_state(void) { return sub_state; }
 
 static void hub_render_menu(void) {
     uint8_t i;
-    cls();
+    clear_visible_rows();       /* was: cls() */
     gotoxy(1u, 0u);
     printf(hub->name);
     for (i = 0u; i < hub->num_npcs; i++) {
@@ -283,7 +295,7 @@ static void hub_start_dialog(uint8_t npc_cursor) {
       RESTORE_BANK(); }
     sub_state = HUB_SUB_DIALOG;
     vbl_display_off();         /* tick music + disable LCD in 1 VBlank */
-    cls();
+    clear_visible_rows();       /* was: cls() */
     load_portrait(npc_cursor);
     { SET_BANK(dialog_border_tiles);
       set_bkg_data(HUB_BORDER_TILE_SLOT, 8u, dialog_border_tiles);
@@ -295,11 +307,13 @@ static void hub_start_dialog(uint8_t npc_cursor) {
 static void update_menu(void) {
     uint8_t menu_size = (uint8_t)(hub->num_npcs + 1u);
     if (KEY_TICKED(J_UP) && cursor > 0u) {
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(" ");
         cursor--;
-        hub_render_menu();
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(">");
     } else if (KEY_TICKED(J_DOWN) && cursor < menu_size - 1u) {
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(" ");
         cursor++;
-        hub_render_menu();
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(">");
     } else if (KEY_TICKED(J_A)) {
         if (cursor == hub->num_npcs) {
             state_pop();
@@ -339,7 +353,7 @@ static void update_dialog(void) {
             dialog_cursor      = 0u;
             dialog_prev_cursor = 0u;
             vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
-            cls();
+            clear_visible_rows();   /* was: cls() */
             hub_render_dialog();
             DISPLAY_ON;
         } else {
@@ -351,7 +365,7 @@ static void update_dialog(void) {
             dialog_next_offset = 0u;
             if (more) {
                 vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
-                cls();
+                clear_visible_rows();   /* was: cls() */
                 hub_render_dialog();
                 DISPLAY_ON;
             } else {
@@ -388,7 +402,6 @@ static void enter(void) {
       set_sprite_data(DIALOG_ARROW_TILE_BASE, dialog_arrow_tile_data_count, dialog_arrow_tile_data);
       RESTORE_BANK(); }
     set_sprite_tile(DIALOG_ARROW_OAM_SLOT, DIALOG_ARROW_TILE_BASE);
-    cls();
     hub_render_menu();
     DISPLAY_ON;
     SHOW_BKG;
