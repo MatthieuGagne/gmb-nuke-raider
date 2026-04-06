@@ -17,3 +17,5 @@ For deep hardware reference: **https://gbdev.io/pandocs/single.html** (fetch wit
 7. No `SET_BANK`/`SWITCH_ROM` in banked files — route through `loader.c` (bank-0 only)
 8. Entity pools → SoA (Structure-of-Arrays), not AoS; capacity constants in `config.h`
 9. For deep hardware specs (OAM, palettes, PPU modes, interrupts, banking) → use `gbdk-expert` agent
+10. Any `#pragma bank 255` function called from bank-0 code MUST have `BANKED` on both declaration and definition — autobank assigns numbers, not trampolines; `static` functions must NOT be `BANKED`
+11. If a new GBDK API function is added to `src/`, grep `tests/mocks/gb/gb.h` for it — if missing, add a `static inline` no-op stub before committing or `make test` will fail with "undefined reference"
