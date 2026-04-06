@@ -2,7 +2,7 @@
 <map version="1.10" tiledversion="1.10.0"
      orientation="orthogonal" renderorder="right-down"
      width="20" height="18" tilewidth="8" tileheight="8"
-     infinite="0" nextlayerid="2" nextobjectid="1">
+     infinite="0" nextlayerid="5" nextobjectid="6">
  <tileset firstgid="1" source="overmap.tsx"/>
  <layer id="1" name="Overmap" width="20" height="18">
   <data encoding="csv">
@@ -26,4 +26,37 @@
 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 </data>
  </layer>
+ <objectgroup id="2" name="hub_spawn">
+  <object id="1" x="72" y="64">
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="dest_tracks">
+  <object id="2" x="16" y="64">
+   <properties>
+    <property name="track_id" type="int" value="1"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="3" x="136" y="64">
+   <properties>
+    <property name="track_id" type="int" value="2"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="4" x="72" y="72">
+   <properties>
+    <property name="track_id" type="int" value="3"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="4" name="city_hubs">
+  <object id="5" x="72" y="48">
+   <properties>
+    <property name="hub_id" type="int" value="1"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
 </map>
