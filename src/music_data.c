@@ -4,7 +4,10 @@
 #include "banking.h"
 #include "hUGEDriver.h"
 
-volatile uint8_t __at(2) __bank_music_data_song;
+/* Bank reference: BANKREF(sym) emits a CODE stub; bankpack rewrites
+   ___bank_sym to the actual assigned bank at link time.
+   Required so BANK(music_data_song) returns the real bank, not a hardcoded constant. */
+BANKREF(music_data_song)
 
 
 static const unsigned char order_cnt = 68;
