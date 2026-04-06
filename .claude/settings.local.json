@@ -330,7 +330,19 @@
       "Bash(xargs -I{} git push origin --delete \"{}\")",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c.TestTmxToC.test_defines_track_map_array -v)",
       "Bash(PYTHONPATH=. python3 -m unittest tests.test_tmx_to_c.TestEnemiesLayer -v)",
-      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider-issue-285/.git git:*)"
+      "Bash(GIT_DIR=/home/mathdaman/code/nuke-raider-issue-285/.git git:*)",
+      "Bash(curl -s \"https://gbdev.io/pandocs/VRAM_Tile_Data.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/Tile_Maps.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/VRAM_Banks.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/OAM.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/CGB_Registers.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/pixel_fifo.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/Tile_Data.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/LCDC.html\")",
+      "Bash(curl -s \"https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html\")",
+      "Bash(curl -s \"https://gbdk-2020.github.io/gbdk-2020/docs/api/docs/index.html\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/gbdk-2020/gbdk-2020/develop/gbdk-lib/include/gb/hardware.h\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/gbdk-2020/gbdk-2020/develop/gbdk-lib/include/gb/metasprites.h\")"
     ]
   },
   "hooks": {
