@@ -134,3 +134,9 @@ When triggered:
 - Motivation: the ~33s stall bug investigation spanned 5+ sessions. Claude fixated on music/order_cnt, introduced a worse crash (26s stall), and dismissed the new symptom as the known issue. This skill prevents all three failure modes.
 - Stateless across sessions — each invocation starts from what the user provides in Mode A
 - This skill is the local `systematic-debugging` skill, shadowing the global superpowers version with GBC-specific tooling
+
+## GBC-Specific Diagnostic Hints
+
+**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, use `find_wram_read_in_fn(noi_path, rom_path, "_getter_fn")` from `tests/integration/helpers.py`. It decodes the getter function's disassembly from the ROM binary to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
+
+**"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, read `SCY`/`SCX` in Emulicious — non-zero values mean the tilemap is rendering off-screen.

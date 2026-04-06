@@ -131,7 +131,6 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 | Forgetting to check `SPRITE_POOL_INVALID` | `get_sprite()` returns `0xFF` when pool is full |
 | Loading tile data before `SPRITES_8x8` | Set mode first, then load data and assign tiles |
 | Abstract placeholder art for directional sprites | Use a clear directional arrow (↑ ↗ → ↘) — makes facing readable at a glance in the emulator. |
-| Assigning gas to A/B button | D-pad = facing + gas simultaneously. A/B must NOT be used for movement. |
 
 ---
 

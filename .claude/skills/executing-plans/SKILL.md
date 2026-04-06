@@ -29,6 +29,13 @@ Expected: current directory is under `.claude/worktrees/` and branch is a featur
 
 If not in a worktree: use the `using-git-worktrees` skill or `EnterWorktree` tool before proceeding.
 
+**Stale worktree recovery:** If a directory exists at `.claude/worktrees/<name>` but `git worktree list` does NOT show it (and `git branch --show-current` inside it returns `master`), the worktree was removed without deleting the directory. Fix:
+1. Save any already-written files to `/tmp/`
+2. `rm -rf .claude/worktrees/<name>`
+3. `git checkout -b <branch> origin/master`
+4. `git checkout master && git worktree add .claude/worktrees/<name> <branch>`
+5. Restore saved files into the new worktree
+
 ### Step 2: Sync with master
 
 After confirming you are in a worktree, pull and merge latest master:

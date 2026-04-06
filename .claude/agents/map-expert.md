@@ -142,6 +142,7 @@ When any pipeline step fails, apply this policy:
 | `encoding: "csv"` in XML = string | Split on `','`, not a JSON array |
 | Object `type` vs `class` | Pre-1.9: `type` field; since 1.9: `class` field |
 | Assuming RGB PNG from Aseprite | Aseprite exports indexed color (type 3) — check IHDR before reading pixels |
+| Finish line at the map y-boundary | `player.c` resets `vy = 0` when the player hits `active_map_h * 8 - 16` — if the finish row is exactly at that boundary the player arrives with zero velocity and `finish_eval` never fires. Always leave at least 4–6 road rows below the finish line so the player can cross with positive downward velocity. |
 
 **For full Python implementation code, PNG read/write utilities, Aseprite sync, GB hardware deep-dive (VRAM layout, LCDC bits, scroll registers, CGB attributes), and Tiled format reference — see [`REFERENCE.md`](../skills/map-expert/REFERENCE.md).**
 

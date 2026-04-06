@@ -48,6 +48,12 @@ Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No ba
 
 **Integration test gate:** If the plan touches any game state (add/remove state, change overmap node positions, change state transition triggers, change hp/damage logic), add a task to update `tests/integration/test_regression.py`. Always ask the user before modifying or adding integration tests — do not auto-update them.
 
+**Constant-removal audit:** If any task removes or renames a shared constant (e.g. `PLAYER_ACCEL`, `PLAYER_MAX_SPEED`), add a grep step at the top of that task before listing affected files:
+```bash
+grep -r CONSTANT_NAME tests/
+```
+Include ALL matching test files in the task's file list — not just the ones the plan author remembered. Missing a file means surprise failures during parallel execution (other tasks' commits have already landed).
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
