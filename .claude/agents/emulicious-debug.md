@@ -150,3 +150,57 @@ romusage build/nuke-raider.cdb -a
 4. Set VS Code breakpoints at suspect line; use Step Over/Into to inspect variables
 5. Use Tilemap/Sprite Viewers to confirm visual state matches logic
 6. Remove `EMU_printf` calls before committing
+
+---
+
+## Structured Output
+
+After every debug session response, append a fenced ` ```json ` block as the **last element** of the response. This placement is intentional — downstream automation finds it by locating the last ` ```json ` block without ambiguity.
+
+### Schema
+
+```json
+{
+  "bank": <int | null>,
+  "address": <hex string | null>,
+  "symptom": <string>,
+  "registers": [<objects>],
+  "stack_trace": [<frames> | null],
+  "hypothesis": <string>
+}
+```
+
+### Field Definitions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bank` | `int \| null` | ROM bank number where the crash or anomaly occurred. `null` if bank cannot be determined. |
+| `address` | `hex string \| null` | Memory address (e.g. `"0xC123"`) of the crash site or suspect instruction. `null` if address cannot be determined. |
+| `symptom` | `string` | Plain-English description of the observed symptom (e.g. `"blank screen at ~3s after race start"`). Always populated. |
+| `registers` | `array of objects` | CPU register values at the point of interest. Each object has `"name"` and `"value"` keys. Empty array `[]` if registers are unavailable. |
+| `stack_trace` | `array of frames \| null` | Call stack frames if available from the debugger. `null` if stack trace cannot be determined. |
+| `hypothesis` | `string` | LLM-generated plain-English inference based on the register/stack data (e.g. `"likely NULL pointer dereference in enemy_update at bank 2"`). Not raw emulator data or a pattern-matched tag — always a synthesized interpretation. |
+
+### Null Semantics
+
+Fields that cannot be determined **must emit `null`** — do not omit the field and do not use empty string. This allows automation to distinguish "unknown" from "empty".
+
+### Example
+
+```json
+{
+  "bank": 2,
+  "address": "0xC042",
+  "symptom": "game freezes 3 seconds after entering race state",
+  "registers": [
+    {"name": "A", "value": "0x00"},
+    {"name": "HL", "value": "0xC042"},
+    {"name": "SP", "value": "0xDFE0"}
+  ],
+  "stack_trace": [
+    {"frame": 0, "address": "0x4123", "label": "_enemy_update"},
+    {"frame": 1, "address": "0x0234", "label": "_game_update"}
+  ],
+  "hypothesis": "HL points into WRAM at 0xC042 which is likely an uninitialized enemy pointer; enemy_update dereferences it unconditionally"
+}
+```
