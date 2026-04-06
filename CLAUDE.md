@@ -96,8 +96,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`gbdk-expert`** — GBDK-2020 API, hardware registers, sprites/palettes/interrupts, compilation errors. Banking questions → bank-pre-write/bank-post-build skills.
 - **`gb-c-optimizer`** — C code review AND fix for GBC performance/ROM size, anti-pattern detection, SDCC optimization. In post-implementation contexts (executing-plans, subagent-driven-development), applies fixes directly; in plan-phase contexts (writing-plans), reports issues only.
 - **`gb-memory-validator`** — Documents WRAM/VRAM/OAM budget checks. **Now fires automatically** after every non-clean `make` via PostToolUse hook (`post_build_hook.py` runs `make memory-check`).
-- **`map-builder`** — End-to-end map creation: Tiled layout, TMX conversion pipeline, wiring generated C files into the game.
-- **`map-expert`** — Map pipeline reference: Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware. Use when creating or modifying maps. **Update this agent in the same PR** whenever the pipeline changes.
+- **`map-expert`** — Autonomous map agent: executes end-to-end map creation pipeline AND holds domain knowledge (Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware). Use when creating or modifying maps. **Update this agent in the same PR** whenever the pipeline changes.
 - **`sprite-expert`** — Autonomous sprite agent: Aseprite pipeline, `png_to_tiles.py`, OAM management, CGB palettes, coordinate system, and end-to-end execution checklist with self-correction retry loop. Use when creating or modifying sprites. **Update this agent in the same PR** whenever the sprite system changes.
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage.
 - **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
