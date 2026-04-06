@@ -72,10 +72,7 @@ Write → verify → commit. No bank gates required.
 ```bash
 make test                # C unit tests (gcc + Unity, no GBDK needed)
 make test-tools          # Python tool tests (png_to_tiles, tmx_to_c)
-make test-integration    # headless PyBoy regression suite (builds debug ROM first)
 ```
-
-`make test-integration` boots the debug ROM once and navigates every game state (title → overmap → hub → playing → game_over → title). Update `tests/integration/test_regression.py` when game states or navigation change — always ask the user first.
 
 ### ROM build
 
