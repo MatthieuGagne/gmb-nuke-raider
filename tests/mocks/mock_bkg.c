@@ -13,13 +13,32 @@ int mock_load_bkg_row_call_count = 0;
 int     mock_move_bkg_call_count = 0;
 uint8_t mock_move_bkg_last_y     = 0;
 
+uint8_t mock_set_bkg_tile_xy_max_row    = 0u;
+int     mock_set_bkg_tile_xy_call_count = 0;
+
+void mock_set_bkg_tile_xy_reset(void) {
+    mock_set_bkg_tile_xy_max_row    = 0u;
+    mock_set_bkg_tile_xy_call_count = 0;
+}
+
 void mock_vram_clear(void) {
     uint16_t i;
     mock_set_bkg_tiles_call_count = 0;
     mock_load_bkg_row_call_count  = 0;
     mock_move_bkg_call_count      = 0;
     mock_move_bkg_last_y          = 0;
+    mock_set_bkg_tile_xy_reset();
     for (i = 0u; i < 32u * 32u; i++) mock_vram[i] = 0u;
+}
+
+void set_bkg_tile_xy(uint8_t x, uint8_t y, uint8_t tile) {
+    mock_set_bkg_tile_xy_call_count++;
+    if (y > mock_set_bkg_tile_xy_max_row) {
+        mock_set_bkg_tile_xy_max_row = y;
+    }
+    uint8_t vx = x & 31u;
+    uint8_t vy = y & 31u;
+    mock_vram[(uint16_t)vy * 32u + vx] = tile;
 }
 
 void move_bkg(uint8_t x, uint8_t y) {
