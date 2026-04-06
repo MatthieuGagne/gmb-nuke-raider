@@ -144,7 +144,7 @@ romusage build/nuke-raider.cdb -a
 
 ## GBC-Specific Diagnostic Hints
 
-**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, use `find_wram_read_in_fn(noi_path, rom_path, "_getter_fn")` from `tests/integration/helpers.py`. It decodes the getter function's disassembly from the ROM binary to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
+**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, disassemble the getter function from the ROM binary (`.noi` from `make build-debug`) to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
 
 **"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, open the Memory Editor and read `SCY`/`SCX` (0xFF42/0xFF43) — non-zero values mean the tilemap is rendering off-screen.
 

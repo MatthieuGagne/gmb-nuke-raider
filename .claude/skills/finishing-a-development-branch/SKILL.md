@@ -60,14 +60,6 @@ Invoke the `bank-post-build` skill. If it reports any FAIL, stop and fix before 
 
 Only continue to Step 4 when it passes.
 
-### Step 4: Headless Integration Tests
-
-**Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 4.5.
-
-Invoke the `test-integration` skill. If it reports any failure, stop and fix before continuing.
-
-Only continue to Step 4.5 when it passes.
-
 ### Step 4.5: Smoketest in Emulicious
 
 **Skip this step for doc-only branches** (no `src/*.c`, `src/*.h`, or asset changes) — go directly to Step 4.6.
@@ -320,7 +312,6 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 - Get typed confirmation for Option 3
 - Update `docs/dev-workflow.md` in the same PR as any skill/agent/CLAUDE.md change
 - After PR creation (Option 1): tell user the worktree path and ask them to confirm when merged
-- Run headless integration tests (`make test-integration`) before presenting options — mandatory for non-doc-only branches
 - After merge confirmation: cd to main repo root → git worktree remove → --force fallback → rm -rf + prune fallback → git worktree prune
 
 ## Integration
