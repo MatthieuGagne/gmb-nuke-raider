@@ -1,6 +1,6 @@
 ---
 name: sprite-expert
-description: "Use when creating sprites, editing sprite assets, changing how sprites are loaded or rendered, adding new sprite types, modifying the sprite pool, changing OAM slot assignments, updating sprite tile data, or working with the Aseprite pipeline or png_to_tiles converter."
+description: "Autonomous sprite agent: creates, modifies, and troubleshoots sprites end-to-end — Aseprite pipeline, png_to_tiles, OAM management, CGB palettes, and full execution checklist with self-correction retry loop. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments."
 color: orange
 ---
 
@@ -202,7 +202,9 @@ Place this specific rule **before** the generic pattern rule, or anywhere (Make 
 
 ---
 
-## Adding a New Sprite
+## Execution Checklist
+
+> **Self-correction active:** If any step fails, apply the Self-Correction Loop (see below) before moving on — retry the failed step only, max 3 attempts, then surface to the user on 3rd failure.
 
 1. Create or edit `assets/sprites/<name>.aseprite` in Aseprite (indexed color, 4-shade GBC palette, multiples of 8)
 
@@ -215,6 +217,32 @@ Place this specific rule **before** the generic pattern rule, or anywhere (Make 
 6. Allocate OAM slots via `get_sprite()` — one per 8×8 tile used on screen at once
 7. Position with `move_sprite(slot, sx + 8, sy + 16)`
 8. Update `config.h` capacity constants if pool budget changes
+9. Build: `GBDK_HOME=/home/mathdaman/gbdk make` → ROM at `build/nuke-raider.gb`, zero errors
+10. Smoketest: launch in Emulicious, confirm sprite appears at the correct position with no tile corruption or flicker
+
+---
+
+## Self-Correction Loop
+
+Apply this loop to any step in the Execution Checklist that produces an error:
+
+1. **Capture all error output** from the failed tool or command.
+2. **Classify the failure** — consult the Error Patterns table below.
+3. **Retry the failed step only.** Do NOT restart the checklist from the top — restarting risks re-creating files that already succeeded.
+4. **Limit:** maximum 3 retry attempts per step.
+5. **On 3rd failure:** stop immediately and surface to the user with the complete error output from all 3 attempts. Do not attempt a silent workaround.
+
+---
+
+## Error Patterns
+
+| Pattern | Detection | Typical Cause | Fix |
+|---------|-----------|---------------|-----|
+| `make` non-zero exit | Exit code ≠ 0 from `GBDK_HOME=... make` | Compilation error in generated or hand-written C | Read SDCC error output; verify `extern` symbol names match generated arrays; check `#pragma bank` |
+| `png_to_tiles.py` non-zero exit | Exit code ≠ 0 from `python3 tools/png_to_tiles.py` | Wrong PNG dimensions, wrong color mode, or missing file | Canvas must be multiples of 8; color mode must be Indexed; re-export from Aseprite |
+| Aseprite `--batch` error | Non-zero exit or no output PNG produced | Wrong CLI flag, source file not found, wrong export mode for multi-frame | Invoke `aseprite` skill for correct flags; check `.aseprite` path; use `--sheet --sheet-type horizontal` for multi-frame |
+| Missing tile output file | `src/<name>_sprite.c` absent after `png_to_tiles.py` | Converter did not run or output path was wrong | Re-run with explicit output path; verify `tools/png_to_tiles.py` is present |
+| Tile count mismatch | `<name>_tile_data_count` differs from expected in-game | Canvas dimensions changed, wrong export resolution | Expected count = `(px_width / 8) × (px_height / 8)` per frame; re-export PNG and re-run converter |
 
 ---
 
