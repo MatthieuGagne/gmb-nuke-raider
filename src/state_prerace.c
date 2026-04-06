@@ -51,7 +51,9 @@ static void pr_render(void) {
 
 static void enter(void) {
     pr_cursor = 0u;
+    DISPLAY_OFF;
     pr_render();
+    DISPLAY_ON;
 }
 
 static void update(void) {
@@ -100,4 +102,4 @@ static void update(void) {
 
 static void pr_exit(void) {}
 
-const State state_prerace = {255, enter, update, pr_exit};
+const State state_prerace = {BANK(state_prerace), enter, update, pr_exit};
