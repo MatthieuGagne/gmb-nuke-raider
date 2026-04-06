@@ -27,5 +27,5 @@ After completing a task, append new pipeline gotchas or confirmed patterns. Do n
 3. **Tiled layout** — paint the "Track" layer (CSV encoding), add "start" objectgroup with one spawn object.
 4. **Convert** — `python3 tools/tmx_to_c.py assets/maps/<name>.tmx src/<name>_map.c`. Run `tmx_to_c` tests to verify.
 5. **Wire into game** — `extern` declare generated symbols; load tile data then tilemap during VBlank; update `config.h` dimensions if changed.
-6. **Sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **sprite-builder** agent.
+6. **Sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **sprite-expert** agent.
 7. **Build & smoketest** — use `/build` skill, launch in Emulicious, confirm map renders and player spawns correctly.
