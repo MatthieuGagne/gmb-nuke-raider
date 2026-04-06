@@ -17,25 +17,17 @@ BANKREF(state_prerace)
 
 static uint8_t pr_cursor;
 
-static void pr_render(void) {
+/* Render only the dynamic content (cursor + values) — no BG clear.
+ * Safe to call from update() because it completes well within one frame.
+ * The full BG clear is done once in enter() under DISPLAY_OFF. */
+static void pr_render_content(void) {
     uint8_t i;
     uint8_t vals[PR_CONFIG_ROWS];
-    uint8_t tx, ty;
 
     vals[0] = loadout_get_car();
     vals[1] = loadout_get_armor();
     vals[2] = loadout_get_weapon1();
     vals[3] = loadout_get_weapon2();
-
-    /* Clear only the 18 visible BG rows — cls() writes all 32 rows and corrupts
-     * rows 18-31 that camera_init() does not restore, breaking track tilemap. */
-    for (ty = 0u; ty < 18u; ty++) {
-        for (tx = 0u; tx < 20u; tx++) {
-            set_bkg_tile_xy(tx, ty, 0x00u);  /* GBDK console: space = tile 0 (ASCII 0x20 - 0x20 offset) */
-        }
-    }
-    gotoxy(6u, 0u);
-    printf("LOADOUT");
 
     for (i = 0u; i < PR_CONFIG_ROWS; i++) {
         gotoxy(0u, (uint8_t)(2u + i));
@@ -55,6 +47,24 @@ static void pr_render(void) {
     printf(pr_cursor == 5u ? ">" : " ");
     gotoxy(2u, 8u);
     printf("CANCEL");
+}
+
+/* Full render: clear BG rows 0-17 then draw all static + dynamic content.
+ * Must only be called under DISPLAY_OFF to avoid taking multiple frames
+ * (360 set_bkg_tile_xy calls span >1 frame) and corrupting input_update(). */
+static void pr_render(void) {
+    uint8_t tx, ty;
+
+    /* Clear only the 18 visible BG rows — cls() writes all 32 rows and corrupts
+     * rows 18-31 that camera_init() does not restore, breaking track tilemap. */
+    for (ty = 0u; ty < 18u; ty++) {
+        for (tx = 0u; tx < 20u; tx++) {
+            set_bkg_tile_xy(tx, ty, 0x00u);  /* GBDK console: space = tile 0 (ASCII 0x20 - 0x20 offset) */
+        }
+    }
+    gotoxy(6u, 0u);
+    printf("LOADOUT");
+    pr_render_content();
 }
 
 static void enter(void) {
@@ -106,7 +116,7 @@ static void update(void) {
         return;
     }
 
-    if (changed) { pr_render(); }
+    if (changed) { pr_render_content(); }
 }
 
 static void pr_exit(void) {}
