@@ -91,6 +91,7 @@ When a hypothesis is **Confirmed** (or when instrumentation requires domain expe
 | Map / tileset / BG rendering | `map-expert` agent + `emulicious-debug` agent | Parallel |
 | Music / audio | `music-expert` agent + `emulicious-debug` agent | Parallel |
 | Performance / ROM size / bank overrun | `gb-c-optimizer` agent + `bank-post-build` skill | Parallel |
+| Autobanker reassignment (data added to a full bank → autobanker pushes a file to a new bank → BANKED functions that assumed co-location silently read garbage) | `bank-post-build` skill + `gbdk-expert` agent | Compare `___bank_*` symbols in `.noi` between master and branch; fix: route reads through NONBANKED helpers in `loader.c` |
 | Regression ("worked in PR X, broken now") | `compare-prs` skill | Sequential |
 | Runtime memory / registers / VRAM | `emulicious-debug` agent | Single |
 | Compile error / GBDK API misuse | `gbdk-expert` agent | Single |
