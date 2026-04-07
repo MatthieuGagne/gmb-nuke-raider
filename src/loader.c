@@ -34,6 +34,16 @@ extern const uint8_t        track3_checkpoint_count;
 extern uint8_t active_map_w;
 extern uint8_t active_map_h;
 
+/* Active-track ROM data bank and pointer — set by load_track_header().
+ * Defaults to track 0 (same bank as track_map, offset past 2-byte header)
+ * so tile reads work before track_select() is first called. */
+static uint8_t         loader_active_data_bank = 1u;  /* default: track 0/1 bank */
+static const uint8_t  *loader_active_map_ptr = track_map + 2u;
+
+/* track3 scalars — extern'd here for use in load_track_scalars() */
+extern const int16_t track3_start_x;
+extern const int16_t track3_start_y;
+
 void load_player_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(player_tile_data));
@@ -131,17 +141,88 @@ void load_track_header(uint8_t id) NONBANKED {
         SWITCH_ROM(BANK(track_map));
         active_map_w = track_map[0];
         active_map_h = track_map[1];
+        loader_active_data_bank = BANK(track_map);
+        loader_active_map_ptr   = track_map + 2u;
     } else if (id == 1u) {
         SWITCH_ROM(BANK(track2_map));
         active_map_w = track2_map[0];
         active_map_h = track2_map[1];
+        loader_active_data_bank = BANK(track2_map);
+        loader_active_map_ptr   = track2_map + 2u;
     } else {
         SWITCH_ROM(BANK(track3_map));
         active_map_w = track3_map[0];
         active_map_h = track3_map[1];
+        loader_active_data_bank = BANK(track3_map);
+        loader_active_map_ptr   = track3_map + 2u;
     }
     SWITCH_ROM(saved);
 }
+
+void load_track_scalars(uint8_t id, int16_t *sx, int16_t *sy, uint8_t *mtype) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    if (id == 0u) {
+        SWITCH_ROM(BANK(track_start_x));
+        *sx = track_start_x; *sy = track_start_y; *mtype = track_map_type;
+    } else if (id == 1u) {
+        SWITCH_ROM(BANK(track2_start_x));
+        *sx = track2_start_x; *sy = track2_start_y; *mtype = track2_map_type;
+    } else {
+        SWITCH_ROM(BANK(track3_map_type));
+        *sx = track3_start_x; *sy = track3_start_y; *mtype = track3_map_type;
+    }
+    SWITCH_ROM(saved);
+}
+
+uint8_t loader_map_read_byte(uint16_t idx) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t result;
+    SWITCH_ROM(loader_active_data_bank);
+    result = loader_active_map_ptr[idx];
+    SWITCH_ROM(saved);
+    return result;
+}
+
+void loader_map_fill_row(uint8_t ty, uint8_t w, uint8_t *buf) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t tx;
+    uint16_t base = (uint16_t)ty * w;
+    SWITCH_ROM(loader_active_data_bank);
+    for (tx = 0u; tx < w; tx++) buf[tx] = loader_active_map_ptr[base + tx];
+    SWITCH_ROM(saved);
+}
+
+void loader_map_fill_range(uint8_t ty, uint8_t w, uint8_t tx_start, uint8_t count, uint8_t *buf) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t tx;
+    uint16_t base = (uint16_t)ty * w;
+    SWITCH_ROM(loader_active_data_bank);
+    for (i = 0u; i < count; i++) {
+        tx = tx_start + i;
+        buf[i] = (tx < w) ? loader_active_map_ptr[base + tx] : 0u;
+    }
+    SWITCH_ROM(saved);
+}
+
+void loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uint8_t count, uint8_t *buf) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t ty;
+    SWITCH_ROM(loader_active_data_bank);
+    for (i = 0u; i < count; i++) {
+        ty = ty_start + i;
+        buf[i] = (tx < w && ty < h) ? loader_active_map_ptr[(uint16_t)ty * w + tx] : 0u;
+    }
+    SWITCH_ROM(saved);
+}
+
+#ifndef __SDCC
+void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
+    loader_active_map_ptr = map;
+    loader_active_data_bank = data_bank;
+}
+#endif
 
 void load_npc_positions(uint8_t id,
                          uint8_t *out_tx,

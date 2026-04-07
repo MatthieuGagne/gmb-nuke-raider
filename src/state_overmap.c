@@ -25,15 +25,8 @@ static uint8_t car_ty;
 uint8_t current_race_id = 0u;
 uint8_t current_hub_id  = 0u;
 
-/* Scan-result SoA arrays — populated by overmap_scan_map() in enter() */
-static uint8_t overmap_hub_tx[1u];
-static uint8_t overmap_hub_ty[1u];
-static uint8_t overmap_dest_tx[MAX_OVERMAP_DESTS];
-static uint8_t overmap_dest_ty[MAX_OVERMAP_DESTS];
-static uint8_t overmap_city_hub_tx[MAX_OVERMAP_HUBS];
-static uint8_t overmap_city_hub_ty[MAX_OVERMAP_HUBS];
-static uint8_t overmap_dest_count;
-static uint8_t overmap_city_hub_count;
+static uint8_t spawn_tx;   /* cached from ROM overmap_hub_spawn_tx in enter() */
+static uint8_t spawn_ty;
 
 #define TRAVEL_FRAMES_PER_TILE 4u   /* file-local tuning — not in config.h */
 
@@ -47,37 +40,9 @@ static uint8_t dest_ty;
 uint8_t overmap_get_car_tx(void) { return car_tx; }
 uint8_t overmap_get_car_ty(void) { return car_ty; }
 
-/* Must be called inside SET_BANK(overmap_map) on hardware;
- * SET_BANK is a no-op in host tests so direct access is safe. */
-static void overmap_scan_map(void) {
-    uint8_t tx, ty;
-    uint8_t hub_found = 0u;
-    overmap_dest_count     = 0u;
-    overmap_city_hub_count = 0u;
-    for (ty = 0u; ty < OVERMAP_H; ty++) {
-        for (tx = 0u; tx < OVERMAP_W; tx++) {
-            uint8_t tile = overmap_map[(uint16_t)ty * OVERMAP_W + tx];
-            if (tile == OVERMAP_TILE_HUB && !hub_found) {
-                overmap_hub_tx[0] = tx;
-                overmap_hub_ty[0] = ty;
-                hub_found = 1u;
-            } else if (tile == OVERMAP_TILE_DEST &&
-                       overmap_dest_count < MAX_OVERMAP_DESTS) {
-                overmap_dest_tx[overmap_dest_count] = tx;
-                overmap_dest_ty[overmap_dest_count] = ty;
-                overmap_dest_count++;
-            } else if (tile == OVERMAP_TILE_CITY_HUB &&
-                       overmap_city_hub_count < MAX_OVERMAP_HUBS) {
-                overmap_city_hub_tx[overmap_city_hub_count] = tx;
-                overmap_city_hub_ty[overmap_city_hub_count] = ty;
-                overmap_city_hub_count++;
-            }
-        }
-    }
-}
 
-uint8_t overmap_get_spawn_tx(void) { return overmap_hub_tx[0]; }
-uint8_t overmap_get_spawn_ty(void) { return overmap_hub_ty[0]; }
+uint8_t overmap_get_spawn_tx(void) { return spawn_tx; }
+uint8_t overmap_get_spawn_ty(void) { return spawn_ty; }
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 static uint8_t overmap_walkable(uint8_t tx, uint8_t ty) {
@@ -140,31 +105,15 @@ static void overmap_check_tile_effect(void) {
     uint8_t tile = overmap_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
     EMU_printf("tile_effect tile=%hu\n", tile);
     if (tile == OVERMAP_TILE_CITY_HUB) {
-        uint8_t i;
         traveling = 0u;
-        current_hub_id = 0u;
-        for (i = 0u; i < overmap_city_hub_count; i++) {
-            if (overmap_city_hub_tx[i] == car_tx &&
-                overmap_city_hub_ty[i] == car_ty) {
-                current_hub_id = i;
-                break;
-            }
-        }
+        current_hub_id = overmap_id_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
         state_push(&state_hub, BANK(state_hub));
         overmap_hub_entered = 1u;
         return;
     }
     if (tile == OVERMAP_TILE_DEST) {
-        uint8_t i;
         traveling = 0u;
-        current_race_id = 0u;
-        for (i = 0u; i < overmap_dest_count; i++) {
-            if (overmap_dest_tx[i] == car_tx &&
-                overmap_dest_ty[i] == car_ty) {
-                current_race_id = i;
-                break;
-            }
-        }
+        current_race_id = overmap_id_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
         track_select(current_race_id);   /* wire up dispatch table before STATE_PRERACE */
         state_push(&state_prerace, BANK(state_prerace));
     }
@@ -175,12 +124,13 @@ void overmap_set_returning(void) { om_returning = 1u; }
 /* ── State callbacks ─────────────────────────────────────────────────────────── */
 static void enter(void) {
     EMU_printf("OVERMAP enter\n");
-    { SET_BANK(overmap_map);
-      overmap_scan_map();
+    { SET_BANK(overmap_map);    /* also covers overmap_id_map and spawn scalars — same bank */
+      spawn_tx = overmap_hub_spawn_tx;
+      spawn_ty = overmap_hub_spawn_ty;
       RESTORE_BANK(); }
     if (!om_returning) {
-        car_tx = overmap_hub_tx[0];
-        car_ty = overmap_hub_ty[0];
+        car_tx = spawn_tx;
+        car_ty = spawn_ty;
     }
     om_returning = 0u;
     traveling = 0u; travel_dir = J_UP; travel_frame_count = 0u;

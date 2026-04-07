@@ -139,8 +139,8 @@ src/overmap_tiles.c: assets/maps/overmap_tiles.png tools/png_to_tiles.py
 $(TARGET): src/overmap_tiles.c
 
 # src/overmap_map.c is checked into git so CI works without Python/Tiled.
-src/overmap_map.c: assets/maps/overmap.tmx tools/tmx_to_array_c.py
-	python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
+src/overmap_map.c: assets/maps/overmap.tmx tools/overmap_to_c.py
+	python3 tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c
 
 $(TARGET): src/overmap_map.c
 
@@ -156,7 +156,7 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c -v
+	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
