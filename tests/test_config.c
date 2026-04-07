@@ -26,11 +26,16 @@ void test_max_checkpoints_defined(void) {
     TEST_ASSERT_EQUAL_UINT8(8u, MAX_CHECKPOINTS);
 }
 
+void test_enemy_bullet_damage_defined(void) {
+    TEST_ASSERT_EQUAL_UINT8(10u, ENEMY_BULLET_DAMAGE);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_debug_log_does_not_overlap_tick);
     RUN_TEST(test_debug_addresses_in_wram);
     RUN_TEST(test_sfx_count_defined);
     RUN_TEST(test_max_checkpoints_defined);
+    RUN_TEST(test_enemy_bullet_damage_defined);
     return UNITY_END();
 }

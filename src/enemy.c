@@ -151,7 +151,7 @@ void enemy_update(int16_t player_px, int16_t player_py) BANKED {
 
     /* Check if any enemy bullet hit the player */
     if (projectile_check_hit_player(player_oam_x, player_oam_y, TURRET_HIT_RADIUS)) {
-        damage_apply(10u);
+        damage_apply(ENEMY_BULLET_DAMAGE);
     }
 }
 
