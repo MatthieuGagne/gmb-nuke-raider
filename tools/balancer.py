@@ -17,15 +17,19 @@ import sys
 import termios
 import tty
 
-from rich.console import Console
-from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT   = os.path.dirname(SCRIPT_DIR)
 CONFIG_H    = os.path.join(REPO_ROOT, 'src', 'config.h')
+
+# ANSI codes
+RESET  = '\033[0m'
+BOLD   = '\033[1m'
+DIM    = '\033[2m'
+CYAN   = '\033[96m'
+YELLOW = '\033[93m'
+GREEN  = '\033[92m'
+RED    = '\033[91m'
+CLEAR  = '\033[2J\033[H'
 
 # ---------------------------------------------------------------------------
 # Variable catalogue — (name, category, min, max)
@@ -83,7 +87,6 @@ def apply_changes(text: str, changes: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def _read_key(fd: int) -> str:
-    """Read one keypress from raw-mode fd; return a string token."""
     ch = os.read(fd, 1)
     if ch == b'\x1b':
         rest = os.read(fd, 2)
@@ -101,38 +104,29 @@ def _read_key(fd: int) -> str:
 # Rendering
 # ---------------------------------------------------------------------------
 
-def _build_panel(variables, values, cursor, status):
-    table = Table.grid(padding=(0, 2))
-    table.add_column(justify='left',  no_wrap=True)
-    table.add_column(justify='right', no_wrap=True)
-    table.add_column(justify='left',  no_wrap=True)
-
+def _draw(variables, values, cursor, status):
+    lines = [f'{BOLD}Nuke Raider Balancer{RESET}']
     last_cat = None
     for idx, (name, cat, lo, hi) in enumerate(variables):
         if cat != last_cat:
-            table.add_row(Text(f'\n  {cat}', style='bold yellow'), '', '')
+            lines.append(f'{YELLOW}{cat}{RESET}')
             last_cat = cat
         val    = values.get(name, '?')
         is_cur = idx == cursor
-        style  = 'bold cyan' if is_cur else 'white'
-        arrow  = '\u25b6 ' if is_cur else '  '
-        table.add_row(
-            Text(f'{arrow}{name}', style=style),
-            Text(f'[{val:>3}]',    style=style),
-            Text(f'({lo}\u2013{hi})', style='dim'),
-        )
+        arrow  = '\u25b6' if is_cur else ' '
+        col    = CYAN + BOLD if is_cur else ''
+        end    = RESET if is_cur else ''
+        lines.append(f'  {col}{arrow} {name:<28} [{val:>3}]  {DIM}({lo}\u2013{hi}){RESET}{end}')
 
-    table.add_row('', '', '')
-    table.add_row(
-        Text('  [\u2191\u2193] navigate  [\u2190\u2192] change  [s] save  [q] quit',
-             style='dim'),
-        '', '',
-    )
+    hint = f'{DIM}[\u2191\u2193] nav  [\u2190\u2192] change  [s] save  [q] quit{RESET}'
     if status:
-        st_style = 'green' if status.startswith('Saved') else 'red'
-        table.add_row(Text(f'  {status}', style=st_style), '', '')
+        col = GREEN if status.startswith('Saved') else RED
+        hint += f'  {col}{status}{RESET}'
+    lines.append('')
+    lines.append(hint)
 
-    return Panel(table, title='[bold]Nuke Raider Balancer[/bold]', border_style='blue')
+    sys.stdout.write(CLEAR + '\n'.join(lines))
+    sys.stdout.flush()
 
 
 # ---------------------------------------------------------------------------
@@ -150,56 +144,54 @@ def main():
     cursor       = 0
     status       = ''
 
-    console      = Console()
-    fd           = sys.stdin.fileno()
+    tty_file     = open('/dev/tty', 'rb+', buffering=0)
+    fd           = tty_file.fileno()
     old_settings = termios.tcgetattr(fd)
 
     try:
         tty.setraw(fd)
-        with Live(_build_panel(VARIABLES, values, cursor, status),
-                  console=console, refresh_per_second=30, screen=True) as live:
-            while True:
-                key = _read_key(fd)
+        _draw(VARIABLES, values, cursor, status)
+        while True:
+            key = _read_key(fd)
 
-                if key == 'UP':
-                    cursor = max(0, cursor - 1)
-                elif key == 'DOWN':
-                    cursor = min(len(VARIABLES) - 1, cursor + 1)
-                elif key in ('LEFT', 'RIGHT'):
-                    name, _, lo, hi = VARIABLES[cursor]
-                    delta = -1 if key == 'LEFT' else 1
-                    values[name] = max(lo, min(hi, values[name] + delta))
-                    status = ''
-                elif key == 's':
-                    changes  = {n: v for n, v in values.items()
-                                if v != saved_values.get(n)}
-                    new_text = apply_changes(original_text, changes)
-                    try:
-                        with open(CONFIG_H, 'w') as f:
-                            f.write(new_text)
-                        original_text = new_text
-                        saved_values  = dict(values)
-                        status        = 'Saved.'
-                    except OSError as e:
-                        status = f'Error: {e}'
-                elif key in ('q', '\x03'):  # q or Ctrl-C
-                    if values != saved_values:
-                        live.stop()
-                        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-                        ans = input('Unsaved changes. Quit? [y/N] ').strip().lower()
-                        if ans != 'y':
-                            tty.setraw(fd)
-                            live.start()
-                            status = ''
-                            live.update(_build_panel(VARIABLES, values, cursor, status))
-                            continue
-                    break
+            if key == 'UP':
+                cursor = max(0, cursor - 1)
+            elif key == 'DOWN':
+                cursor = min(len(VARIABLES) - 1, cursor + 1)
+            elif key in ('LEFT', 'RIGHT'):
+                name, _, lo, hi = VARIABLES[cursor]
+                delta = -1 if key == 'LEFT' else 1
+                values[name] = max(lo, min(hi, values[name] + delta))
+                status = ''
+            elif key == 's':
+                changes  = {n: v for n, v in values.items()
+                            if v != saved_values.get(n)}
+                new_text = apply_changes(original_text, changes)
+                try:
+                    with open(CONFIG_H, 'w') as f:
+                        f.write(new_text)
+                    original_text = new_text
+                    saved_values  = dict(values)
+                    status        = 'Saved.'
+                except OSError as e:
+                    status = f'Error: {e}'
+            elif key in ('q', '\x03'):
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                if values != saved_values:
+                    ans = input('Unsaved changes. Quit? [y/N] ').strip().lower()
+                    if ans != 'y':
+                        tty.setraw(fd)
+                        _draw(VARIABLES, values, cursor, status)
+                        continue
+                break
 
-                live.update(_build_panel(VARIABLES, values, cursor, status))
+            _draw(VARIABLES, values, cursor, status)
     finally:
+        sys.stdout.write(CLEAR)
+        sys.stdout.flush()
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        tty_file.close()
 
-    # Optional build prompt — after TUI exits, tool exits after build
     ans = input('Build now? [y/N] ').strip().lower()
     if ans == 'y':
         os.chdir(REPO_ROOT)
