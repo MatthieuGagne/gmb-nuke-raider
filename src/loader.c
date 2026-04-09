@@ -219,12 +219,77 @@ void loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uin
     SWITCH_ROM(saved);
 }
 
+/* ---- VRAM slot bitmap allocator ---- */
+
+/* 256-bit bitmap: bit N = VRAM slot N occupied.
+ * Slots 0-63: sprite region. Slots 64-254: BG region.
+ * Slot 255 is permanently reserved as the 0xFF failure sentinel — never allocated. */
+static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
+
+/* Asset-to-slot table: first allocated VRAM slot per tile_asset_t.
+ * 0xFF = not yet allocated. Updated by Increment 2 (loader_load_asset). */
+static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;
     loader_active_data_bank = data_bank;
 }
+void loader_reset_bitmap_for_test(void) {
+    uint8_t i;
+    for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
+    for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+}
 #endif
+
+void loader_init_allocator(void) NONBANKED {
+    uint8_t i;
+    for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
+    for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+}
+
+uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED {
+    uint8_t i;
+    uint8_t run;
+    uint8_t start;
+    uint8_t cap;
+    if (region_end > 254u) return 0xFFu;
+    if (count == 0u) return 0xFFu;
+    if (region_end < region_start) return 0xFFu;
+    /* cap: last valid start so that start+count-1 <= region_end */
+    if ((region_end - region_start + 1u) < count) return 0xFFu;
+    cap = region_end - count + 1u;
+    for (start = region_start; start <= cap; start++) {
+        run = 0u;
+        for (i = 0u; i < count; i++) {
+            uint8_t slot = start + i;
+            if (loader_vram_bitmap[slot >> 3u] & (uint8_t)(1u << (slot & 7u))) break;
+            run++;
+        }
+        if (run == count) {
+            /* Mark bits occupied */
+            for (i = 0u; i < count; i++) {
+                uint8_t slot = start + i;
+                loader_vram_bitmap[slot >> 3u] |= (uint8_t)(1u << (slot & 7u));
+            }
+            return start;
+        }
+    }
+    return 0xFFu;
+}
+
+void loader_free_slots(uint8_t first_slot, uint8_t count) NONBANKED {
+    uint8_t i;
+    for (i = 0u; i < count; i++) {
+        uint8_t slot = first_slot + i;
+        loader_vram_bitmap[slot >> 3u] &= (uint8_t)~(uint8_t)(1u << (slot & 7u));
+    }
+}
+
+uint8_t loader_get_asset_slot(tile_asset_t asset) NONBANKED {
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) return 0xFFu;
+    return loader_asset_slot[(uint8_t)asset];
+}
 
 void load_npc_positions(uint8_t id,
                          uint8_t *out_tx,
