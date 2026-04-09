@@ -145,7 +145,7 @@ wait_vbl_done()
 
 For **compile errors**: check the GBDK constraints above; invoke `gbdk-expert` agent.
 
-For **runtime issues** (crashes, glitches, wrong values): invoke the `emulicious-debug` skill.
+For **runtime issues** (crashes, glitches, wrong values): invoke the `systematic-debugging` skill (`/debug`) first — it enforces hypothesis-queue-first debugging and requires a `confirm_when` artifact on every hypothesis before the queue can be approved. Then dispatch `emulicious-debug` for instrumentation.
 
 Key tools in Emulicious:
 - **EMU_printf** (`src/debug.h`) — formatted print output visible in the Emulicious console
