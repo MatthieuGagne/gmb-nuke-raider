@@ -9,7 +9,7 @@
 #include "input.h"
 #include "banking.h"
 #include "dialog.h"
-#include "dialog_data.h"
+#include "loader.h"
 #include "config.h"
 #include "npc_mechanic_portrait.h"
 #include "npc_trader_portrait.h"
@@ -25,6 +25,18 @@ BANKREF(state_hub)
 #define HUB_SUB_DIALOG 1u
 #define DIALOG_INNER_W 12u  /* inner text cols inside dialog box (cols 7-18) */
 
+/* Clear only the 18 visible BG rows (0-17). cls() clears all 32 rows and
+ * corrupts rows 18-31 that camera_init() does not restore, breaking the
+ * track tilemap on overmap return. Must be called under DISPLAY_OFF. */
+static void clear_visible_rows(void) {
+    uint8_t tx, ty;
+    for (ty = 0u; ty < 18u; ty++) {
+        for (tx = 0u; tx < 20u; tx++) {
+            set_bkg_tile_xy(tx, ty, 0x00u);
+        }
+    }
+}
+
 uint8_t overmap_hub_entered = 0u;
 
 static uint8_t           sub_state;
@@ -32,8 +44,6 @@ static uint8_t           cursor;
 static uint8_t           active_npc;
 static uint8_t           dialog_cursor;
 static const HubDef     *hub;
-static char              dialog_text_buf[64]; /* WRAM — copy banked text here before printf */
-static char              dialog_name_buf[16]; /* WRAM — copy banked NPC name here before printf */
 static uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
 static uint8_t           dialog_page_start;   /* char offset of currently-shown page (0 = beginning) */
 static uint8_t           dialog_next_offset;  /* return of last render_wrapped; 0 = no overflow */
@@ -45,7 +55,7 @@ uint8_t hub_get_sub_state(void) { return sub_state; }
 
 static void hub_render_menu(void) {
     uint8_t i;
-    cls();
+    clear_visible_rows();       /* was: cls() */
     gotoxy(1u, 0u);
     printf(hub->name);
     for (i = 0u; i < hub->num_npcs; i++) {
@@ -145,25 +155,7 @@ static void hub_render_dialog(void) {
         HUB_PORTRAIT_TILE_SLOT + 11u,  HUB_PORTRAIT_TILE_SLOT + 15u,
     };
 
-    /* --- Copy banked text + name to WRAM before bank restore --- */
-    { SET_BANK(npc_dialogs);
-      {
-          const char *src = dialog_get_text();
-          uint8_t     k   = 0u;
-          while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
-              dialog_text_buf[k] = src[k]; k++;
-          }
-          dialog_text_buf[k] = '\0';
-      }
-      {
-          const char *src = dialog_get_name();
-          uint8_t     k   = 0u;
-          while (src[k] && k < (uint8_t)(sizeof(dialog_name_buf) - 1u)) {
-              dialog_name_buf[k] = src[k]; k++;
-          }
-          dialog_name_buf[k] = '\0';
-      }
-      RESTORE_BANK(); }
+    /* WRAM cache already populated by loader_dialog_cache_node — no bank switch needed. */
 
     /* portrait box border rows (6 tiles wide: cols 0-5) */
     static const uint8_t portrait_top[HUB_PORTRAIT_BOX_W]  = {BRD_TL, BRD_T,  BRD_T,  BRD_T,  BRD_T,  BRD_TR};
@@ -197,11 +189,11 @@ static void hub_render_dialog(void) {
 
     /* --- Draw NPC name at row 1, inner col 7 --- */
     gotoxy(7u, 1u);
-    printf(dialog_name_buf);
+    printf(dialog_get_name());
     printf(":");
 
     /* --- Word-wrap dialog text into inner cols 7-18, rows 2-6 --- */
-    dialog_next_offset = render_wrapped(dialog_text_buf, 7u, 2u, DIALOG_INNER_W, 5u, dialog_page_start);
+    dialog_next_offset = render_wrapped(dialog_get_text(), 7u, 2u, DIALOG_INNER_W, 5u, dialog_page_start);
 
     /* --- Show or hide overflow arrow OAM sprite (OAM slot 2, screen tile (18,6)) --- */
     /* BG tile (18,6) = screen pixel (144,48); OAM coords add +8 x, +16 y */
@@ -220,19 +212,9 @@ static void hub_render_dialog(void) {
         printf(">");
     } else {
         for (i = 0u; i < num_choices; i++) {
-            /* Copy choice label to WRAM (banked pointer) */
-            { SET_BANK(npc_dialogs);
-              {
-                  const char *src = dialog_get_choice(i);
-                  uint8_t     k   = 0u;
-                  while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
-                      dialog_text_buf[k] = src[k]; k++;
-                  }
-                  dialog_text_buf[k] = '\0';
-              }
-              RESTORE_BANK(); }
+            /* WRAM cache already populated — read directly from dialog_choice_cache. */
             gotoxy(1u, (uint8_t)(9u + i));
-            printf(dialog_text_buf);
+            printf(dialog_get_choice(i));
         }
         /* Draw initial cursor */
         gotoxy(0u, (uint8_t)(9u + dialog_cursor));
@@ -278,12 +260,11 @@ static void hub_start_dialog(uint8_t npc_cursor) {
     dialog_page_start  = 0u;
     dialog_next_offset = 0u;
     npc_id = hub->npc_dialog_ids[npc_cursor];
-    { SET_BANK(npc_dialogs);
-      dialog_start(npc_id, &npc_dialogs[npc_id]);
-      RESTORE_BANK(); }
+    loader_dialog_cache_node(npc_id, 0u);
+    dialog_start(npc_id);
     sub_state = HUB_SUB_DIALOG;
     vbl_display_off();         /* tick music + disable LCD in 1 VBlank */
-    cls();
+    clear_visible_rows();       /* was: cls() */
     load_portrait(npc_cursor);
     { SET_BANK(dialog_border_tiles);
       set_bkg_data(HUB_BORDER_TILE_SLOT, 8u, dialog_border_tiles);
@@ -295,11 +276,13 @@ static void hub_start_dialog(uint8_t npc_cursor) {
 static void update_menu(void) {
     uint8_t menu_size = (uint8_t)(hub->num_npcs + 1u);
     if (KEY_TICKED(J_UP) && cursor > 0u) {
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(" ");
         cursor--;
-        hub_render_menu();
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(">");
     } else if (KEY_TICKED(J_DOWN) && cursor < menu_size - 1u) {
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(" ");
         cursor++;
-        hub_render_menu();
+        gotoxy(1u, (uint8_t)(2u + cursor));     printf(">");
     } else if (KEY_TICKED(J_A)) {
         if (cursor == hub->num_npcs) {
             state_pop();
@@ -339,7 +322,7 @@ static void update_dialog(void) {
             dialog_cursor      = 0u;
             dialog_prev_cursor = 0u;
             vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
-            cls();
+            clear_visible_rows();   /* was: cls() */
             hub_render_dialog();
             DISPLAY_ON;
         } else {
@@ -351,7 +334,7 @@ static void update_dialog(void) {
             dialog_next_offset = 0u;
             if (more) {
                 vbl_display_off();   /* tick music + disable LCD in 1 VBlank */
-                cls();
+                clear_visible_rows();   /* was: cls() */
                 hub_render_dialog();
                 DISPLAY_ON;
             } else {
@@ -388,7 +371,6 @@ static void enter(void) {
       set_sprite_data(DIALOG_ARROW_TILE_BASE, dialog_arrow_tile_data_count, dialog_arrow_tile_data);
       RESTORE_BANK(); }
     set_sprite_tile(DIALOG_ARROW_OAM_SLOT, DIALOG_ARROW_TILE_BASE);
-    cls();
     hub_render_menu();
     DISPLAY_ON;
     SHOW_BKG;

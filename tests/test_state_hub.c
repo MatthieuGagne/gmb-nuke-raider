@@ -74,6 +74,26 @@ void test_render_wrapped_returns_nonzero_offset_on_overflow(void) {
     }
 }
 
+void test_hub_clear_does_not_write_rows_18_to_31(void) {
+    /* After hub enter(), set_bkg_tile_xy must never touch rows 18-31.
+     * If cls() is still present, it writes rows 0-31 via GBDK internals —
+     * but in the host mock, cls() is a no-op, so this test catches the
+     * case where our new clear_visible_rows() accidentally clears beyond row 17. */
+    mock_vram_clear();
+    state_hub.enter();
+    TEST_ASSERT_LESS_OR_EQUAL_UINT8(17u, mock_set_bkg_tile_xy_max_row);
+}
+
+void test_hub_cursor_move_does_not_trigger_full_clear(void) {
+    /* A cursor keypress must NOT call set_bkg_tile_xy (dirty update only).
+     * Before the fix, hub_render_menu() was called on every keypress,
+     * which would invoke clear_visible_rows() and increment the count. */
+    state_hub.enter();
+    mock_set_bkg_tile_xy_reset();   /* reset counter AFTER enter (enter legitimately clears) */
+    tick(J_DOWN);                   /* move cursor — should only write 2 console tiles */
+    TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tile_xy_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_enter_clears_hub_entered_flag);
@@ -86,5 +106,7 @@ int main(void) {
     RUN_TEST(test_a_on_leave_does_not_enter_dialog);
     RUN_TEST(test_render_wrapped_returns_zero_when_text_fits);
     RUN_TEST(test_render_wrapped_returns_nonzero_offset_on_overflow);
+    RUN_TEST(test_hub_clear_does_not_write_rows_18_to_31);
+    RUN_TEST(test_hub_cursor_move_does_not_trigger_full_clear);
     return UNITY_END();
 }

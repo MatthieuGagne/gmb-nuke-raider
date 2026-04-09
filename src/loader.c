@@ -6,6 +6,8 @@
 #include "track.h"
 #include "config.h"
 #include "overmap_car_sprite.h"
+#include "dialog.h"
+#include "dialog_data.h"
 
 extern const uint8_t player_tile_data[];
 extern const uint8_t player_tile_data_count;
@@ -314,3 +316,47 @@ void load_bkg_row(uint8_t vram_x, uint8_t vram_y,
     for (i = 0u; i < count; i++) dst[i] = tiles[i];
 }
 #endif /* __SDCC */
+
+void loader_dialog_cache_node(uint8_t npc_id, uint8_t node_idx) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t i;
+    uint8_t k;
+    const char *src;
+    const NpcDialog  *dlg;
+    const DialogNode *node;
+    SWITCH_ROM(BANK(npc_dialogs));
+
+    dlg  = &npc_dialogs[npc_id];
+    node = &dlg->nodes[node_idx];
+
+    /* Copy NPC name */
+    src = dlg->name;
+    for (k = 0u; src[k] && k < DIALOG_NAME_BUF_LEN - 1u; k++)
+        dialog_name_cache[k] = src[k];
+    dialog_name_cache[k] = '\0';
+
+    /* Copy node text */
+    src = node->text;
+    for (k = 0u; src[k] && k < DIALOG_TEXT_BUF_LEN - 1u; k++)
+        dialog_text_cache[k] = src[k];
+    dialog_text_cache[k] = '\0';
+
+    /* Copy num_choices and next[] */
+    dialog_num_choices_cache = node->num_choices;
+    for (i = 0u; i < 3u; i++)
+        dialog_next_cache[i] = node->next[i];
+
+    /* Copy choice labels */
+    for (i = 0u; i < 3u; i++) {
+        if (node->choices[i]) {
+            src = node->choices[i];
+            for (k = 0u; src[k] && k < DIALOG_CHOICE_BUF_LEN - 1u; k++)
+                dialog_choice_cache[i][k] = src[k];
+            dialog_choice_cache[i][k] = '\0';
+        } else {
+            dialog_choice_cache[i][0] = '\0';
+        }
+    }
+
+    SWITCH_ROM(saved);
+}

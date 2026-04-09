@@ -70,6 +70,11 @@
 #define OVERMAP_TILE_DEST     3u
 #define OVERMAP_TILE_CITY_HUB 4u  /* city hub building — drives north to enter */
 
+/* Dialog WRAM cache buffer sizes */
+#define DIALOG_TEXT_BUF_LEN   64u
+#define DIALOG_NAME_BUF_LEN   16u
+#define DIALOG_CHOICE_BUF_LEN 32u
+
 /* Hub system */
 #define MAX_HUB_NPCS           3u
 #define HUB_PORTRAIT_TILE_SLOT 96u   /* BKG tile slots 96-111 (16 tiles) for 32x32 portrait */
