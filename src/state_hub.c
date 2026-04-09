@@ -9,7 +9,7 @@
 #include "input.h"
 #include "banking.h"
 #include "dialog.h"
-#include "dialog_data.h"
+#include "loader.h"
 #include "config.h"
 #include "npc_mechanic_portrait.h"
 #include "npc_trader_portrait.h"
@@ -44,8 +44,6 @@ static uint8_t           cursor;
 static uint8_t           active_npc;
 static uint8_t           dialog_cursor;
 static const HubDef     *hub;
-static char              dialog_text_buf[64]; /* WRAM — copy banked text here before printf */
-static char              dialog_name_buf[16]; /* WRAM — copy banked NPC name here before printf */
 static uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
 static uint8_t           dialog_page_start;   /* char offset of currently-shown page (0 = beginning) */
 static uint8_t           dialog_next_offset;  /* return of last render_wrapped; 0 = no overflow */
@@ -157,25 +155,7 @@ static void hub_render_dialog(void) {
         HUB_PORTRAIT_TILE_SLOT + 11u,  HUB_PORTRAIT_TILE_SLOT + 15u,
     };
 
-    /* --- Copy banked text + name to WRAM before bank restore --- */
-    { SET_BANK(npc_dialogs);
-      {
-          const char *src = dialog_get_text();
-          uint8_t     k   = 0u;
-          while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
-              dialog_text_buf[k] = src[k]; k++;
-          }
-          dialog_text_buf[k] = '\0';
-      }
-      {
-          const char *src = dialog_get_name();
-          uint8_t     k   = 0u;
-          while (src[k] && k < (uint8_t)(sizeof(dialog_name_buf) - 1u)) {
-              dialog_name_buf[k] = src[k]; k++;
-          }
-          dialog_name_buf[k] = '\0';
-      }
-      RESTORE_BANK(); }
+    /* WRAM cache already populated by loader_dialog_cache_node — no bank switch needed. */
 
     /* portrait box border rows (6 tiles wide: cols 0-5) */
     static const uint8_t portrait_top[HUB_PORTRAIT_BOX_W]  = {BRD_TL, BRD_T,  BRD_T,  BRD_T,  BRD_T,  BRD_TR};
@@ -209,11 +189,11 @@ static void hub_render_dialog(void) {
 
     /* --- Draw NPC name at row 1, inner col 7 --- */
     gotoxy(7u, 1u);
-    printf(dialog_name_buf);
+    printf(dialog_get_name());
     printf(":");
 
     /* --- Word-wrap dialog text into inner cols 7-18, rows 2-6 --- */
-    dialog_next_offset = render_wrapped(dialog_text_buf, 7u, 2u, DIALOG_INNER_W, 5u, dialog_page_start);
+    dialog_next_offset = render_wrapped(dialog_get_text(), 7u, 2u, DIALOG_INNER_W, 5u, dialog_page_start);
 
     /* --- Show or hide overflow arrow OAM sprite (OAM slot 2, screen tile (18,6)) --- */
     /* BG tile (18,6) = screen pixel (144,48); OAM coords add +8 x, +16 y */
@@ -232,19 +212,9 @@ static void hub_render_dialog(void) {
         printf(">");
     } else {
         for (i = 0u; i < num_choices; i++) {
-            /* Copy choice label to WRAM (banked pointer) */
-            { SET_BANK(npc_dialogs);
-              {
-                  const char *src = dialog_get_choice(i);
-                  uint8_t     k   = 0u;
-                  while (src[k] && k < (uint8_t)(sizeof(dialog_text_buf) - 1u)) {
-                      dialog_text_buf[k] = src[k]; k++;
-                  }
-                  dialog_text_buf[k] = '\0';
-              }
-              RESTORE_BANK(); }
+            /* WRAM cache already populated — read directly from dialog_choice_cache. */
             gotoxy(1u, (uint8_t)(9u + i));
-            printf(dialog_text_buf);
+            printf(dialog_get_choice(i));
         }
         /* Draw initial cursor */
         gotoxy(0u, (uint8_t)(9u + dialog_cursor));
@@ -290,9 +260,8 @@ static void hub_start_dialog(uint8_t npc_cursor) {
     dialog_page_start  = 0u;
     dialog_next_offset = 0u;
     npc_id = hub->npc_dialog_ids[npc_cursor];
-    { SET_BANK(npc_dialogs);
-      dialog_start(npc_id, &npc_dialogs[npc_id]);
-      RESTORE_BANK(); }
+    loader_dialog_cache_node(npc_id, 0u);
+    dialog_start(npc_id);
     sub_state = HUB_SUB_DIALOG;
     vbl_display_off();         /* tick music + disable LCD in 1 VBlank */
     clear_visible_rows();       /* was: cls() */

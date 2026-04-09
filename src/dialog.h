@@ -23,14 +23,23 @@ typedef struct {
     const char       *name;      /* NPC display name, e.g. "MECHANIC" */
 } NpcDialog;
 
+/* --- WRAM cache buffers (written by loader_dialog_cache_node, read by BANKED fns) */
+extern char    dialog_text_cache[DIALOG_TEXT_BUF_LEN];
+extern char    dialog_name_cache[DIALOG_NAME_BUF_LEN];
+extern char    dialog_choice_cache[3][DIALOG_CHOICE_BUF_LEN];
+extern uint8_t dialog_num_choices_cache;
+extern uint8_t dialog_next_cache[3];
+
 /* --- Public API ---------------------------------------------------------- */
 
 /* Zero all NPC state. Call once at game start. */
 void dialog_init(void) BANKED;
 
 /* Begin a conversation with npc_id, resuming from its stored current_node.
- * npc_id must be < MAX_NPCS. dialog must remain valid for the session. */
-void dialog_start(uint8_t npc_id, const NpcDialog *dialog) BANKED;
+ * npc_id must be < MAX_NPCS.
+ * Caller must invoke loader_dialog_cache_node(npc_id, current_node) BEFORE
+ * calling dialog_start so the WRAM cache is populated. */
+void dialog_start(uint8_t npc_id) BANKED;
 
 /* Return the text of the current node (valid after dialog_start). */
 const char *dialog_get_text(void) BANKED;
@@ -48,7 +57,8 @@ const char *dialog_get_name(void) BANKED;
  * For narration nodes (num_choices == 0): choice_idx is ignored.
  * For choice nodes: choice_idx selects the branch (0, 1, or 2).
  * Returns 1 if there is more dialog, 0 if the conversation has ended.
- * On end, current_node is reset to 0 for the next dialog_start. */
+ * On end, current_node is reset to 0 for the next dialog_start.
+ * When returning 1, the WRAM cache is refreshed via loader_dialog_cache_node. */
 uint8_t dialog_advance(uint8_t choice_idx) BANKED;
 
 /* Persistent flag API (within-session only, not saved to SRAM). */

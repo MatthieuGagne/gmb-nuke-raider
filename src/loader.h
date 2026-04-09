@@ -60,6 +60,11 @@ void    loader_map_fill_row(uint8_t ty, uint8_t w, uint8_t *buf) NONBANKED;
 void    loader_map_fill_range(uint8_t ty, uint8_t w, uint8_t tx_start, uint8_t count, uint8_t *buf) NONBANKED;
 void    loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uint8_t count, uint8_t *buf) NONBANKED;
 
+/* Switches to BANK(npc_dialogs), copies node text/name/choices/next into
+ * dialog.c WRAM cache buffers, then restores bank.
+ * Call before dialog_start() and after dialog_advance() returns 1. */
+void loader_dialog_cache_node(uint8_t npc_id, uint8_t node_idx) NONBANKED;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);

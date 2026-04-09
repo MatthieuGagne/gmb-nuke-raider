@@ -5,7 +5,7 @@
   "src/dialog_arrow_sprite.c":   {"bank": 255, "reason": "autobank"},
   "src/dialog_border_tiles.c":   {"bank": 255, "reason": "autobank — no longer needs pinning after state_manager moved to bank 0"},
   "src/damage.c":                {"bank": 255, "reason": "autobank"},
-  "src/dialog_data.c":           {"bank": 255, "reason": "autobank"},
+  "src/dialog_data.c":           {"bank": 255, "reason": "autobank — npc_dialogs read only via loader_dialog_cache_node (NONBANKED); no co-location pin needed"},
   "src/economy.c":               {"bank": 255, "reason": "autobank — economy module; BANKED functions called via state callbacks"},
   "src/hub_data.c":              {"bank": 0,   "reason": "bank-0 data, always mapped — no #pragma bank"},
   "src/loader.c":                {"bank": 0,   "reason": "NONBANKED VRAM loaders — only bank-0 code may call SWITCH_ROM"},
