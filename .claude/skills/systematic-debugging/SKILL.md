@@ -9,6 +9,7 @@ description: Use when encountering any bug, test failure, or unexpected behavior
 
 ```
 NO FIXES WITHOUT A VISIBLE, APPROVED HYPOTHESIS QUEUE FIRST
+NO HYPOTHESIS IS APPROVABLE WITHOUT A confirm_when ARTIFACT
 ```
 
 **Never touch code, instrument, or propose a fix until:**
@@ -28,6 +29,9 @@ Ask the user (one question at a time):
 1. "What is the GitHub issue number for this bug?"
 2. "Describe the symptom in one sentence: what do you observe, and when?"
 3. "Which hypotheses have you already ruled out? (list them, or say 'none')"
+4. "Describe the exact reproduction steps: what do you do in the emulator and what do you observe?"
+
+Question 4 is locked in before any investigation begins — do not proceed to hypothesis generation until the user answers it.
 
 Then:
 
@@ -36,12 +40,28 @@ Then:
 ```
 Hypothesis Queue (pending user approval):
 1. [Most likely] <hypothesis> — reasoning: <why>
+   confirm_when: <specific artifact> = <expected value or timing>
 2. [Likely]      <hypothesis> — reasoning: <why>
+   confirm_when: <specific artifact> = <expected value or timing>
 3. [Possible]    <hypothesis> — reasoning: <why>
+   confirm_when: <specific artifact> = <expected value or timing>
 ...
 
 Ruled out (will not re-test): <list from user>
 ```
+
+**confirm_when validity rule:**
+A valid `confirm_when` MUST name at least one of: a specific variable/symbol, a hardware register, an `EMU_printf` output string, or a memory address — AND state the expected value or timing.
+
+Valid examples:
+- `confirm_when: EMU_printf "order_cnt=N" appears with N > 3 at the ~24s mark`
+- `confirm_when: LCDC register reads 0x91 at frame 120`
+- `confirm_when: WRAM address 0xC0A2 holds 0x00 after sp_exit()`
+
+Invalid examples (vague — not approvable):
+- `confirm_when: behavior improves`
+- `confirm_when: crash disappears`
+- `confirm_when: game runs better`
 
 **STOP. Show queue to user. Do not proceed until they approve.**
 
@@ -74,16 +94,48 @@ For each hypothesis in the queue:
 1. Add instrumentation (use `emulicious-debug` agent for GBC runtime inspection)
 2. Build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
 3. Run: launch ROM in Emulicious, observe output/behavior
-4. Conclude: one of:
-   - **Confirmed** — hypothesis is the root cause, proceed to fix
-   - **Ruled out** — add to ruled-out list, advance queue
-   - **Inconclusive** — refine instrumentation, count as attempt
+4. Conclude — one of:
+
+| Outcome | Meaning | Next action |
+|---------|---------|-------------|
+| **Confirmed + clean** | `confirm_when` artifact observed; fix applied; original symptom gone; no new symptoms | Proceed — done |
+| **Confirmed + shifted** | `confirm_when` artifact observed; fix applied; original symptom gone but **new symptom appeared** | See Shifted Symptom Handling below |
+| **Ruled out** | Hypothesis is not the cause | Add to ruled-out list, advance queue |
+| **Inconclusive** | Cannot determine yet | Refine instrumentation; counts as an attempt toward 3-strikes |
+
+---
+
+### Post-Fix Verification (mandatory after every fix)
+
+Run after any fix is applied, before declaring success.
+
+**Step 1 — Re-run reproduction scenario**
+Observe for `crash_time + 30s` (or 60s if `crash_time` is unknown).
+Confirm the `confirm_when` artifact is now absent.
+- If fix had no effect (artifact still present) → counts as a **strike** against the hypothesis (see 3-strikes rule). Do not apply further changes — advance the queue.
+
+**Step 2 — Shifted symptom check**
+Observe for any new abnormal behavior during the same window.
+- No new behavior → outcome is **Confirmed + clean**.
+- New behavior observed → outcome is **Confirmed + shifted** (see Shifted Symptom Handling below).
+
+---
+
+### Shifted Symptom Handling
+
+When outcome is **Confirmed + shifted**:
+
+1. Declare out loud: `"Symptom shifted: <old symptom description> → <new symptom description>"`
+2. Insert a new hypothesis for the new symptom at the **top** of the remaining queue (position 1), with:
+   - Fresh strike counter (starts at 0)
+   - `confirm_when` field required immediately — do not begin instrumentation until it is written and user-approved
+3. **Confirmed + shifted does NOT count as a strike** against the original hypothesis — the fix correctly resolved the root cause; the new symptom is a separate bug.
 
 ---
 
 ## Expert Routing
 
-When a hypothesis is **Confirmed** (or when instrumentation requires domain expertise), classify the hypothesis type and dispatch to the appropriate expert agent(s) using the Agent tool. Fire parallel agents when the routing table lists two agents.
+When a hypothesis is **Confirmed + clean** or **Confirmed + shifted** (or when instrumentation requires domain expertise), classify the hypothesis type and dispatch to the appropriate expert agent(s) using the Agent tool. Fire parallel agents when the routing table lists two agents.
 
 | Hypothesis type | Agent(s) to dispatch | Notes |
 |----------------|---------------------|-------|
@@ -107,6 +159,7 @@ When a hypothesis is **Confirmed** (or when instrumentation requires domain expe
 | Never re-test a ruled-out hypothesis | Once ruled out, it stays ruled out |
 | One variable per test | Never make two changes between test runs |
 | 3-strikes halt | After 3 consecutive failed/inconclusive attempts on ANY hypothesis: halt, post findings to the GitHub issue, ask user for direction |
+| **Confirmed + shifted ≠ strike** | Shifting a symptom is not a failed attempt. Only "fix had no effect" (artifact still present after post-fix verification) counts as a strike. |
 
 ### 3-strikes action
 
