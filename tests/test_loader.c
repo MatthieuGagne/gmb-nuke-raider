@@ -3,7 +3,9 @@
 #include "loader.h"
 #include "track.h"
 
-void setUp(void) {}
+void setUp(void) {
+    loader_reset_bitmap_for_test();
+}
 void tearDown(void) {}
 
 /* Host tests verify that loader functions compile, link, and run without
@@ -76,6 +78,69 @@ void test_load_bkg_row_writes_to_mock_vram(void) {
     TEST_ASSERT_EQUAL_UINT8(7u, mock_vram[1u * 32u + 4u]);
 }
 
+/* ---- Allocator tests ---- */
+
+void test_alloc_returns_region_start_when_empty(void) {
+    /* Bitmap starts zeroed (static storage). Alloc 1 slot in sprite region 40-47. */
+    uint8_t slot = loader_alloc_slots(40u, 47u, 1u);
+    TEST_ASSERT_EQUAL_UINT8(40u, slot);
+}
+
+void test_alloc_sets_bitmap_bits(void) {
+    /* After allocating slot 50, a second alloc in [50,50] must fail (bit occupied). */
+    loader_alloc_slots(50u, 50u, 1u);
+    uint8_t slot = loader_alloc_slots(50u, 50u, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+}
+
+void test_alloc_consecutive_runs_do_not_overlap(void) {
+    /* Two allocs of 4 slots each in region [48,55] must not overlap. */
+    uint8_t a = loader_alloc_slots(48u, 55u, 4u);
+    uint8_t b = loader_alloc_slots(48u, 55u, 4u);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, a);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, b);
+    /* b must start at or after a + 4 */
+    TEST_ASSERT_TRUE(b >= a + 4u);
+}
+
+void test_alloc_past_region_end_returns_sentinel(void) {
+    /* Request 8 slots in region [60,63] (only 4 slots available). */
+    uint8_t slot = loader_alloc_slots(60u, 63u, 8u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+}
+
+void test_alloc_exhaustion_returns_sentinel(void) {
+    /* Fill region [56,59] (4 slots) with two 2-slot allocs, then a third must fail. */
+    loader_alloc_slots(56u, 59u, 2u);
+    loader_alloc_slots(56u, 59u, 2u);
+    uint8_t slot = loader_alloc_slots(56u, 59u, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+}
+
+void test_free_clears_bits_allowing_realloc(void) {
+    uint8_t slot = loader_alloc_slots(32u, 39u, 4u);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    loader_free_slots(slot, 4u);
+    /* After free, same region must be available again. */
+    uint8_t slot2 = loader_alloc_slots(32u, 39u, 4u);
+    TEST_ASSERT_EQUAL_UINT8(slot, slot2);
+}
+
+void test_alloc_region_boundary_enforced(void) {
+    /* region_end > 254 must return 0xFF (slot 255 is reserved sentinel). */
+    uint8_t slot = loader_alloc_slots(253u, 255u, 2u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+}
+
+void test_get_asset_slot_returns_sentinel_initially(void) {
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_DIALOG_BORDER));
+}
+
+void test_tile_asset_count_is_correct(void) {
+    TEST_ASSERT_EQUAL_UINT8(12u, (uint8_t)TILE_ASSET_COUNT);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -88,5 +153,14 @@ int main(void) {
     RUN_TEST(test_load_npc_positions_id2_returns_count);
     RUN_TEST(test_load_bkg_row_increments_mock_count);
     RUN_TEST(test_load_bkg_row_writes_to_mock_vram);
+    RUN_TEST(test_alloc_returns_region_start_when_empty);
+    RUN_TEST(test_alloc_sets_bitmap_bits);
+    RUN_TEST(test_alloc_consecutive_runs_do_not_overlap);
+    RUN_TEST(test_alloc_past_region_end_returns_sentinel);
+    RUN_TEST(test_alloc_exhaustion_returns_sentinel);
+    RUN_TEST(test_free_clears_bits_allowing_realloc);
+    RUN_TEST(test_alloc_region_boundary_enforced);
+    RUN_TEST(test_get_asset_slot_returns_sentinel_initially);
+    RUN_TEST(test_tile_asset_count_is_correct);
     return UNITY_END();
 }
