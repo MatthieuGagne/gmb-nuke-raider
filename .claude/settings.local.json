@@ -348,7 +348,10 @@
       "Bash(mkdir -p tools/balancer)",
       "Bash(go mod:*)",
       "Bash(go get:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(sdcc --version)",
+      "Bash(/home/mathdaman/gbdk/bin/sdasgb -l font.o)"
     ]
   },
   "hooks": {
