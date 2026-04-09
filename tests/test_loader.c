@@ -141,6 +141,34 @@ void test_tile_asset_count_is_correct(void) {
     TEST_ASSERT_EQUAL_UINT8(12u, (uint8_t)TILE_ASSET_COUNT);
 }
 
+/* ---- Registry tests ---- */
+
+void test_registry_player_is_sprite(void) {
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_PLAYER);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT8(1u, e->is_sprite);
+    TEST_ASSERT_NOT_NULL(e->data);
+    TEST_ASSERT_NOT_NULL(e->count_ptr);
+}
+
+void test_registry_track_is_bg(void) {
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_TRACK);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT8(0u, e->is_sprite);
+}
+
+void test_registry_hud_font_is_null_sentinel(void) {
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_HUD_FONT);
+    TEST_ASSERT_NOT_NULL(e);       /* entry exists */
+    TEST_ASSERT_NULL(e->data);     /* but data is NULL (self-managed) */
+    TEST_ASSERT_NULL(e->count_ptr);
+}
+
+void test_registry_out_of_bounds_returns_null(void) {
+    const tile_registry_entry_t *e = loader_get_registry((tile_asset_t)TILE_ASSET_COUNT);
+    TEST_ASSERT_NULL(e);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -162,5 +190,9 @@ int main(void) {
     RUN_TEST(test_alloc_region_boundary_enforced);
     RUN_TEST(test_get_asset_slot_returns_sentinel_initially);
     RUN_TEST(test_tile_asset_count_is_correct);
+    RUN_TEST(test_registry_player_is_sprite);
+    RUN_TEST(test_registry_track_is_bg);
+    RUN_TEST(test_registry_hud_font_is_null_sentinel);
+    RUN_TEST(test_registry_out_of_bounds_returns_null);
     return UNITY_END();
 }
