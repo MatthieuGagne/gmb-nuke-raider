@@ -65,9 +65,59 @@ void    loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, 
  * Call before dialog_start() and after dialog_advance() returns 1. */
 void loader_dialog_cache_node(uint8_t npc_id, uint8_t node_idx) NONBANKED;
 
+/* Tile asset registry — one entry per loaded asset.
+ * TILE_ASSET_HUD_FONT is self-managed by hud.c; its registry entry is a NULL sentinel. */
+typedef enum {
+    TILE_ASSET_PLAYER         = 0,
+    TILE_ASSET_BULLET         = 1,
+    TILE_ASSET_TURRET         = 2,
+    TILE_ASSET_OVERMAP_CAR    = 3,
+    TILE_ASSET_DIALOG_ARROW   = 4,
+    TILE_ASSET_TRACK          = 5,
+    TILE_ASSET_OVERMAP_BG     = 6,
+    TILE_ASSET_HUD_FONT       = 7,   /* self-managed by hud.c — NULL registry entry */
+    TILE_ASSET_NPC_DRIFTER    = 8,
+    TILE_ASSET_NPC_MECHANIC   = 9,
+    TILE_ASSET_NPC_TRADER     = 10,
+    TILE_ASSET_DIALOG_BORDER  = 11,
+    TILE_ASSET_COUNT          = 12
+} tile_asset_t;
+
+/* Registry struct — ROM-resident; bank stored separately in loader_asset_bank[]. */
+typedef struct {
+    const uint8_t *data;       /* ROM pointer to tile data; NULL for self-managed assets */
+    const uint8_t *count_ptr;  /* pointer to X_tile_data_count variable; NULL if self-managed */
+    uint8_t        is_sprite;  /* 1 = sprite region (slots 0-63), 0 = BG region (slots 64-254) */
+} tile_registry_entry_t;
+
+/* VRAM slot bitmap allocator.
+ * Slots 0-63 = sprite region. Slots 64-254 = BG region. Slot 255 = reserved failure sentinel.
+ * Returns first slot of a free run of `count` consecutive slots in [region_start, region_end] (inclusive),
+ * or 0xFF on failure (including if region_end > 254). */
+uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED;
+
+/* Clears `count` consecutive bitmap bits starting at `first_slot`. */
+void    loader_free_slots(uint8_t first_slot, uint8_t count) NONBANKED;
+
+/* Returns the first VRAM slot allocated to `asset`, or 0xFF if not yet allocated. */
+uint8_t loader_get_asset_slot(tile_asset_t asset) NONBANKED;
+
+/* Initializes the VRAM bitmap (all free) and asset slot table (all 0xFF).
+ * Call once during STATE_INIT. */
+void    loader_init_allocator(void) NONBANKED;
+
+/* Returns a pointer to the ROM-resident registry entry for `asset`.
+ * Returns NULL if asset >= TILE_ASSET_COUNT. */
+const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED;
+
+/* Returns the bank number for `asset` from the ROM-resident bank table. */
+uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);
+/* Test-only seam: reset bitmap and slot table to initial state. Call in setUp(). */
+void loader_reset_bitmap_for_test(void);
 #endif
 
 #endif /* LOADER_H */

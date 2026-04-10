@@ -4,4 +4,5 @@
 #include "banking.h"
 BANKREF_EXTERN(npc_drifter_portrait)
 extern const uint8_t npc_drifter_portrait[];
+extern const uint8_t npc_drifter_portrait_count;
 #endif
