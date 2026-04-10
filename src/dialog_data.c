@@ -77,6 +77,22 @@ static const DialogNode placeholder5_nodes[] = {
     /* 0 */ { n5_0, 0, {NULL,   NULL,   NULL}, {DIALOG_END, DIALOG_END, DIALOG_END} },
 };
 
+/* --- NPC 6: PLACEHOLDER6 --- */
+static const char n6_0[] = "...";
+static const char npc_name_placeholder6[] = "PLACEHOLDER6";
+
+static const DialogNode placeholder6_nodes[] = {
+    /* 0 */ { n6_0, 0, {NULL,   NULL,   NULL}, {DIALOG_END, DIALOG_END, DIALOG_END} },
+};
+
+/* --- NPC 7: PLACEHOLDER7 --- */
+static const char n7_0[] = "...";
+static const char npc_name_placeholder7[] = "PLACEHOLDER7";
+
+static const DialogNode placeholder7_nodes[] = {
+    /* 0 */ { n7_0, 0, {NULL,   NULL,   NULL}, {DIALOG_END, DIALOG_END, DIALOG_END} },
+};
+
 /* --- NPC dialog table (indexed by npc_id) --- */
 BANKREF(npc_dialogs)
 const NpcDialog npc_dialogs[] = {
@@ -86,4 +102,6 @@ const NpcDialog npc_dialogs[] = {
     { placeholder3_nodes, 1, npc_name_placeholder3 }, /* NPC 3: PLACEHOLDER3 */
     { placeholder4_nodes, 1, npc_name_placeholder4 }, /* NPC 4: PLACEHOLDER4 */
     { placeholder5_nodes, 1, npc_name_placeholder5 }, /* NPC 5: PLACEHOLDER5 */
+    { placeholder6_nodes, 1, npc_name_placeholder6 }, /* NPC 6: PLACEHOLDER6 */
+    { placeholder7_nodes, 1, npc_name_placeholder7 }, /* NPC 7: PLACEHOLDER7 */
 };
