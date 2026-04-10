@@ -4,7 +4,7 @@
 /* Entity capacity constants — all entity pools MUST use SoA (parallel arrays),
  * not AoS (struct arrays). See CLAUDE.md "Entity management" for rationale. */
 
-#define MAX_NPCS     6
+#define MAX_NPCS     8
 /* OAM budget: player=4, dialog_arrow=1 (fixed), projectiles≤8, turrets≤8; hardware cap=40 */
 #define MAX_SPRITES  28
 

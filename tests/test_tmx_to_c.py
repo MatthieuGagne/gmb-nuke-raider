@@ -492,6 +492,46 @@ class TestEnemiesLayer(unittest.TestCase):
         self.assertNotIn('turret_ty', result)
         self.assertNotIn('turret_count', result)
 
+    def test_npc_truncation_warning_printed_to_stderr(self):
+        """When more than MAX_NPCS NPCs are in the TMX, a warning is printed to stderr."""
+        import io, contextlib
+        # Build a minimal TMX with MAX_NPCS + 1 enemy objects
+        npc_objects = ""
+        for i in range(9):  # 9 > MAX_NPCS (8)
+            npc_objects += f'<object id="{i+1}" name="car" x="{i*16}" y="16" width="8" height="8"/>\n'
+        tmx = f'''<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal" renderorder="right-down"
+     width="10" height="10" tilewidth="8" tileheight="8">
+ <tileset firstgid="1" source="tileset.tsx"/>
+ <layer id="1" name="track" width="10" height="10">
+  <data encoding="csv">{",".join(["1"]*100)}</data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="100" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="101" x="0" y="8" width="80" height="8"/>
+ </objectgroup>
+ <objectgroup id="4" name="enemies">
+  {npc_objects}
+ </objectgroup>
+</map>'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.tmx', delete=False) as f:
+            f.write(tmx)
+            tmx_path = f.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            stderr_capture = io.StringIO()
+            with contextlib.redirect_stderr(stderr_capture):
+                conv.tmx_to_c(tmx_path, out_path)
+            warning_output = stderr_capture.getvalue()
+            self.assertIn("WARNING", warning_output)
+            self.assertIn("MAX_NPCS", warning_output)
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
 
 class TestEmitHeader(unittest.TestCase):
 
