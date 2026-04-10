@@ -161,6 +161,34 @@
           ]
         }
       ]
+    },
+    {
+      "id": 6,
+      "name": "PLACEHOLDER6",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "...",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "PLACEHOLDER7",
+      "nodes": [
+        {
+          "idx": 0,
+          "text": "...",
+          "choices": [],
+          "next": [
+            "END"
+          ]
+        }
+      ]
     }
   ]
 }
