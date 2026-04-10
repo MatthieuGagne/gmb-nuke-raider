@@ -239,9 +239,6 @@ static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
  * 0xFF = not yet allocated. Updated by Increment 2 (loader_load_asset). */
 static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
 
-/* Bank-per-asset table — populated at runtime by loader_init_allocator().
- * BANK(sym) is a runtime expression in SDCC, not a constant initializer. */
-static uint8_t loader_asset_bank_tbl[TILE_ASSET_COUNT];
 
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
@@ -259,20 +256,6 @@ void loader_init_allocator(void) NONBANKED {
     uint8_t i;
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
-    /* Populate bank table at runtime — BANK(sym) is not a constant expression
-     * in SDCC, so this cannot be done as a static initializer. */
-    loader_asset_bank_tbl[TILE_ASSET_PLAYER]       = BANK(player_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_BULLET]        = BANK(bullet_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_TURRET]        = BANK(turret_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_OVERMAP_CAR]   = BANK(overmap_car_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_DIALOG_ARROW]  = BANK(dialog_arrow_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_TRACK]         = BANK(track_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_OVERMAP_BG]    = BANK(overmap_tile_data);
-    loader_asset_bank_tbl[TILE_ASSET_HUD_FONT]      = 0u; /* self-managed, fixed page */
-    loader_asset_bank_tbl[TILE_ASSET_NPC_DRIFTER]   = BANK(npc_drifter_portrait);
-    loader_asset_bank_tbl[TILE_ASSET_NPC_MECHANIC]  = BANK(npc_mechanic_portrait);
-    loader_asset_bank_tbl[TILE_ASSET_NPC_TRADER]    = BANK(npc_trader_portrait);
-    loader_asset_bank_tbl[TILE_ASSET_DIALOG_BORDER] = BANK(dialog_border_tiles);
 }
 
 uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED {
@@ -280,23 +263,25 @@ uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t cou
     uint8_t run;
     uint8_t start;
     uint8_t cap;
+    uint8_t slot;
     if (region_end > 254u) return 0xFFu;
     if (count == 0u) return 0xFFu;
     if (region_end < region_start) return 0xFFu;
-    /* cap: last valid start so that start+count-1 <= region_end */
+    /* cap: last valid start so that start+count-1 <= region_end.
+     * Safe from wrap: region_end <= 254 (enforced above), so cap <= 254. */
     if ((region_end - region_start + 1u) < count) return 0xFFu;
     cap = region_end - count + 1u;
     for (start = region_start; start <= cap; start++) {
         run = 0u;
         for (i = 0u; i < count; i++) {
-            uint8_t slot = start + i;
+            slot = start + i;
             if (loader_vram_bitmap[slot >> 3u] & (uint8_t)(1u << (slot & 7u))) break;
             run++;
         }
         if (run == count) {
             /* Mark bits occupied */
             for (i = 0u; i < count; i++) {
-                uint8_t slot = start + i;
+                slot = start + i;
                 loader_vram_bitmap[slot >> 3u] |= (uint8_t)(1u << (slot & 7u));
             }
             return start;
@@ -343,8 +328,21 @@ const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED {
 }
 
 uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
-    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) return 0u;
-    return loader_asset_bank_tbl[(uint8_t)asset];
+    switch ((uint8_t)asset) {
+        case TILE_ASSET_PLAYER:        return BANK(player_tile_data);
+        case TILE_ASSET_BULLET:        return BANK(bullet_tile_data);
+        case TILE_ASSET_TURRET:        return BANK(turret_tile_data);
+        case TILE_ASSET_OVERMAP_CAR:   return BANK(overmap_car_tile_data);
+        case TILE_ASSET_DIALOG_ARROW:  return BANK(dialog_arrow_tile_data);
+        case TILE_ASSET_TRACK:         return BANK(track_tile_data);
+        case TILE_ASSET_OVERMAP_BG:    return BANK(overmap_tile_data);
+        case TILE_ASSET_HUD_FONT:      return 0u;
+        case TILE_ASSET_NPC_DRIFTER:   return BANK(npc_drifter_portrait);
+        case TILE_ASSET_NPC_MECHANIC:  return BANK(npc_mechanic_portrait);
+        case TILE_ASSET_NPC_TRADER:    return BANK(npc_trader_portrait);
+        case TILE_ASSET_DIALOG_BORDER: return BANK(dialog_border_tiles);
+        default:                       return 0u;
+    }
 }
 
 void load_npc_positions(uint8_t id,

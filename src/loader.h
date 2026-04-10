@@ -92,7 +92,7 @@ typedef struct {
 
 /* VRAM slot bitmap allocator.
  * Slots 0-63 = sprite region. Slots 64-254 = BG region. Slot 255 = reserved failure sentinel.
- * Returns first slot of a free run of `count` consecutive slots in [region_start, region_end-1],
+ * Returns first slot of a free run of `count` consecutive slots in [region_start, region_end] (inclusive),
  * or 0xFF on failure (including if region_end > 254). */
 uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED;
 
