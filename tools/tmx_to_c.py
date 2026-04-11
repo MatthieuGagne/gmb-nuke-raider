@@ -93,6 +93,11 @@ def parse_npc_objects(root):
             ty = int(py) // 8
             npcs.append((tx, ty, type_val, dir_val))
             if len(npcs) >= MAX_NPCS:
+                print(
+                    f"WARNING: tmx_to_c: NPC count hit cap (MAX_NPCS={MAX_NPCS}), "
+                    f"truncating remaining NPCs.",
+                    file=sys.stderr,
+                )
                 break
         break  # only process first 'enemies' layer
     return npcs
@@ -279,13 +284,13 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None):
         f.write(f"\nBANKREF({prefix}_npc_count)\n")
         f.write(f"const uint8_t {prefix}_npc_count = {npc_count}u;\n\n")
         f.write(f"BANKREF({prefix}_npc_tx)\n")
-        f.write(f"const uint8_t {prefix}_npc_tx[8] = {{ {fmt_arr(npc_tx)} }};\n\n")
+        f.write(f"const uint8_t {prefix}_npc_tx[{MAX_NPCS}] = {{ {fmt_arr(npc_tx)} }};\n\n")
         f.write(f"BANKREF({prefix}_npc_ty)\n")
-        f.write(f"const uint8_t {prefix}_npc_ty[8] = {{ {fmt_arr(npc_ty)} }};\n\n")
+        f.write(f"const uint8_t {prefix}_npc_ty[{MAX_NPCS}] = {{ {fmt_arr(npc_ty)} }};\n\n")
         f.write(f"BANKREF({prefix}_npc_type)\n")
-        f.write(f"const uint8_t {prefix}_npc_type[8] = {{ {fmt_arr(npc_type)} }};\n\n")
+        f.write(f"const uint8_t {prefix}_npc_type[{MAX_NPCS}] = {{ {fmt_arr(npc_type)} }};\n\n")
         f.write(f"BANKREF({prefix}_npc_dir)\n")
-        f.write(f"const uint8_t {prefix}_npc_dir[8] = {{ {fmt_arr(npc_dir)} }};\n")
+        f.write(f"const uint8_t {prefix}_npc_dir[{MAX_NPCS}] = {{ {fmt_arr(npc_dir)} }};\n")
         f.write(f"\nBANKREF({prefix}_powerup_count)\n")
         f.write(f"const uint8_t {prefix}_powerup_count = {powerup_count}u;\n\n")
         f.write(f"BANKREF({prefix}_powerup_tx)\n")
