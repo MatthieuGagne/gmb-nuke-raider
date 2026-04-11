@@ -169,6 +169,30 @@ void test_registry_out_of_bounds_returns_null(void) {
     TEST_ASSERT_NULL(e);
 }
 
+void test_set_track_1_registry_is_bg_non_null(void) {
+    loader_set_track(1u);
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_TRACK);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_NOT_NULL(e->data);
+    TEST_ASSERT_EQUAL_UINT8(0u, e->is_sprite);
+}
+
+void test_set_track_2_registry_is_bg_non_null(void) {
+    loader_set_track(2u);
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_TRACK);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_NOT_NULL(e->data);
+    TEST_ASSERT_EQUAL_UINT8(0u, e->is_sprite);
+}
+
+void test_set_track_0_restores_default_registry(void) {
+    loader_set_track(1u);
+    loader_set_track(0u);
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_TRACK);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_EQUAL_UINT8(0u, e->is_sprite);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -194,5 +218,8 @@ int main(void) {
     RUN_TEST(test_registry_track_is_bg);
     RUN_TEST(test_registry_hud_font_is_null_sentinel);
     RUN_TEST(test_registry_out_of_bounds_returns_null);
+    RUN_TEST(test_set_track_1_registry_is_bg_non_null);
+    RUN_TEST(test_set_track_2_registry_is_bg_non_null);
+    RUN_TEST(test_set_track_0_restores_default_registry);
     return UNITY_END();
 }

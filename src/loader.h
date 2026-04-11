@@ -113,6 +113,11 @@ const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED;
 /* Returns the bank number for `asset` from the ROM-resident bank table. */
 uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED;
 
+/* Sets the active track index (0-2) used by loader_get_registry() for TILE_ASSET_TRACK.
+ * Call before loader_load_state() when entering a track-based state.
+ * Asserts (halts) if track_id > 2. */
+void loader_set_track(uint8_t track_id) NONBANKED;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);

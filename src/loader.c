@@ -51,6 +51,10 @@ extern uint8_t active_map_h;
 static uint8_t         loader_active_data_bank = 1u;  /* default: track 0/1 bank */
 static const uint8_t  *loader_active_map_ptr = track_map + 2u;
 
+/* Active track index (0-2) — set by loader_set_track().
+ * Used by loader_get_registry() to select the per-track BG tile registry entry. */
+static uint8_t loader_active_track = 0u;
+
 /* track3 scalars — extern'd here for use in load_track_scalars() */
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;
@@ -240,6 +244,11 @@ static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
 static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
 
 
+void loader_set_track(uint8_t track_id) NONBANKED {
+    if (track_id > 2u) { while (1) {} } /* assert: invalid track id */
+    loader_active_track = track_id;
+}
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;
@@ -249,6 +258,7 @@ void loader_reset_bitmap_for_test(void) {
     uint8_t i;
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+    loader_active_track = 0u;
 }
 #endif
 
@@ -256,6 +266,7 @@ void loader_init_allocator(void) NONBANKED {
     uint8_t i;
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+    loader_active_track = 0u;
 }
 
 uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED {
@@ -322,8 +333,19 @@ static const tile_registry_entry_t loader_registry_tbl[TILE_ASSET_COUNT] = {
     { dialog_border_tiles,    &dialog_border_tiles_count,    0u }, /* DIALOG_BORDER — BG     */
 };
 
+/* Per-track BG tile registry — indexed by loader_active_track (0-2).
+ * All three currently point to track_tile_data (tracks 1 and 2 are placeholders).
+ * Replace entries when per-track tile assets are introduced. */
+static const tile_registry_entry_t loader_track_registry_tbl[3u] = {
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 0 */
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 1 — placeholder */
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 2 — placeholder */
+};
+
 const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED {
     if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) return 0;
+    if ((uint8_t)asset == (uint8_t)TILE_ASSET_TRACK)
+        return &loader_track_registry_tbl[loader_active_track];
     return &loader_registry_tbl[(uint8_t)asset];
 }
 
