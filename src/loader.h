@@ -123,7 +123,7 @@ void loader_set_track(uint8_t track_id) NONBANKED;
  * based on each asset's is_sprite registry flag.
  * Asserts (halts) if: called while a state is already loaded; any asset has NULL data
  * (self-managed); or the VRAM region is exhausted. */
-void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED;
+void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED;
 
 /* Frees all allocated VRAM slots and resets the slot table to 0xFF.
  * Asserts (halts) if no state is currently loaded. */
@@ -139,15 +139,15 @@ uint8_t loader_get_slot(tile_asset_t asset) NONBANKED;
 void loader_load_asset(tile_asset_t asset) NONBANKED;
 
 /* State manifests — pass to loader_load_state() at state entry.
- * Each array lists the tile_asset_t values to load for that state. */
-extern const tile_asset_t k_playing_assets[];
-extern const uint8_t      k_playing_assets_count;
+ * uint8_t arrays (not tile_asset_t) so each element is 1 byte on SDCC/SM83. */
+extern const uint8_t k_playing_assets[];
+extern const uint8_t k_playing_assets_count;
 
-extern const tile_asset_t k_overmap_assets[];
-extern const uint8_t      k_overmap_assets_count;
+extern const uint8_t k_overmap_assets[];
+extern const uint8_t k_overmap_assets_count;
 
-extern const tile_asset_t k_hub_assets[];
-extern const uint8_t      k_hub_assets_count;
+extern const uint8_t k_hub_assets[];
+extern const uint8_t k_hub_assets_count;
 
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */

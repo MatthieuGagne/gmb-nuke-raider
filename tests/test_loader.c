@@ -196,7 +196,7 @@ void test_set_track_0_restores_default_registry(void) {
 /* ---- loader_load_state / loader_unload_state tests ---- */
 
 void test_load_state_assigns_sprite_slot_in_range(void) {
-    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    static const uint8_t assets[] = { TILE_ASSET_PLAYER };
     loader_load_state(assets, 1u);
     uint8_t slot = loader_get_asset_slot(TILE_ASSET_PLAYER);
     TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
@@ -204,7 +204,7 @@ void test_load_state_assigns_sprite_slot_in_range(void) {
 }
 
 void test_load_state_assigns_bg_slot_in_range(void) {
-    static const tile_asset_t assets[] = { TILE_ASSET_TRACK };
+    static const uint8_t assets[] = { TILE_ASSET_TRACK };
     loader_load_state(assets, 1u);
     uint8_t slot = loader_get_asset_slot(TILE_ASSET_TRACK);
     TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
@@ -212,14 +212,14 @@ void test_load_state_assigns_bg_slot_in_range(void) {
 }
 
 void test_unload_state_clears_slot_table(void) {
-    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    static const uint8_t assets[] = { TILE_ASSET_PLAYER };
     loader_load_state(assets, 1u);
     loader_unload_state();
     TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
 }
 
 void test_unload_state_allows_realloc_same_slot(void) {
-    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    static const uint8_t assets[] = { TILE_ASSET_PLAYER };
     loader_load_state(assets, 1u);
     uint8_t slot1 = loader_get_asset_slot(TILE_ASSET_PLAYER);
     loader_unload_state();
@@ -229,7 +229,7 @@ void test_unload_state_allows_realloc_same_slot(void) {
 }
 
 void test_load_state_multiple_assets_no_overlap(void) {
-    static const tile_asset_t assets[] = {
+    static const uint8_t assets[] = {
         TILE_ASSET_PLAYER, TILE_ASSET_BULLET, TILE_ASSET_TURRET
     };
     loader_load_state(assets, 3u);
@@ -247,7 +247,7 @@ void test_load_state_multiple_assets_no_overlap(void) {
 }
 
 void test_get_slot_returns_valid_slot_after_load_state(void) {
-    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    static const uint8_t assets[] = { TILE_ASSET_PLAYER };
     loader_load_state(assets, 1u);
     uint8_t slot = loader_get_slot(TILE_ASSET_PLAYER);
     TEST_ASSERT_TRUE(slot <= 63u);

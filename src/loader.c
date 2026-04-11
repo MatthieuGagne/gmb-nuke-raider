@@ -293,11 +293,11 @@ static void loader_do_load_one(tile_asset_t asset) NONBANKED {
     SWITCH_ROM(saved);
 }
 
-void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED {
+void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED {
     uint8_t i;
     if (loader_state_active) { disable_interrupts(); while (1) {} } /* assert: double-load */
     for (i = 0u; i < count; i++) {
-        loader_do_load_one(assets[i]);
+        loader_do_load_one((tile_asset_t)assets[i]);
     }
     loader_state_active = 1u;
 }
@@ -339,29 +339,31 @@ void loader_load_asset(tile_asset_t asset) NONBANKED {
 }
 
 /* ---- State manifests — ROM-resident, zero WRAM cost ---- */
+/* uint8_t arrays (not tile_asset_t) so each element is 1 byte;
+ * SDCC would otherwise emit 2-byte enum elements on SM83. */
 
-const tile_asset_t k_playing_assets[] = {
+const uint8_t k_playing_assets[] = {
     TILE_ASSET_PLAYER,
     TILE_ASSET_BULLET,
     TILE_ASSET_TURRET,
     TILE_ASSET_TRACK,
 };
-const uint8_t k_playing_assets_count = 4u;
+const uint8_t k_playing_assets_count = (uint8_t)(sizeof(k_playing_assets) / sizeof(k_playing_assets[0]));
 
-const tile_asset_t k_overmap_assets[] = {
+const uint8_t k_overmap_assets[] = {
     TILE_ASSET_OVERMAP_CAR,
     TILE_ASSET_OVERMAP_BG,
 };
-const uint8_t k_overmap_assets_count = 2u;
+const uint8_t k_overmap_assets_count = (uint8_t)(sizeof(k_overmap_assets) / sizeof(k_overmap_assets[0]));
 
-const tile_asset_t k_hub_assets[] = {
+const uint8_t k_hub_assets[] = {
     TILE_ASSET_DIALOG_ARROW,
     TILE_ASSET_NPC_DRIFTER,
     TILE_ASSET_NPC_MECHANIC,
     TILE_ASSET_NPC_TRADER,
     TILE_ASSET_DIALOG_BORDER,
 };
-const uint8_t k_hub_assets_count = 5u;
+const uint8_t k_hub_assets_count = (uint8_t)(sizeof(k_hub_assets) / sizeof(k_hub_assets[0]));
 
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
