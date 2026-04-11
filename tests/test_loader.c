@@ -274,6 +274,33 @@ void test_load_asset_independent_of_state_flag(void) {
     TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_DIALOG_ARROW));
 }
 
+/* ---- State manifest tests ---- */
+
+void test_playing_manifest_count_is_correct(void) {
+    TEST_ASSERT_EQUAL_UINT8(4u, k_playing_assets_count);
+}
+
+void test_overmap_manifest_count_is_correct(void) {
+    TEST_ASSERT_EQUAL_UINT8(2u, k_overmap_assets_count);
+}
+
+void test_hub_manifest_count_is_correct(void) {
+    TEST_ASSERT_EQUAL_UINT8(5u, k_hub_assets_count);
+}
+
+void test_playing_manifest_load_unload_cycle(void) {
+    loader_load_state(k_playing_assets, k_playing_assets_count);
+    /* All playing assets should have valid slots */
+    TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
+    TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_BULLET));
+    TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_TURRET));
+    TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_TRACK));
+    loader_unload_state();
+    /* After unload, all slots cleared */
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_TRACK));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -311,5 +338,9 @@ int main(void) {
     RUN_TEST(test_load_asset_assigns_sprite_slot);
     RUN_TEST(test_load_asset_assigns_bg_slot);
     RUN_TEST(test_load_asset_independent_of_state_flag);
+    RUN_TEST(test_playing_manifest_count_is_correct);
+    RUN_TEST(test_overmap_manifest_count_is_correct);
+    RUN_TEST(test_hub_manifest_count_is_correct);
+    RUN_TEST(test_playing_manifest_load_unload_cycle);
     return UNITY_END();
 }

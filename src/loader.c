@@ -338,6 +338,31 @@ void loader_load_asset(tile_asset_t asset) NONBANKED {
     loader_do_load_one(asset);
 }
 
+/* ---- State manifests — ROM-resident, zero WRAM cost ---- */
+
+const tile_asset_t k_playing_assets[] = {
+    TILE_ASSET_PLAYER,
+    TILE_ASSET_BULLET,
+    TILE_ASSET_TURRET,
+    TILE_ASSET_TRACK,
+};
+const uint8_t k_playing_assets_count = 4u;
+
+const tile_asset_t k_overmap_assets[] = {
+    TILE_ASSET_OVERMAP_CAR,
+    TILE_ASSET_OVERMAP_BG,
+};
+const uint8_t k_overmap_assets_count = 2u;
+
+const tile_asset_t k_hub_assets[] = {
+    TILE_ASSET_DIALOG_ARROW,
+    TILE_ASSET_NPC_DRIFTER,
+    TILE_ASSET_NPC_MECHANIC,
+    TILE_ASSET_NPC_TRADER,
+    TILE_ASSET_DIALOG_BORDER,
+};
+const uint8_t k_hub_assets_count = 5u;
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;

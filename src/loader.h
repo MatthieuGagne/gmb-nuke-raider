@@ -138,6 +138,17 @@ uint8_t loader_get_slot(tile_asset_t asset) NONBANKED;
  * Asserts (halts) if the asset is already loaded, out of range, or self-managed (NULL data). */
 void loader_load_asset(tile_asset_t asset) NONBANKED;
 
+/* State manifests — pass to loader_load_state() at state entry.
+ * Each array lists the tile_asset_t values to load for that state. */
+extern const tile_asset_t k_playing_assets[];
+extern const uint8_t      k_playing_assets_count;
+
+extern const tile_asset_t k_overmap_assets[];
+extern const uint8_t      k_overmap_assets_count;
+
+extern const tile_asset_t k_hub_assets[];
+extern const uint8_t      k_hub_assets_count;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);
