@@ -73,6 +73,9 @@ void load_track_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
+/* DEPRECATED: identical to load_track_tiles() — placeholder until track 2 gets its own tile data.
+ * Referenced as a function pointer in track.c TrackDef table; remove when per-track
+ * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
 void load_track2_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(track_tile_data));
@@ -80,6 +83,9 @@ void load_track2_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
+/* DEPRECATED: identical to load_track_tiles() — placeholder until track 3 gets its own tile data.
+ * Referenced as a function pointer in track.c TrackDef table; remove when per-track
+ * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
 void load_track3_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(track_tile_data));
@@ -245,7 +251,7 @@ static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
 
 
 void loader_set_track(uint8_t track_id) NONBANKED {
-    if (track_id > 2u) { while (1) {} } /* assert: invalid track id */
+    if (track_id > 2u) { disable_interrupts(); while (1) {} } /* assert: invalid track id */
     loader_active_track = track_id;
 }
 
@@ -344,8 +350,11 @@ static const tile_registry_entry_t loader_track_registry_tbl[3u] = {
 
 const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED {
     if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) return 0;
-    if ((uint8_t)asset == (uint8_t)TILE_ASSET_TRACK)
-        return &loader_track_registry_tbl[loader_active_track];
+    if ((uint8_t)asset == (uint8_t)TILE_ASSET_TRACK) {
+        if (loader_active_track == 1u) return &loader_track_registry_tbl[1];
+        if (loader_active_track == 2u) return &loader_track_registry_tbl[2];
+        return &loader_track_registry_tbl[0];
+    }
     return &loader_registry_tbl[(uint8_t)asset];
 }
 
@@ -356,7 +365,11 @@ uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
         case TILE_ASSET_TURRET:        return BANK(turret_tile_data);
         case TILE_ASSET_OVERMAP_CAR:   return BANK(overmap_car_tile_data);
         case TILE_ASSET_DIALOG_ARROW:  return BANK(dialog_arrow_tile_data);
-        case TILE_ASSET_TRACK:         return BANK(track_tile_data);
+        case TILE_ASSET_TRACK:
+            /* Mirror loader_track_registry_tbl — update in sync when per-track banks diverge. */
+            if (loader_active_track == 1u) return BANK(track_tile_data); /* track 1 — placeholder */
+            if (loader_active_track == 2u) return BANK(track_tile_data); /* track 2 — placeholder */
+            return BANK(track_tile_data); /* track 0 */
         case TILE_ASSET_OVERMAP_BG:    return BANK(overmap_tile_data);
         case TILE_ASSET_HUD_FONT:      return 0u;
         case TILE_ASSET_NPC_DRIFTER:   return BANK(npc_drifter_portrait);
