@@ -1,0 +1,38 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "",
+    "expandedProjectPaths": [
+    ],
+    "file.lastUsedOpenFilter": "All Files (*)",
+    "fileStates": {
+        "track.tmx": {
+            "scale": 1.0378749999999999,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 80.45284836805979,
+                "y": 400.3372275081296
+            }
+        },
+        "track.tsx": {
+            "scaleInDock": 1
+        },
+        "track2.tmx": {
+            "scale": 1.0378749999999999,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 80.45284836805979,
+                "y": 400.3372275081296
+            }
+        }
+    },
+    "openFiles": [
+    ],
+    "project": "nuke-raider.tiled-project",
+    "recentFiles": [
+        "track.tmx",
+        "track2.tmx"
+    ]
+}
