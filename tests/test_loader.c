@@ -193,6 +193,59 @@ void test_set_track_0_restores_default_registry(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, e->is_sprite);
 }
 
+/* ---- loader_load_state / loader_unload_state tests ---- */
+
+void test_load_state_assigns_sprite_slot_in_range(void) {
+    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    loader_load_state(assets, 1u);
+    uint8_t slot = loader_get_asset_slot(TILE_ASSET_PLAYER);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    TEST_ASSERT_TRUE(slot <= 63u);
+}
+
+void test_load_state_assigns_bg_slot_in_range(void) {
+    static const tile_asset_t assets[] = { TILE_ASSET_TRACK };
+    loader_load_state(assets, 1u);
+    uint8_t slot = loader_get_asset_slot(TILE_ASSET_TRACK);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    TEST_ASSERT_TRUE(slot >= 64u && slot <= 254u);
+}
+
+void test_unload_state_clears_slot_table(void) {
+    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    loader_load_state(assets, 1u);
+    loader_unload_state();
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
+}
+
+void test_unload_state_allows_realloc_same_slot(void) {
+    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    loader_load_state(assets, 1u);
+    uint8_t slot1 = loader_get_asset_slot(TILE_ASSET_PLAYER);
+    loader_unload_state();
+    loader_load_state(assets, 1u);
+    uint8_t slot2 = loader_get_asset_slot(TILE_ASSET_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(slot1, slot2);
+}
+
+void test_load_state_multiple_assets_no_overlap(void) {
+    static const tile_asset_t assets[] = {
+        TILE_ASSET_PLAYER, TILE_ASSET_BULLET, TILE_ASSET_TURRET
+    };
+    loader_load_state(assets, 3u);
+    uint8_t s0 = loader_get_asset_slot(TILE_ASSET_PLAYER);
+    uint8_t s1 = loader_get_asset_slot(TILE_ASSET_BULLET);
+    uint8_t s2 = loader_get_asset_slot(TILE_ASSET_TURRET);
+    /* All allocated (not sentinel) */
+    TEST_ASSERT_NOT_EQUAL(0xFFu, s0);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, s1);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, s2);
+    /* All in sprite region */
+    TEST_ASSERT_TRUE(s0 <= 63u);
+    TEST_ASSERT_TRUE(s1 <= 63u);
+    TEST_ASSERT_TRUE(s2 <= 63u);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -221,5 +274,10 @@ int main(void) {
     RUN_TEST(test_set_track_1_registry_is_bg_non_null);
     RUN_TEST(test_set_track_2_registry_is_bg_non_null);
     RUN_TEST(test_set_track_0_restores_default_registry);
+    RUN_TEST(test_load_state_assigns_sprite_slot_in_range);
+    RUN_TEST(test_load_state_assigns_bg_slot_in_range);
+    RUN_TEST(test_unload_state_clears_slot_table);
+    RUN_TEST(test_unload_state_allows_realloc_same_slot);
+    RUN_TEST(test_load_state_multiple_assets_no_overlap);
     return UNITY_END();
 }

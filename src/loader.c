@@ -55,6 +55,9 @@ static const uint8_t  *loader_active_map_ptr = track_map + 2u;
  * Used by loader_get_registry() to select the per-track BG tile registry entry. */
 static uint8_t loader_active_track = 0u;
 
+/* 1 when a state's assets are loaded via loader_load_state(); 0 otherwise. */
+static uint8_t loader_state_active = 0u;
+
 /* track3 scalars — extern'd here for use in load_track_scalars() */
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;
@@ -255,6 +258,66 @@ void loader_set_track(uint8_t track_id) NONBANKED {
     loader_active_track = track_id;
 }
 
+/* Internal helper — allocates VRAM slots and writes tile data for one asset.
+ * Asserts (halts) if the registry entry has NULL data (self-managed asset) or
+ * if the VRAM region is exhausted. Does NOT check for double-load; callers enforce that. */
+static void loader_do_load_one(tile_asset_t asset) {
+    uint8_t saved;
+    uint8_t slot;
+    uint8_t tile_count;
+    uint8_t region_start;
+    uint8_t region_end;
+    const tile_registry_entry_t *entry;
+    entry = loader_get_registry(asset);
+    if (!entry || !entry->data) { disable_interrupts(); while (1) {} } /* assert: self-managed asset */
+    tile_count = *entry->count_ptr;
+    if (entry->is_sprite) {
+        region_start = 0u;
+        region_end   = 63u;
+    } else {
+        region_start = 64u;
+        region_end   = 254u;
+    }
+    slot = loader_alloc_slots(region_start, region_end, tile_count);
+    if (slot == 0xFFu) { disable_interrupts(); while (1) {} } /* assert: VRAM region exhausted */
+    loader_asset_slot[(uint8_t)asset] = slot;
+    saved = CURRENT_BANK;
+    SWITCH_ROM(loader_get_asset_bank(asset));
+    if (entry->is_sprite) {
+        set_sprite_data(slot, tile_count, entry->data);
+    } else {
+        set_bkg_data(slot, tile_count, entry->data);
+    }
+    SWITCH_ROM(saved);
+}
+
+void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED {
+    uint8_t i;
+    if (loader_state_active) { disable_interrupts(); while (1) {} } /* assert: double-load */
+    for (i = 0u; i < count; i++) {
+        loader_do_load_one(assets[i]);
+    }
+    loader_state_active = 1u;
+}
+
+void loader_unload_state(void) NONBANKED {
+    uint8_t i;
+    uint8_t slot;
+    uint8_t tile_count;
+    const tile_registry_entry_t *entry;
+    if (!loader_state_active) { disable_interrupts(); while (1) {} } /* assert: unload with no state loaded */
+    for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) {
+        slot = loader_asset_slot[i];
+        if (slot == 0xFFu) continue;
+        entry = loader_get_registry((tile_asset_t)i);
+        if (!entry || !entry->count_ptr) continue; /* self-managed — skip */
+        tile_count = *entry->count_ptr;
+        loader_free_slots(slot, tile_count);
+        loader_asset_slot[i] = 0xFFu;
+    }
+    loader_state_active = 0u;
+}
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;
@@ -265,6 +328,7 @@ void loader_reset_bitmap_for_test(void) {
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
     loader_active_track = 0u;
+    loader_state_active = 0u;
 }
 #endif
 
@@ -273,6 +337,7 @@ void loader_init_allocator(void) NONBANKED {
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
     loader_active_track = 0u;
+    loader_state_active = 0u;
 }
 
 uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED {

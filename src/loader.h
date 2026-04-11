@@ -118,6 +118,17 @@ uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED;
  * Asserts (halts) if track_id > 2. */
 void loader_set_track(uint8_t track_id) NONBANKED;
 
+/* Allocates VRAM slots and writes tile data for each asset in `assets[0..count-1]`.
+ * Assets are allocated from the sprite region (slots 0-63) or BG region (slots 64-254)
+ * based on each asset's is_sprite registry flag.
+ * Asserts (halts) if: called while a state is already loaded; any asset has NULL data
+ * (self-managed); or the VRAM region is exhausted. */
+void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED;
+
+/* Frees all allocated VRAM slots and resets the slot table to 0xFF.
+ * Asserts (halts) if no state is currently loaded. */
+void loader_unload_state(void) NONBANKED;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);
