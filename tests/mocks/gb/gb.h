@@ -32,6 +32,10 @@ typedef int16_t  WORD;
 #define DISPLAY_ON  ((void)0)
 #define DISPLAY_OFF ((void)0)
 
+/* Interrupt control — no-ops in host tests */
+static inline void disable_interrupts(void) {}
+static inline void enable_interrupts(void) {}
+
 /* VBlank */
 static inline void wait_vbl_done(void) {}
 

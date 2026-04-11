@@ -113,6 +113,42 @@ const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED;
 /* Returns the bank number for `asset` from the ROM-resident bank table. */
 uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED;
 
+/* Sets the active track index (0-2) used by loader_get_registry() for TILE_ASSET_TRACK.
+ * Call before loader_load_state() when entering a track-based state.
+ * Asserts (halts) if track_id > 2. */
+void loader_set_track(uint8_t track_id) NONBANKED;
+
+/* Allocates VRAM slots and writes tile data for each asset in `assets[0..count-1]`.
+ * Assets are allocated from the sprite region (slots 0-63) or BG region (slots 64-254)
+ * based on each asset's is_sprite registry flag.
+ * Asserts (halts) if: called while a state is already loaded; any asset has NULL data
+ * (self-managed); or the VRAM region is exhausted. */
+void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED;
+
+/* Frees all allocated VRAM slots and resets the slot table to 0xFF.
+ * Asserts (halts) if no state is currently loaded. */
+void loader_unload_state(void) NONBANKED;
+
+/* Returns the VRAM slot assigned to `asset`.
+ * Asserts (halts) if the asset is not currently loaded.
+ * Use loader_get_asset_slot() for a non-asserting query (returns 0xFF if not loaded). */
+uint8_t loader_get_slot(tile_asset_t asset) NONBANKED;
+
+/* Allocates and loads a single asset outside a state manifest (e.g. dynamic portrait).
+ * Asserts (halts) if the asset is already loaded, out of range, or self-managed (NULL data). */
+void loader_load_asset(tile_asset_t asset) NONBANKED;
+
+/* State manifests — pass to loader_load_state() at state entry.
+ * uint8_t arrays (not tile_asset_t) so each element is 1 byte on SDCC/SM83. */
+extern const uint8_t k_playing_assets[];
+extern const uint8_t k_playing_assets_count;
+
+extern const uint8_t k_overmap_assets[];
+extern const uint8_t k_overmap_assets_count;
+
+extern const uint8_t k_hub_assets[];
+extern const uint8_t k_hub_assets_count;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);

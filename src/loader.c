@@ -51,6 +51,13 @@ extern uint8_t active_map_h;
 static uint8_t         loader_active_data_bank = 1u;  /* default: track 0/1 bank */
 static const uint8_t  *loader_active_map_ptr = track_map + 2u;
 
+/* Active track index (0-2) — set by loader_set_track().
+ * Used by loader_get_registry() to select the per-track BG tile registry entry. */
+static uint8_t loader_active_track = 0u;
+
+/* 1 when a state's assets are loaded via loader_load_state(); 0 otherwise. */
+static uint8_t loader_state_active = 0u;
+
 /* track3 scalars — extern'd here for use in load_track_scalars() */
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;
@@ -69,6 +76,9 @@ void load_track_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
+/* DEPRECATED: identical to load_track_tiles() — placeholder until track 2 gets its own tile data.
+ * Referenced as a function pointer in track.c TrackDef table; remove when per-track
+ * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
 void load_track2_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(track_tile_data));
@@ -76,6 +86,9 @@ void load_track2_tiles(void) NONBANKED {
     SWITCH_ROM(saved);
 }
 
+/* DEPRECATED: identical to load_track_tiles() — placeholder until track 3 gets its own tile data.
+ * Referenced as a function pointer in track.c TrackDef table; remove when per-track
+ * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
 void load_track3_tiles(void) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     SWITCH_ROM(BANK(track_tile_data));
@@ -240,6 +253,118 @@ static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
 static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
 
 
+void loader_set_track(uint8_t track_id) NONBANKED {
+    if (track_id > 2u) { disable_interrupts(); while (1) {} } /* assert: invalid track id */
+    loader_active_track = track_id;
+}
+
+/* Internal helper — allocates VRAM slots and writes tile data for one asset.
+ * Asserts (halts) if the registry entry has NULL data (self-managed asset) or
+ * if the VRAM region is exhausted. Does NOT check for double-load; callers enforce that.
+ * Uses a single SWITCH_ROM pair: reads count_ptr and writes tile data in one bank window. */
+static void loader_do_load_one(tile_asset_t asset) NONBANKED {
+    uint8_t saved;
+    uint8_t slot;
+    uint8_t tile_count;
+    uint8_t region_start;
+    uint8_t region_end;
+    const tile_registry_entry_t *entry;
+    entry = loader_get_registry(asset);
+    if (!entry || !entry->data) { disable_interrupts(); while (1) {} } /* assert: self-managed asset */
+    /* Determine region from is_sprite (bank-0 static table — always safe). */
+    if (entry->is_sprite) {
+        region_start = 0u;
+        region_end   = 63u;
+    } else {
+        region_start = 64u;
+        region_end   = 254u;
+    }
+    saved = CURRENT_BANK;
+    SWITCH_ROM(loader_get_asset_bank(asset));
+    tile_count = *entry->count_ptr;                      /* count lives in asset's bank */
+    slot = loader_alloc_slots(region_start, region_end, tile_count); /* NONBANKED — safe */
+    if (slot == 0xFFu) { SWITCH_ROM(saved); disable_interrupts(); while (1) {} }
+    loader_asset_slot[(uint8_t)asset] = slot;
+    if (entry->is_sprite) {
+        set_sprite_data(slot, tile_count, entry->data);
+    } else {
+        set_bkg_data(slot, tile_count, entry->data);
+    }
+    SWITCH_ROM(saved);
+}
+
+void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED {
+    uint8_t i;
+    if (loader_state_active) { disable_interrupts(); while (1) {} } /* assert: double-load */
+    for (i = 0u; i < count; i++) {
+        loader_do_load_one((tile_asset_t)assets[i]);
+    }
+    loader_state_active = 1u;
+}
+
+void loader_unload_state(void) NONBANKED {
+    uint8_t i;
+    uint8_t saved;
+    uint8_t slot;
+    uint8_t tile_count;
+    const tile_registry_entry_t *entry;
+    if (!loader_state_active) { disable_interrupts(); while (1) {} } /* assert: unload with no state loaded */
+    saved = CURRENT_BANK;
+    for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) {
+        slot = loader_asset_slot[i];
+        if (slot == 0xFFu) continue;
+        entry = loader_get_registry((tile_asset_t)i);
+        if (!entry || !entry->count_ptr) continue; /* self-managed — skip */
+        SWITCH_ROM(loader_get_asset_bank((tile_asset_t)i));
+        tile_count = *entry->count_ptr;              /* count lives in asset's bank */
+        SWITCH_ROM(saved);
+        loader_free_slots(slot, tile_count);
+        loader_asset_slot[i] = 0xFFu;
+    }
+    loader_state_active = 0u;
+}
+
+uint8_t loader_get_slot(tile_asset_t asset) NONBANKED {
+    uint8_t slot;
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) { disable_interrupts(); while (1) {} }
+    slot = loader_asset_slot[(uint8_t)asset];
+    if (slot == 0xFFu) { disable_interrupts(); while (1) {} } /* assert: asset not currently loaded */
+    return slot;
+}
+
+void loader_load_asset(tile_asset_t asset) NONBANKED {
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) { disable_interrupts(); while (1) {} }
+    if (loader_asset_slot[(uint8_t)asset] != 0xFFu) { disable_interrupts(); while (1) {} } /* assert: already loaded */
+    loader_do_load_one(asset);
+}
+
+/* ---- State manifests — ROM-resident, zero WRAM cost ---- */
+/* uint8_t arrays (not tile_asset_t) so each element is 1 byte;
+ * SDCC would otherwise emit 2-byte enum elements on SM83. */
+
+const uint8_t k_playing_assets[] = {
+    TILE_ASSET_PLAYER,
+    TILE_ASSET_BULLET,
+    TILE_ASSET_TURRET,
+    TILE_ASSET_TRACK,
+};
+const uint8_t k_playing_assets_count = (uint8_t)(sizeof(k_playing_assets) / sizeof(k_playing_assets[0]));
+
+const uint8_t k_overmap_assets[] = {
+    TILE_ASSET_OVERMAP_CAR,
+    TILE_ASSET_OVERMAP_BG,
+};
+const uint8_t k_overmap_assets_count = (uint8_t)(sizeof(k_overmap_assets) / sizeof(k_overmap_assets[0]));
+
+const uint8_t k_hub_assets[] = {
+    TILE_ASSET_DIALOG_ARROW,
+    TILE_ASSET_NPC_DRIFTER,
+    TILE_ASSET_NPC_MECHANIC,
+    TILE_ASSET_NPC_TRADER,
+    TILE_ASSET_DIALOG_BORDER,
+};
+const uint8_t k_hub_assets_count = (uint8_t)(sizeof(k_hub_assets) / sizeof(k_hub_assets[0]));
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;
@@ -249,6 +374,8 @@ void loader_reset_bitmap_for_test(void) {
     uint8_t i;
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+    loader_active_track = 0u;
+    loader_state_active = 0u;
 }
 #endif
 
@@ -256,6 +383,8 @@ void loader_init_allocator(void) NONBANKED {
     uint8_t i;
     for (i = 0u; i < 32u; i++) loader_vram_bitmap[i] = 0u;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) loader_asset_slot[i] = 0xFFu;
+    loader_active_track = 0u;
+    loader_state_active = 0u;
 }
 
 uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t count) NONBANKED {
@@ -322,8 +451,22 @@ static const tile_registry_entry_t loader_registry_tbl[TILE_ASSET_COUNT] = {
     { dialog_border_tiles,    &dialog_border_tiles_count,    0u }, /* DIALOG_BORDER — BG     */
 };
 
+/* Per-track BG tile registry — indexed by loader_active_track (0-2).
+ * All three currently point to track_tile_data (tracks 1 and 2 are placeholders).
+ * Replace entries when per-track tile assets are introduced. */
+static const tile_registry_entry_t loader_track_registry_tbl[3u] = {
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 0 */
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 1 — placeholder */
+    { track_tile_data, &track_tile_data_count, 0u }, /* track 2 — placeholder */
+};
+
 const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED {
     if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) return 0;
+    if ((uint8_t)asset == (uint8_t)TILE_ASSET_TRACK) {
+        if (loader_active_track == 1u) return &loader_track_registry_tbl[1];
+        if (loader_active_track == 2u) return &loader_track_registry_tbl[2];
+        return &loader_track_registry_tbl[0];
+    }
     return &loader_registry_tbl[(uint8_t)asset];
 }
 
@@ -334,7 +477,11 @@ uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
         case TILE_ASSET_TURRET:        return BANK(turret_tile_data);
         case TILE_ASSET_OVERMAP_CAR:   return BANK(overmap_car_tile_data);
         case TILE_ASSET_DIALOG_ARROW:  return BANK(dialog_arrow_tile_data);
-        case TILE_ASSET_TRACK:         return BANK(track_tile_data);
+        case TILE_ASSET_TRACK:
+            /* Mirror loader_track_registry_tbl — update in sync when per-track banks diverge. */
+            if (loader_active_track == 1u) return BANK(track_tile_data); /* track 1 — placeholder */
+            if (loader_active_track == 2u) return BANK(track_tile_data); /* track 2 — placeholder */
+            return BANK(track_tile_data); /* track 0 */
         case TILE_ASSET_OVERMAP_BG:    return BANK(overmap_tile_data);
         case TILE_ASSET_HUD_FONT:      return 0u;
         case TILE_ASSET_NPC_DRIFTER:   return BANK(npc_drifter_portrait);
