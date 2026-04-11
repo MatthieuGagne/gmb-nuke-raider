@@ -260,8 +260,9 @@ void loader_set_track(uint8_t track_id) NONBANKED {
 
 /* Internal helper — allocates VRAM slots and writes tile data for one asset.
  * Asserts (halts) if the registry entry has NULL data (self-managed asset) or
- * if the VRAM region is exhausted. Does NOT check for double-load; callers enforce that. */
-static void loader_do_load_one(tile_asset_t asset) {
+ * if the VRAM region is exhausted. Does NOT check for double-load; callers enforce that.
+ * Uses a single SWITCH_ROM pair: reads count_ptr and writes tile data in one bank window. */
+static void loader_do_load_one(tile_asset_t asset) NONBANKED {
     uint8_t saved;
     uint8_t slot;
     uint8_t tile_count;
@@ -270,7 +271,7 @@ static void loader_do_load_one(tile_asset_t asset) {
     const tile_registry_entry_t *entry;
     entry = loader_get_registry(asset);
     if (!entry || !entry->data) { disable_interrupts(); while (1) {} } /* assert: self-managed asset */
-    tile_count = *entry->count_ptr;
+    /* Determine region from is_sprite (bank-0 static table — always safe). */
     if (entry->is_sprite) {
         region_start = 0u;
         region_end   = 63u;
@@ -278,11 +279,12 @@ static void loader_do_load_one(tile_asset_t asset) {
         region_start = 64u;
         region_end   = 254u;
     }
-    slot = loader_alloc_slots(region_start, region_end, tile_count);
-    if (slot == 0xFFu) { disable_interrupts(); while (1) {} } /* assert: VRAM region exhausted */
-    loader_asset_slot[(uint8_t)asset] = slot;
     saved = CURRENT_BANK;
     SWITCH_ROM(loader_get_asset_bank(asset));
+    tile_count = *entry->count_ptr;                      /* count lives in asset's bank */
+    slot = loader_alloc_slots(region_start, region_end, tile_count); /* NONBANKED — safe */
+    if (slot == 0xFFu) { SWITCH_ROM(saved); disable_interrupts(); while (1) {} }
+    loader_asset_slot[(uint8_t)asset] = slot;
     if (entry->is_sprite) {
         set_sprite_data(slot, tile_count, entry->data);
     } else {
@@ -302,16 +304,20 @@ void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED {
 
 void loader_unload_state(void) NONBANKED {
     uint8_t i;
+    uint8_t saved;
     uint8_t slot;
     uint8_t tile_count;
     const tile_registry_entry_t *entry;
     if (!loader_state_active) { disable_interrupts(); while (1) {} } /* assert: unload with no state loaded */
+    saved = CURRENT_BANK;
     for (i = 0u; i < (uint8_t)TILE_ASSET_COUNT; i++) {
         slot = loader_asset_slot[i];
         if (slot == 0xFFu) continue;
         entry = loader_get_registry((tile_asset_t)i);
         if (!entry || !entry->count_ptr) continue; /* self-managed — skip */
-        tile_count = *entry->count_ptr;
+        SWITCH_ROM(loader_get_asset_bank((tile_asset_t)i));
+        tile_count = *entry->count_ptr;              /* count lives in asset's bank */
+        SWITCH_ROM(saved);
         loader_free_slots(slot, tile_count);
         loader_asset_slot[i] = 0xFFu;
     }
