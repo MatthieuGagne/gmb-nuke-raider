@@ -246,6 +246,34 @@ void test_load_state_multiple_assets_no_overlap(void) {
     TEST_ASSERT_TRUE(s2 <= 63u);
 }
 
+void test_get_slot_returns_valid_slot_after_load_state(void) {
+    static const tile_asset_t assets[] = { TILE_ASSET_PLAYER };
+    loader_load_state(assets, 1u);
+    uint8_t slot = loader_get_slot(TILE_ASSET_PLAYER);
+    TEST_ASSERT_TRUE(slot <= 63u);
+}
+
+void test_load_asset_assigns_sprite_slot(void) {
+    loader_load_asset(TILE_ASSET_BULLET);
+    uint8_t slot = loader_get_asset_slot(TILE_ASSET_BULLET);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    TEST_ASSERT_TRUE(slot <= 63u);
+}
+
+void test_load_asset_assigns_bg_slot(void) {
+    loader_load_asset(TILE_ASSET_OVERMAP_BG);
+    uint8_t slot = loader_get_asset_slot(TILE_ASSET_OVERMAP_BG);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    TEST_ASSERT_TRUE(slot >= 64u && slot <= 254u);
+}
+
+void test_load_asset_independent_of_state_flag(void) {
+    /* loader_load_asset should work with no state loaded */
+    /* setUp() resets bitmap and state_active = 0 */
+    loader_load_asset(TILE_ASSET_DIALOG_ARROW);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, loader_get_asset_slot(TILE_ASSET_DIALOG_ARROW));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_load_player_tiles_is_callable);
@@ -279,5 +307,9 @@ int main(void) {
     RUN_TEST(test_unload_state_clears_slot_table);
     RUN_TEST(test_unload_state_allows_realloc_same_slot);
     RUN_TEST(test_load_state_multiple_assets_no_overlap);
+    RUN_TEST(test_get_slot_returns_valid_slot_after_load_state);
+    RUN_TEST(test_load_asset_assigns_sprite_slot);
+    RUN_TEST(test_load_asset_assigns_bg_slot);
+    RUN_TEST(test_load_asset_independent_of_state_flag);
     return UNITY_END();
 }

@@ -324,6 +324,20 @@ void loader_unload_state(void) NONBANKED {
     loader_state_active = 0u;
 }
 
+uint8_t loader_get_slot(tile_asset_t asset) NONBANKED {
+    uint8_t slot;
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) { disable_interrupts(); while (1) {} }
+    slot = loader_asset_slot[(uint8_t)asset];
+    if (slot == 0xFFu) { disable_interrupts(); while (1) {} } /* assert: asset not currently loaded */
+    return slot;
+}
+
+void loader_load_asset(tile_asset_t asset) NONBANKED {
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_COUNT) { disable_interrupts(); while (1) {} }
+    if (loader_asset_slot[(uint8_t)asset] != 0xFFu) { disable_interrupts(); while (1) {} } /* assert: already loaded */
+    loader_do_load_one(asset);
+}
+
 #ifndef __SDCC
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank) {
     loader_active_map_ptr = map;

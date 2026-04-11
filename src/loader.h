@@ -129,6 +129,15 @@ void loader_load_state(const tile_asset_t *assets, uint8_t count) NONBANKED;
  * Asserts (halts) if no state is currently loaded. */
 void loader_unload_state(void) NONBANKED;
 
+/* Returns the VRAM slot assigned to `asset`.
+ * Asserts (halts) if the asset is not currently loaded.
+ * Use loader_get_asset_slot() for a non-asserting query (returns 0xFF if not loaded). */
+uint8_t loader_get_slot(tile_asset_t asset) NONBANKED;
+
+/* Allocates and loads a single asset outside a state manifest (e.g. dynamic portrait).
+ * Asserts (halts) if the asset is already loaded, out of range, or self-managed (NULL data). */
+void loader_load_asset(tile_asset_t asset) NONBANKED;
+
 #ifndef __SDCC
 /* Test-only seam: inject a synthetic active map without a hardware bank switch. */
 void loader_test_set_active_map(const uint8_t *map, uint8_t data_bank);
