@@ -99,7 +99,7 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **`map-expert`** — Autonomous map agent: executes end-to-end map creation pipeline AND holds domain knowledge (Tiled TMX format, Python converters (`tmx_to_c`, `png_to_tiles`), GB BG tilemap hardware). Use when creating or modifying maps. **Update this agent in the same PR** whenever the pipeline changes.
 - **`sprite-expert`** — Autonomous sprite agent: Aseprite pipeline, `png_to_tiles.py`, OAM management, CGB palettes, coordinate system, and end-to-end execution checklist with self-correction retry loop. Use when creating or modifying sprites. **Update this agent in the same PR** whenever the sprite system changes.
 - **`emulicious-debug`** — Step-through debugger, breakpoints, `EMU_printf`, memory/tile/sprite inspection, tracer, profiler, romusage. Appends a machine-readable `\`\`\`json` block as the last element of every response (schema: `bank`, `address`, `symptom`, `registers[]`, `stack_trace`, `hypothesis`; unknown fields emit `null`).
-- **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls.
+- **`music-expert`** — Music driver integration, hUGEDriver patterns, music_tick placement, bank-safe calls. Consultation mode: ask about audio issues, hUGEDriver API, channel routing. Implementation mode: dispatch with `"implement this task: <task text>"` to execute the full music pipeline end-to-end (export, BANKREF declarations, wiring, `music_song_validate.py` + `music_wire_check.py` validation, bank gates).
 
 ### Skills (in `.claude/skills/`, invoked with the Skill tool)
 

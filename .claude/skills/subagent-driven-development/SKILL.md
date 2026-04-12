@@ -113,7 +113,13 @@ When dispatching the implementer subagent, include ALL of the following in the p
 2. Scene-setting context (where this task fits in the overall feature)
 3. **C task routing:**
 
-   If the task creates or modifies `src/*.c` or `src/*.h`, the implementer IS `gbdk-expert`. Dispatch the `gbdk-expert` agent (Agent tool) with:
+   **Music C task** — if the task creates or modifies `src/music_data.c`, `src/music_data.h`, or any new song `.c` file, the implementer IS `music-expert`. Dispatch the `music-expert` agent (Agent tool) with:
+
+   > implement this task: <full task text from plan>
+
+   `music-expert` owns the full music pipeline: export, BANKREF declarations, `music_song_validate.py`, `music_wire_check.py`, bank-pre-write gate, build, bank-post-build gate, and commit. Do NOT include separate gate instructions — `music-expert`'s own body enforces them.
+
+   **All other C tasks** — if the task creates or modifies other `src/*.c` or `src/*.h` files, the implementer IS `gbdk-expert`. Dispatch the `gbdk-expert` agent (Agent tool) with:
 
    > implement this task: <full task text from plan>
 
