@@ -28,17 +28,17 @@
 
 **Double-enter hang in `test_state_hub.c`:** After `loader_load_state()` was added to `enter()`, three tests called `enter()` a second time (after setUp already called it) without resetting loader state — triggering the double-load assert (`while(1){}`). Fix: add `state_hub.exit(); loader_reset_bitmap_for_test();` before each extra `enter()` call. Documented in `gbdk-expert.md` and `test/SKILL.md`.
 
-### Smoketest Checkpoint 1 — BLOCKED
+### Smoketest Checkpoint 1 — PASSED (2026-04-11)
 
-**Hub crash:** Game crashed when entering the city hub. Root cause unknown — needs `systematic-debugging` investigation before Batch 2 can proceed.
+Two bugs found and fixed during systematic-debugging:
 
-**Suspected area:** `state_hub.c` `enter()` — the hub migration (Task 3) is the most invasive change. Possible causes:
-- `loader_get_slot(TILE_ASSET_DIALOG_ARROW)` returns wrong slot → `set_sprite_tile()` corrupts OAM
-- `s_border_slot` computed before enough state is initialized
-- `hub_render_menu()` runs before tiles are in VRAM (no `DISPLAY_OFF` guard around the full enter sequence)
-- Banking issue in `loader_load_state()` path from bank-0 state_hub code
+**Bug 1 — Double-load assert on `state_push` (`6686fa9`):**
+`state_push()` does not call the current state's `exit()`, so `loader_state_active` stayed `true` when hub's `enter()` called `loader_load_state()` → hit `disable_interrupts(); while(1){}` → complete freeze.
+Fix: changed the assert in `loader_load_state()` to auto-unload the suspended state first.
 
-**Next step:** Run `systematic-debugging` to find root cause before continuing with Batch 2.
+**Bug 2 — BG allocation overwrote GBDK printf font (`dcbd2e5`):**
+Loader BG region started at tile 64, overwriting GBDK's ASCII-indexed printf() font (tiles 0–127). Hub uses `printf()` for NPC names → garbled text.
+Fix: promoted `HUD_FONT_BASE`/`HUD_FONT_COUNT` to `config.h`; derived `LOADER_BG_START = 143` from them; loader now uses `LOADER_BG_START` for the BG region floor.
 
 ---
 
