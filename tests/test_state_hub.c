@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "state_hub.h"
+#include "loader.h"
 #include "config.h"
 #include "input.h"
 #include "music.h"
@@ -12,6 +13,7 @@ static void tick(uint8_t btn) {
 }
 
 void setUp(void) {
+    loader_reset_bitmap_for_test(); /* clear loader state so enter() can call loader_load_state() */
     input = 0; prev_input = 0;
     state_hub.enter();
 }
@@ -19,6 +21,8 @@ void tearDown(void) {}
 
 void test_enter_clears_hub_entered_flag(void) {
     overmap_hub_entered = 1u;
+    state_hub.exit();
+    loader_reset_bitmap_for_test();
     state_hub.enter();
     TEST_ASSERT_EQUAL_UINT8(0u, overmap_hub_entered);
 }
@@ -79,6 +83,8 @@ void test_hub_clear_does_not_write_rows_18_to_31(void) {
      * If cls() is still present, it writes rows 0-31 via GBDK internals —
      * but in the host mock, cls() is a no-op, so this test catches the
      * case where our new clear_visible_rows() accidentally clears beyond row 17. */
+    state_hub.exit();
+    loader_reset_bitmap_for_test();
     mock_vram_clear();
     state_hub.enter();
     TEST_ASSERT_LESS_OR_EQUAL_UINT8(17u, mock_set_bkg_tile_xy_max_row);
@@ -88,6 +94,8 @@ void test_hub_cursor_move_does_not_trigger_full_clear(void) {
     /* A cursor keypress must NOT call set_bkg_tile_xy (dirty update only).
      * Before the fix, hub_render_menu() was called on every keypress,
      * which would invoke clear_visible_rows() and increment the count. */
+    state_hub.exit();
+    loader_reset_bitmap_for_test();
     state_hub.enter();
     mock_set_bkg_tile_xy_reset();   /* reset counter AFTER enter (enter legitimately clears) */
     tick(J_DOWN);                   /* move cursor — should only write 2 console tiles */

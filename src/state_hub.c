@@ -11,11 +11,6 @@
 #include "dialog.h"
 #include "loader.h"
 #include "config.h"
-#include "npc_mechanic_portrait.h"
-#include "npc_trader_portrait.h"
-#include "npc_drifter_portrait.h"
-#include "dialog_arrow_sprite.h"
-#include "dialog_border_tiles.h"
 #include "music.h"
 #include "sfx.h"
 
@@ -47,6 +42,42 @@ static const HubDef     *hub;
 static uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
 static uint8_t           dialog_page_start;   /* char offset of currently-shown page (0 = beginning) */
 static uint8_t           dialog_next_offset;  /* return of last render_wrapped; 0 = no overflow */
+
+static uint8_t           s_portrait_slot;     /* VRAM slot of active NPC portrait (16 tiles) */
+static uint8_t           s_border_slot;       /* VRAM slot of dialog border tileset (8 tiles) */
+
+/* portrait tile map and border tile rows — rebuilt at runtime via hub_rebuild_tile_maps() */
+static uint8_t portrait_map[16];
+static uint8_t portrait_top[HUB_PORTRAIT_BOX_W];
+static uint8_t portrait_side[HUB_PORTRAIT_BOX_W];
+static uint8_t portrait_bot[HUB_PORTRAIT_BOX_W];
+static uint8_t dialog_top[HUB_DIALOG_BOX_W];
+static uint8_t dialog_side[HUB_DIALOG_BOX_W];
+static uint8_t dialog_bot[HUB_DIALOG_BOX_W];
+
+static const uint8_t portrait_offsets[16] = {
+    0u,4u,8u,12u, 1u,5u,9u,13u, 2u,6u,10u,14u, 3u,7u,11u,15u
+};
+
+static void hub_rebuild_tile_maps(void) {
+    uint8_t i;
+    uint8_t bl = s_border_slot;
+    for (i = 0u; i < 16u; i++) portrait_map[i] = s_portrait_slot + portrait_offsets[i];
+
+    portrait_top[0]=bl;    portrait_top[1]=bl+1u; portrait_top[2]=bl+1u;
+    portrait_top[3]=bl+1u; portrait_top[4]=bl+1u; portrait_top[5]=bl+2u;
+    portrait_side[0]=bl+3u; portrait_side[1]=0u;  portrait_side[2]=0u;
+    portrait_side[3]=0u;    portrait_side[4]=0u;  portrait_side[5]=bl+4u;
+    portrait_bot[0]=bl+5u; portrait_bot[1]=bl+6u; portrait_bot[2]=bl+6u;
+    portrait_bot[3]=bl+6u; portrait_bot[4]=bl+6u; portrait_bot[5]=bl+7u;
+
+    dialog_top[0] =bl;    dialog_top[13]=bl+2u;
+    { uint8_t j; for (j=1u; j<13u; j++) dialog_top[j]=bl+1u; }
+    dialog_side[0]=bl+3u; dialog_side[13]=bl+4u;
+    { uint8_t j; for (j=1u; j<13u; j++) dialog_side[j]=0u; }
+    dialog_bot[0] =bl+5u; dialog_bot[13]=bl+7u;
+    { uint8_t j; for (j=1u; j<13u; j++) dialog_bot[j]=bl+6u; }
+}
 
 uint8_t hub_get_cursor(void)    { return cursor; }
 uint8_t hub_get_sub_state(void) { return sub_state; }
@@ -128,43 +159,13 @@ uint8_t render_wrapped(const char *text, uint8_t start_col, uint8_t start_row,
     return finished ? 0u : word_start;
 }
 
-#define BRD_TL (HUB_BORDER_TILE_SLOT + 0u)
-#define BRD_T  (HUB_BORDER_TILE_SLOT + 1u)
-#define BRD_TR (HUB_BORDER_TILE_SLOT + 2u)
-#define BRD_L  (HUB_BORDER_TILE_SLOT + 3u)
-#define BRD_R  (HUB_BORDER_TILE_SLOT + 4u)
-#define BRD_BL (HUB_BORDER_TILE_SLOT + 5u)
-#define BRD_B  (HUB_BORDER_TILE_SLOT + 6u)
-#define BRD_BR (HUB_BORDER_TILE_SLOT + 7u)
-
 static void hub_render_dialog(void) {
     uint8_t num_choices;
     uint8_t i;
-    /* portrait_map: corrected for column-major tile order from png_to_tiles.py.
-     * Tile array index = tx*4+ty (col-major). For visual row r, col c:
-     * tile index = c*4+r → VRAM slot = HUB_PORTRAIT_TILE_SLOT + c*4+r.
-     * portrait_map[r*4+c] = HUB_PORTRAIT_TILE_SLOT + c*4+r */
-    static const uint8_t portrait_map[16] = {
-        HUB_PORTRAIT_TILE_SLOT,        HUB_PORTRAIT_TILE_SLOT + 4u,
-        HUB_PORTRAIT_TILE_SLOT + 8u,   HUB_PORTRAIT_TILE_SLOT + 12u,
-        HUB_PORTRAIT_TILE_SLOT + 1u,   HUB_PORTRAIT_TILE_SLOT + 5u,
-        HUB_PORTRAIT_TILE_SLOT + 9u,   HUB_PORTRAIT_TILE_SLOT + 13u,
-        HUB_PORTRAIT_TILE_SLOT + 2u,   HUB_PORTRAIT_TILE_SLOT + 6u,
-        HUB_PORTRAIT_TILE_SLOT + 10u,  HUB_PORTRAIT_TILE_SLOT + 14u,
-        HUB_PORTRAIT_TILE_SLOT + 3u,   HUB_PORTRAIT_TILE_SLOT + 7u,
-        HUB_PORTRAIT_TILE_SLOT + 11u,  HUB_PORTRAIT_TILE_SLOT + 15u,
-    };
+    /* portrait_map, portrait_top/side/bot, dialog_top/side/bot are module-level statics
+     * populated by hub_rebuild_tile_maps() before hub_render_dialog() is called. */
 
     /* WRAM cache already populated by loader_dialog_cache_node — no bank switch needed. */
-
-    /* portrait box border rows (6 tiles wide: cols 0-5) */
-    static const uint8_t portrait_top[HUB_PORTRAIT_BOX_W]  = {BRD_TL, BRD_T,  BRD_T,  BRD_T,  BRD_T,  BRD_TR};
-    static const uint8_t portrait_side[HUB_PORTRAIT_BOX_W] = {BRD_L,  0u,     0u,     0u,     0u,     BRD_R };
-    static const uint8_t portrait_bot[HUB_PORTRAIT_BOX_W]  = {BRD_BL, BRD_B,  BRD_B,  BRD_B,  BRD_B,  BRD_BR};
-    /* dialog box border rows (14 tiles wide: cols 6-19) */
-    static const uint8_t dialog_top[HUB_DIALOG_BOX_W]  = {BRD_TL, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_T, BRD_TR};
-    static const uint8_t dialog_side[HUB_DIALOG_BOX_W] = {BRD_L,  0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    0u,    BRD_R };
-    static const uint8_t dialog_bot[HUB_DIALOG_BOX_W]  = {BRD_BL, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_B, BRD_BR};
 
     /* --- Draw portrait box border (cols 0-5, rows 0-7) using BG tiles --- */
     set_bkg_tiles(0u, 0u, HUB_PORTRAIT_BOX_W, 1u, portrait_top);
@@ -223,37 +224,12 @@ static void hub_render_dialog(void) {
     }
     } /* end if (dialog_next_offset == 0u) */
 }
-#undef BRD_TL
-#undef BRD_T
-#undef BRD_TR
-#undef BRD_L
-#undef BRD_R
-#undef BRD_BL
-#undef BRD_B
-#undef BRD_BR
 
 /* ── Logic helpers ──────────────────────────────────────────────────────── */
 
-static void load_portrait(uint8_t npc_idx) {
-    /* wait_vbl_done() removed: callers already turn DISPLAY_OFF before
-     * calling here, so VRAM is freely accessible — no VBlank sync needed. */
-    if (npc_idx == 0u) {
-        { SET_BANK(npc_mechanic_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_mechanic_portrait);
-          RESTORE_BANK(); }
-    } else if (npc_idx == 1u) {
-        { SET_BANK(npc_trader_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_trader_portrait);
-          RESTORE_BANK(); }
-    } else {
-        { SET_BANK(npc_drifter_portrait);
-          set_bkg_data(HUB_PORTRAIT_TILE_SLOT, 16u, npc_drifter_portrait);
-          RESTORE_BANK(); }
-    }
-}
-
 static void hub_start_dialog(uint8_t npc_cursor) {
     uint8_t npc_id;
+    tile_asset_t portrait_asset;
     active_npc         = npc_cursor;
     dialog_cursor      = 0u;
     dialog_prev_cursor = 0u;
@@ -262,13 +238,21 @@ static void hub_start_dialog(uint8_t npc_cursor) {
     npc_id = hub->npc_dialog_ids[npc_cursor];
     loader_dialog_cache_node(npc_id, 0u);
     dialog_start(npc_id);
+    /* Resolve portrait asset slot from NPC cursor position:
+     * 0=mechanic, 1=trader, 2=drifter — mirrors old load_portrait() logic. */
+    if (npc_cursor == 0u) {
+        portrait_asset = TILE_ASSET_NPC_MECHANIC;
+    } else if (npc_cursor == 1u) {
+        portrait_asset = TILE_ASSET_NPC_TRADER;
+    } else {
+        portrait_asset = TILE_ASSET_NPC_DRIFTER;
+    }
+    s_portrait_slot = loader_get_slot(portrait_asset);
+    hub_rebuild_tile_maps();
     sub_state = HUB_SUB_DIALOG;
     vbl_display_off();         /* tick music + disable LCD in 1 VBlank */
     clear_visible_rows();       /* was: cls() */
-    load_portrait(npc_cursor);
-    { SET_BANK(dialog_border_tiles);
-      set_bkg_data(HUB_BORDER_TILE_SLOT, 8u, dialog_border_tiles);
-      RESTORE_BANK(); }
+    /* Tiles already in VRAM via loader_load_state() — no SET_BANK/set_bkg_data needed. */
     hub_render_dialog();
     DISPLAY_ON;
 }
@@ -360,6 +344,8 @@ static void enter(void) {
     dialog_prev_cursor = 0u;
     dialog_page_start  = 0u;
     dialog_next_offset = 0u;
+    loader_load_state(k_hub_assets, k_hub_assets_count);
+    s_border_slot = loader_get_slot(TILE_ASSET_DIALOG_BORDER);
     /* clear all 4 player OAM slots (player uses pool slots 0-3 for 2x2 grid) */
     move_sprite(0u, 0u, 0u);
     move_sprite(1u, 0u, 0u);
@@ -367,10 +353,7 @@ static void enter(void) {
     move_sprite(3u, 0u, 0u);
     move_sprite(DIALOG_ARROW_OAM_SLOT, 0u, 0u);
     DISPLAY_OFF;
-    { SET_BANK(dialog_arrow_tile_data);
-      set_sprite_data(DIALOG_ARROW_TILE_BASE, dialog_arrow_tile_data_count, dialog_arrow_tile_data);
-      RESTORE_BANK(); }
-    set_sprite_tile(DIALOG_ARROW_OAM_SLOT, DIALOG_ARROW_TILE_BASE);
+    set_sprite_tile(DIALOG_ARROW_OAM_SLOT, loader_get_slot(TILE_ASSET_DIALOG_ARROW));
     hub_render_menu();
     DISPLAY_ON;
     SHOW_BKG;
@@ -381,6 +364,8 @@ static void update(void) {
     else                            { update_dialog(); }
 }
 
-static void hub_exit(void) {}
+static void hub_exit(void) {
+    loader_unload_state();
+}
 
 const State state_hub = { 0, enter, update, hub_exit };
