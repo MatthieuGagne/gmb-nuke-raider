@@ -10,8 +10,20 @@ tile values (0=off-track, 1=road, etc.).
 import sys
 import xml.etree.ElementTree as ET
 
-# Top 4 bits of a 32-bit GID encode H/V/D flip and hex rotation — never tile data.
-GID_CLEAR_FLAGS = 0x0FFFFFFF
+# Top 3 bits of a 32-bit GID encode H/V/D flip — never tile data.
+GID_CLEAR_FLAGS = 0x1FFFFFFF  # strip only top 3 flag bits (H=31, V=30, D=29)
+
+GID_FLAG_H = 0x80000000
+GID_FLAG_V = 0x40000000
+GID_FLAG_D = 0x20000000
+
+
+def gid_to_flags(gid: int) -> int:
+    """Extract 3-bit rotation flags from a GID (H=bit2, V=bit1, D=bit0)."""
+    h = 1 if (gid & GID_FLAG_H) else 0
+    v = 1 if (gid & GID_FLAG_V) else 0
+    d = 1 if (gid & GID_FLAG_D) else 0
+    return (h << 2) | (v << 1) | d
 
 # NPC type → numeric constant. Must match NPC_TYPE_* in src/config.h.
 NPC_TYPE_MAP = {
@@ -39,16 +51,63 @@ POWERUP_TYPE_MAP = {
 MAX_POWERUPS = 4  # Must match MAX_POWERUPS in src/config.h.
 
 
-def gid_to_tile_id(gid: int, firstgid: int) -> int:
+def gid_to_tile_id(gid: int, firstgid: int, id_map=None) -> int:
     """Convert a Tiled GID to a 0-indexed GB tile ID.
 
-    GID 0 (empty cell) maps to 0, matching track.c's `!= 0u` on-track check.
-    Flip flags (bits 28-31) are stripped before subtracting firstgid.
+    If id_map is provided, resolves rotated variants to their assigned tile IDs.
+    If id_map is None (backward compat), strips flags like before.
     """
     if gid == 0:
         return 0
-    gid &= GID_CLEAR_FLAGS
-    return gid - firstgid
+    flags = gid_to_flags(gid)
+    base_id = (gid & GID_CLEAR_FLAGS) - firstgid
+    if flags == 0 or id_map is None:
+        return base_id
+    key = f"{base_id}:{flags}"
+    return id_map["variants"].get(key, base_id)
+
+
+def parse_rotation_manifest(tmx_contents, firstgid=1):
+    """Parse unique (base_tile_id, flags) combos from a list of TMX content strings.
+
+    Returns dict: {str(base_id): sorted list of flags}. Identity (flags=0) excluded.
+    The firstgid parameter is ignored — it is read from each TMX tileset element.
+    """
+    rotations = {}
+    for content in tmx_contents:
+        root = ET.fromstring(content)
+        tileset = root.find("tileset")
+        fgid = int(tileset.get("firstgid", firstgid)) if tileset is not None else firstgid
+        for layer in root.findall("layer"):
+            data = layer.find("data")
+            if data is None:
+                continue
+            for token in data.text.strip().split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                gid = int(token, 0)  # handles hex (0x...) and decimal
+                if gid == 0:
+                    continue
+                flags = gid_to_flags(gid)
+                if flags == 0:
+                    continue
+                base_id = (gid & GID_CLEAR_FLAGS) - fgid
+                key = str(base_id)
+                rotations.setdefault(key, set()).add(flags)
+    return {k: sorted(v) for k, v in rotations.items()}
+
+
+def collect_rotation_manifest(tmx_paths):
+    """Scan TMX files and collect unique (base_tile_id, flags) pairs.
+
+    Returns dict: {str(base_id): sorted list of flags}. Identity (flags=0) excluded.
+    """
+    contents = []
+    for path in tmx_paths:
+        with open(path) as f:
+            contents.append(f.read())
+    return parse_rotation_manifest(contents)
 
 
 def parse_npc_objects(root):
@@ -136,7 +195,7 @@ def parse_powerup_objects(root):
     return powerups
 
 
-def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None):
+def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_map=None):
     tree = ET.parse(tmx_path)
     root = tree.getroot()
 
@@ -163,7 +222,7 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None):
                 map_type_val = 0 if val == 'race' else 1
 
     raw      = data_el.text.strip()
-    tile_ids = [gid_to_tile_id(int(x), firstgid) for x in raw.split(',') if x.strip()]
+    tile_ids = [gid_to_tile_id(int(x), firstgid, id_map=id_map) for x in raw.split(',') if x.strip()]
 
     if len(tile_ids) != width * height:
         raise ValueError(
@@ -398,6 +457,15 @@ if __name__ == '__main__':
         parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
         args = parser.parse_args()
         emit_powerup_header(args.emit_powerup_header, args.tmx)
+    elif '--emit-rotation-manifest' in sys.argv:
+        import json
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--emit-rotation-manifest', metavar='OUTPUT', required=True)
+        parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
+        args = parser.parse_args()
+        manifest = collect_rotation_manifest(args.tmx)
+        with open(args.emit_rotation_manifest, 'w') as f:
+            json.dump({"rotations": manifest}, f, indent=2)
     elif '--emit-header' in sys.argv:
         parser = argparse.ArgumentParser()
         parser.add_argument('--emit-header', metavar='OUT_H', required=True,
@@ -410,5 +478,12 @@ if __name__ == '__main__':
         parser.add_argument('tmx_path')
         parser.add_argument('out_path')
         parser.add_argument('--prefix', default='track')
+        parser.add_argument('--id-map', metavar='PATH',
+                            help='Path to track_tile_id_map.json for resolving rotated tile IDs')
         args = parser.parse_args()
-        tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix)
+        id_map = None
+        if args.id_map:
+            import json
+            with open(args.id_map) as f:
+                id_map = json.load(f)
+        tmx_to_c(args.tmx_path, args.out_path, prefix=args.prefix, id_map=id_map)
