@@ -54,6 +54,7 @@ static void enter(void) {
     DISPLAY_OFF;
     track_init();
     checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
+    camera_set_tile_base(loader_get_slot(TILE_ASSET_TRACK));
     camera_init(player_get_x(), player_get_y());
     hud_init(track_get_map_type(), track_get_lap_count());
     hud_set_lap(lap_get_current(), lap_get_total());

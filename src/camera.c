@@ -8,6 +8,8 @@ volatile uint8_t  cam_scy_shadow;
 volatile uint16_t cam_x;
 volatile uint8_t  cam_scx_shadow;
 
+static uint8_t s_track_tile_base;
+
 /* Clamp signed v to [0, max]. */
 static uint16_t clamp_cam(int16_t v, uint16_t max) {
     if (v < 0) return 0u;
@@ -33,7 +35,11 @@ static void stream_row(uint8_t world_ty) {
     uint8_t vram_y = world_ty & 31u;
     uint8_t vram_x = cam_tile_x_snap & 31u;
     uint8_t first_count;
+    uint8_t i;
     track_fill_row_range(world_ty, cam_tile_x_snap, VIS_COLS, row_buf);
+    if (s_track_tile_base) {
+        for (i = 0u; i < VIS_COLS; i++) row_buf[i] = (uint8_t)(row_buf[i] + s_track_tile_base);
+    }
     if ((uint8_t)(vram_x + VIS_COLS) > 32u) {
         /* Window crosses BG ring boundary — split into two calls */
         first_count = 32u - vram_x;
@@ -53,7 +59,11 @@ static void stream_col(uint8_t world_tx) {
     uint8_t vram_x = world_tx & 31u;
     uint8_t vram_y = cam_tile_y & 31u;
     uint8_t first_count;
+    uint8_t i;
     track_fill_col(world_tx, cam_tile_y, VIS_ROWS, col_buf);
+    if (s_track_tile_base) {
+        for (i = 0u; i < VIS_ROWS; i++) col_buf[i] = (uint8_t)(col_buf[i] + s_track_tile_base);
+    }
     if ((uint8_t)(vram_y + VIS_ROWS) > 32u) {
         first_count = 32u - vram_y;
         set_bkg_tiles(vram_x, vram_y, 1u, first_count, col_buf);
@@ -82,7 +92,11 @@ static void stream_row_direct(uint8_t world_ty) {
     uint8_t vram_y = world_ty & 31u;
     uint8_t vram_x = cam_tile_x_snap & 31u;
     uint8_t first_count;
+    uint8_t i;
     track_fill_row_range(world_ty, cam_tile_x_snap, VIS_COLS, row_buf);
+    if (s_track_tile_base) {
+        for (i = 0u; i < VIS_COLS; i++) row_buf[i] = (uint8_t)(row_buf[i] + s_track_tile_base);
+    }
     if ((uint8_t)(vram_x + VIS_COLS) > 32u) {
         first_count = 32u - vram_x;
         set_bkg_tiles(vram_x, vram_y, first_count, 1u, row_buf);
@@ -94,6 +108,10 @@ static void stream_row_direct(uint8_t world_ty) {
 }
 
 /* --- Public API ---------------------------------------------------------- */
+
+void camera_set_tile_base(uint8_t tile_base) BANKED {
+    s_track_tile_base = tile_base;
+}
 
 void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED {
     uint8_t ty;

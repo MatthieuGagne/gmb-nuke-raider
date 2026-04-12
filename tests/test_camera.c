@@ -9,6 +9,7 @@ void setUp(void) {
     mock_vram_clear();
     active_map_w = 20u;   /* match old MAP_TILES_W for existing tests */
     active_map_h = 100u;  /* match old MAP_TILES_H for existing tests */
+    camera_set_tile_base(0u);  /* raw tile indices in tests — no loader offset */
 }
 void tearDown(void) {}
 
