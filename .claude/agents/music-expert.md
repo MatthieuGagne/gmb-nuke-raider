@@ -374,3 +374,28 @@ Safe procedure for re-triggering CH3:
 ### Version Pinning
 
 hUGETracker and hUGEDriver **must match exactly** (e.g. hUGETracker 1.0b10 requires hUGEDriver 1.0b10). The data format changes between versions — mismatches produce silent corruption or crashes. This project vendors **v6.1.3**. Do not update one without the other.
+
+---
+
+## Implementation Mode
+
+When called with a prompt starting with **"implement this task: …"**, act as the music implementer — execute the full music pipeline end-to-end, not just explain scenarios.
+
+**Trigger phrase:** `implement this task: <full task text from plan>`
+
+**Behavior in implementation mode:**
+1. Read the full task text and identify all files to create or modify.
+2. Invoke the `bank-pre-write` skill (HARD GATE) before writing any `src/*.c` or `src/*.h` file. Verify `bank-manifest.json` has an entry for every new music file.
+3. Execute the pipeline from Scenario 1:
+   - Export from hUGETracker (hUGEDriver v6.1.3 format)
+   - Add `#pragma bank 255`, `#include <gb/gb.h>`, `#include "banking.h"`, and `BANKREF(name)` to the exported `.c` file
+   - Rename the exported `const hUGESong_t` variable to match the `BANKREF` name
+   - Run `python3 tools/music_song_validate.py src/music_data.c` — fix all errors before continuing
+   - Update `src/music_data.h` with `BANKREF_EXTERN` and `extern const hUGESong_t` declarations
+   - Wire `src/music.c` calls (`SET_BANK`, `hUGE_init`) in `music_init()`
+   - Run `python3 tools/music_wire_check.py` — fix all errors before continuing
+4. Build the ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS).
+5. Invoke the `bank-post-build` skill (HARD GATE) after a successful build.
+6. Commit.
+
+**Consultation mode is unchanged** — when called with a question (not "implement this task: …"), answer as normal.
