@@ -295,7 +295,7 @@ static void loader_do_load_one(tile_asset_t asset) NONBANKED {
 
 void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED {
     uint8_t i;
-    if (loader_state_active) { disable_interrupts(); while (1) {} } /* assert: double-load */
+    if (loader_state_active) { loader_unload_state(); } /* push path: unload suspended state first */
     for (i = 0u; i < count; i++) {
         loader_do_load_one((tile_asset_t)assets[i]);
     }
