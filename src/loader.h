@@ -37,9 +37,13 @@ void load_powerup_positions(uint8_t id,
                              uint8_t *out_type,
                              uint8_t *out_count) NONBANKED;
 
-/* Reads start position and map type for track `id` from their ROM bank.
- * NONBANKED — safe to call from any bank. */
-void load_track_scalars(uint8_t id, int16_t *sx, int16_t *sy, uint8_t *mtype) NONBANKED;
+/* Reads start position, map type, lap count, and finish direction for track `id`.
+ * All scalars are read in a single SWITCH_ROM — all live in the same bank 255 file. */
+void load_track_scalars(uint8_t id,
+                        int16_t *sx, int16_t *sy,
+                        uint8_t *mtype,
+                        uint8_t *lap_count,
+                        uint8_t *finish_dir) NONBANKED;
 
 /* NONBANKED tile-read helpers — switch to the active track's data bank,
  * copy the requested data, and restore. Call from BANKED code in track.c. */

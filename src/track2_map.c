@@ -16,6 +16,12 @@ const uint8_t track2_finish_line_y = 6;
 BANKREF(track2_map_type)
 const uint8_t track2_map_type = 0u;
 
+BANKREF(track2_lap_count)
+const uint8_t track2_lap_count = 3u;
+
+BANKREF(track2_finish_direction)
+const uint8_t track2_finish_direction = 1u; /* S */
+
 BANKREF(track2_map)
 const uint8_t track2_map[2002] = {
     /* header */ 20, 100,

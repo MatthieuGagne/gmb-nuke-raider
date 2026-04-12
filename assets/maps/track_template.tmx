@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.0" orientation="orthogonal" renderorder="right-down" width="20" height="8" tilewidth="8" tileheight="8" infinite="0" nextlayerid="7" nextobjectid="10">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+  <property name="map_type" value="race"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="20" height="8">
+  <data encoding="csv">
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,
+1,1,1,1,7,7,7,7,7,7,7,7,7,7,7,7,1,1,1,1,
+1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="80" y="8">
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="48" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="4" name="checkpoints">
+  <object id="3" x="32" y="32" width="96" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+    <property name="index" type="int" value="0"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="enemies"/>
+ <objectgroup id="6" name="powerups"/>
+</map>

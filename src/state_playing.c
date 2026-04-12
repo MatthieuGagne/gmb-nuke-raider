@@ -24,14 +24,22 @@ BANKREF_EXTERN(state_playing)
 
 static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
 static uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
+static uint8_t finish_dir_cache;    /* cached at enter(); CHECKPOINT_DIR_N/S/E/W */
 
 #ifndef __SDCC
 uint8_t
 #else
 static uint8_t
 #endif
-finish_eval(uint8_t map_type, uint8_t armed, int8_t pvy, uint8_t cps_cleared) {
-    if (!armed || pvy <= 0) return 0u;
+finish_eval(uint8_t map_type, uint8_t armed,
+            int8_t pvx, int8_t pvy,
+            uint8_t finish_dir,
+            uint8_t cps_cleared) {
+    if (!armed) return 0u;
+    if      (finish_dir == CHECKPOINT_DIR_N) { if (pvy >= 0) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_S) { if (pvy <= 0) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_E) { if (pvx <= 0) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_W) { if (pvx >= 0) return 0u; }
     if (map_type == TRACK_TYPE_COMBAT) return 1u;
     return cps_cleared;
 }
@@ -50,6 +58,7 @@ static void enter(void) {
     powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
+    finish_dir_cache = track_get_finish_direction();
     finish_armed = 1u;
     DISPLAY_OFF;
     track_init();
@@ -110,7 +119,8 @@ static void update(void) {
          * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
-            if (finish_eval(active_map_type_cache, finish_armed, pvy,
+            if (finish_eval(active_map_type_cache, finish_armed,
+                            pvx, pvy, finish_dir_cache,
                             checkpoint_all_cleared())) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
