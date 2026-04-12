@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "track.h"
+#include "track_tileset_meta.h"
 
 #ifndef __SDCC
 /* Seam declared in track.h — set synthetic map for wide-map index math test */
@@ -92,18 +93,26 @@ void test_tile_type_from_index_oil(void) {
 void test_tile_type_from_index_boost(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
 }
-/* After LUT shrink: tile indices 7 and 8 are OOB → road (passable).
- * tile_data_count stays 9 — tileset PNG unchanged; only LUT shrank. */
+/* After refactor: generated LUT has 9 entries (TRACK_TILE_LUT_LEN == 9u).
+ * Indices 7 and 8 are now valid LUT entries (TILE_ROAD).
+ * OOB indices (>= TRACK_TILE_LUT_LEN) return TILE_WALL for safety. */
 void test_tile_lut_len_is_7(void) {
-    /* Tile index 6 = TILE_FINISH — last valid LUT entry */
+    /* TRACK_TILE_LUT_LEN from generated track_tileset_meta.h */
+    TEST_ASSERT_EQUAL_UINT8(9u, TRACK_TILE_LUT_LEN);
+    /* Tile index 6 = TILE_FINISH — still in LUT */
     TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6u));
-    /* Tile index 7 = OOB → treated as road */
+    /* Tile index 7 = TILE_ROAD (in-LUT rotated variant) */
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(7u));
-    /* Tile index 8 = OOB → treated as road */
+    /* Tile index 8 = TILE_ROAD (in-LUT rotated variant) */
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(8u));
 }
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
-    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(99));
+    /* After refactor: OOB index returns TILE_WALL (safe default), not TILE_ROAD. */
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type_from_index(99));
+}
+void test_track_tile_type_from_index_oob_returns_wall(void) {
+    /* After refactor: OOB index returns TILE_WALL (safe default), not TILE_ROAD. */
+    TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type_from_index(99));
 }
 void test_finish_tile_is_finish(void) {
     /* tile index 6 must now be TILE_FINISH (passable, triggers lap detection) */
@@ -327,6 +336,7 @@ int main(void) {
     RUN_TEST(test_tile_type_from_index_boost);
     RUN_TEST(test_tile_lut_len_is_7);
     RUN_TEST(test_tile_type_from_index_unknown_defaults_to_road);
+    RUN_TEST(test_track_tile_type_from_index_oob_returns_wall);
     RUN_TEST(test_finish_tile_is_finish);
     RUN_TEST(test_track_tile_type_road);
     RUN_TEST(test_track_tile_type_wall);
