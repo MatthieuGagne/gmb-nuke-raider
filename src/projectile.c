@@ -4,7 +4,6 @@
 #include "projectile.h"
 #include "player.h"
 #include "sprite_pool.h"
-#include "loader.h"
 #include "camera.h"
 #include "track.h"
 #include "config.h"
@@ -22,11 +21,13 @@ static uint8_t proj_ttl[MAX_PROJECTILES];
 static uint8_t proj_oam[MAX_PROJECTILES];  /* OAM slot assigned to each bullet */
 
 static uint8_t proj_cooldown_tick = 0u;    /* frames until next fire is allowed */
+static uint8_t s_proj_tile_base   = 0u;    /* VRAM sprite tile slot, set by projectile_init() */
 
 /* ── init ──────────────────────────────────────────────────────────────── */
 
-void projectile_init(void) BANKED {
+void projectile_init(uint8_t tile_base) BANKED {
     uint8_t i;
+    s_proj_tile_base = tile_base;
     for (i = 0u; i < MAX_PROJECTILES; i++) {
         if (proj_active[i]) {
             clear_sprite(proj_oam[i]);
@@ -34,7 +35,6 @@ void projectile_init(void) BANKED {
         proj_active[i] = 0u;
     }
     proj_cooldown_tick = 0u;
-    load_bullet_tiles();
 }
 
 /* ── fire ──────────────────────────────────────────────────────────────── */
@@ -60,7 +60,7 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t own
             proj_oam[i]    = oam;
             proj_active[i] = 1u;
 
-            set_sprite_tile(oam, PROJ_TILE_BASE);
+            set_sprite_tile(oam, s_proj_tile_base);
             if (owner == PROJ_OWNER_PLAYER) {
                 proj_cooldown_tick = PROJ_FIRE_COOLDOWN;
             }

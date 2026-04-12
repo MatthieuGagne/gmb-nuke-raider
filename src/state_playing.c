@@ -39,12 +39,13 @@ finish_eval(uint8_t map_type, uint8_t armed, int8_t pvy, uint8_t cps_cleared) {
 static void enter(void) {
     loader_set_track(track_get_id());
     loader_load_state(k_playing_assets, k_playing_assets_count);
+    player_init(loader_get_slot(TILE_ASSET_PLAYER));
     int16_t sx = track_get_start_x();
     int16_t sy = track_get_start_y();
     player_set_pos(sx, sy);
     player_reset_vel();
     damage_init();
-    projectile_init();
+    projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     enemy_init();
     powerup_init();
     lap_init(track_get_lap_count());
