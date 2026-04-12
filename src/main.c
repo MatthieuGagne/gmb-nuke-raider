@@ -45,7 +45,7 @@ void main(void) {
     DISPLAY_OFF;
 
     init_palettes();
-    player_init();
+    player_init(0u);
     economy_init();
     loadout_init();   /* set loadout defaults before first state push */
     music_init();

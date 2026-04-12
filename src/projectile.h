@@ -9,7 +9,7 @@
 #define PROJ_OWNER_PLAYER 0u
 #define PROJ_OWNER_ENEMY  1u
 
-void    projectile_init(void) BANKED;
+void    projectile_init(uint8_t tile_base) BANKED;
 void    projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t owner) BANKED;
 void    projectile_update(void) BANKED;
 void    projectile_render(void) BANKED;

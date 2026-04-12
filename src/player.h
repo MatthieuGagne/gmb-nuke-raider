@@ -17,7 +17,7 @@ typedef enum {
     DIR_LT = 7,  /* NW         (UP + LEFT)    */
 } player_dir_t;
 
-void     player_init(void) BANKED;
+void     player_init(uint8_t tile_base) BANKED;
 void     player_update(void) BANKED;
 void     player_render(void) BANKED;
 void     player_set_pos(int16_t x, int16_t y) BANKED;

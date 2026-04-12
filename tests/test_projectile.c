@@ -16,7 +16,7 @@ void setUp(void) {
     mock_vram_clear();
     camera_init(88, 648);   /* cam_y=576; world_y = scr_y+cam_y-16 = 80+576-16=640 ty=80 tx=9 passable */
     sprite_pool_init();     /* reset OAM pool — player_init not called here */
-    projectile_init();
+    projectile_init(17u);
 }
 void tearDown(void) {}
 
@@ -187,6 +187,17 @@ void test_projectile_player_cooldown_still_applies(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
 }
 
+/* ── tile_base ────────────────────────────────────────────────────────── */
+
+/* projectile_render() passes the tile_base given to projectile_init() to
+ * set_sprite_tile().  sprite_pool_init() resets all OAM, so the first
+ * get_sprite() call returns slot 0. */
+void test_projectile_render_uses_tile_base(void) {
+    projectile_fire(80u, 72u, DIR_T, PROJ_OWNER_PLAYER);
+    projectile_render();
+    TEST_ASSERT_EQUAL_UINT8(17u, mock_sprite_tile[0]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_projectile_init_no_active_slots);
@@ -209,5 +220,6 @@ int main(void) {
     RUN_TEST(test_projectile_enemy_bypasses_cooldown);
     RUN_TEST(test_projectile_player_cooldown_unaffected_by_enemy_shot);
     RUN_TEST(test_projectile_player_cooldown_still_applies);
+    RUN_TEST(test_projectile_render_uses_tile_base);
     return UNITY_END();
 }

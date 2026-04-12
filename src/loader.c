@@ -2,7 +2,6 @@
 #include <gb/gb.h>
 #include "loader.h"
 #include "banking.h"
-#include "player.h"
 #include "track.h"
 #include "config.h"
 #include "overmap_car_sprite.h"
@@ -61,65 +60,6 @@ static uint8_t loader_state_active = 0u;
 /* track3 scalars — extern'd here for use in load_track_scalars() */
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;
-
-void load_player_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(player_tile_data));
-    set_sprite_data(0, player_tile_data_count, player_tile_data);
-    SWITCH_ROM(saved);
-}
-
-void load_track_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(track_tile_data));
-    set_bkg_data(0, track_tile_data_count, track_tile_data);
-    SWITCH_ROM(saved);
-}
-
-/* DEPRECATED: identical to load_track_tiles() — placeholder until track 2 gets its own tile data.
- * Referenced as a function pointer in track.c TrackDef table; remove when per-track
- * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
-void load_track2_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(track_tile_data));
-    set_bkg_data(0, track_tile_data_count, track_tile_data);
-    SWITCH_ROM(saved);
-}
-
-/* DEPRECATED: identical to load_track_tiles() — placeholder until track 3 gets its own tile data.
- * Referenced as a function pointer in track.c TrackDef table; remove when per-track
- * tile data is introduced and callers migrate to loader_set_track() + loader_load_state(). */
-void load_track3_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(track_tile_data));
-    set_bkg_data(0, track_tile_data_count, track_tile_data);
-    SWITCH_ROM(saved);
-}
-
-void load_bullet_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(bullet_tile_data));
-    set_sprite_data(PROJ_TILE_BASE, bullet_tile_data_count, bullet_tile_data);
-    SWITCH_ROM(saved);
-}
-
-void load_object_sprites(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(turret_tile_data));
-    set_sprite_data(TURRET_TILE_BASE, turret_tile_data_count, turret_tile_data);
-    SWITCH_ROM(saved);
-}
-
-/* Loads overmap car tiles into VRAM sprite slots 18–19 (OVERMAP_CAR_TILE_BASE).
-   Must be called inside DISPLAY_OFF during STATE_OVERMAP enter() only.
-   Slot 18 is shared with TURRET_TILE_BASE — mutual exclusion enforced by
-   state machine: turret loads only in STATE_PLAYING, car loads only in STATE_OVERMAP. */
-void load_overmap_car_tiles(void) NONBANKED {
-    uint8_t saved = CURRENT_BANK;
-    SWITCH_ROM(BANK(overmap_car_tile_data));
-    set_sprite_data(OVERMAP_CAR_TILE_BASE, overmap_car_tile_data_count, overmap_car_tile_data);
-    SWITCH_ROM(saved);
-}
 
 void load_track_start_pos(int16_t *x, int16_t *y) NONBANKED {
     uint8_t saved = CURRENT_BANK;
@@ -244,7 +184,10 @@ void loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uin
 /* ---- VRAM slot bitmap allocator ---- */
 
 /* 256-bit bitmap: bit N = VRAM slot N occupied.
- * Slots 0-63: sprite region. Slots 64-254: BG region.
+ * Slots 0-63:   sprite region (pool allocated by loader).
+ * Slots 0-127:  GBDK default printf() font (DO NOT allocate here).
+ * Slots 128-142: HUD custom font loaded by hud_init() (DO NOT allocate here).
+ * Slots 143-254: BG region (pool allocated by loader).
  * Slot 255 is permanently reserved as the 0xFF failure sentinel — never allocated. */
 static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
 
@@ -276,7 +219,7 @@ static void loader_do_load_one(tile_asset_t asset) NONBANKED {
         region_start = 0u;
         region_end   = 63u;
     } else {
-        region_start = 64u;
+        region_start = LOADER_BG_START;  /* 0-127: GBDK printf font; 128-142: HUD custom font */
         region_end   = 254u;
     }
     saved = CURRENT_BANK;
@@ -295,7 +238,7 @@ static void loader_do_load_one(tile_asset_t asset) NONBANKED {
 
 void loader_load_state(const uint8_t *assets, uint8_t count) NONBANKED {
     uint8_t i;
-    if (loader_state_active) { disable_interrupts(); while (1) {} } /* assert: double-load */
+    if (loader_state_active) { loader_unload_state(); } /* push path: unload suspended state first */
     for (i = 0u; i < count; i++) {
         loader_do_load_one((tile_asset_t)assets[i]);
     }
@@ -572,16 +515,6 @@ void load_powerup_positions(uint8_t id,
     *out_count = n;
     SWITCH_ROM(saved);
 }
-
-#ifdef __SDCC
-void load_bkg_row(uint8_t vram_x, uint8_t vram_y,
-                  uint8_t count, const uint8_t *tiles) NONBANKED {
-    uint8_t i;
-    volatile uint8_t *dst = (volatile uint8_t *)
-        (0x9800u + ((uint16_t)(vram_y & 31u) << 5u) + (vram_x & 31u));
-    for (i = 0u; i < count; i++) dst[i] = tiles[i];
-}
-#endif /* __SDCC */
 
 void loader_dialog_cache_node(uint8_t npc_id, uint8_t node_idx) NONBANKED {
     uint8_t saved = CURRENT_BANK;

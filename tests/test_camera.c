@@ -5,12 +5,11 @@
 
 extern int     mock_move_bkg_call_count;
 extern uint8_t mock_move_bkg_last_y;
-extern int     mock_load_bkg_row_call_count;
-
 void setUp(void) {
     mock_vram_clear();
     active_map_w = 20u;   /* match old MAP_TILES_W for existing tests */
     active_map_h = 100u;  /* match old MAP_TILES_H for existing tests */
+    camera_set_tile_base(0u);  /* raw tile indices in tests — no loader offset */
 }
 void tearDown(void) {}
 
@@ -39,16 +38,15 @@ void test_camera_init_clamps_cam_y_to_max(void) {
 /* --- camera_init: preloads exactly 18 rows, not all 100 ----------------- */
 
 void test_camera_init_preloads_18_rows(void) {
-    /* camera_init() must use load_bkg_row() (display-off direct write),
-     * NOT set_bkg_tiles() (which polls VBlank). */
+    /* camera_init() uses set_bkg_tiles() directly (display-off direct write).
+     * cam_y=8 -> first_row=1; preloads rows 1-18 = 18 set_bkg_tiles calls
+     * (one per row, no ring-wrap for 20-tile-wide narrow track). */
     mock_vram_clear();
     active_map_w = 20u;
     active_map_h = 100u;
     camera_init(88, 8);
-    /* cam_y=8 -> first_row=1; preloads rows 1-18 = 18 load_bkg_row calls */
-    TEST_ASSERT_EQUAL_INT(18, mock_load_bkg_row_call_count);
-    /* Must NOT call set_bkg_tiles during init (no VBlank stall) */
-    TEST_ASSERT_EQUAL_INT(0, mock_set_bkg_tiles_call_count);
+    /* 18 rows x 1 set_bkg_tiles call each = 18 */
+    TEST_ASSERT_EQUAL_INT(18, mock_set_bkg_tiles_call_count);
 }
 
 /* --- camera_update: bidirectional centering camera --------------------- */

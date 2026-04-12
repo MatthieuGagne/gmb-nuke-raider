@@ -6,8 +6,10 @@
 #include "projectile.h"
 #include "damage.h"
 #include "sprite_pool.h"
-#include "loader.h"    /* load_object_sprites() NONBANKED — do NOT call set_sprite_data() directly */
+#include "loader.h"    /* load_npc_positions(), loader_get_slot() — NONBANKED helpers */
 #include "camera.h"    /* cam_y — needed for OAM y coordinate calculations */
+
+static uint8_t s_enemy_tile_base;  /* OBJ tile index set by enemy_init() */
 
 /* SoA enemy pool — tile coordinates + cached OAM x (never changes for turrets) */
 static uint8_t enemy_tx[MAX_ENEMIES];
@@ -33,20 +35,20 @@ static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty, uint8_t type, uint8_t d
     enemy_oam_x[i]  = (uint8_t)((uint16_t)tx * 8u + 8u);  /* OAM x cached once */
     enemy_oam[i]    = get_sprite();
     if (enemy_oam[i] != SPRITE_POOL_INVALID) {
-        set_sprite_tile(enemy_oam[i], TURRET_TILE_BASE);
+        set_sprite_tile(enemy_oam[i], s_enemy_tile_base);
     }
 }
 
 /* ---- public API ---- */
 
-void enemy_init(void) BANKED {
+void enemy_init(uint8_t tile_base) BANKED {
     uint8_t i;
     uint8_t count = 0u;
+    s_enemy_tile_base = tile_base;
     for (i = 0u; i < MAX_ENEMIES; i++) {
         enemy_active[i] = 0u;
         enemy_oam[i]    = SPRITE_POOL_INVALID;
     }
-    load_object_sprites();
     load_npc_positions(track_get_id(),
                        enemy_tx, enemy_ty,
                        enemy_type, enemy_dir,

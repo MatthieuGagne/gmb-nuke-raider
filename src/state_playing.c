@@ -37,13 +37,16 @@ finish_eval(uint8_t map_type, uint8_t armed, int8_t pvy, uint8_t cps_cleared) {
 }
 
 static void enter(void) {
+    loader_set_track(track_get_id());
+    loader_load_state(k_playing_assets, k_playing_assets_count);
+    player_init(loader_get_slot(TILE_ASSET_PLAYER));
     int16_t sx = track_get_start_x();
     int16_t sy = track_get_start_y();
     player_set_pos(sx, sy);
     player_reset_vel();
     damage_init();
-    projectile_init();
-    enemy_init();
+    projectile_init(loader_get_slot(TILE_ASSET_BULLET));
+    enemy_init(loader_get_slot(TILE_ASSET_TURRET));
     powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
@@ -51,6 +54,7 @@ static void enter(void) {
     DISPLAY_OFF;
     track_init();
     checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
+    camera_set_tile_base(loader_get_slot(TILE_ASSET_TRACK));
     camera_init(player_get_x(), player_get_y());
     hud_init(track_get_map_type(), track_get_lap_count());
     hud_set_lap(lap_get_current(), lap_get_total());
@@ -134,6 +138,7 @@ static void update(void) {
 }
 
 static void sp_exit(void) {
+    loader_unload_state();
     HIDE_WIN;
     cam_scx_shadow = 0u;
     cam_scy_shadow = 0u;

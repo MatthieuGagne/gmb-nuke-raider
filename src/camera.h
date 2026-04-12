@@ -19,6 +19,11 @@ extern volatile uint16_t cam_x;
  * uint8_t: SCX hardware register is 8-bit; value wraps into 32-tile BG ring. */
 extern volatile uint8_t cam_scx_shadow;
 
+/* Call before camera_init() to set the VRAM tile base for track tiles.
+ * Required: the loader assigns track tiles at runtime (not slot 0),
+ * so raw track tile indices must be offset before writing to the tilemap. */
+void camera_set_tile_base(uint8_t tile_base) BANKED;
+
 /* Call once when entering STATE_PLAYING (after track_init).
  * Preloads the 18 initially visible rows and sets cam_y. */
 void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED;

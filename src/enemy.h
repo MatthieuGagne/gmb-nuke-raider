@@ -6,9 +6,10 @@
 #include "config.h"
 
 /* Initialise enemy pool from pre-computed turret positions in ROM.
+ * tile_base: OBJ tile index returned by loader_get_slot(TILE_ASSET_TURRET).
  * Reads track_get_id() to select the correct per-track array.
  * Must be called after track_select(). */
-void    enemy_init(void) BANKED;
+void    enemy_init(uint8_t tile_base) BANKED;
 
 /* Zero the pool without map scan — host-test helper only. */
 void    enemy_init_empty(void) BANKED;
