@@ -24,16 +24,34 @@ MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 all: $(TARGET)
 
 # ── Generated sources ─────────────────────────────────────────────────────────
-# src/track_map.c is checked into git so CI works without Python/Tiled.
-# Running `make src/track_map.c` (or plain `make`) regenerates it when needed.
-src/track_map.c: assets/maps/track.tmx tools/tmx_to_c.py
-	python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c
+# ── Tile rotation pipeline ──────────────────────────────────────────────────
 
-src/track2_map.c: assets/maps/track2.tmx tools/tmx_to_c.py
-	python3 tools/tmx_to_c.py assets/maps/track2.tmx src/track2_map.c --prefix track2
+# Step 1: Scan all 3 TMX files → rotation manifest
+build/track_rotation_manifest.json: \
+    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
+    tools/tmx_to_c.py | build
+	python3 tools/tmx_to_c.py --emit-rotation-manifest $@ \
+	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
 
-src/track3_map.c: assets/maps/track3.tmx tools/tmx_to_c.py
-	python3 tools/tmx_to_c.py assets/maps/track3.tmx src/track3_map.c --prefix track3
+# Step 2: Generate tile data + id-map + meta header (src/track_tiles.c rule below)
+
+# Side-effect outputs of the tile generation step
+build/track_tile_id_map.json src/track_tileset_meta.h: src/track_tiles.c
+
+# Step 3a: track 1 map (uses id-map to resolve rotated GIDs)
+src/track_map.c: assets/maps/track.tmx build/track_tile_id_map.json tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	    assets/maps/track.tmx src/track_map.c
+
+# Step 3b: track 2 map
+src/track2_map.c: assets/maps/track2.tmx build/track_tile_id_map.json tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	    --prefix track2 assets/maps/track2.tmx src/track2_map.c
+
+# Step 3c: track 3 map
+src/track3_map.c: assets/maps/track3.tmx build/track_tile_id_map.json tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	    --prefix track3 assets/maps/track3.tmx src/track3_map.c
 
 # Generate shared NPC extern header — included by src/track.h.
 # Checked into git so CI works without Python/Tiled.
@@ -68,8 +86,16 @@ export-sprites: assets/maps/tileset.png $(patsubst assets/sprites/%.aseprite,ass
 
 # src/track_tiles.c is checked into git so CI works without Python.
 # Running `make src/track_tiles.c` (or plain `make`) regenerates it when needed.
-src/track_tiles.c: assets/maps/tileset.png tools/png_to_tiles.py
-	python3 tools/png_to_tiles.py --bank 255 assets/maps/tileset.png src/track_tiles.c track_tile_data
+# Step 2: Generate tile data + id-map + meta header
+src/track_tiles.c: \
+    assets/maps/tileset.png assets/maps/track.tsx \
+    build/track_rotation_manifest.json tools/png_to_tiles.py | build
+	python3 tools/png_to_tiles.py --bank 255 \
+	    --rotation-manifest build/track_rotation_manifest.json \
+	    --tsx assets/maps/track.tsx \
+	    --id-map-out build/track_tile_id_map.json \
+	    --meta-header-out src/track_tileset_meta.h \
+	    assets/maps/tileset.png src/track_tiles.c track_tile_data
 
 # Ensure regeneration happens before ROM link if PNG is newer
 $(TARGET): src/track_tiles.c
