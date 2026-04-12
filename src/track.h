@@ -76,7 +76,7 @@ typedef struct {
     uint8_t         lap_count;
     const uint8_t  *map_type;   /* points to track_map_type / track2_map_type / track3_map_type */
     uint16_t        reward;     /* scrap payout; TRACK1_REWARD / TRACK2_REWARD from config.h */
-    void (*load_tiles)(void);   /* NONBANKED tile loader — called by track_init() */
+    /* load_tiles removed: tiles loaded by loader_load_state() */
 } TrackDesc;
 
 /* Select active track before entering STATE_PLAYING.

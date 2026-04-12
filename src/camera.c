@@ -1,7 +1,6 @@
 #pragma bank 255
 #include <gb/gb.h>
 #include "camera.h"
-#include "loader.h"
 #include "track.h"
 
 volatile uint16_t cam_y;
@@ -86,11 +85,11 @@ static void stream_row_direct(uint8_t world_ty) {
     track_fill_row_range(world_ty, cam_tile_x_snap, VIS_COLS, row_buf);
     if ((uint8_t)(vram_x + VIS_COLS) > 32u) {
         first_count = 32u - vram_x;
-        load_bkg_row(vram_x, vram_y, first_count, row_buf);
-        load_bkg_row(0u,     vram_y, (uint8_t)(VIS_COLS - first_count),
-                     row_buf + first_count);
+        set_bkg_tiles(vram_x, vram_y, first_count, 1u, row_buf);
+        set_bkg_tiles(0u,     vram_y, (uint8_t)(VIS_COLS - first_count), 1u,
+                      row_buf + first_count);
     } else {
-        load_bkg_row(vram_x, vram_y, VIS_COLS, row_buf);
+        set_bkg_tiles(vram_x, vram_y, VIS_COLS, 1u, row_buf);
     }
 }
 
