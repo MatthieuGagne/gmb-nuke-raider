@@ -1,6 +1,7 @@
 <map version="1.10" tiledversion="1.10.0" orientation="orthogonal" renderorder="right-down" width="20" height="100" tilewidth="8" tileheight="8" infinite="0" nextlayerid="5" nextobjectid="6">
  <properties>
-  <property name="map_type" value="race" />
+  <property name="lap_count" type="int" value="1"/>
+  <property name="map_type" value="race"/>
  </properties>
  <tileset firstgid="1" source="track.tsx" />
  <layer id="1" name="Track" width="20" height="100">
@@ -14,7 +15,11 @@
   </object>
  </objectgroup>
  <objectgroup id="3" name="finish">
-  <object id="2" x="0" y="760" width="160" height="8" />
+  <object id="2" x="0" y="760" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="4" name="enemies">
   <object id="3" name="turret" x="32" y="176">
