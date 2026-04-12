@@ -46,7 +46,7 @@ static void enter(void) {
     player_reset_vel();
     damage_init();
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
-    enemy_init();
+    enemy_init(loader_get_slot(TILE_ASSET_TURRET));
     powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
