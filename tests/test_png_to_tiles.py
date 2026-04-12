@@ -7,7 +7,7 @@ import zlib
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c
+from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c, apply_transform
 
 
 # ── Minimal PNG helpers ────────────────────────────────────────────────────
@@ -182,6 +182,69 @@ class TestPngToC(unittest.TestCase):
             src = f.read()
         self.assertIn('volatile __at(2) uint8_t __bank_my_tiles;', src)
         self.assertNotIn('BANKREF', src)
+
+
+class TestApplyTransform(unittest.TestCase):
+
+    def make_8x8_gradient(self):
+        """Returns an 8×8 pixel grid with unique values for each cell."""
+        return [[r * 8 + c for c in range(8)] for r in range(8)]
+
+    def test_identity(self):
+        """flags=0 returns the original pixel grid unchanged."""
+        pixels = self.make_8x8_gradient()
+        self.assertEqual(apply_transform(pixels, 0), pixels)
+
+    def test_h_flip(self):
+        """flags=4 (H-flip) mirrors columns left↔right."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 4)
+        self.assertEqual(result[0][0], pixels[0][7])
+        self.assertEqual(result[0][7], pixels[0][0])
+
+    def test_v_flip(self):
+        """flags=2 (V-flip) mirrors rows top↔bottom."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 2)
+        self.assertEqual(result[0][0], pixels[7][0])
+        self.assertEqual(result[7][0], pixels[0][0])
+
+    def test_180(self):
+        """flags=6 (H+V) is equivalent to 180° rotation."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 6)
+        self.assertEqual(result[0][0], pixels[7][7])
+        self.assertEqual(result[7][7], pixels[0][0])
+
+    def test_transpose(self):
+        """flags=1 (D) swaps rows and columns."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 1)
+        self.assertTrue(all(result[r][c] == pixels[c][r] for r in range(8) for c in range(8)))
+
+    def test_90cw(self):
+        """flags=5 (D+H) is 90° CW rotation."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 5)
+        for r in range(8):
+            for c in range(8):
+                self.assertEqual(result[r][c], pixels[7-c][r])
+
+    def test_270cw(self):
+        """flags=3 (D+V) is 270° CW rotation."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 3)
+        for r in range(8):
+            for c in range(8):
+                self.assertEqual(result[r][c], pixels[c][7-r])
+
+    def test_anti_transpose(self):
+        """flags=7 (D+H+V) is anti-transpose."""
+        pixels = self.make_8x8_gradient()
+        result = apply_transform(pixels, 7)
+        for r in range(8):
+            for c in range(8):
+                self.assertEqual(result[r][c], pixels[7-c][7-r])
 
 
 if __name__ == '__main__':

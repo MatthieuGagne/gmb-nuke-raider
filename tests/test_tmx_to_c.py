@@ -7,7 +7,29 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import tmx_to_c as conv
-from tmx_to_c import gid_to_tile_id
+from tmx_to_c import gid_to_tile_id, parse_rotation_manifest
+
+def make_test_tmx(tiles):
+    """Create a minimal TMX string with the given tile GIDs (as strings)."""
+    tile_data = ",".join(tiles)
+    width = len(tiles)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="{width}" height="1" tilewidth="8" tileheight="8">
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="{width}" height="1">
+  <data encoding="csv">
+{tile_data}
+  </data>
+ </layer>
+ <objectgroup name="start">
+  <object id="10" x="0" y="0" width="8" height="8"/>
+ </objectgroup>
+ <objectgroup name="finish">
+  <object id="11" x="0" y="8" width="160" height="8"/>
+ </objectgroup>
+</map>"""
+
 
 # 3×2 map: Tiled IDs 1,2,1 / 2,1,2  →  GB values 0,1,0 / 1,0,1
 # Includes a "start" object at pixel (88, 720) and a "finish" object at pixel y=8 (row 1).
@@ -171,17 +193,70 @@ class TestGidToTileId(unittest.TestCase):
         self.assertEqual(gid_to_tile_id(0, 1), 0)
         self.assertEqual(gid_to_tile_id(0, 2), 0)
 
-    def test_hflip_stripped(self):
-        # GID with H-flip bit set (0x80000001) and firstgid=1 → tile 0
-        self.assertEqual(gid_to_tile_id(0x80000001, 1), 0)
+    def test_gid_h_flip_resolves_via_id_map(self):
+        """H-flip GID (flags=4) resolves to rotated tile ID from id-map."""
+        id_map = {"base_count": 9, "variants": {"0:4": 10}}
+        # GID 0x80000001 = base tile 0 (1-indexed) with H-flip (bit 31)
+        self.assertEqual(gid_to_tile_id(0x80000001, firstgid=1, id_map=id_map), 10)
 
-    def test_vflip_stripped(self):
-        # GID with V-flip bit set (0x40000002) and firstgid=1 → tile 1
-        self.assertEqual(gid_to_tile_id(0x40000002, 1), 1)
+    def test_gid_v_flip_resolves_via_id_map(self):
+        """V-flip GID (flags=2) resolves to rotated tile ID from id-map."""
+        id_map = {"base_count": 9, "variants": {"1:2": 11}}
+        # GID 0x40000002 = base tile 1 (1-indexed) with V-flip (bit 30)
+        self.assertEqual(gid_to_tile_id(0x40000002, firstgid=1, id_map=id_map), 11)
 
-    def test_all_flags_stripped(self):
-        # GID with all flip bits set (0xF0000003) and firstgid=1 → tile 2
-        self.assertEqual(gid_to_tile_id(0xF0000003, 1), 2)
+    def test_gid_all_flags_resolves_via_id_map(self):
+        """All flags set (flags=7) resolves to rotated tile ID from id-map."""
+        id_map = {"base_count": 9, "variants": {"2:7": 12}}
+        # GID 0xE0000003 = base tile 2 (1-indexed) with H+V+D (bits 31+30+29)
+        self.assertEqual(gid_to_tile_id(0xE0000003, firstgid=1, id_map=id_map), 12)
+
+    def test_gid_flags_no_id_map_strips_flags(self):
+        """Without id-map, flags are stripped (backward compatibility)."""
+        self.assertEqual(gid_to_tile_id(0x80000001, firstgid=1, id_map=None), 0)
+
+    def test_gid_identity_no_entry_needed(self):
+        """flags=0 (identity) maps to base tile even with id-map present."""
+        id_map = {"base_count": 9, "variants": {}}
+        self.assertEqual(gid_to_tile_id(0x00000001, firstgid=1, id_map=id_map), 0)
+
+
+class TestRotationManifest(unittest.TestCase):
+
+    def test_collect_unique_rotations(self):
+        """collects unique (tile_id, flags) from TMX content list."""
+        tmx_a = make_test_tmx(tiles=["0x80000001", "0x80000001", "0x40000002"])
+        manifest = parse_rotation_manifest([tmx_a], firstgid=1)
+        self.assertEqual(manifest, {"0": [4], "1": [2]})
+
+    def test_excludes_identity(self):
+        """flags=0 tiles are not included in the manifest."""
+        tmx_a = make_test_tmx(tiles=["1", "2"])
+        manifest = parse_rotation_manifest([tmx_a], firstgid=1)
+        self.assertEqual(manifest, {})
+
+    def test_deduplicates_across_tmx_files(self):
+        """Same (tile_id, flags) across multiple TMX files appears only once."""
+        tmx_a = make_test_tmx(tiles=["0x80000001"])
+        tmx_b = make_test_tmx(tiles=["0x80000001"])
+        manifest = parse_rotation_manifest([tmx_a, tmx_b], firstgid=1)
+        self.assertEqual(manifest, {"0": [4]})
+
+    def test_all_8_orientations_extracted(self):
+        """All 8 flag values (0-7) are extracted correctly from GIDs."""
+        gids = {
+            1: 0x20000001,  # D only → flags=1
+            2: 0x40000001,  # V only → flags=2
+            3: 0x60000001,  # V+D   → flags=3
+            4: 0x80000001,  # H only → flags=4
+            5: 0xA0000001,  # H+D   → flags=5
+            6: 0xC0000001,  # H+V   → flags=6
+            7: 0xE0000001,  # H+V+D → flags=7
+        }
+        for expected_flags, gid in gids.items():
+            tmx_content = make_test_tmx(tiles=[hex(gid)])
+            manifest = parse_rotation_manifest([tmx_content], firstgid=1)
+            self.assertEqual(manifest, {"0": [expected_flags]}, f"flags={expected_flags}")
 
 
 class TestGidIntegration(unittest.TestCase):
