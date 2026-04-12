@@ -75,6 +75,14 @@
 #define DIALOG_NAME_BUF_LEN   16u
 #define DIALOG_CHOICE_BUF_LEN 32u
 
+/* VRAM tile layout — BG region
+ * Tiles 0-127:  GBDK default printf() font (ASCII-indexed, written at boot by GBDK init).
+ * Tiles 128-142: HUD custom font (digits, H, P, :, /, space) loaded by hud_init().
+ * Tiles 143-254: loader-managed BG pool (see loader.c). */
+#define HUD_FONT_BASE    128u  /* first HUD custom font tile in BG tile data */
+#define HUD_FONT_COUNT    15u  /* H,P,:,0-9,space,/ — update LOADER_BG_START if this grows */
+#define LOADER_BG_START  ((uint8_t)(HUD_FONT_BASE + HUD_FONT_COUNT))  /* first loader-writable BG tile */
+
 /* Hub system */
 #define MAX_HUB_NPCS           3u
 #define HUB_PORTRAIT_TILE_SLOT 96u   /* BKG tile slots 96-111 (16 tiles) for 32x32 portrait */

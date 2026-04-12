@@ -5,8 +5,7 @@
 #include "hud.h"
 
 /* --- Tile index constants --- */
-#define HUD_FONT_BASE  128u  /* first font tile in BG tile data — above track tiles */
-#define HUD_FONT_COUNT  15u  /* tiles: 0-9(10) + H(10) + P(11) + :(12) + space(13) + /(14) */
+/* HUD_FONT_BASE and HUD_FONT_COUNT are defined in config.h */
 #define HUD_TILE_H      10u
 #define HUD_TILE_P      11u
 #define HUD_TILE_COLON  12u

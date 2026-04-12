@@ -244,7 +244,10 @@ void loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uin
 /* ---- VRAM slot bitmap allocator ---- */
 
 /* 256-bit bitmap: bit N = VRAM slot N occupied.
- * Slots 0-63: sprite region. Slots 64-254: BG region.
+ * Slots 0-63:   sprite region (pool allocated by loader).
+ * Slots 0-127:  GBDK default printf() font (DO NOT allocate here).
+ * Slots 128-142: HUD custom font loaded by hud_init() (DO NOT allocate here).
+ * Slots 143-254: BG region (pool allocated by loader).
  * Slot 255 is permanently reserved as the 0xFF failure sentinel — never allocated. */
 static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
 
@@ -276,7 +279,7 @@ static void loader_do_load_one(tile_asset_t asset) NONBANKED {
         region_start = 0u;
         region_end   = 63u;
     } else {
-        region_start = 64u;
+        region_start = LOADER_BG_START;  /* 0-127: GBDK printf font; 128-142: HUD custom font */
         region_end   = 254u;
     }
     saved = CURRENT_BANK;
