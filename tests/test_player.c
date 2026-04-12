@@ -408,10 +408,10 @@ void test_dir_L_tile_tl_is_right_tr_with_flipx(void) {
     mock_move_sprite_reset();
     player_apply_physics(J_LEFT, TILE_ROAD);
     player_render();
-    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 2u, mock_sprite_tile[0]); /* TL = tile_base + R TR */
-    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 3u, mock_sprite_tile[1]); /* BL = tile_base + R BR */
-    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 0u, mock_sprite_tile[2]); /* TR = tile_base + R TL */
-    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 1u, mock_sprite_tile[3]); /* BR = tile_base + R BL */
+    TEST_ASSERT_EQUAL_UINT8(16u + 6u, mock_sprite_tile[0]); /* TL = tile_base + R TR (offset 6) */
+    TEST_ASSERT_EQUAL_UINT8(16u + 7u, mock_sprite_tile[1]); /* BL = tile_base + R BR (offset 7) */
+    TEST_ASSERT_EQUAL_UINT8(16u + 4u, mock_sprite_tile[2]); /* TR = tile_base + R TL (offset 4) */
+    TEST_ASSERT_EQUAL_UINT8(16u + 5u, mock_sprite_tile[3]); /* BR = tile_base + R BL (offset 5) */
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
 }
 

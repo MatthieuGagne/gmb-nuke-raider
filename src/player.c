@@ -37,45 +37,46 @@ static const int8_t DIR_DY[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
 /* Direction → tile index for each 2×2 OAM position.
  * Derived directions use col-swap (FLIPX) or row-swap (FLIPY).
  * Tile layout per 16×16 set: base+0=TL, base+1=BL, base+2=TR, base+3=BR. */
+/* Offsets within a 16-tile player sprite sheet: UP=0-3, RIGHT=4-7, UPRIGHT=8-11, DOWNRIGHT=12-15 */
 static const uint8_t DIR_TILE_TL[8] = {
-    PLAYER_TILE_UP_BASE        + 0u, /* T  */
-    PLAYER_TILE_UPRIGHT_BASE   + 0u, /* RT */
-    PLAYER_TILE_RIGHT_BASE     + 0u, /* R  */
-    PLAYER_TILE_DOWNRIGHT_BASE + 0u, /* RB */
-    PLAYER_TILE_UP_BASE        + 1u, /* B  = UP FLIPY+row-swap → TL gets UP BL */
-    PLAYER_TILE_DOWNRIGHT_BASE + 2u, /* LB = DR FLIPX+col-swap → TL gets DR TR */
-    PLAYER_TILE_RIGHT_BASE     + 2u, /* L  = R  FLIPX+col-swap → TL gets R  TR */
-    PLAYER_TILE_UPRIGHT_BASE   + 2u, /* LT = UR FLIPX+col-swap → TL gets UR TR */
+     0u, /*  T  UP TL        */
+     8u, /* RT UPRIGHT TL    */
+     4u, /*  R  RIGHT TL     */
+    12u, /* RB DOWNRIGHT TL  */
+     1u, /*  B  UP BL (row-swap FLIPY) */
+    14u, /* LB DR TR (col-swap FLIPX) */
+     6u, /*  L  R  TR (col-swap FLIPX) */
+    10u, /* LT UR TR (col-swap FLIPX) */
 };
 static const uint8_t DIR_TILE_BL[8] = {
-    PLAYER_TILE_UP_BASE        + 1u, /* T  */
-    PLAYER_TILE_UPRIGHT_BASE   + 1u, /* RT */
-    PLAYER_TILE_RIGHT_BASE     + 1u, /* R  */
-    PLAYER_TILE_DOWNRIGHT_BASE + 1u, /* RB */
-    PLAYER_TILE_UP_BASE        + 0u, /* B  → BL gets UP TL */
-    PLAYER_TILE_DOWNRIGHT_BASE + 3u, /* LB → BL gets DR BR */
-    PLAYER_TILE_RIGHT_BASE     + 3u, /* L  → BL gets R  BR */
-    PLAYER_TILE_UPRIGHT_BASE   + 3u, /* LT → BL gets UR BR */
+     1u, /*  T  UP BL        */
+     9u, /* RT UPRIGHT BL    */
+     5u, /*  R  RIGHT BL     */
+    13u, /* RB DOWNRIGHT BL  */
+     0u, /*  B  UP TL        */
+    15u, /* LB DR BR         */
+     7u, /*  L  R  BR        */
+    11u, /* LT UR BR         */
 };
 static const uint8_t DIR_TILE_TR[8] = {
-    PLAYER_TILE_UP_BASE        + 2u, /* T  */
-    PLAYER_TILE_UPRIGHT_BASE   + 2u, /* RT */
-    PLAYER_TILE_RIGHT_BASE     + 2u, /* R  */
-    PLAYER_TILE_DOWNRIGHT_BASE + 2u, /* RB */
-    PLAYER_TILE_UP_BASE        + 3u, /* B  → TR gets UP BR */
-    PLAYER_TILE_DOWNRIGHT_BASE + 0u, /* LB → TR gets DR TL */
-    PLAYER_TILE_RIGHT_BASE     + 0u, /* L  → TR gets R  TL */
-    PLAYER_TILE_UPRIGHT_BASE   + 0u, /* LT → TR gets UR TL */
+     2u, /*  T  UP TR        */
+    10u, /* RT UPRIGHT TR    */
+     6u, /*  R  RIGHT TR     */
+    14u, /* RB DOWNRIGHT TR  */
+     3u, /*  B  UP BR        */
+    12u, /* LB DR TL         */
+     4u, /*  L  R  TL        */
+     8u, /* LT UR TL         */
 };
 static const uint8_t DIR_TILE_BR[8] = {
-    PLAYER_TILE_UP_BASE        + 3u, /* T  */
-    PLAYER_TILE_UPRIGHT_BASE   + 3u, /* RT */
-    PLAYER_TILE_RIGHT_BASE     + 3u, /* R  */
-    PLAYER_TILE_DOWNRIGHT_BASE + 3u, /* RB */
-    PLAYER_TILE_UP_BASE        + 2u, /* B  → BR gets UP TR */
-    PLAYER_TILE_DOWNRIGHT_BASE + 1u, /* LB → BR gets DR BL */
-    PLAYER_TILE_RIGHT_BASE     + 1u, /* L  → BR gets R  BL */
-    PLAYER_TILE_UPRIGHT_BASE   + 1u, /* LT → BR gets UR BL */
+     3u, /*  T  UP BR        */
+    11u, /* RT UPRIGHT BR    */
+     7u, /*  R  RIGHT BR     */
+    15u, /* RB DOWNRIGHT BR  */
+     2u, /*  B  UP TR        */
+    13u, /* LB DR BL         */
+     5u, /*  L  R  BL        */
+     9u, /* LT UR BL         */
 };
 static const uint8_t DIR_FLIP[8] = {
     0u,      /* T  */
@@ -112,10 +113,10 @@ void player_init(uint8_t tile_base) BANKED {
     player_sprite_slot[1] = get_sprite();  /* BL */
     player_sprite_slot[2] = get_sprite();  /* TR */
     player_sprite_slot[3] = get_sprite();  /* BR */
-    set_sprite_tile(player_sprite_slot[0], s_player_tile_base + PLAYER_TILE_UP_BASE + 0u);
-    set_sprite_tile(player_sprite_slot[1], s_player_tile_base + PLAYER_TILE_UP_BASE + 1u);
-    set_sprite_tile(player_sprite_slot[2], s_player_tile_base + PLAYER_TILE_UP_BASE + 2u);
-    set_sprite_tile(player_sprite_slot[3], s_player_tile_base + PLAYER_TILE_UP_BASE + 3u);
+    set_sprite_tile(player_sprite_slot[0], s_player_tile_base + 0u);
+    set_sprite_tile(player_sprite_slot[1], s_player_tile_base + 1u);
+    set_sprite_tile(player_sprite_slot[2], s_player_tile_base + 2u);
+    set_sprite_tile(player_sprite_slot[3], s_player_tile_base + 3u);
     load_track_start_pos(&px, &py);
     vx = 0;
     vy = 0;
