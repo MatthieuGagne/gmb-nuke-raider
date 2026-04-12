@@ -2,6 +2,7 @@
 #include "state_overmap.h"
 #include "state_hub.h"
 #include "config.h"
+#include "loader.h"
 
 #include "input.h"
 
@@ -28,6 +29,7 @@ static void travel_to_node(uint8_t btn) {
 void setUp(void) {
     input = 0;
     prev_input = 0;
+    loader_reset_bitmap_for_test();
     state_overmap.enter();
 }
 
@@ -111,29 +113,29 @@ void test_travel_advances_one_tile_per_four_frames(void) {
 
 void test_overmap_car_props_up(void) {
     uint8_t tile, props;
-    overmap_car_props(J_UP, &tile, &props);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_CAR_TILE_BASE, tile);
+    overmap_car_props(J_UP, 18u, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(18u, tile);
     TEST_ASSERT_EQUAL_UINT8(0u, props);
 }
 
 void test_overmap_car_props_down(void) {
     uint8_t tile, props;
-    overmap_car_props(J_DOWN, &tile, &props);
-    TEST_ASSERT_EQUAL_UINT8(OVERMAP_CAR_TILE_BASE, tile);
+    overmap_car_props(J_DOWN, 18u, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(18u, tile);
     TEST_ASSERT_EQUAL_UINT8(S_FLIPY, props);
 }
 
 void test_overmap_car_props_left(void) {
     uint8_t tile, props;
-    overmap_car_props(J_LEFT, &tile, &props);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)(OVERMAP_CAR_TILE_BASE + 1u), tile);
+    overmap_car_props(J_LEFT, 18u, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(19u, tile);
     TEST_ASSERT_EQUAL_UINT8(0u, props);
 }
 
 void test_overmap_car_props_right(void) {
     uint8_t tile, props;
-    overmap_car_props(J_RIGHT, &tile, &props);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)(OVERMAP_CAR_TILE_BASE + 1u), tile);
+    overmap_car_props(J_RIGHT, 18u, &tile, &props);
+    TEST_ASSERT_EQUAL_UINT8(19u, tile);
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, props);
 }
 

@@ -22,6 +22,7 @@ BANKREF(state_overmap)
 /* ── State ─────────────────────────────────────────────────────────────────── */
 static uint8_t car_tx;
 static uint8_t car_ty;
+static uint8_t s_car_tile_base;
 uint8_t current_race_id = 0u;
 uint8_t current_hub_id  = 0u;
 
@@ -49,18 +50,18 @@ static uint8_t overmap_walkable(uint8_t tx, uint8_t ty) {
     return overmap_map[(uint16_t)ty * OVERMAP_W + tx] != OVERMAP_TILE_BLANK;
 }
 
-void overmap_car_props(uint8_t dir, uint8_t *tile, uint8_t *props) {
+void overmap_car_props(uint8_t dir, uint8_t car_tile_base, uint8_t *tile, uint8_t *props) {
     if (dir == J_LEFT) {
-        *tile  = (uint8_t)(OVERMAP_CAR_TILE_BASE + 1u); /* horizontal tile, no flip */
+        *tile  = (uint8_t)(car_tile_base + 1u); /* horizontal tile, no flip */
         *props = 0u;
     } else if (dir == J_RIGHT) {
-        *tile  = (uint8_t)(OVERMAP_CAR_TILE_BASE + 1u); /* horizontal tile + S_FLIPX */
+        *tile  = (uint8_t)(car_tile_base + 1u); /* horizontal tile + S_FLIPX */
         *props = S_FLIPX;
     } else if (dir == J_DOWN) {
-        *tile  = OVERMAP_CAR_TILE_BASE;                  /* vertical tile + S_FLIPY */
+        *tile  = car_tile_base;                  /* vertical tile + S_FLIPY */
         *props = S_FLIPY;
-    } else {                                              /* J_UP (default) */
-        *tile  = OVERMAP_CAR_TILE_BASE;                  /* vertical tile, no flip */
+    } else {                                     /* J_UP (default) */
+        *tile  = car_tile_base;                  /* vertical tile, no flip */
         *props = 0u;
     }
 }
@@ -70,7 +71,7 @@ static void overmap_move_sprite(void) {
     uint8_t sx = (uint8_t)(car_tx * 8u + 8u);
     uint8_t sy = (uint8_t)(car_ty * 8u + 16u);
     uint8_t tile, props;
-    overmap_car_props(travel_dir, &tile, &props);
+    overmap_car_props(travel_dir, s_car_tile_base, &tile, &props);
     set_sprite_tile(0u, tile);
     set_sprite_prop(0u, props);
     move_sprite(0u, sx, sy);
@@ -124,6 +125,8 @@ void overmap_set_returning(void) { om_returning = 1u; }
 /* ── State callbacks ─────────────────────────────────────────────────────────── */
 static void enter(void) {
     EMU_printf("OVERMAP enter\n");
+    loader_load_state(k_overmap_assets, k_overmap_assets_count);
+    s_car_tile_base = loader_get_slot(TILE_ASSET_OVERMAP_CAR);
     { SET_BANK(overmap_map);    /* also covers overmap_id_map and spawn scalars — same bank */
       spawn_tx = overmap_hub_spawn_tx;
       spawn_ty = overmap_hub_spawn_ty;
@@ -146,7 +149,6 @@ static void enter(void) {
       RESTORE_BANK(); }
     cam_scy_shadow = 0u;    /* reset shadow so VBL ISR keeps SCY=0 in overmap */
     move_bkg(0u, 0u);      /* apply immediately for the first frame */
-    load_overmap_car_tiles();          /* load 2 tiles into VRAM slots 18–19 */
     { uint8_t i;                       /* hide all slots 1-39 — overmap uses slot 0 only */
       for (i = 1u; i < 40u; i++) { move_sprite(i, 0u, 0u); } }
     overmap_move_sprite();  /* pre-set OAM so first visible frame has car in correct position */
@@ -200,6 +202,7 @@ static void update(void) {
 }
 
 static void om_exit(void) {
+    loader_unload_state();
 }
 
 const State state_overmap = { 0, enter, update, om_exit };

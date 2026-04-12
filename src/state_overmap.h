@@ -32,6 +32,6 @@ uint8_t overmap_get_spawn_ty(void);
 void overmap_set_returning(void);
 
 /* Direction → tile/prop mapping — pure function, testable host-side */
-void overmap_car_props(uint8_t dir, uint8_t *tile, uint8_t *props);
+void overmap_car_props(uint8_t dir, uint8_t car_tile_base, uint8_t *tile, uint8_t *props);
 
 #endif /* STATE_OVERMAP_H */
