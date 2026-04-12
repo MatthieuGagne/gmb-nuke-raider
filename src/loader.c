@@ -123,17 +123,24 @@ void load_track_header(uint8_t id) NONBANKED {
     SWITCH_ROM(saved);
 }
 
-void load_track_scalars(uint8_t id, int16_t *sx, int16_t *sy, uint8_t *mtype) NONBANKED {
+void load_track_scalars(uint8_t id,
+                        int16_t *sx, int16_t *sy,
+                        uint8_t *mtype,
+                        uint8_t *lap_count,
+                        uint8_t *finish_dir) NONBANKED {
     uint8_t saved = CURRENT_BANK;
     if (id == 0u) {
         SWITCH_ROM(BANK(track_start_x));
         *sx = track_start_x; *sy = track_start_y; *mtype = track_map_type;
+        *lap_count = track_lap_count; *finish_dir = track_finish_direction;
     } else if (id == 1u) {
         SWITCH_ROM(BANK(track2_start_x));
         *sx = track2_start_x; *sy = track2_start_y; *mtype = track2_map_type;
+        *lap_count = track2_lap_count; *finish_dir = track2_finish_direction;
     } else {
         SWITCH_ROM(BANK(track3_map_type));
         *sx = track3_start_x; *sy = track3_start_y; *mtype = track3_map_type;
+        *lap_count = track3_lap_count; *finish_dir = track3_finish_direction;
     }
     SWITCH_ROM(saved);
 }
