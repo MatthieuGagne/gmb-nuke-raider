@@ -352,7 +352,10 @@
       "Bash(xargs -I{} basename {})",
       "Bash(sdcc --version)",
       "Bash(/home/mathdaman/gbdk/bin/sdasgb -l font.o)",
-      "Bash(/home/mathdaman/gbdk/bin/romusage:*)"
+      "Bash(/home/mathdaman/gbdk/bin/romusage:*)",
+      "Bash(tee /tmp/test3.txt)",
+      "Bash(timeout 5 /tmp/test_state_hub_fresh)",
+      "Bash(timeout 3 /tmp/test_state_hub_dbg)"
     ]
   },
   "hooks": {
