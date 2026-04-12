@@ -40,6 +40,15 @@ DIR_MAP = {
     "S": 4,
     "W": 6,
 }
+
+# finish dir string → CHECKPOINT_DIR_* numeric constant.
+# Must match CHECKPOINT_DIR_* in src/checkpoint.h (N=0, S=1, E=2, W=3).
+FINISH_DIR_MAP = {
+    "N": 0,
+    "S": 1,
+    "E": 2,
+    "W": 3,
+}
 DIR_NONE = 0xFF
 MAX_NPCS = 8  # Must match MAX_ENEMIES in src/config.h.
 
@@ -221,6 +230,17 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
                 val = p.get('value', 'race')
                 map_type_val = 0 if val == 'race' else 1
 
+    # Read lap_count property (required — error if missing)
+    lap_count_val = None
+    if map_props_el is not None:
+        for p in map_props_el.findall('property'):
+            if p.get('name') == 'lap_count':
+                lap_count_val = int(p.get('value', '0'))
+    if lap_count_val is None:
+        raise ValueError(
+            f"TMX '{tmx_path}' is missing required root property 'lap_count'."
+        )
+
     raw      = data_el.text.strip()
     tile_ids = [gid_to_tile_id(int(x), firstgid, id_map=id_map) for x in raw.split(',') if x.strip()]
 
@@ -255,6 +275,24 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
     if finish_obj is None:
         raise ValueError("'finish' objectgroup has no objects")
     finish_tile_y = int(float(finish_obj.get('y'))) // 8
+
+    # Read required 'direction' property on the finish object
+    finish_dir_val = None
+    finish_props = finish_obj.find('properties')
+    if finish_props is not None:
+        for prop in finish_props.findall('property'):
+            if prop.get('name') == 'direction':
+                raw = prop.get('value', '')
+                if raw not in FINISH_DIR_MAP:
+                    raise ValueError(
+                        f"Unknown finish direction '{raw}' in '{tmx_path}'. "
+                        f"Valid values: {list(FINISH_DIR_MAP.keys())}"
+                    )
+                finish_dir_val = FINISH_DIR_MAP[raw]
+    if finish_dir_val is None:
+        raise ValueError(
+            f"TMX '{tmx_path}': finish object is missing required 'direction' property."
+        )
 
     # Parse optional "checkpoints" objectgroup — missing = 0 checkpoints (backwards compat).
     checkpoints_group = next(
@@ -316,6 +354,13 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
         f.write(f"const uint8_t {prefix}_finish_line_y = {finish_tile_y};\n\n")
         f.write(f"BANKREF({prefix}_map_type)\n")
         f.write(f"const uint8_t {prefix}_map_type = {map_type_val}u;\n\n")
+        f.write(f"BANKREF({prefix}_lap_count)\n")
+        f.write(f"const uint8_t {prefix}_lap_count = {lap_count_val}u;\n\n")
+        f.write(f"BANKREF({prefix}_finish_direction)\n")
+        # Store raw integer; comment names the direction for readability.
+        finish_dir_name = {0: 'N', 1: 'S', 2: 'E', 3: 'W'}.get(finish_dir_val, '?')
+        f.write(f"const uint8_t {prefix}_finish_direction"
+                f" = {finish_dir_val}u; /* {finish_dir_name} */\n\n")
         f.write(f"BANKREF({prefix}_map)\n")
         total_bytes = 2 + width * height   # 2 header bytes + tile data
         f.write(f"const uint8_t {prefix}_map[{total_bytes}] = {{\n")
