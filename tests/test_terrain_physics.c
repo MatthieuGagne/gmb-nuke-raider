@@ -12,7 +12,7 @@ void setUp(void) {
     prev_input = 0;
     mock_vram_clear();
     camera_init(88, 720);
-    player_init();  /* resets px, py, vx=0, vy=0 */
+    player_init(0u);  /* resets px, py, vx=0, vy=0 */
     enemy_init_empty();
 }
 void tearDown(void) {}

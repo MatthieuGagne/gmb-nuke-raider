@@ -28,6 +28,7 @@ static const uint8_t GEAR_ACCEL[3]     = {GEAR1_ACCEL, GEAR2_ACCEL, GEAR3_ACCEL}
 static uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
 static uint8_t player_flicker_tick;
 static player_dir_t player_dir = DIR_T;
+static uint8_t s_player_tile_base;
 
 /* Direction → velocity delta tables. Indexed by player_dir_t (0=T..7=LT). */
 static const int8_t DIR_DX[8] = {  0,  1,  1,  1,  0, -1, -1, -1 };
@@ -103,18 +104,18 @@ static uint8_t corners_passable(int16_t wx, int16_t wy) {
            track_passable(wx + 15,   wy + 15 ) && !corner_active_turret(wx + 15,   wy + 15 );
 }
 
-void player_init(void) BANKED {
+void player_init(uint8_t tile_base) BANKED {
     SPRITES_8x8;
+    s_player_tile_base = tile_base;
     sprite_pool_init();
     player_sprite_slot[0] = get_sprite();  /* TL */
     player_sprite_slot[1] = get_sprite();  /* BL */
     player_sprite_slot[2] = get_sprite();  /* TR */
     player_sprite_slot[3] = get_sprite();  /* BR */
-    load_player_tiles();
-    set_sprite_tile(player_sprite_slot[0], PLAYER_TILE_UP_BASE + 0u);
-    set_sprite_tile(player_sprite_slot[1], PLAYER_TILE_UP_BASE + 1u);
-    set_sprite_tile(player_sprite_slot[2], PLAYER_TILE_UP_BASE + 2u);
-    set_sprite_tile(player_sprite_slot[3], PLAYER_TILE_UP_BASE + 3u);
+    set_sprite_tile(player_sprite_slot[0], s_player_tile_base + PLAYER_TILE_UP_BASE + 0u);
+    set_sprite_tile(player_sprite_slot[1], s_player_tile_base + PLAYER_TILE_UP_BASE + 1u);
+    set_sprite_tile(player_sprite_slot[2], s_player_tile_base + PLAYER_TILE_UP_BASE + 2u);
+    set_sprite_tile(player_sprite_slot[3], s_player_tile_base + PLAYER_TILE_UP_BASE + 3u);
     load_track_start_pos(&px, &py);
     vx = 0;
     vy = 0;
@@ -178,10 +179,10 @@ void player_render(void) BANKED {
     uint8_t hw_y = (uint8_t)(py - cam_y + 16);
     uint8_t flip = DIR_FLIP[player_dir];
 
-    set_sprite_tile(player_sprite_slot[0], DIR_TILE_TL[player_dir]);
-    set_sprite_tile(player_sprite_slot[1], DIR_TILE_BL[player_dir]);
-    set_sprite_tile(player_sprite_slot[2], DIR_TILE_TR[player_dir]);
-    set_sprite_tile(player_sprite_slot[3], DIR_TILE_BR[player_dir]);
+    set_sprite_tile(player_sprite_slot[0], s_player_tile_base + DIR_TILE_TL[player_dir]);
+    set_sprite_tile(player_sprite_slot[1], s_player_tile_base + DIR_TILE_BL[player_dir]);
+    set_sprite_tile(player_sprite_slot[2], s_player_tile_base + DIR_TILE_TR[player_dir]);
+    set_sprite_tile(player_sprite_slot[3], s_player_tile_base + DIR_TILE_BR[player_dir]);
     set_sprite_prop(player_sprite_slot[0], flip);
     set_sprite_prop(player_sprite_slot[1], flip);
     set_sprite_prop(player_sprite_slot[2], flip);

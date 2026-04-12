@@ -14,7 +14,7 @@ void setUp(void) {
     prev_input = 0;
     mock_vram_clear();
     camera_init(88, 720);  /* cam_y = 648 */
-    player_init();
+    player_init(0u);
     player_set_pos(88, 720);  /* track start: col 11, row 90 — road */
 }
 void tearDown(void) {}

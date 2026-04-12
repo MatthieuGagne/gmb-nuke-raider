@@ -17,7 +17,7 @@ void setUp(void) {
     mock_move_sprite_reset();
     camera_init(88, 8);  /* cam_y = 0 (clamped) */
     damage_init();
-    player_init();
+    player_init(16u);
 }
 void tearDown(void) {}
 
@@ -381,14 +381,14 @@ void test_player_dir_dy_south(void) {
 /* --- direction → tile index mapping (16×16 2×2 grid) ------------------- */
 
 void test_dir_T_tile_tl_is_up_base(void) {
-    /* DIR_T: no flip, all 4 slots use PLAYER_TILE_UP_BASE + 0..3 */
+    /* DIR_T: no flip, all 4 slots use tile_base(16) + UP relative offsets 0..3 */
     mock_move_sprite_reset();
     player_apply_physics(J_UP, TILE_ROAD);
     player_render();
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 0u, mock_sprite_tile[0]);
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 1u, mock_sprite_tile[1]);
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 2u, mock_sprite_tile[2]);
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 3u, mock_sprite_tile[3]);
+    TEST_ASSERT_EQUAL_UINT8(16u + 0u, mock_sprite_tile[0]);
+    TEST_ASSERT_EQUAL_UINT8(16u + 1u, mock_sprite_tile[1]);
+    TEST_ASSERT_EQUAL_UINT8(16u + 2u, mock_sprite_tile[2]);
+    TEST_ASSERT_EQUAL_UINT8(16u + 3u, mock_sprite_tile[3]);
 }
 
 void test_dir_B_tile_tl_is_up_bl_with_flipy(void) {
@@ -396,10 +396,10 @@ void test_dir_B_tile_tl_is_up_bl_with_flipy(void) {
     mock_move_sprite_reset();
     player_apply_physics(J_DOWN, TILE_ROAD);
     player_render();
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 1u, mock_sprite_tile[0]); /* TL = UP BL */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 0u, mock_sprite_tile[1]); /* BL = UP TL */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 3u, mock_sprite_tile[2]); /* TR = UP BR */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_UP_BASE + 2u, mock_sprite_tile[3]); /* BR = UP TR */
+    TEST_ASSERT_EQUAL_UINT8(16u + 1u, mock_sprite_tile[0]); /* TL = tile_base + UP BL */
+    TEST_ASSERT_EQUAL_UINT8(16u + 0u, mock_sprite_tile[1]); /* BL = tile_base + UP TL */
+    TEST_ASSERT_EQUAL_UINT8(16u + 3u, mock_sprite_tile[2]); /* TR = tile_base + UP BR */
+    TEST_ASSERT_EQUAL_UINT8(16u + 2u, mock_sprite_tile[3]); /* BR = tile_base + UP TR */
     TEST_ASSERT_EQUAL_UINT8(S_FLIPY, mock_sprite_prop[0]);
 }
 
@@ -408,10 +408,10 @@ void test_dir_L_tile_tl_is_right_tr_with_flipx(void) {
     mock_move_sprite_reset();
     player_apply_physics(J_LEFT, TILE_ROAD);
     player_render();
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 2u, mock_sprite_tile[0]); /* TL = R TR */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 3u, mock_sprite_tile[1]); /* BL = R BR */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 0u, mock_sprite_tile[2]); /* TR = R TL */
-    TEST_ASSERT_EQUAL_UINT8(PLAYER_TILE_RIGHT_BASE + 1u, mock_sprite_tile[3]); /* BR = R BL */
+    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 2u, mock_sprite_tile[0]); /* TL = tile_base + R TR */
+    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 3u, mock_sprite_tile[1]); /* BL = tile_base + R BR */
+    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 0u, mock_sprite_tile[2]); /* TR = tile_base + R TL */
+    TEST_ASSERT_EQUAL_UINT8(16u + PLAYER_TILE_RIGHT_BASE + 1u, mock_sprite_tile[3]); /* BR = tile_base + R BL */
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
 }
 
