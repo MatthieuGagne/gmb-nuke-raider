@@ -41,6 +41,9 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
 }
 
 void music_tick(void) {
+    /* Do NOT add static locals here: SDCC may place them at hUGEDriver
+     * WRAM addresses (0xC3CE–0xC3D6), causing silent state corruption.
+     * Use fixed DEBUG_* addresses in config.h for any debug state. */
     DBG_TICK_INC();  /* DEBUG=1 only: count calls for headless diagnostic */
     __critical {
         uint8_t _saved_bank = CURRENT_BANK;
