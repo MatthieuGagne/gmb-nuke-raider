@@ -112,6 +112,7 @@ GBDK_HOME=/home/mathdaman/gbdk make
 | Crash after audio starts | `music_tick()` called from VBL ISR | Move `music_tick()` to main loop — see Banking Rules |
 | Wrong song plays | `SET_BANK()` references wrong song name | Run `python3 tools/music_wire_check.py` |
 | Music glitches on state transition | `SWITCH_ROM` called from ISR during song switch | Call `music_start()` from main loop only |
+| Song loops at half its intended length | `order_cnt` set to pattern count instead of byte count | Fix: `static const unsigned char order_cnt = n_patterns * 2;` — e.g. 68 patterns → 136. Run `make test` — `test_music_data_order_cnt_is_136` catches this |
 | Silent channels after SFX | Channel left muted | Call `hUGE_mute_channel(HT_CHx, HT_CH_PLAY)` after SFX completes |
 | Ticking/popping on CH3 | Wave RAM corrupted on DMG re-trigger | Follow CH3 Wave RAM safe access procedure |
 
@@ -199,10 +200,12 @@ extern volatile unsigned char hUGE_mute_mask;
 
 ### hUGESong_t Struct
 
+> **`order_cnt` is a byte-offset count, not a pattern count.** The driver reads `*order_cnt` as the total byte length of the order table, because `current_order` advances by 2 per pattern. Correct value: `n_patterns × 2`. Example: 68 patterns → `order_cnt = 136`. The regression test `test_music_data_order_cnt_is_136` in `tests/test_music.c` catches this automatically after any re-export.
+
 ```c
 typedef struct hUGESong_t {
     unsigned char tempo;
-    const unsigned char * order_cnt;       // pointer to order count byte
+    const unsigned char * order_cnt;       // pointer to byte-offset count: n_patterns × 2
     const unsigned char ** order1;         // CH1 pattern order table
     const unsigned char ** order2;         // CH2 pattern order table
     const unsigned char ** order3;         // CH3 pattern order table
@@ -368,9 +371,36 @@ Safe procedure for re-triggering CH3:
 | Calling `music_tick()` inside `vbl_isr()` | Call it in the main loop after `frame_ready = 0` — `SWITCH_ROM` inside an ISR corrupts MBC shadow state, causing crashes after several deep BANKED call sequences |
 | Song variable name doesn't match BANKREF | Run `music_song_validate.py` — it catches this |
 | Inconsistency between music_data.h, music.c, or bank-manifest.json | Run `music_wire_check.py` — it catches cross-file mismatches |
+| `order_cnt = n_patterns` instead of `n_patterns × 2` | `order_cnt` is a byte-offset count — the driver advances `current_order` by 2 per pattern, so the total must be `n_patterns × 2`. Wrong value causes song to loop at half length. The regression test `test_music_data_order_cnt_is_136` catches this. |
+| `static` local variable inside `music_tick()` | SDCC may place it at hUGEDriver WRAM (0xC3CE–0xC3D6), corrupting `ticks_per_row` and causing gradual music freeze. Use fixed `DEBUG_*` addresses from `config.h` (high WRAM 0xDFC0+) for any persistent debug state. |
 
 ---
 
 ### Version Pinning
 
 hUGETracker and hUGEDriver **must match exactly** (e.g. hUGETracker 1.0b10 requires hUGEDriver 1.0b10). The data format changes between versions — mismatches produce silent corruption or crashes. This project vendors **v6.1.3**. Do not update one without the other.
+
+---
+
+## Implementation Mode
+
+When called with a prompt starting with **"implement this task: …"**, act as the music implementer — execute the full music pipeline end-to-end, not just explain scenarios.
+
+**Trigger phrase:** `implement this task: <full task text from plan>`
+
+**Behavior in implementation mode:**
+1. Read the full task text and identify all files to create or modify.
+2. Invoke the `bank-pre-write` skill (HARD GATE) before writing any `src/*.c` or `src/*.h` file. Verify `bank-manifest.json` has an entry for every new music file.
+3. Execute the pipeline from Scenario 1:
+   - Export from hUGETracker (hUGEDriver v6.1.3 format)
+   - Add `#pragma bank 255`, `#include <gb/gb.h>`, `#include "banking.h"`, and `BANKREF(name)` to the exported `.c` file
+   - Rename the exported `const hUGESong_t` variable to match the `BANKREF` name
+   - Run `python3 tools/music_song_validate.py src/music_data.c` — fix all errors before continuing
+   - Update `src/music_data.h` with `BANKREF_EXTERN` and `extern const hUGESong_t` declarations
+   - Wire `src/music.c` calls (`SET_BANK`, `hUGE_init`) in `music_init()`
+   - Run `python3 tools/music_wire_check.py` — fix all errors before continuing
+4. Build the ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS).
+5. Invoke the `bank-post-build` skill (HARD GATE) after a successful build.
+6. Commit.
+
+**Consultation mode is unchanged** — when called with a question (not "implement this task: …"), answer as normal.

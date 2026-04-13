@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "music.h"
+#include "music_data.h"
 
 void setUp(void)    { frame_ready = 0; _current_bank_mock = 0; }
 void tearDown(void) {}
@@ -23,9 +24,16 @@ void test_music_tick_restores_bank(void) {
     TEST_ASSERT_EQUAL_UINT8(5, _current_bank_mock);
 }
 
+/* order_cnt is a byte-offset count (2 bytes per pattern × 68 patterns = 136).
+ * A wrong value (e.g. 68) causes the song to loop at half length. */
+void test_music_data_order_cnt_is_136(void) {
+    TEST_ASSERT_EQUAL_UINT8(136u, *music_data_song.order_cnt);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_vbl_display_off_consumes_frame_ready);
     RUN_TEST(test_music_tick_restores_bank);
+    RUN_TEST(test_music_data_order_cnt_is_136);
     return UNITY_END();
 }
