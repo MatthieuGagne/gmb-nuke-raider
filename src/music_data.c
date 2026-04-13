@@ -10,7 +10,7 @@
 BANKREF(music_data_song)
 
 
-static const unsigned char order_cnt = 68;
+static const unsigned char order_cnt = 136;  /* 68 patterns × 2 bytes/entry */
 
 static const unsigned char P0[] = {
     DN(C_5,1,0x2FF),

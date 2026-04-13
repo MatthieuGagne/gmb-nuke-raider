@@ -112,6 +112,7 @@ GBDK_HOME=/home/mathdaman/gbdk make
 | Crash after audio starts | `music_tick()` called from VBL ISR | Move `music_tick()` to main loop — see Banking Rules |
 | Wrong song plays | `SET_BANK()` references wrong song name | Run `python3 tools/music_wire_check.py` |
 | Music glitches on state transition | `SWITCH_ROM` called from ISR during song switch | Call `music_start()` from main loop only |
+| Song loops at half its intended length | `order_cnt` set to pattern count instead of byte count | Fix: `static const unsigned char order_cnt = n_patterns * 2;` — e.g. 68 patterns → 136. Run `make test` — `test_music_data_order_cnt_is_136` catches this |
 | Silent channels after SFX | Channel left muted | Call `hUGE_mute_channel(HT_CHx, HT_CH_PLAY)` after SFX completes |
 | Ticking/popping on CH3 | Wave RAM corrupted on DMG re-trigger | Follow CH3 Wave RAM safe access procedure |
 
@@ -199,10 +200,12 @@ extern volatile unsigned char hUGE_mute_mask;
 
 ### hUGESong_t Struct
 
+> **`order_cnt` is a byte-offset count, not a pattern count.** The driver reads `*order_cnt` as the total byte length of the order table, because `current_order` advances by 2 per pattern. Correct value: `n_patterns × 2`. Example: 68 patterns → `order_cnt = 136`. The regression test `test_music_data_order_cnt_is_136` in `tests/test_music.c` catches this automatically after any re-export.
+
 ```c
 typedef struct hUGESong_t {
     unsigned char tempo;
-    const unsigned char * order_cnt;       // pointer to order count byte
+    const unsigned char * order_cnt;       // pointer to byte-offset count: n_patterns × 2
     const unsigned char ** order1;         // CH1 pattern order table
     const unsigned char ** order2;         // CH2 pattern order table
     const unsigned char ** order3;         // CH3 pattern order table
@@ -368,6 +371,8 @@ Safe procedure for re-triggering CH3:
 | Calling `music_tick()` inside `vbl_isr()` | Call it in the main loop after `frame_ready = 0` — `SWITCH_ROM` inside an ISR corrupts MBC shadow state, causing crashes after several deep BANKED call sequences |
 | Song variable name doesn't match BANKREF | Run `music_song_validate.py` — it catches this |
 | Inconsistency between music_data.h, music.c, or bank-manifest.json | Run `music_wire_check.py` — it catches cross-file mismatches |
+| `order_cnt = n_patterns` instead of `n_patterns × 2` | `order_cnt` is a byte-offset count — the driver advances `current_order` by 2 per pattern, so the total must be `n_patterns × 2`. Wrong value causes song to loop at half length. The regression test `test_music_data_order_cnt_is_136` catches this. |
+| `static` local variable inside `music_tick()` | SDCC may place it at hUGEDriver WRAM (0xC3CE–0xC3D6), corrupting `ticks_per_row` and causing gradual music freeze. Use fixed `DEBUG_*` addresses from `config.h` (high WRAM 0xDFC0+) for any persistent debug state. |
 
 ---
 
