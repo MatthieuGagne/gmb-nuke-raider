@@ -114,8 +114,6 @@ Every track TMX must have these root-level properties or `tmx_to_c.py` will erro
 | `enemies` | no | Object `name` = type (`turret`); optional `dir` property for fixed facing |
 | `powerups` | no | Object `name` = type (`heal`) |
 
-Use `assets/maps/track_template.tmx` as the starting scaffold for new tracks — it includes all required properties and objectgroups pre-filled.
-
 #### Build pipeline (3 steps, all automated by `make`)
 
 1. **Rotation manifest** — `tmx_to_c.py --emit-rotation-manifest` scans all TMX files for rotated/flipped tile variants; outputs `build/track_rotation_manifest.json`.
@@ -123,6 +121,89 @@ Use `assets/maps/track_template.tmx` as the starting scaffold for new tracks —
 3. **Per-track map arrays** — separate `tmx_to_c.py --id-map` call per TMX file; uses the ID-map to resolve rotated GIDs into correct C tile indices.
 
 `src/track_tileset_meta.h` is fully generated — **never edit it by hand**.
+
+---
+
+## How to add a new track
+
+`assets/maps/track_template.tmx` is the canonical starting point. It ships
+with all required properties and objectgroups pre-filled so the build never
+errors on a missing field.
+
+**Step 1 — Copy the template**
+
+```sh
+cp assets/maps/track_template.tmx assets/maps/trackN.tmx
+```
+
+Open `trackN.tmx` in Tiled.
+
+**Step 2 — Set required map properties** (Map → Map Properties)
+
+| Property | What to set |
+|----------|-------------|
+| `lap_count` | Number of laps (`1` for combat/one-shot, `3` for a standard race) |
+| `map_type` | `race` or `combat` |
+
+**Step 3 — Place the `start` object**
+
+In the `start` objectgroup, move the single object to the player spawn tile
+(top-left corner of the intended spawn position, in tile coordinates × 8).
+
+**Step 4 — Place the `finish` object and set its direction**
+
+In the `finish` objectgroup, move the object to the finish line tile and set
+its `direction` custom property:
+
+| Value | Meaning |
+|-------|---------|
+| `N` | Player crosses finish heading north (upward) |
+| `S` | Player crosses finish heading south (downward) |
+| `E` | Player crosses finish heading east (rightward) |
+| `W` | Player crosses finish heading west (leftward) |
+
+The finish line must be **≥ 4 tiles from the map edge** in that direction.
+
+**Step 5 — Add checkpoints** (optional but recommended for looping tracks)
+
+In the `checkpoints` objectgroup, place one object per checkpoint. Each needs:
+- `direction` property: `N`/`S`/`E`/`W` (direction player crosses it)
+- `index` property: integer ordering (0, 1, 2, …)
+
+**Step 6 — Paint tiles**
+
+Draw the track using the shared tileset (`assets/maps/tileset.png` / `track.tsx`).
+Rotated/flipped tile variants are supported — the pipeline generates them automatically.
+
+**Step 7 — Wire it into the Makefile**
+
+Add a new rule for `src/trackN_map.c` following the pattern of the existing
+`track2_map.c` and `track3_map.c` rules:
+
+```makefile
+src/trackN_map.c: assets/maps/trackN.tmx build/track_tile_id_map.json tools/tmx_to_c.py
+	python3 tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	    --prefix trackN assets/maps/trackN.tmx src/trackN_map.c
+
+build/obj/trackN_map.o: src/trackN_map.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+```
+
+Also add `assets/maps/trackN.tmx` to the `build/track_rotation_manifest.json`
+dependency list so rotated variants from the new map are included.
+
+**Step 8 — Add the new TMX to `bank-manifest.json`**
+
+Add an entry for `src/trackN_map.c` before building.
+
+**Step 9 — Build and verify**
+
+```sh
+make clean && GBDK_HOME=~/gbdk make
+make tile-check
+```
+
+Expected: ROM builds cleanly, `tile-check` reports PASS for all states.
 
 ---
 
@@ -136,3 +217,7 @@ Use `assets/maps/track_template.tmx` as the starting scaffold for new tracks —
 | PNG not indexed to 4 colors | `png_to_tiles.py` exits with error |
 | Tile dimensions not multiples of 8 | `png_to_tiles.py` exits with error |
 | Editing `src/*_map.c` directly | Changes silently overwritten on next `make` |
+| Editing `src/track_tileset_meta.h` directly | Overwritten on next `make` |
+| TMX missing `lap_count` root property | `tmx_to_c.py` errors: `missing required root property 'lap_count'` |
+| TMX finish object missing `direction` property | `tmx_to_c.py` errors: `finish object is missing required 'direction' property` |
+| Base + rotation tiles > 192 | `png_to_tiles.py` errors: `VRAM budget exceeded` |
