@@ -132,5 +132,8 @@ gmb-nuke-raider/
 └── README.md
 ```
 
-For developer workflow, build gates, debugging, and contribution conventions, see
-[`docs/dev-workflow.md`](docs/dev-workflow.md).
+## Documentation
+
+- [Asset pipeline](docs/asset-pipeline.md) — full asset authoring and conversion workflow
+- [Tile system reference](docs/TILES.md) — hardware limits, per-state tile budgets, and pipeline workflow
+- [Developer workflow](docs/dev-workflow.md) — build gates, debugging, and contribution conventions

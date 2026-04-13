@@ -366,7 +366,7 @@ uint8_t loader_alloc_slots(uint8_t region_start, uint8_t region_end, uint8_t cou
             return start;
         }
     }
-    return 0xFFu;
+    disable_interrupts(); while (1) {} /* assert: tile pool full */
 }
 
 void loader_free_slots(uint8_t first_slot, uint8_t count) NONBANKED {

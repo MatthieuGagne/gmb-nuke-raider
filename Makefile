@@ -19,7 +19,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check dialog_data build-debug
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug
 
 all: $(TARGET)
 
@@ -193,6 +193,9 @@ bank-post-build:
 
 memory-check:
 	python3 tools/memory_check.py .
+
+tile-check: $(TARGET)
+	python3 tools/check_tile_budget.py .
 
 build-debug:
 	DEBUG=1 GBDK_HOME=/home/mathdaman/gbdk $(MAKE) clean all

@@ -60,11 +60,10 @@ void test_alloc_returns_region_start_when_empty(void) {
     TEST_ASSERT_EQUAL_UINT8(40u, slot);
 }
 
-void test_alloc_sets_bitmap_bits(void) {
-    /* After allocating slot 50, a second alloc in [50,50] must fail (bit occupied). */
-    loader_alloc_slots(50u, 50u, 1u);
+void test_alloc_single_slot_region_fills_once(void) {
     uint8_t slot = loader_alloc_slots(50u, 50u, 1u);
-    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, slot);
+    TEST_ASSERT_EQUAL_UINT8(50u, slot);
 }
 
 void test_alloc_consecutive_runs_do_not_overlap(void) {
@@ -83,12 +82,12 @@ void test_alloc_past_region_end_returns_sentinel(void) {
     TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
 }
 
-void test_alloc_exhaustion_returns_sentinel(void) {
-    /* Fill region [56,59] (4 slots) with two 2-slot allocs, then a third must fail. */
-    loader_alloc_slots(56u, 59u, 2u);
-    loader_alloc_slots(56u, 59u, 2u);
-    uint8_t slot = loader_alloc_slots(56u, 59u, 1u);
-    TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
+void test_alloc_region_fills_completely(void) {
+    uint8_t a = loader_alloc_slots(56u, 59u, 2u);
+    uint8_t b = loader_alloc_slots(56u, 59u, 2u);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, a);
+    TEST_ASSERT_NOT_EQUAL(0xFFu, b);
+    TEST_ASSERT_NOT_EQUAL(a, b); /* two distinct runs */
 }
 
 void test_free_clears_bits_allowing_realloc(void) {
@@ -284,10 +283,10 @@ int main(void) {
     RUN_TEST(test_load_npc_positions_id1_returns_count);
     RUN_TEST(test_load_npc_positions_id2_returns_count);
     RUN_TEST(test_alloc_returns_region_start_when_empty);
-    RUN_TEST(test_alloc_sets_bitmap_bits);
+    RUN_TEST(test_alloc_single_slot_region_fills_once);
     RUN_TEST(test_alloc_consecutive_runs_do_not_overlap);
     RUN_TEST(test_alloc_past_region_end_returns_sentinel);
-    RUN_TEST(test_alloc_exhaustion_returns_sentinel);
+    RUN_TEST(test_alloc_region_fills_completely);
     RUN_TEST(test_free_clears_bits_allowing_realloc);
     RUN_TEST(test_alloc_region_boundary_enforced);
     RUN_TEST(test_get_asset_slot_returns_sentinel_initially);

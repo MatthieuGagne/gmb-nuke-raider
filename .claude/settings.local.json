@@ -356,6 +356,8 @@
       "Bash(tee /tmp/test3.txt)",
       "Bash(timeout 5 /tmp/test_state_hub_fresh)",
       "Bash(timeout 3 /tmp/test_state_hub_dbg)",
+      "Bash(timeout 5 ./build/test_camera)",
+      "Bash(BUILD)",
       "Bash(timeout 10 ./build/test_music)",
       "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/music-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/music-expert.md)",
       "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/gbdk-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/gbdk-expert.md)"
