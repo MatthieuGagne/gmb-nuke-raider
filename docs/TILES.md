@@ -78,7 +78,7 @@ but only 32 rows × 32 columns are in VRAM at any time.
 |----------|-----------|
 | Track maps | Can exceed 32×32 (camera streams rows/cols dynamically) |
 | Overmap | Hard limit: **32×32 tiles** (entire map fits in one tilemap) |
-| Finish line | Must be **≥ 4 rows from map bottom boundary** |
+| Finish line | Must be **≥ 4 tiles from the map edge** in the finish direction (N/S/E/W) |
 
 ### Map ROM budget
 
@@ -94,6 +94,35 @@ but only 32 rows × 32 columns are in VRAM at any time.
 **Never edit generated `src/*_map.c` files directly** — they are overwritten on
 the next build. To place a tile (e.g. `TILE_REPAIR`), add it in Tiled, then
 run `make clean && make` to regenerate.
+
+#### Required TMX map properties
+
+Every track TMX must have these root-level properties or `tmx_to_c.py` will error:
+
+| Property | Type | Example | Notes |
+|----------|------|---------|-------|
+| `lap_count` | integer | `3` | Number of laps; `1` for combat/one-shot tracks |
+| `map_type` | string | `race` | `race` or any other string (treated as combat) |
+
+#### Required objectgroups
+
+| Objectgroup | Required | Notes |
+|-------------|----------|-------|
+| `start` | yes | Exactly one object — player spawn position |
+| `finish` | yes | Exactly one object — must have `direction` property: `N`, `S`, `E`, or `W` |
+| `checkpoints` | no | Each object needs `direction` (N/S/E/W, default S) and `index` (int) |
+| `enemies` | no | Object `name` = type (`turret`); optional `dir` property for fixed facing |
+| `powerups` | no | Object `name` = type (`heal`) |
+
+Use `assets/maps/track_template.tmx` as the starting scaffold for new tracks — it includes all required properties and objectgroups pre-filled.
+
+#### Build pipeline (3 steps, all automated by `make`)
+
+1. **Rotation manifest** — `tmx_to_c.py --emit-rotation-manifest` scans all TMX files for rotated/flipped tile variants; outputs `build/track_rotation_manifest.json`.
+2. **Tile data + ID-map + meta header** — `png_to_tiles.py` generates base tiles + rotation variants (`src/track_tiles.c`), the ID-map (`build/track_tile_id_map.json`), and `src/track_tileset_meta.h`. Total tiles (base + rotations) must not exceed **192** (one VRAM bank).
+3. **Per-track map arrays** — separate `tmx_to_c.py --id-map` call per TMX file; uses the ID-map to resolve rotated GIDs into correct C tile indices.
+
+`src/track_tileset_meta.h` is fully generated — **never edit it by hand**.
 
 ---
 
