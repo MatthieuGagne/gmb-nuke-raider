@@ -360,7 +360,10 @@
       "Bash(BUILD)",
       "Bash(timeout 10 ./build/test_music)",
       "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/music-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/music-expert.md)",
-      "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/gbdk-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/gbdk-expert.md)"
+      "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/gbdk-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/gbdk-expert.md)",
+      "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/tileset.png assets/maps/tileset.png)",
+      "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/track2.tmx assets/maps/track2.tmx)",
+      "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/track.tsx assets/maps/track.tsx)"
     ]
   },
   "hooks": {

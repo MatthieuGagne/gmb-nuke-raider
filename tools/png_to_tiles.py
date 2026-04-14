@@ -266,26 +266,46 @@ def png_to_c(png_path, out_path, array_name, bank,
     if rotation_manifest is not None:
         with open(rotation_manifest) as f:
             manifest = json.load(f)
-        # Build 2D pixel grid for each base tile
+        # Build 2D pixel grid for each base tile.
+        # encode_2bpp writes tiles column-major (outer=tx, inner=ty), so
+        # tile_idx maps as: tx = tile_idx // tiles_tall, ty = tile_idx % tiles_tall.
+        tiles_x = width // 8
+        tiles_tall = height // 8
         base_tile_pixels = []
         for tile_idx in range(n_tiles):
+            tx = tile_idx // tiles_tall
+            ty = tile_idx % tiles_tall
             grid = []
             for row in range(8):
                 row_pixels = []
                 for col in range(8):
-                    x = tile_idx * 8 + col
-                    y = row
+                    x = tx * 8 + col
+                    y = ty * 8 + row
                     row_pixels.append(pixels[y * width + x])
                 grid.append(row_pixels)
             base_tile_pixels.append(grid)
 
-        id_map = {"base_count": n_tiles, "variants": {}}
+        # Build base_remap: Tiled uses row-major GIDs but encode_2bpp writes
+        # tiles column-major. For multi-row tilesets this diverges, so we store
+        # an explicit row-major→column-major index mapping for tmx_to_c.py.
+        base_remap = {}
+        if tiles_tall > 1:
+            for row_idx in range(n_tiles):
+                col_in_ts = row_idx % tiles_x
+                row_in_ts = row_idx // tiles_x
+                col_major_idx = col_in_ts * tiles_tall + row_in_ts
+                base_remap[str(row_idx)] = col_major_idx
+
+        id_map = {"base_count": n_tiles, "base_remap": base_remap, "variants": {}}
         variant_tiles = []  # list of (key, tile_2bpp_bytes)
 
         for base_id_str, flag_list in sorted(manifest["rotations"].items(),
                                               key=lambda x: int(x[0])):
             base_id = int(base_id_str)
-            base_pixels_grid = base_tile_pixels[base_id]
+            # base_id is row-major (Tiled GID offset); base_tile_pixels is
+            # indexed by column-major C index — remap before lookup.
+            col_major_src = int(base_remap.get(str(base_id), base_id))
+            base_pixels_grid = base_tile_pixels[col_major_src]
             for flags in sorted(flag_list):
                 rotated = apply_transform(base_pixels_grid, flags)
                 # Flatten 2D grid to encode
@@ -366,8 +386,14 @@ def png_to_c(png_path, out_path, array_name, bank,
     if meta_header_out is not None and tsx_path is not None and id_map is not None:
         tsx_types = parse_tsx_types(tsx_path)
         lut_entries = []
+        _tiles_x = width // 8
+        _tiles_tall = height // 8
         for i in range(n_tiles):
-            t = tsx_types.get(i, "TILE_ROAD")
+            # encode_2bpp writes column-major (outer=tx, inner=ty), so C index i
+            # maps to: tx = i // tiles_tall, ty = i % tiles_tall.
+            # Tiled tile index is row-major: tiled_idx = ty * tiles_x + tx.
+            tiled_idx = (i % _tiles_tall) * _tiles_x + (i // _tiles_tall)
+            t = tsx_types.get(tiled_idx, "TILE_ROAD")
             lut_entries.append(f"    {t},  /* {i} */")
         for key, _ in variant_tiles:
             base_id = int(key.split(":")[0])

@@ -19,41 +19,62 @@ You are the map pipeline expert for the Nuke Raider Game Boy Color game. You han
 
 ## Quick Command Reference
 
+The Makefile runs the full track pipeline automatically. Manual invocations for reference:
+
 | Tool | Command | Notes |
 |------|---------|-------|
-| `gen_tileset.py` | `python3 tools/gen_tileset.py assets/maps/tileset.png` | Generates 6-tile hardcoded tileset PNG |
-| `png_to_tiles.py` | `python3 tools/png_to_tiles.py --bank <N> <in.png> <out.c> <array>` | `--bank` required; use `255` for autobanker |
-| `tmx_to_c.py` | `python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c` | Track map only |
+| `png_to_tiles.py` | see Makefile | Invoked with `--rotation-manifest`, `--tsx`, `--id-map-out`, `--meta-header-out`; do not invoke manually for tracks |
+| `tmx_to_c.py` | see Makefile | Invoked with `--id-map` for tracks, `--emit-rotation-manifest` first pass |
 | `tmx_to_array_c.py` | `python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h` | Overmap only |
-| `create_assets.py` | `python3 assets/maps/create_assets.py` | One-time bootstrap |
 
 **Test:** `python3 -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
 
 ---
 
-## Tileset Tile Indices
+## Tileset Tile Indices & Types
 
-| Index | Name | Visual |
-|-------|------|--------|
-| 0 | Wall / off-track | Solid dark-grey |
-| 1 | Road | Solid light-grey |
-| 2 | Center dashes | Solid black |
-| 3 | Sand | White/dark-grey checkerboard |
-| 4 | Oil puddle | Black with grey center rect |
-| 5 | Boost stripes | Alternating row pattern |
+Tiles are defined in `assets/maps/track.tsx` (Tiled tileset file). Current tileset (`tileset.png`) is 9×2 tiles (9 columns, 2 rows = 18 base tiles). Types assigned via TSX `<property name="type">`.
+
+| Tiled tile ID | C index | Type | Notes |
+|--------------|---------|------|-------|
+| 0 | 0 | TILE_WALL | Outer boundary / off-track |
+| 1 | 2 | TILE_ROAD | |
+| 2 | 4 | TILE_ROAD | |
+| 3 | 6 | TILE_SAND | |
+| 4 | 8 | TILE_OIL | |
+| 5 | 10 | TILE_BOOST | |
+| 6 | 12 | TILE_FINISH | |
+| 7 | 14 | TILE_ROAD | |
+| 8 | 16 | TILE_ROAD | |
+| 9 | 1 | TILE_ROAD | Row 2 tiles start here |
+| 10 | 3 | TILE_WALL | |
+| 11–17 | 5,7,9,11,13,15,17 | TILE_ROAD | Row 2, columns 2–8 |
+
+> **Tiled tile ID ≠ C array index for multi-row tilesets.** `encode_2bpp` writes tiles **column-major** (outer loop = column, inner loop = row). For a W×H-tile tileset, C index `i` → col = `i // H`, row = `i % H`. The `base_remap` field in `build/track_tile_id_map.json` stores the row-major→column-major translation and is applied automatically by `tmx_to_c.py`.
+
+### Adding tiles to tileset.png
+
+- Tileset can have **multiple rows** (supported since PR #332).
+- Keep PNG dimensions multiples of 8.
+- After editing the PNG, update `track.tsx`: set `tilecount = cols × rows`, `columns = cols`, image `width`/`height`.
+- Add a `<tile id="N"><properties>…</properties></tile>` entry in the TSX for each new tile's type. Tile IDs in the TSX are **Tiled row-major** (left-to-right, top-to-bottom).
+- The Makefile regenerates `track_tile_id_map.json` and `track_tileset_meta.h` automatically on next build.
 
 ---
 
 ## Pipeline Overview
 
-**Track pipeline:**
+**Track pipeline (3-step, driven by Makefile):**
 ```
-assets/maps/tileset.png   ←─ gen_tileset.py (or hand-drawn in Aseprite)
-         │
-         ▼
-tools/png_to_tiles.py  →  src/track_tiles.c  (2bpp C array)
-assets/maps/track.tmx  →  tools/tmx_to_c.py  →  src/track_map.c  (tile index array)
+assets/maps/tileset.png  ─┐
+assets/maps/track.tsx     ├─→ png_to_tiles.py → src/track_tiles.c + build/track_tile_id_map.json + src/track_tileset_meta.h
+assets/maps/track*.tmx   ─┤
+                           └─→ tmx_to_c.py (--id-map) → src/track*_map.c
 ```
+
+Step 1: `tmx_to_c.py --emit-rotation-manifest` scans all track TMXs for rotated tiles → `build/track_rotation_manifest.json`
+Step 2: `png_to_tiles.py` encodes tileset + rotation variants → `src/track_tiles.c`, `build/track_tile_id_map.json`, `src/track_tileset_meta.h`
+Step 3: `tmx_to_c.py --id-map` converts each TMX → `src/track*_map.c` using the id map
 
 **Overmap pipeline (separate converter):**
 ```
@@ -72,19 +93,12 @@ On any error in the steps below, follow the **Self-Correction Policy** section.
 
 ### Track Map
 
-1. **Tileset** — draw or extend `assets/maps/tileset.png` in Aseprite or a pixel editor. Export as PNG.
-2. **Convert tileset to tiles:**
-   ```bash
-   python3 tools/png_to_tiles.py --bank 255 assets/maps/tileset.png src/track_tiles.c track_tiles
-   ```
-3. **Paint map in Tiled** — open `assets/maps/track.tmx`, paint the `Track` layer (CSV encoding). Ensure an `<objectgroup name="start">` with one spawn object exists.
-4. **Convert map:**
-   ```bash
-   python3 tools/tmx_to_c.py assets/maps/track.tmx src/track_map.c
-   ```
-5. **Wire into game** — `extern`-declare generated symbols in the relevant `.c` file; load tile data then tilemap during VBlank.
-6. **OAM sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **`sprite-expert`** agent.
-7. **Build & smoketest** — use the `build` skill, launch in Emulicious, confirm map renders and player spawns correctly.
+1. **Tileset** — draw or extend `assets/maps/tileset.png` in Aseprite or a pixel editor. Export as indexed PNG (max 4 colours). If adding a second (or further) row of tiles, also update `assets/maps/track.tsx`: `tilecount`, `columns`, image `width`/`height`, and add `<tile id="N">` type entries for new tiles.
+2. **Paint map in Tiled** — open the relevant `assets/maps/track*.tmx`, paint the `Track` layer (CSV encoding). Tile types are defined in `track.tsx`. Ensure an `<objectgroup name="start">` with one spawn object exists.
+3. **Build** — just run `make`; the Makefile drives the full 3-step pipeline (rotation manifest → png_to_tiles → tmx_to_c for every track). Inspect `src/track_tileset_meta.h` to verify tile types are correct.
+4. **Wire into game** — `extern`-declare generated symbols in the relevant `.c` file; load tile data then tilemap during VBlank.
+5. **OAM sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **`sprite-expert`** agent.
+6. **Build & smoketest** — use the `build` skill, launch in Emulicious, confirm map renders and player spawns correctly.
 
 ### Overmap
 
@@ -125,7 +139,7 @@ When any pipeline step fails, apply this policy:
 | Non-zero exit from `make` | Compiler errors in generated `.c` files; check array size/type mismatches |
 | Non-zero exit from `tmx_to_c.py` or `png_to_tiles.py` | Missing input file, bad TMX encoding, wrong argument count |
 | Missing generated `.c` output file | Converter exited 0 but wrote nothing — check output path argument |
-| Tile count mismatch | PNG dimensions not a multiple of 8; tileset row/column count changed |
+| Tile count mismatch | PNG dimensions not a multiple of 8; TSX `tilecount`/`columns` not updated after adding a row |
 | Tiled validation errors | Missing `start` objectgroup, wrong layer name, non-CSV encoding |
 
 ---
@@ -137,7 +151,9 @@ When any pipeline step fails, apply this policy:
 | Hardcoding `- 1` as tile offset | Read `firstgid` from `<tileset>` element |
 | GID 0 underflows to 255 (uint8) | Check `gid == 0` before subtracting; return 0 |
 | Ignoring GID flip flags | Mask with `& 0x0FFFFFFF` before subtracting `firstgid` |
-| Editing `src/track_map.c` by hand | It's generated — edit `assets/maps/track.tmx` and re-run |
+| Editing `src/track_map.c` by hand | It's generated — edit `assets/maps/track.tmx` and re-run make |
+| Assuming Tiled tile ID = C array index | Only true for single-row tilesets. Multi-row: encode_2bpp is column-major, so C index ≠ Tiled tile ID. Use the TSX and let the Makefile pipeline handle remapping via `base_remap`. |
+| Adding tile type only in TSX, not rebuilding | `src/track_tileset_meta.h` is generated — must rebuild for type changes to take effect |
 | Missing `start` objectgroup | TMX must have `<objectgroup name="start">` with one object |
 | `encoding: "csv"` in XML = string | Split on `','`, not a JSON array |
 | Object `type` vs `class` | Pre-1.9: `type` field; since 1.9: `class` field |

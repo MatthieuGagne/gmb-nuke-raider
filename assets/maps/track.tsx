@@ -3,7 +3,7 @@
  <image source="tileset.png" width="72" height="16"/>
  <tile id="0">
   <properties>
-   <property name="type" value="TILE_ROAD"/>
+   <property name="type" value="TILE_WALL"/>
   </properties>
  </tile>
  <tile id="1">

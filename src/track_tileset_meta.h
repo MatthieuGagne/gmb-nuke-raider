@@ -3,19 +3,19 @@
 #define TRACK_TILESET_META_H
 #define TRACK_TILE_LUT_LEN 26u
 static const uint8_t track_tile_type_lut[TRACK_TILE_LUT_LEN] = {
-    TILE_ROAD,  /* 0 */
+    TILE_WALL,  /* 0 */
     TILE_ROAD,  /* 1 */
     TILE_ROAD,  /* 2 */
-    TILE_SAND,  /* 3 */
-    TILE_OIL,  /* 4 */
-    TILE_BOOST,  /* 5 */
-    TILE_FINISH,  /* 6 */
+    TILE_WALL,  /* 3 */
+    TILE_ROAD,  /* 4 */
+    TILE_ROAD,  /* 5 */
+    TILE_SAND,  /* 6 */
     TILE_ROAD,  /* 7 */
-    TILE_ROAD,  /* 8 */
+    TILE_OIL,  /* 8 */
     TILE_ROAD,  /* 9 */
-    TILE_WALL,  /* 10 */
+    TILE_BOOST,  /* 10 */
     TILE_ROAD,  /* 11 */
-    TILE_ROAD,  /* 12 */
+    TILE_FINISH,  /* 12 */
     TILE_ROAD,  /* 13 */
     TILE_ROAD,  /* 14 */
     TILE_ROAD,  /* 15 */
