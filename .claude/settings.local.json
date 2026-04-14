@@ -363,7 +363,11 @@
       "Bash(cp /home/mathdaman/code/nuke-raider/.claude/agents/gbdk-expert.md /home/mathdaman/code/nuke-raider/.claude/worktrees/issue-329-music-stall/.claude/agents/gbdk-expert.md)",
       "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/tileset.png assets/maps/tileset.png)",
       "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/track2.tmx assets/maps/track2.tmx)",
-      "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/track.tsx assets/maps/track.tsx)"
+      "Bash(cp /home/mathdaman/code/nuke-raider/assets/maps/track.tsx assets/maps/track.tsx)",
+      "Bash(cmd.exe /c \"reg query HKCU\\\\Control Panel\\\\Desktop /v LogPixels\")",
+      "Bash(cmd.exe /c \"reg query HKCU\\\\Control Panel\\\\Desktop\\\\WindowMetrics /v AppliedDPI\")",
+      "Bash(cmd.exe /c \"echo %USERNAME%\")",
+      "Bash(tiled:*)"
     ]
   },
   "hooks": {
