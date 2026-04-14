@@ -85,26 +85,27 @@ void test_tile_type_from_index_dashes_is_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(2));
 }
 void test_tile_type_from_index_sand(void) {
-    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type_from_index(3));
+    /* 9x2 tileset, column-major: Tiled tile 3 (SAND) -> col 3, row 0 -> C index 6 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type_from_index(6));
 }
 void test_tile_type_from_index_oil(void) {
-    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type_from_index(4));
+    /* Tiled tile 4 (OIL) -> col 4, row 0 -> C index 8 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type_from_index(8));
 }
 void test_tile_type_from_index_boost(void) {
-    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(5));
+    /* Tiled tile 5 (BOOST) -> col 5, row 0 -> C index 10 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(10));
 }
-/* After refactor: generated LUT has 9 entries (TRACK_TILE_LUT_LEN == 9u).
- * Indices 7 and 8 are now valid LUT entries (TILE_ROAD).
- * OOB indices (>= TRACK_TILE_LUT_LEN) return TILE_WALL for safety. */
+/* 9x2 tileset + 8 rotation variants = 26 total entries in the LUT. */
 void test_tile_lut_len_is_7(void) {
     /* TRACK_TILE_LUT_LEN from generated track_tileset_meta.h */
-    TEST_ASSERT_EQUAL_UINT8(9u, TRACK_TILE_LUT_LEN);
-    /* Tile index 6 = TILE_FINISH — still in LUT */
-    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6u));
-    /* Tile index 7 = TILE_ROAD (in-LUT rotated variant) */
-    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(7u));
-    /* Tile index 8 = TILE_ROAD (in-LUT rotated variant) */
-    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(8u));
+    TEST_ASSERT_EQUAL_UINT8(26u, TRACK_TILE_LUT_LEN);
+    /* C index 12 = Tiled tile 6 = TILE_FINISH */
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(12u));
+    /* C index 14 = Tiled tile 7 = TILE_ROAD */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(14u));
+    /* C index 16 = Tiled tile 8 = TILE_ROAD */
+    TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(16u));
 }
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
     /* After refactor: OOB index returns TILE_WALL (safe default), not TILE_ROAD. */
@@ -115,13 +116,12 @@ void test_track_tile_type_from_index_oob_returns_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type_from_index(99));
 }
 void test_finish_tile_is_finish(void) {
-    /* tile index 6 must now be TILE_FINISH (passable, triggers lap detection) */
-    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(6));
+    /* 9x2 tileset: Tiled tile 6 (FINISH) -> col 6, row 0 -> C index 12 */
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(12));
 }
 void test_track_tile_data_count_is_9(void) {
-    /* tileset PNG still has 9 tiles (wall, road, center-dash, sand, oil, boost, finish,
-     * repair-gfx, turret-gfx); LUT shrunk to 7 — indices 7-8 no longer placed in maps. */
-    TEST_ASSERT_EQUAL_UINT8(9u, track_tile_data_count);
+    /* 9x2 tileset (18 base tiles) + 8 rotation variants = 26 total */
+    TEST_ASSERT_EQUAL_UINT8(26u, track_tile_data_count);
 }
 
 /* --- TileType: track_tile_type (world coords, uses updated track_map) ---- */
@@ -192,9 +192,11 @@ void test_track_fill_col_road_column(void) {
      * Both 1 and 2 map to TILE_ROAD via the LUT; we assert the raw index. */
     uint8_t buf[3];
     track_fill_col(10u, 0u, 3u, buf);
-    TEST_ASSERT_EQUAL_UINT8(2u, buf[0]);  /* row 0, col 10 = dashes tile */
-    TEST_ASSERT_EQUAL_UINT8(1u, buf[1]);  /* row 1, col 10 = road tile */
-    TEST_ASSERT_EQUAL_UINT8(1u, buf[2]);  /* row 2, col 10 = road tile */
+    /* 9x2 tileset with base_remap: GID 3 (dashes, Tiled tile 2) -> C index 4;
+     * GID 2 (road, Tiled tile 1) -> C index 2. */
+    TEST_ASSERT_EQUAL_UINT8(4u, buf[0]);  /* row 0, col 10 = dashes tile (C=4) */
+    TEST_ASSERT_EQUAL_UINT8(2u, buf[1]);  /* row 1, col 10 = road tile (C=2) */
+    TEST_ASSERT_EQUAL_UINT8(2u, buf[2]);  /* row 2, col 10 = road tile (C=2) */
 }
 
 /* OOB tx: tile x >= active_map_w (20) fills zeros */
