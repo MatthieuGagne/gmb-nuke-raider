@@ -70,10 +70,16 @@ def gid_to_tile_id(gid: int, firstgid: int, id_map=None) -> int:
         return 0
     flags = gid_to_flags(gid)
     base_id = (gid & GID_CLEAR_FLAGS) - firstgid
-    if flags == 0 or id_map is None:
+    if id_map is None:
         return base_id
+    # base_remap converts Tiled's row-major GID index to the column-major C index
+    # produced by encode_2bpp (only populated for multi-row tilesets).
+    base_remap = id_map.get("base_remap", {})
+    remapped_base = base_remap.get(str(base_id), base_id)
+    if flags == 0:
+        return remapped_base
     key = f"{base_id}:{flags}"
-    return id_map["variants"].get(key, base_id)
+    return id_map["variants"].get(key, remapped_base)
 
 
 def parse_rotation_manifest(tmx_contents, firstgid=1):
