@@ -367,7 +367,9 @@
       "Bash(cmd.exe /c \"reg query HKCU\\\\Control Panel\\\\Desktop /v LogPixels\")",
       "Bash(cmd.exe /c \"reg query HKCU\\\\Control Panel\\\\Desktop\\\\WindowMetrics /v AppliedDPI\")",
       "Bash(cmd.exe /c \"echo %USERNAME%\")",
-      "Bash(tiled:*)"
+      "Bash(tiled:*)",
+      "Bash(xdg-open *)",
+      "Bash(firefox *)"
     ]
   },
   "hooks": {
