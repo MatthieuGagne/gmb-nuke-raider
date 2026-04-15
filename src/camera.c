@@ -2,6 +2,7 @@
 #include <gb/gb.h>
 #include "camera.h"
 #include "track.h"
+#include "config.h"
 
 volatile uint16_t cam_y;
 volatile uint8_t  cam_scy_shadow;
@@ -17,7 +18,7 @@ static uint16_t clamp_cam(int16_t v, uint16_t max) {
     return (uint16_t)v;
 }
 
-/* cam_max_y = active_map_h * 8 - 144 (computed inline — cheaper than WRAM var) */
+/* cam_max_y = active_map_h * 8 - HUD_SCANLINE (computed inline — cheaper than WRAM var) */
 /* cam_max_x = active_map_w * 8 - 160 (computed inline) */
 
 /* --- Row streaming ------------------------------------------------------- */
@@ -122,7 +123,7 @@ void camera_init(int16_t player_world_x, int16_t player_world_y) BANKED {
     stream_row_buf_len = 0u;
     stream_col_buf_len = 0u;
 
-    cam_max_y = (uint16_t)active_map_h * 8u - 144u;
+    cam_max_y = (uint16_t)active_map_h * 8u - (uint16_t)HUD_SCANLINE;
     cam_max_x = (active_map_w > 20u) ? ((uint16_t)active_map_w * 8u - 160u) : 0u;
 
     cam_y = clamp_cam(player_world_y - 72, cam_max_y);
@@ -146,7 +147,7 @@ void camera_update(int16_t player_world_x, int16_t player_world_y) BANKED {
     uint8_t old_left, new_left;
     uint8_t old_right, new_right;
 
-    cam_max_y = (uint16_t)active_map_h * 8u - 144u;
+    cam_max_y = (uint16_t)active_map_h * 8u - (uint16_t)HUD_SCANLINE;
     cam_max_x = (active_map_w > 20u) ? ((uint16_t)active_map_w * 8u - 160u) : 0u;
 
     ncy = clamp_cam(player_world_y - 72, cam_max_y);

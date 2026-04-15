@@ -29,10 +29,10 @@ void test_camera_init_clamps_cam_y_to_zero(void) {
     TEST_ASSERT_EQUAL_UINT16(0, cam_y);
 }
 
-/* Player past bottom: cam_y capped at CAM_MAX_Y = 656 */
+/* Player past bottom: cam_y capped at CAM_MAX_Y = 672 (100*8 - HUD_SCANLINE=128) */
 void test_camera_init_clamps_cam_y_to_max(void) {
-    camera_init(80, 800);  /* 800-72=728 > 656 -> 656 */
-    TEST_ASSERT_EQUAL_UINT16(656, cam_y);
+    camera_init(80, 800);  /* 800-72=728 > 672 -> 672 */
+    TEST_ASSERT_EQUAL_UINT16(672, cam_y);
 }
 
 /* --- camera_init: preloads exactly 18 rows, not all 100 ----------------- */
