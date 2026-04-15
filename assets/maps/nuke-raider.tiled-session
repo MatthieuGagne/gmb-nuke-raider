@@ -3,36 +3,51 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "",
+    "activeFile": "track2.tmx",
     "expandedProjectPaths": [
     ],
     "file.lastUsedOpenFilter": "All Files (*)",
     "fileStates": {
-        "track.tmx": {
-            "scale": 1.0378749999999999,
+        "//wsl.localhost/Ubuntu/home/mathdaman/code/gmb-nuke-raider/assets/maps/track.tmx": {
+            "scale": 1,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 80.45284836805979,
-                "y": 400.3372275081296
+                "x": 79.5,
+                "y": 398.5
+            }
+        },
+        "//wsl.localhost/Ubuntu/home/mathdaman/code/gmb-nuke-raider/assets/maps/track.tsx": {
+            "scaleInDock": 8
+        },
+        "track.tmx": {
+            "scale": 1,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 242.5,
+                "y": 256.5
             }
         },
         "track.tsx": {
-            "scaleInDock": 1
+            "scaleInDock": 5.5,
+            "scaleInEditor": 11
         },
         "track2.tmx": {
-            "scale": 1.0378749999999999,
+            "scale": 3,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 80.45284836805979,
-                "y": 400.3372275081296
+                "x": 50.83333333333334,
+                "y": 246.16666666666666
             }
         }
     },
     "openFiles": [
+        "track2.tmx"
     ],
     "project": "nuke-raider.tiled-project",
     "recentFiles": [
+        "track2.tmx",
+        "track.tsx",
         "track.tmx",
-        "track2.tmx"
+        "//wsl.localhost/Ubuntu/home/mathdaman/code/gmb-nuke-raider/assets/maps/track.tmx"
     ]
 }
