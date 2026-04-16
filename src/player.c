@@ -142,8 +142,8 @@ void player_update(void) BANKED {
      * sfx_play(SFX_SHOOT) is called inside projectile_fire() — only fires when a
      * projectile actually spawns (every PROJ_FIRE_COOLDOWN frames), not every frame. */
     if (KEY_PRESSED(J_A)) {
-        uint8_t scr_x = (uint8_t)(px + 16 + DIR_DX[player_dir] * 8);
-        uint8_t scr_y = (uint8_t)(py - cam_y + 24 + DIR_DY[player_dir] * 8);
+        uint8_t scr_x = (uint8_t)(px + 12 + DIR_DX[player_dir] * 8);
+        uint8_t scr_y = (uint8_t)(py - cam_y + 20 + DIR_DY[player_dir] * 8);
         projectile_fire(scr_x, scr_y, player_dir, PROJ_OWNER_PLAYER);
     }
 

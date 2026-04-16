@@ -454,38 +454,39 @@ static void setup_dir_and_fire(uint8_t dpad_buttons) {
 }
 
 void test_bullet_spawn_north(void) {
-    /* DIR_T: dx=0, dy=-1 → scr_x=88+16+0=104, scr_y=8+24-8=24 */
+    /* DIR_T: dx=0, dy=-1 → bullet center at car top-center
+     * oam_x=88+12+0=100, oam_y=8+20-8=20 */
     setup_dir_and_fire(J_UP);
-    TEST_ASSERT_EQUAL_UINT8(104u, projectile_get_x(0u));
-    TEST_ASSERT_EQUAL_UINT8( 24u, projectile_get_y(0u));
+    TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_south(void) {
-    /* DIR_B: dx=0, dy=+1 → scr_x=104, scr_y=8+24+8=40 */
+    /* DIR_B: dx=0, dy=+1 → oam_x=100, oam_y=8+20+8=36 */
     setup_dir_and_fire(J_DOWN);
-    TEST_ASSERT_EQUAL_UINT8(104u, projectile_get_x(0u));
-    TEST_ASSERT_EQUAL_UINT8( 40u, projectile_get_y(0u));
+    TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 36u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_east(void) {
-    /* DIR_R: dx=+1, dy=0 → scr_x=88+16+8=112, scr_y=8+24+0=32 */
+    /* DIR_R: dx=+1, dy=0 → oam_x=88+12+8=108, oam_y=8+20+0=28 */
     setup_dir_and_fire(J_RIGHT);
-    TEST_ASSERT_EQUAL_UINT8(112u, projectile_get_x(0u));
-    TEST_ASSERT_EQUAL_UINT8( 32u, projectile_get_y(0u));
+    TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_west(void) {
-    /* DIR_L: dx=-1, dy=0 → scr_x=88+16-8=96, scr_y=32 */
+    /* DIR_L: dx=-1, dy=0 → oam_x=88+12-8=92, oam_y=28 */
     setup_dir_and_fire(J_LEFT);
-    TEST_ASSERT_EQUAL_UINT8( 96u, projectile_get_x(0u));
-    TEST_ASSERT_EQUAL_UINT8( 32u, projectile_get_y(0u));
+    TEST_ASSERT_EQUAL_UINT8( 92u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_northeast(void) {
-    /* DIR_RT: dx=+1, dy=-1 → scr_x=112, scr_y=24 */
+    /* DIR_RT: dx=+1, dy=-1 → oam_x=108, oam_y=20 */
     setup_dir_and_fire(J_RIGHT | J_UP);
-    TEST_ASSERT_EQUAL_UINT8(112u, projectile_get_x(0u));
-    TEST_ASSERT_EQUAL_UINT8( 24u, projectile_get_y(0u));
+    TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
 
 int main(void) {
