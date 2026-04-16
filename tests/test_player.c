@@ -5,6 +5,7 @@
 #include "camera.h"
 #include "../src/damage.h"
 #include "../src/track.h"  /* active_map_h — runtime track height */
+#include "projectile.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
@@ -439,6 +440,55 @@ void test_dir_LT_flipx(void) {
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
 }
 
+/* ===== Bullet spawn position (issue #339) ================================ */
+/* setUp: player at (88,8), cam_y=0.
+ * OAM center formula: scr_x = px+16, scr_y = py-cam_y+24
+ * Front offset: DIR_DX[dir]*8, DIR_DY[dir]*8                               */
+
+static void setup_dir_and_fire(uint8_t dpad_buttons) {
+    projectile_init(0u);          /* clear cooldown + active flags */
+    player_apply_physics(dpad_buttons, TILE_ROAD); /* set direction */
+    player_reset_vel();           /* zero velocity so px/py stay at setUp pos */
+    input = J_A;                  /* fire only — no movement direction */
+    player_update();
+}
+
+void test_bullet_spawn_north(void) {
+    /* DIR_T: dx=0, dy=-1 → bullet center at car top-center
+     * oam_x=88+12+0=100, oam_y=8+20-8=20 */
+    setup_dir_and_fire(J_UP);
+    TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
+}
+
+void test_bullet_spawn_south(void) {
+    /* DIR_B: dx=0, dy=+1 → oam_x=100, oam_y=8+20+8=36 */
+    setup_dir_and_fire(J_DOWN);
+    TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 36u, projectile_get_y(0u));
+}
+
+void test_bullet_spawn_east(void) {
+    /* DIR_R: dx=+1, dy=0 → oam_x=88+12+8=108, oam_y=8+20+0=28 */
+    setup_dir_and_fire(J_RIGHT);
+    TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
+}
+
+void test_bullet_spawn_west(void) {
+    /* DIR_L: dx=-1, dy=0 → oam_x=88+12-8=92, oam_y=28 */
+    setup_dir_and_fire(J_LEFT);
+    TEST_ASSERT_EQUAL_UINT8( 92u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
+}
+
+void test_bullet_spawn_northeast(void) {
+    /* DIR_RT: dx=+1, dy=-1 → oam_x=108, oam_y=20 */
+    setup_dir_and_fire(J_RIGHT | J_UP);
+    TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
+    TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -501,5 +551,11 @@ int main(void) {
     RUN_TEST(test_dir_RB_no_flip);
     RUN_TEST(test_dir_LB_flipx);
     RUN_TEST(test_dir_LT_flipx);
+    /* AC: bullet spawn position (issue #339) */
+    RUN_TEST(test_bullet_spawn_north);
+    RUN_TEST(test_bullet_spawn_south);
+    RUN_TEST(test_bullet_spawn_east);
+    RUN_TEST(test_bullet_spawn_west);
+    RUN_TEST(test_bullet_spawn_northeast);
     return UNITY_END();
 }
