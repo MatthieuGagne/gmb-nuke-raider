@@ -369,7 +369,8 @@
       "Bash(cmd.exe /c \"echo %USERNAME%\")",
       "Bash(tiled:*)",
       "Bash(xdg-open *)",
-      "Bash(firefox *)"
+      "Bash(firefox *)",
+      "Bash(identify /home/mathdaman/code/nuke-raider/assets/sprites/player_car.png)"
     ]
   },
   "hooks": {
