@@ -28,3 +28,17 @@ On success: confirm the PNG was written (no output = success for Aseprite batch 
 On failure: show the error output. Common causes: wrong file path, unsupported color mode (must be indexed, 4 colours), dimensions not a multiple of 8.
 
 After export, run the `track-build` skill (or `build` skill) to regenerate the game ROM from the updated PNG.
+
+## After editing tileset.aseprite — sync turret.png
+
+`assets/sprites/turret.png` is extracted from the tileset (tile index 8, col 8 row 0). It has no `.aseprite` source of its own. When `tileset.aseprite` changes the turret tile, sync it manually before building:
+
+```sh
+python3 - <<'EOF'
+from PIL import Image
+tileset = Image.open("assets/maps/tileset.png")
+tileset.crop((64, 0, 72, 8)).save("assets/sprites/turret.png")
+EOF
+```
+
+Then `make` will auto-regenerate `src/turret_sprite.c` from the updated PNG.
