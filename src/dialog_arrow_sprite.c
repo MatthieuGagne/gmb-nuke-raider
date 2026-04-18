@@ -3,7 +3,11 @@
 #include <stdint.h>
 #include "banking.h"
 
+/* Bank reference: BANKREF(name) emits a CODE stub; bankpack rewrites
+   ___bank_name to the actual assigned bank at link time.
+   Required for autobank (255) so BANK(name) returns the real bank. */
 BANKREF(dialog_arrow_tile_data)
+
 const uint8_t dialog_arrow_tile_data[] = {
     /* tile 0 */ 0x00, 0x00, 0xFF, 0x00, 0x81, 0x7E, 0x81, 0x7E, 0x42, 0x3C, 0x24, 0x18, 0x18, 0x00, 0x00, 0x00,
 };

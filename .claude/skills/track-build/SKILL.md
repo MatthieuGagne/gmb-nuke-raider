@@ -23,3 +23,15 @@ On failure: extract lines containing `error:` and show each as `file:line: messa
 ## Common workflow
 
 If the tileset was also edited in Aseprite, run `aseprite-build` first to export the PNG, then `track-build`.
+
+If the turret tile (col 8, row 0 = tile index 8) changed in the tileset, also sync `turret.png` before building:
+
+```sh
+python3 - <<'EOF'
+from PIL import Image
+tileset = Image.open("assets/maps/tileset.png")
+tileset.crop((64, 0, 72, 8)).save("assets/sprites/turret.png")
+EOF
+```
+
+`make` will then auto-regenerate `src/turret_sprite.c` from the updated PNG.
