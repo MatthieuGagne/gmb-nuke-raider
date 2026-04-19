@@ -120,6 +120,21 @@ $(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter
 
 # src/dialog_border_tiles.c is checked into git so CI works without Python.
 # Run `make src/dialog_border_tiles.c` to regenerate from updated PNG.
+src/turret_sprite.c: assets/sprites/turret.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/turret.png src/turret_sprite.c turret_tile_data
+
+$(TARGET): src/turret_sprite.c
+
+src/bullet_sprite.c: assets/sprites/bullet.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/bullet.png src/bullet_sprite.c bullet_tile_data
+
+$(TARGET): src/bullet_sprite.c
+
+src/dialog_arrow_sprite.c: assets/sprites/dialog_arrow.png tools/png_to_tiles.py
+	python3 tools/png_to_tiles.py --bank 255 assets/sprites/dialog_arrow.png src/dialog_arrow_sprite.c dialog_arrow_tile_data
+
+$(TARGET): src/dialog_arrow_sprite.c
+
 src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_border.png tools/png_to_tiles.py
 	python3 tools/png_to_tiles.py --bank 255 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
 
