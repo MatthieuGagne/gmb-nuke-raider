@@ -373,7 +373,16 @@
       "Bash(identify /home/mathdaman/code/nuke-raider/assets/sprites/player_car.png)",
       "Bash(ASEPRITE_SCALE=1 aseprite /home/mathdaman/code/nuke-raider/assets/maps/tileset.aseprite)",
       "Bash(ASEPRITE_SCALE=1 aseprite *)",
-      "Bash(eog *)"
+      "Bash(eog *)",
+      "Bash(/home/mathdaman/.local/bin/hUGETracker --version)",
+      "Bash(/home/mathdaman/.local/bin/hUGETracker --help)",
+      "Bash(pip3 show *)",
+      "WebFetch(domain:beatscribe.itch.io)",
+      "WebFetch(domain:git.sr.ht)",
+      "Bash(pip show *)",
+      "Bash(/home/mathdaman/.local/bin/hUGETracker *)",
+      "Bash(DISPLAY=:0 /home/mathdaman/.local/bin/hUGETracker /home/mathdaman/code/nuke-raider/assets/music/BeepBox-Song.uge)",
+      "Bash(cmd.exe *)"
     ]
   },
   "hooks": {
