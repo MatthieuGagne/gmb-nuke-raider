@@ -66,6 +66,16 @@
    <property name="type" value="TILE_ROAD"/>
   </properties>
  </tile>
+ <tile id="14">
+  <properties>
+   <property name="type" value="TILE_ROAD"/>
+  </properties>
+ </tile>
+ <tile id="15">
+  <properties>
+   <property name="type" value="TILE_ROAD"/>
+  </properties>
+ </tile>
  <tile id="17">
   <properties>
    <property name="type" value="TILE_ROAD"/>
