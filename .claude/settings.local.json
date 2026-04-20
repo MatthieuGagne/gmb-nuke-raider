@@ -382,7 +382,8 @@
       "Bash(pip show *)",
       "Bash(/home/mathdaman/.local/bin/hUGETracker *)",
       "Bash(DISPLAY=:0 /home/mathdaman/.local/bin/hUGETracker /home/mathdaman/code/nuke-raider/assets/music/BeepBox-Song.uge)",
-      "Bash(cmd.exe *)"
+      "Bash(cmd.exe *)",
+      "Bash(Tiled *)"
     ]
   },
   "hooks": {
