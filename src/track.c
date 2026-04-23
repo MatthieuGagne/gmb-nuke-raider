@@ -103,7 +103,8 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     tx = (uint8_t)((uint16_t)world_x >> 3u);
     ty = (uint8_t)((uint16_t)world_y >> 3u);
     tile_idx = track_get_raw_tile(tx, ty);
-    return track_tile_type_from_index(tile_idx) != TILE_WALL ? 1u : 0u;
+    if (track_tile_type_from_index(tile_idx) == TILE_WALL) return 0u;
+    return 1u;
 }
 
 const CheckpointDef *track_get_checkpoints(void) BANKED { return wram_checkpoints; }
