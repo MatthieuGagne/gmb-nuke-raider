@@ -5,6 +5,8 @@
 #ifndef __SDCC
 /* Seam declared in track.h — set synthetic map for wide-map index math test */
 extern void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h);
+/* Seam: inject a diagonal mask into the collision bitmask for a specific tile index */
+extern void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8);
 #endif
 
 void setUp(void)    {}
@@ -250,6 +252,30 @@ void test_track_fill_row_range_oob_col(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, buf[2]);
 }
 
+/* --- per-pixel collision via bitmask ------------------------------------ */
+
+/* Inject a diagonal mask into tile 0 (which is TILE_WALL, normally all 0x00).
+ * Lower-left triangle: row oy has passable bits 0..oy set.
+ * Bit ox (LSB=left): passable if ox <= oy. */
+void test_track_passable_diagonal_inside(void) {
+    /* tile at world (0,0): tx=0, ty=0, tile_idx = track_get_raw_tile(0,0) */
+    uint8_t diag[8];
+    uint8_t oy;
+    uint8_t tile_idx = track_get_raw_tile(0u, 0u);
+    for (oy = 0u; oy < 8u; oy++)
+        diag[oy] = (uint8_t)((1u << (oy + 1u)) - 1u);
+    track_test_set_collision_mask(tile_idx, diag);
+    /* pixel (1, 3): ox=1, oy=3 → bit 1 of row 3 = (0x0F >> 1) & 1 = 1 → passable */
+    TEST_ASSERT_EQUAL_UINT8(1u, track_passable(1, 3));
+    /* pixel (5, 3): ox=5, oy=3 → bit 5 of row 3 = (0x0F >> 5) & 1 = 0 → solid */
+    TEST_ASSERT_EQUAL_UINT8(0u, track_passable(5, 3));
+}
+
+void test_track_passable_oob_tile_idx_is_solid(void) {
+    /* OOB world coord is already tested and returns 0 */
+    TEST_ASSERT_EQUAL_UINT8(0u, track_passable(160, 80));  /* tx=20 >= active_map_w */
+}
+
 /* --- track_get_reward --- */
 
 void test_track1_reward(void) {
@@ -368,5 +394,7 @@ int main(void) {
     RUN_TEST(test_track_get_id_returns_2_after_select_2);
     RUN_TEST(test_track_select_oob_clamps_to_0);
     RUN_TEST(test_track_select_large_id_clamps_to_0);
+    RUN_TEST(test_track_passable_oob_tile_idx_is_solid);
+    RUN_TEST(test_track_passable_diagonal_inside);
     return UNITY_END();
 }

@@ -131,6 +131,10 @@ void track_fill_col(uint8_t tx, uint8_t ty_start, uint8_t count, uint8_t *buf) B
 /* Test-only seam: inject a synthetic map without hardware (gcc host tests only).
  * Never compiled into the GB ROM. */
 void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h);
+/* Test-only seam: inject an 8-byte per-pixel collision mask for tile tile_idx.
+ * rows8[oy] is a bitmask of passable pixels in row oy; LSB = leftmost pixel.
+ * Never compiled into the GB ROM. */
+void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8);
 #endif
 
 #endif /* TRACK_H */
