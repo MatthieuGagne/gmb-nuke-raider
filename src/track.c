@@ -108,7 +108,7 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     if (tile_idx >= TRACK_TILE_LUT_LEN) return 0u;
     ox = (uint8_t)(world_x & 7u);
     oy = (uint8_t)(world_y & 7u);
-    return (track_collision_mask[(uint8_t)(tile_idx << 3u) + oy] >> ox) & 1u;
+    return (track_collision_mask[((uint16_t)tile_idx << 3u) + oy] >> ox) & 1u;
 }
 
 const CheckpointDef *track_get_checkpoints(void) BANKED { return wram_checkpoints; }
@@ -147,6 +147,6 @@ void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h) {
 void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8) {
     uint8_t i;
     for (i = 0u; i < 8u; i++)
-        track_collision_mask[(uint8_t)(tile_idx << 3u) + i] = rows8[i];
+        track_collision_mask[((uint16_t)tile_idx << 3u) + i] = rows8[i];
 }
 #endif
