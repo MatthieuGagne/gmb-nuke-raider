@@ -99,12 +99,16 @@ uint8_t track_passable(int16_t world_x, int16_t world_y) BANKED {
     uint8_t tx;
     uint8_t ty;
     uint8_t tile_idx;
+    uint8_t ox;
+    uint8_t oy;
     if (world_x < 0 || world_y < 0) return 0u;
     tx = (uint8_t)((uint16_t)world_x >> 3u);
     ty = (uint8_t)((uint16_t)world_y >> 3u);
     tile_idx = track_get_raw_tile(tx, ty);
-    if (track_tile_type_from_index(tile_idx) == TILE_WALL) return 0u;
-    return 1u;
+    if (tile_idx >= TRACK_TILE_LUT_LEN) return 0u;
+    ox = (uint8_t)(world_x & 7u);
+    oy = (uint8_t)(world_y & 7u);
+    return (track_collision_mask[((uint16_t)tile_idx << 3u) + oy] >> ox) & 1u;
 }
 
 const CheckpointDef *track_get_checkpoints(void) BANKED { return wram_checkpoints; }
@@ -135,5 +139,14 @@ void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h) {
     loader_test_set_active_map(map, 1u);  /* test maps are always "bank 1" equivalent */
     active_map_w = w;
     active_map_h = h;
+}
+
+/* Test-only seam — inject an 8-byte collision mask for a single tile index.
+ * rows8[oy] is a bitmask of passable pixels in row oy; LSB = leftmost pixel (ox=0).
+ * Not compiled into the GB ROM. */
+void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8) {
+    uint8_t i;
+    for (i = 0u; i < 8u; i++)
+        track_collision_mask[((uint16_t)tile_idx << 3u) + i] = rows8[i];
 }
 #endif
