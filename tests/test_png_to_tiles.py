@@ -7,7 +7,7 @@ import zlib
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c, apply_transform
+from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c, apply_transform, rasterize_polygon
 
 
 # ── Minimal PNG helpers ────────────────────────────────────────────────────
@@ -245,6 +245,161 @@ class TestApplyTransform(unittest.TestCase):
         for r in range(8):
             for c in range(8):
                 self.assertEqual(result[r][c], pixels[7-c][7-r])
+
+
+class TestRasterizePolygon(unittest.TestCase):
+
+    def test_full_tile_polygon_is_all_passable(self):
+        """Polygon covering the whole 8×8 tile → all rows 0xFF."""
+        poly = [(0,0),(8,0),(8,8),(0,8)]
+        rows = rasterize_polygon(poly)
+        self.assertEqual(rows, [0xFF]*8)
+
+    def test_empty_polygon_is_all_solid(self):
+        """Empty polygon list → all rows 0x00 (no inside pixels)."""
+        rows = rasterize_polygon([])
+        self.assertEqual(rows, [0x00]*8)
+
+    def test_lower_left_triangle(self):
+        """Lower-left triangle: poly=(0,0),(8.001,8),(0,8).
+        Pixel (ox, oy) is passable if ox <= oy (below-left of diagonal).
+        LSB = leftmost pixel (ox=0), bit ox set means passable.
+        Row oy: passable columns 0..oy → mask = (1<<(oy+1))-1
+        Note: diagonal is shifted by 0.001 so pixel centers on y=x are clearly inside."""
+        poly = [(0,0),(8.001,8),(0,8)]
+        rows = rasterize_polygon(poly)
+        for oy in range(8):
+            expected = (1 << (oy + 1)) - 1
+            self.assertEqual(rows[oy], expected,
+                             f"row {oy}: expected 0x{expected:02X} got 0x{rows[oy]:02X}")
+
+    def test_upper_right_triangle(self):
+        """Upper-right triangle: passable columns ox >= (7-oy) per row.
+        Bit ox set means passable. Row oy: passable cols (7-oy)..7.
+        Triangle above the anti-diagonal x+y=8: vertices (8,0),(8,8),(0,8)."""
+        poly = [(8,0),(8,8),(0,8)]
+        rows = rasterize_polygon(poly)
+        for oy in range(8):
+            passable_start = 7 - oy
+            expected = 0
+            for ox in range(passable_start, 8):
+                expected |= (1 << ox)
+            self.assertEqual(rows[oy], expected,
+                             f"row {oy}: expected 0x{expected:02X} got 0x{rows[oy]:02X}")
+
+    def test_single_pixel_center_inside(self):
+        """Tiny square around pixel (3,4) center (3.5,4.5) → only bit 3 of row 4 set."""
+        poly = [(3,4),(4,4),(4,5),(3,5)]
+        rows = rasterize_polygon(poly)
+        for oy in range(8):
+            if oy == 4:
+                self.assertEqual(rows[oy], 1 << 3)
+            else:
+                self.assertEqual(rows[oy], 0x00)
+
+
+class TestMetaHeaderCollisionMask(unittest.TestCase):
+    """Integration: png_to_c emits track_collision_mask in meta header."""
+
+    def _make_minimal_tsx(self, path):
+        """Write a minimal track.tsx with 1 TILE_WALL and 1 TILE_ROAD tile."""
+        content = '''<?xml version="1.0" encoding="UTF-8"?>
+<tileset version="1.8" name="track" tilewidth="8" tileheight="8" tilecount="2" columns="2">
+ <image source="tileset.png" width="16" height="8"/>
+ <tile id="0">
+  <properties><property name="type" value="TILE_WALL"/></properties>
+ </tile>
+ <tile id="1">
+  <properties><property name="type" value="TILE_ROAD"/></properties>
+ </tile>
+</tileset>'''
+        with open(path, 'w') as f:
+            f.write(content)
+
+    def _make_tsx_with_objectgroup(self, path):
+        """TSX with tile 0 having a full-tile objectgroup polygon (passable)."""
+        content = '''<?xml version="1.0" encoding="UTF-8"?>
+<tileset version="1.8" name="track" tilewidth="8" tileheight="8" tilecount="2" columns="2">
+ <image source="tileset.png" width="16" height="8"/>
+ <tile id="0">
+  <properties><property name="type" value="TILE_WALL"/></properties>
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="0">
+    <polygon points="0,0 8,0 8,8 0,8"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="1">
+  <properties><property name="type" value="TILE_ROAD"/></properties>
+ </tile>
+</tileset>'''
+        with open(path, 'w') as f:
+            f.write(content)
+
+    def test_wall_no_objectgroup_produces_all_zero_mask(self):
+        """TILE_WALL with no objectgroup → all 0x00 mask rows (R4)."""
+        png_data = _make_indexed_png(16, 8, [0]*128)
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as d:
+            png_path = os.path.join(d, 't.png')
+            tsx_path = os.path.join(d, 't.tsx')
+            c_path   = os.path.join(d, 't.c')
+            id_path  = os.path.join(d, 'id.json')
+            hdr_path = os.path.join(d, 'meta.h')
+            with open(png_path, 'wb') as f: f.write(png_data)
+            self._make_minimal_tsx(tsx_path)
+            # rotation manifest: no rotations
+            mf_path = os.path.join(d, 'mf.json')
+            with open(mf_path, 'w') as f: json.dump({"rotations":{}}, f)
+            png_to_c(png_path, c_path, 'tiles', bank=255,
+                     rotation_manifest=mf_path, tsx_path=tsx_path,
+                     id_map_out=id_path, meta_header_out=hdr_path)
+            with open(hdr_path) as f: src = f.read()
+        # C index 0 = Tiled tile 0 (TILE_WALL) → expect 8 zero bytes
+        self.assertIn('track_collision_mask', src)
+        # All 8 mask bytes for index 0 must be 0x00
+        self.assertIn('0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00', src)
+
+    def test_road_no_objectgroup_produces_all_ff_mask(self):
+        """TILE_ROAD with no objectgroup → all 0xFF mask rows (R4)."""
+        png_data = _make_indexed_png(16, 8, [0]*128)
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as d:
+            png_path = os.path.join(d, 't.png')
+            tsx_path = os.path.join(d, 't.tsx')
+            c_path   = os.path.join(d, 't.c')
+            id_path  = os.path.join(d, 'id.json')
+            hdr_path = os.path.join(d, 'meta.h')
+            with open(png_path, 'wb') as f: f.write(png_data)
+            self._make_minimal_tsx(tsx_path)
+            mf_path = os.path.join(d, 'mf.json')
+            with open(mf_path, 'w') as f: json.dump({"rotations":{}}, f)
+            png_to_c(png_path, c_path, 'tiles', bank=255,
+                     rotation_manifest=mf_path, tsx_path=tsx_path,
+                     id_map_out=id_path, meta_header_out=hdr_path)
+            with open(hdr_path) as f: src = f.read()
+        # C index 1 = Tiled tile 1 (TILE_ROAD) → expect 8 0xFF bytes
+        self.assertIn('0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF', src)
+
+    def test_wall_with_full_objectgroup_produces_all_ff_mask(self):
+        """TILE_WALL with full-tile polygon → rasterized as all 0xFF (polygon overrides type default)."""
+        png_data = _make_indexed_png(16, 8, [0]*128)
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as d:
+            png_path = os.path.join(d, 't.png')
+            tsx_path = os.path.join(d, 't.tsx')
+            c_path   = os.path.join(d, 't.c')
+            id_path  = os.path.join(d, 'id.json')
+            hdr_path = os.path.join(d, 'meta.h')
+            with open(png_path, 'wb') as f: f.write(png_data)
+            self._make_tsx_with_objectgroup(tsx_path)
+            mf_path = os.path.join(d, 'mf.json')
+            with open(mf_path, 'w') as f: json.dump({"rotations":{}}, f)
+            png_to_c(png_path, c_path, 'tiles', bank=255,
+                     rotation_manifest=mf_path, tsx_path=tsx_path,
+                     id_map_out=id_path, meta_header_out=hdr_path)
+            with open(hdr_path) as f: src = f.read()
+        self.assertIn('0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF', src)
 
 
 if __name__ == '__main__':

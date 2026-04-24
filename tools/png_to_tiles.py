@@ -249,6 +249,78 @@ def parse_tsx_types(tsx_path):
     return types
 
 
+def _point_in_polygon(px, py, polygon):
+    """Even-odd ray casting. Returns True if (px,py) is inside polygon."""
+    n = len(polygon)
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i]
+        xj, yj = polygon[j]
+        if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
+def rasterize_polygon(polygon):
+    """Rasterize a polygon to an 8-byte collision mask.
+
+    polygon: list of (x,y) float/int pairs in tile-local coords (0..8).
+    Returns list of 8 uint8 values, one per row.
+    Bit ox (LSB=left) of row oy is 1 (passable) if pixel center
+    (ox+0.5, oy+0.5) is inside the polygon.
+    Empty polygon → all 0x00.
+    """
+    rows = []
+    for oy in range(8):
+        mask = 0
+        for ox in range(8):
+            if polygon and _point_in_polygon(ox + 0.5, oy + 0.5, polygon):
+                mask |= (1 << ox)
+        rows.append(mask)
+    return rows
+
+
+def parse_tsx_collisions(tsx_path):
+    """Parse per-tile collision polygons from Tiled TSX <objectgroup> elements.
+
+    Returns dict mapping 0-indexed tile ID → list of (x,y) tuples.
+    Tiles with no <objectgroup> are absent from the dict.
+    Only the first <polygon> inside the first <object> is used.
+    """
+    import xml.etree.ElementTree as ET
+    collisions = {}
+    tree = ET.parse(tsx_path)
+    root = tree.getroot()
+    for tile_elem in root.findall("tile"):
+        tile_id = int(tile_elem.get("id"))
+        og = tile_elem.find("objectgroup")
+        if og is None:
+            continue
+        obj = og.find("object")
+        if obj is None:
+            continue
+        obj_x = float(obj.get("x", 0))
+        obj_y = float(obj.get("y", 0))
+        poly_elem = obj.find("polygon")
+        if poly_elem is None:
+            w = float(obj.get("width", 8))
+            h = float(obj.get("height", 8))
+            polygon = [(obj_x, obj_y),
+                       (obj_x + w, obj_y),
+                       (obj_x + w, obj_y + h),
+                       (obj_x, obj_y + h)]
+        else:
+            points_str = poly_elem.get("points", "")
+            polygon = []
+            for pt in points_str.split():
+                px_s, py_s = pt.split(",")
+                polygon.append((obj_x + float(px_s), obj_y + float(py_s)))
+        collisions[tile_id] = polygon
+    return collisions
+
+
 def png_to_c(png_path, out_path, array_name, bank,
              rotation_manifest=None, tsx_path=None,
              id_map_out=None, meta_header_out=None):
@@ -385,22 +457,49 @@ def png_to_c(png_path, out_path, array_name, bank,
 
     if meta_header_out is not None and tsx_path is not None and id_map is not None:
         tsx_types = parse_tsx_types(tsx_path)
+        tsx_collisions = parse_tsx_collisions(tsx_path)
         lut_entries = []
+        mask_rows = []   # flat: 8 bytes per tile, in LUT order
         _tiles_x = width // 8
         _tiles_tall = height // 8
+
+        def _mask_for_tiled_idx(tiled_idx, flags=0):
+            """Return 8-byte mask list for a given Tiled tile id + transform flags."""
+            type_str = tsx_types.get(tiled_idx, "TILE_ROAD")
+            if tiled_idx in tsx_collisions:
+                poly = tsx_collisions[tiled_idx]
+            elif type_str == "TILE_WALL":
+                poly = []          # no objectgroup + TILE_WALL → all 0x00
+            else:
+                poly = [(0,0),(8,0),(8,8),(0,8)]  # no objectgroup + non-wall → all 0xFF
+            rows = rasterize_polygon(poly)
+            if flags != 0:
+                grid = [[1 if (rows[r] >> c) & 1 else 0 for c in range(8)] for r in range(8)]
+                grid = apply_transform(grid, flags)
+                rows = [sum(grid[r][c] << c for c in range(8)) for r in range(8)]
+            return rows
+
         for i in range(n_tiles):
-            # encode_2bpp writes column-major (outer=tx, inner=ty), so C index i
-            # maps to: tx = i // tiles_tall, ty = i % tiles_tall.
-            # Tiled tile index is row-major: tiled_idx = ty * tiles_x + tx.
             tiled_idx = (i % _tiles_tall) * _tiles_x + (i // _tiles_tall)
             t = tsx_types.get(tiled_idx, "TILE_ROAD")
             lut_entries.append(f"    {t},  /* {i} */")
+            mask_rows.extend(_mask_for_tiled_idx(tiled_idx))
+
         for key, _ in variant_tiles:
             base_id = int(key.split(":")[0])
+            flags   = int(key.split(":")[1])
             t = tsx_types.get(base_id, "TILE_ROAD")
             idx = id_map["variants"][key]
             lut_entries.append(f"    {t},  /* {idx} (rotated from {base_id}) */")
+            mask_rows.extend(_mask_for_tiled_idx(base_id, flags))
+
         lut_len = len(lut_entries)
+
+        mask_lines = []
+        for tile_i in range(lut_len):
+            hex_vals = ", ".join(f"0x{mask_rows[tile_i*8 + r]:02X}" for r in range(8))
+            mask_lines.append(f"    /* tile {tile_i} */ {hex_vals},")
+
         header_lines = [
             "/* generated by png_to_tiles.py — do not edit */",
             "#ifndef TRACK_TILESET_META_H",
@@ -408,6 +507,17 @@ def png_to_c(png_path, out_path, array_name, bank,
             f"#define TRACK_TILE_LUT_LEN {lut_len}u",
             f"static const uint8_t track_tile_type_lut[TRACK_TILE_LUT_LEN] = {{",
         ] + lut_entries + [
+            "};",
+            "/* Per-tile 8x8 collision bitmask: 8 bytes per tile, LSB=leftmost pixel.",
+            "   1=passable, 0=solid. Index: tile_idx*8+row_y.",
+            "   On SDCC (GBC): const → placed in ROM bank with track.c.",
+            "   On gcc (host tests): non-const → writable by track_test_set_collision_mask(). */",
+            "#ifdef __SDCC",
+            f"static const uint8_t track_collision_mask[TRACK_TILE_LUT_LEN * 8u] = {{",
+            "#else",
+            f"static uint8_t track_collision_mask[TRACK_TILE_LUT_LEN * 8u] = {{",
+            "#endif",
+        ] + mask_lines + [
             "};",
             "#endif /* TRACK_TILESET_META_H */",
         ]
