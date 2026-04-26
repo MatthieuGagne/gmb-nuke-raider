@@ -81,12 +81,29 @@ void test_enemy_spawn_sets_dir_none(void) {
     TEST_ASSERT_EQUAL_UINT8(DIR_NONE, enemy_get_dir(0u));
 }
 
+void test_turret_dir_enum_has_16_values(void) {
+    /* Compile-time check: new enum constants exist and are in range 8-15 */
+    TEST_ASSERT_EQUAL_INT(8,  DIR_NNE);
+    TEST_ASSERT_EQUAL_INT(9,  DIR_ENE);
+    TEST_ASSERT_EQUAL_INT(10, DIR_ESE);
+    TEST_ASSERT_EQUAL_INT(11, DIR_SSE);
+    TEST_ASSERT_EQUAL_INT(12, DIR_SSW);
+    TEST_ASSERT_EQUAL_INT(13, DIR_WSW);
+    TEST_ASSERT_EQUAL_INT(14, DIR_WNW);
+    TEST_ASSERT_EQUAL_INT(15, DIR_NNW);
+}
+
 void test_npc_type_constants_defined(void) {
     /* Compile-time presence; verify values match tmx_to_c.py NPC_TYPE_MAP */
     TEST_ASSERT_EQUAL_UINT8(0u, NPC_TYPE_TURRET);
     TEST_ASSERT_EQUAL_UINT8(1u, NPC_TYPE_CAR);
     TEST_ASSERT_EQUAL_UINT8(2u, NPC_TYPE_PEDESTRIAN);
     TEST_ASSERT_EQUAL_UINT8(0xFFu, DIR_NONE);
+}
+
+void test_turret_constants_values(void) {
+    TEST_ASSERT_EQUAL_UINT8(45u, TURRET_FIRE_INTERVAL);
+    TEST_ASSERT_EQUAL_UINT8(30u, TURRET_WIND_UP);
 }
 
 int main(void) {
@@ -106,5 +123,7 @@ int main(void) {
     RUN_TEST(test_enemy_three_turrets_timer_all_zero);
     RUN_TEST(test_enemy_spawn_sets_type_turret);
     RUN_TEST(test_enemy_spawn_sets_dir_none);
+    RUN_TEST(test_turret_dir_enum_has_16_values);
+    RUN_TEST(test_turret_constants_values);
     return UNITY_END();
 }
