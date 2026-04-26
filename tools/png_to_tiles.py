@@ -287,7 +287,7 @@ def parse_tsx_collisions(tsx_path):
 
     Returns dict mapping 0-indexed tile ID → list of (x,y) tuples.
     Tiles with no <objectgroup> are absent from the dict.
-    Only the first <polygon> inside the first <object> is used.
+    The first <polygon> or <polyline> inside the first <object> is used.
     """
     import xml.etree.ElementTree as ET
     collisions = {}
@@ -303,7 +303,7 @@ def parse_tsx_collisions(tsx_path):
             continue
         obj_x = float(obj.get("x", 0))
         obj_y = float(obj.get("y", 0))
-        poly_elem = obj.find("polygon")
+        poly_elem = obj.find("polygon") or obj.find("polyline")
         if poly_elem is None:
             w = float(obj.get("width", 8))
             h = float(obj.get("height", 8))
