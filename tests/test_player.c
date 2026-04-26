@@ -489,6 +489,39 @@ void test_bullet_spawn_northeast(void) {
     TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
 
+/* --- directional hitbox ------------------------------------------------- */
+
+/* AC1: driving straight into a wall still blocks */
+void test_hitbox_cardinal_wall_blocks(void) {
+    /* Road: cols 4-15 (x=32-127). Left wall at col 3 (x=24-31).
+     * Player at x=32 (leftmost road tile), driving left.
+     * DIR_L hitbox X offsets: {0,15,0,15} — left points at new_px+0=30 -> col 3 = wall */
+    player_set_pos(32, 80);
+    input = J_LEFT | J_A;
+    player_update();
+    TEST_ASSERT_EQUAL_INT16(32, player_get_x());
+}
+
+/* AC2: driving diagonally along a wall no longer triggers phantom collisions */
+void test_hitbox_diagonal_along_wall_passes(void) {
+    /* Player hugging the left wall at x=32, driving DIR_RT (northeast).
+     * DIR_RT hitbox X offsets: {8,14,1,8}.
+     * new_px = 32+2 = 34; leftmost point = 34+1 = 35 -> col 4 (road) -> passes. */
+    player_set_pos(32, 80);
+    input = J_RIGHT | J_UP | J_A;
+    player_update();
+    TEST_ASSERT_TRUE(player_get_x() > 32);
+}
+
+/* AC1: wall collision deals 1 damage */
+void test_hitbox_cardinal_damage_on_collision(void) {
+    uint8_t hp_before = damage_get_hp();
+    player_set_pos(32, 80);
+    input = J_LEFT | J_A;
+    player_update();   /* blocked by left wall -> damage_wall_hit() */
+    TEST_ASSERT_EQUAL_UINT8(hp_before - 1u, damage_get_hp());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -557,5 +590,9 @@ int main(void) {
     RUN_TEST(test_bullet_spawn_east);
     RUN_TEST(test_bullet_spawn_west);
     RUN_TEST(test_bullet_spawn_northeast);
+    /* AC: directional hitbox */
+    RUN_TEST(test_hitbox_cardinal_wall_blocks);
+    RUN_TEST(test_hitbox_diagonal_along_wall_passes);
+    RUN_TEST(test_hitbox_cardinal_damage_on_collision);
     return UNITY_END();
 }
