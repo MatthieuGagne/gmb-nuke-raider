@@ -97,12 +97,39 @@ static uint8_t corner_active_turret(int16_t wx, int16_t wy) {
     return enemy_blocks_tile(tx, ty);
 }
 
-/* Returns 1 if all 4 corners of the 16×16 hitbox at (wx, wy) are on track. */
+/* Directional hitbox points indexed by player_dir_t (0-7).
+ * Cardinal dirs: rectangle inset ~2px on sides perpendicular to travel.
+ * Diagonal dirs: diamond with points at edge midpoints. */
+static const uint8_t HITBOX_X[8][4] = {
+    {2u, 13u,  2u, 13u},  /* DIR_T  */
+    {8u, 14u,  1u,  8u},  /* DIR_RT */
+    {0u, 15u,  0u, 15u},  /* DIR_R  */
+    {1u,  8u,  8u, 14u},  /* DIR_RB */
+    {2u, 13u,  2u, 13u},  /* DIR_B  */
+    {8u, 14u,  1u,  8u},  /* DIR_LB */
+    {0u, 15u,  0u, 15u},  /* DIR_L  */
+    {1u,  8u,  8u, 14u},  /* DIR_LT */
+};
+static const uint8_t HITBOX_Y[8][4] = {
+    {0u,  0u, 15u, 15u},  /* DIR_T  */
+    {1u,  8u,  8u, 14u},  /* DIR_RT */
+    {2u,  2u, 13u, 13u},  /* DIR_R  */
+    {8u,  1u, 14u,  8u},  /* DIR_RB */
+    {0u,  0u, 15u, 15u},  /* DIR_B  */
+    {1u,  8u,  8u, 14u},  /* DIR_LB */
+    {2u,  2u, 13u, 13u},  /* DIR_L  */
+    {8u,  1u, 14u,  8u},  /* DIR_LT */
+};
+
+/* Returns 1 if all 4 directional hitbox points at (wx, wy) are on track. */
 static uint8_t corners_passable(int16_t wx, int16_t wy) {
-    return track_passable(wx,        wy      ) && !corner_active_turret(wx,        wy      ) &&
-           track_passable(wx + 15,   wy      ) && !corner_active_turret(wx + 15,   wy      ) &&
-           track_passable(wx,        wy + 15 ) && !corner_active_turret(wx,        wy + 15 ) &&
-           track_passable(wx + 15,   wy + 15 ) && !corner_active_turret(wx + 15,   wy + 15 );
+    uint8_t i;
+    for (i = 0u; i < 4u; i++) {
+        int16_t cx = wx + HITBOX_X[player_dir][i];
+        int16_t cy = wy + HITBOX_Y[player_dir][i];
+        if (!track_passable(cx, cy) || corner_active_turret(cx, cy)) return 0u;
+    }
+    return 1u;
 }
 
 void player_init(uint8_t tile_base) BANKED {
