@@ -118,6 +118,13 @@ static void update(void) {
          * - vy > 0 guard: only count when moving downward (prevents backward crossing)
          * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
+        /* DEBUG: show tile type + passability in HUD row 1 cols 18-19 */
+        {
+            uint8_t dbg[2];
+            dbg[0] = 128u + (uint8_t)ct;
+            dbg[1] = 128u + track_passable((int16_t)(px + 4), (int16_t)(py + 4));
+            set_win_tiles(18u, 1u, 2u, 1u, dbg);
+        }
         if (ct == TILE_FINISH) {
             if (finish_eval(active_map_type_cache, finish_armed,
                             pvx, pvy, finish_dir_cache,
