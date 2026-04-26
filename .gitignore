@@ -34,6 +34,7 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+*.tiled-session
 
 # Git worktrees
 .worktrees/
