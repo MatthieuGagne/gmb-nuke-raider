@@ -83,32 +83,22 @@ player_dir_t enemy_dir_to_pixel(uint8_t tx, uint8_t ty,
     int16_t dy = player_py - (int16_t)((uint16_t)ty * 8u);
     int16_t ax = dx < 0 ? -dx : dx;
     int16_t ay = dy < 0 ? -dy : dy;
+    uint8_t toward_x;
 
-    /* Diagonal threshold: |dx| and |dy| within 2x of each other.
-     * Use << 1 instead of * 2 — SM83 has no hardware multiply. */
+    /* Threshold 1: cardinal E/W — |dx| > 2*|dy| */
     if (ax > (int16_t)(ay << 1)) {
         return dx > 0 ? DIR_R : DIR_L;
     }
+    /* Threshold 2: cardinal N/S — |dy| > 2*|dx| */
     if (ay > (int16_t)(ax << 1)) {
         return dy > 0 ? DIR_B : DIR_T;
     }
-    /* Diagonal */
-    if (dx >= 0 && dy >= 0) return DIR_RB;
-    if (dx >= 0 && dy <  0) return DIR_RT;
-    if (dx <  0 && dy >= 0) return DIR_LB;
-    return DIR_LT;
-}
-
-/* Decrement fire timers by 1 frame.
- * WARNING: do NOT call in the same frame as enemy_update() — both decrement
- * enemy_timer[], which would halve TURRET_FIRE_INTERVAL. Test helper only. */
-void enemy_tick_timers(void) BANKED {
-    uint8_t i;
-    for (i = 0u; i < MAX_ENEMIES; i++) {
-        if (enemy_active[i] && enemy_timer[i] > 0u) {
-            enemy_timer[i]--;
-        }
-    }
+    /* Threshold 3: intermediate sector — |dx| vs |dy| */
+    toward_x = (uint8_t)(ax > ay);
+    if (dx >= 0 && dy < 0) { return toward_x ? DIR_ENE : DIR_NNE; }
+    if (dx >= 0)            { return toward_x ? DIR_ESE : DIR_SSE; }
+    if (dy >= 0)            { return toward_x ? DIR_WSW : DIR_SSW; }
+    return toward_x ? DIR_WNW : DIR_NNW;
 }
 
 void enemy_update(int16_t player_px, int16_t player_py) BANKED {

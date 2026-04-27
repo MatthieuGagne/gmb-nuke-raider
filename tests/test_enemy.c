@@ -41,20 +41,42 @@ void test_enemy_direction_to_player_down(void) {
     TEST_ASSERT_EQUAL_INT(DIR_B, enemy_dir_to_pixel(0u, 0u, 0, 64));
 }
 
+/* ax == ay tie → toward_x = (ax > ay) = 0 → NNE-side direction */
 void test_enemy_direction_to_player_down_right(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_RB, enemy_dir_to_pixel(0u, 0u, 64, 64));
+    /* Was DIR_RB; 3-threshold: ax=ay=64, toward_x=0, SE quadrant → DIR_SSE */
+    TEST_ASSERT_EQUAL_INT(DIR_SSE, enemy_dir_to_pixel(0u, 0u, 64, 64));
 }
-
 void test_enemy_direction_to_player_up_left(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_LT, enemy_dir_to_pixel(10u, 10u, 0, 0));
-    /* turret pixel = (80, 80); player at (0,0): dx=-80, dy=-80 → DIR_LT */
+    /* Was DIR_LT; 3-threshold: ax=ay=80, toward_x=0, NW quadrant → DIR_NNW */
+    TEST_ASSERT_EQUAL_INT(DIR_NNW, enemy_dir_to_pixel(10u, 10u, 0, 0));
 }
 
-void test_enemy_timer_fires_on_first_frame(void) {
-    enemy_spawn(10u, 20u);
-    /* Timer starts at 0 — fires on the very first update; active count unchanged */
-    enemy_tick_timers();   /* 1 frame — timer was already 0, stays 0 until fire */
-    TEST_ASSERT_EQUAL_UINT8(1u, enemy_count_active());
+/* 16-direction tests — intermediate sectors */
+void test_enemy_direction_nne(void) {
+    /* ax=10 < ay=15, NE quadrant → DIR_NNE */
+    TEST_ASSERT_EQUAL_INT(DIR_NNE, enemy_dir_to_pixel(0u, 0u, 10, -15));
+}
+void test_enemy_direction_ene(void) {
+    /* ax=15 > ay=10, NE quadrant → DIR_ENE */
+    TEST_ASSERT_EQUAL_INT(DIR_ENE, enemy_dir_to_pixel(0u, 0u, 15, -10));
+}
+void test_enemy_direction_ese(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_ESE, enemy_dir_to_pixel(0u, 0u, 15, 10));
+}
+void test_enemy_direction_sse(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_SSE, enemy_dir_to_pixel(0u, 0u, 10, 15));
+}
+void test_enemy_direction_ssw(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_SSW, enemy_dir_to_pixel(0u, 0u, -10, 15));
+}
+void test_enemy_direction_wsw(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_WSW, enemy_dir_to_pixel(0u, 0u, -15, 10));
+}
+void test_enemy_direction_wnw(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_WNW, enemy_dir_to_pixel(0u, 0u, -15, -10));
+}
+void test_enemy_direction_nnw(void) {
+    TEST_ASSERT_EQUAL_INT(DIR_NNW, enemy_dir_to_pixel(0u, 0u, -10, -15));
 }
 
 void test_enemy_timer_zero_at_spawn(void) {
@@ -118,7 +140,14 @@ int main(void) {
     RUN_TEST(test_enemy_direction_to_player_down);
     RUN_TEST(test_enemy_direction_to_player_down_right);
     RUN_TEST(test_enemy_direction_to_player_up_left);
-    RUN_TEST(test_enemy_timer_fires_on_first_frame);
+    RUN_TEST(test_enemy_direction_nne);
+    RUN_TEST(test_enemy_direction_ene);
+    RUN_TEST(test_enemy_direction_ese);
+    RUN_TEST(test_enemy_direction_sse);
+    RUN_TEST(test_enemy_direction_ssw);
+    RUN_TEST(test_enemy_direction_wsw);
+    RUN_TEST(test_enemy_direction_wnw);
+    RUN_TEST(test_enemy_direction_nnw);
     RUN_TEST(test_enemy_timer_zero_at_spawn);
     RUN_TEST(test_enemy_three_turrets_timer_all_zero);
     RUN_TEST(test_enemy_spawn_sets_type_turret);
