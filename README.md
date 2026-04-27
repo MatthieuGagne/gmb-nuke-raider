@@ -62,7 +62,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Music | `src/music.c/.h`, `src/music_data.c/.h` | hUGEDriver music playback |
 | SFX | `src/sfx.c/.h` | One-shot sound effects: CH4 noise (SFX_SHOOT, SFX_HIT) and CH1 tone sweep (SFX_HEAL, SFX_UI); bank-0 NONBANKED |
 | NPC portraits | `src/npc_*_portrait.c/.h` | Per-NPC portrait tile data |
-| Enemy | `src/enemy.c/.h` | Static turret emplacements: SoA pool, fire timer, collision detection, OAM render; turrets fire on frame 1 (timer init 0) and are not gated by player cooldown |
+| Enemy | `src/enemy.c/.h` | Static turret emplacements: SoA pool, 16-direction aim, fire timer (30-frame wind-up on first appearance, 45-frame interval), screen-visibility gate (no fire or hit-detect while off-screen), collision detection, OAM render |
 | Powerup | `src/powerup.c/.h` | One-shot tile-based powerup system: SoA pool (MAX_POWERUPS=4), OAM sprite per powerup, tile-overlap collect; POWERUP_TYPE_HEAL restores 50 HP and plays SFX_HEAL |
 | Loader | `src/loader.c/.h` | Bank-0 NONBANKED wrappers for VRAM asset loading and map data (NPC/powerup positions) |
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |

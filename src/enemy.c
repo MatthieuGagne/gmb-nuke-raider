@@ -31,7 +31,7 @@ static void _spawn_at(uint8_t i, uint8_t tx, uint8_t ty, uint8_t type, uint8_t d
     enemy_dir[i]    = dir;
     enemy_hp[i]     = TURRET_HP;
     enemy_active[i] = 1u;
-    enemy_timer[i]  = 0u;
+    enemy_timer[i]  = TURRET_WIND_UP;
     enemy_oam_x[i]  = (uint8_t)((uint16_t)tx * 8u + 8u);  /* OAM x cached once */
     enemy_oam[i]    = get_sprite();
     if (enemy_oam[i] != SPRITE_POOL_INVALID) {
@@ -83,32 +83,22 @@ player_dir_t enemy_dir_to_pixel(uint8_t tx, uint8_t ty,
     int16_t dy = player_py - (int16_t)((uint16_t)ty * 8u);
     int16_t ax = dx < 0 ? -dx : dx;
     int16_t ay = dy < 0 ? -dy : dy;
+    uint8_t toward_x;
 
-    /* Diagonal threshold: |dx| and |dy| within 2x of each other.
-     * Use << 1 instead of * 2 — SM83 has no hardware multiply. */
+    /* Threshold 1: cardinal E/W — |dx| > 2*|dy| */
     if (ax > (int16_t)(ay << 1)) {
         return dx > 0 ? DIR_R : DIR_L;
     }
+    /* Threshold 2: cardinal N/S — |dy| > 2*|dx| */
     if (ay > (int16_t)(ax << 1)) {
         return dy > 0 ? DIR_B : DIR_T;
     }
-    /* Diagonal */
-    if (dx >= 0 && dy >= 0) return DIR_RB;
-    if (dx >= 0 && dy <  0) return DIR_RT;
-    if (dx <  0 && dy >= 0) return DIR_LB;
-    return DIR_LT;
-}
-
-/* Decrement fire timers by 1 frame.
- * WARNING: do NOT call in the same frame as enemy_update() — both decrement
- * enemy_timer[], which would halve TURRET_FIRE_INTERVAL. Test helper only. */
-void enemy_tick_timers(void) BANKED {
-    uint8_t i;
-    for (i = 0u; i < MAX_ENEMIES; i++) {
-        if (enemy_active[i] && enemy_timer[i] > 0u) {
-            enemy_timer[i]--;
-        }
-    }
+    /* Threshold 3: intermediate sector — |dx| vs |dy| */
+    toward_x = (uint8_t)(ax > ay);
+    if (dx >= 0 && dy < 0) { return toward_x ? DIR_ENE : DIR_NNE; }
+    if (dx >= 0)            { return toward_x ? DIR_ESE : DIR_SSE; }
+    if (dy >= 0)            { return toward_x ? DIR_WSW : DIR_SSW; }
+    return toward_x ? DIR_WNW : DIR_NNW;
 }
 
 void enemy_update(int16_t player_px, int16_t player_py) BANKED {
@@ -119,13 +109,19 @@ void enemy_update(int16_t player_px, int16_t player_py) BANKED {
     uint8_t player_oam_y = (uint8_t)((int16_t)player_py - (int16_t)cam_y + 24);
 
     for (i = 0u; i < MAX_ENEMIES; i++) {
+        int16_t vis_x, vis_y;
         uint8_t scr_x, scr_y;
         if (!enemy_active[i]) continue;
 
-        /* OAM-space position of this turret — used for fire + hit detection.
-         * scr_x cached in enemy_oam_x[]; scr_y recalculated each frame (cam_y moves). */
-        scr_x = enemy_oam_x[i];
-        scr_y = (uint8_t)((int16_t)((uint16_t)enemy_ty[i] * 8u) - (int16_t)cam_y + 16);
+        /* OAM-space position — adjusted for both scroll axes */
+        vis_x = (int16_t)enemy_oam_x[i] - (int16_t)cam_x;
+        vis_y = (int16_t)((uint16_t)enemy_ty[i] * 8u) - (int16_t)cam_y + 16;
+
+        /* Skip hit detection, timer, and fire for off-screen turrets */
+        if (vis_x < 0 || vis_x >= 168 || vis_y < 0 || vis_y >= 160) continue;
+
+        scr_x = (uint8_t)vis_x;
+        scr_y = (uint8_t)vis_y;
 
         /* Check if a player bullet hit this turret */
         if (projectile_check_hit_enemy(scr_x, scr_y, TURRET_HIT_RADIUS)) {
@@ -140,7 +136,7 @@ void enemy_update(int16_t player_px, int16_t player_py) BANKED {
             }
         }
 
-        /* Fire timer */
+        /* Fire timer — only runs when turret is on screen */
         if (enemy_timer[i] > 0u) {
             enemy_timer[i]--;
         } else {
@@ -160,12 +156,12 @@ void enemy_update(int16_t player_px, int16_t player_py) BANKED {
 void enemy_render(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_ENEMIES; i++) {
-        int16_t oam_y;
+        int16_t oam_x_s, oam_y;
         if (!enemy_active[i] || enemy_oam[i] == SPRITE_POOL_INVALID) continue;
-        /* Turret OAM y accounts for camera scroll — turrets are in world space */
-        oam_y = (int16_t)((uint16_t)enemy_ty[i] * 8u) - (int16_t)cam_y + 16;
-        if (oam_y < 0 || oam_y > 175) continue;   /* off screen — skip */
-        move_sprite(enemy_oam[i], enemy_oam_x[i], (uint8_t)oam_y);
+        oam_y   = (int16_t)((uint16_t)enemy_ty[i] * 8u) - (int16_t)cam_y + 16;
+        oam_x_s = (int16_t)enemy_oam_x[i] - (int16_t)cam_x;
+        if (oam_y < 0 || oam_y > 175 || oam_x_s < 0 || oam_x_s > 167) continue;
+        move_sprite(enemy_oam[i], (uint8_t)oam_x_s, (uint8_t)oam_y);
     }
 }
 
@@ -191,4 +187,9 @@ uint8_t enemy_count_active(void) BANKED {
 uint8_t enemy_get_type(uint8_t i)  { return enemy_type[i]; }
 uint8_t enemy_get_dir(uint8_t i)   { return enemy_dir[i]; }
 uint8_t enemy_get_timer(uint8_t i) { return enemy_timer[i]; }
+uint8_t enemy_is_screen_visible(uint8_t i) {
+    int16_t vis_x = (int16_t)enemy_oam_x[i] - (int16_t)cam_x;
+    int16_t vis_y = (int16_t)((uint16_t)enemy_ty[i] * 8u) - (int16_t)cam_y + 16;
+    return (vis_x >= 0 && vis_x < 168 && vis_y >= 0 && vis_y < 160) ? 1u : 0u;
+}
 #endif

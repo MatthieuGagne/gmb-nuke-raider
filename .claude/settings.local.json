@@ -387,7 +387,9 @@
       "Bash(timeout 10 /tmp/test_track *)",
       "Bash(awk '{print $1}')",
       "Bash(xargs -r kill -9)",
-      "Bash(timeout 10 ./build/test_player_tmp *)"
+      "Bash(timeout 10 ./build/test_player_tmp *)",
+      "Bash(timeout 10 /tmp/test_enemy *)",
+      "Bash(timeout 10 build/test_projectile)"
     ]
   },
   "hooks": {

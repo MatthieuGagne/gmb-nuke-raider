@@ -10,6 +10,47 @@
 #include "sfx.h"  /* sfx_play is NONBANKED (bank 0) — safe to call from any bank */
 BANKREF(projectile)
 
+/* ── Direction velocity tables ──────────────────────────────────────────── */
+/* Maps player_dir_t (0-15) to bullet pixel velocity per frame.
+ * Entries 0-7 match PROJ_SPEED * DIR_DX/DY (player directions, unchanged).
+ * Entries 8-15 are turret-only intermediate directions at 22.5° steps. */
+static const int8_t PROJ_VEL_DX[16] = {
+    /*  0 DIR_T   */  0,
+    /*  1 DIR_RT  */  4,
+    /*  2 DIR_R   */  4,
+    /*  3 DIR_RB  */  4,
+    /*  4 DIR_B   */  0,
+    /*  5 DIR_LB  */ -4,
+    /*  6 DIR_L   */ -4,
+    /*  7 DIR_LT  */ -4,
+    /*  8 DIR_NNE */  2,
+    /*  9 DIR_ENE */  4,
+    /* 10 DIR_ESE */  4,
+    /* 11 DIR_SSE */  2,
+    /* 12 DIR_SSW */ -2,
+    /* 13 DIR_WSW */ -4,
+    /* 14 DIR_WNW */ -4,
+    /* 15 DIR_NNW */ -2,
+};
+static const int8_t PROJ_VEL_DY[16] = {
+    /*  0 DIR_T   */ -4,
+    /*  1 DIR_RT  */ -4,
+    /*  2 DIR_R   */  0,
+    /*  3 DIR_RB  */  4,
+    /*  4 DIR_B   */  4,
+    /*  5 DIR_LB  */  4,
+    /*  6 DIR_L   */  0,
+    /*  7 DIR_LT  */ -4,
+    /*  8 DIR_NNE */ -4,
+    /*  9 DIR_ENE */ -2,
+    /* 10 DIR_ESE */  2,
+    /* 11 DIR_SSE */  4,
+    /* 12 DIR_SSW */  4,
+    /* 13 DIR_WSW */  2,
+    /* 14 DIR_WNW */ -2,
+    /* 15 DIR_NNW */ -4,
+};
+
 /* ── SoA bullet pool ───────────────────────────────────────────────────── */
 static uint8_t proj_x[MAX_PROJECTILES];
 static uint8_t proj_y[MAX_PROJECTILES];
@@ -53,8 +94,8 @@ void projectile_fire(uint8_t scr_x, uint8_t scr_y, player_dir_t dir, uint8_t own
 
             proj_x[i]      = scr_x;
             proj_y[i]      = scr_y;
-            proj_dx[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dx(dir));
-            proj_dy[i]     = (int8_t)((int8_t)PROJ_SPEED * player_dir_dy(dir));
+            proj_dx[i]     = PROJ_VEL_DX[(uint8_t)dir];
+            proj_dy[i]     = PROJ_VEL_DY[(uint8_t)dir];
             proj_ttl[i]    = PROJ_MAX_TTL;
             proj_owner[i]  = owner;
             proj_oam[i]    = oam;

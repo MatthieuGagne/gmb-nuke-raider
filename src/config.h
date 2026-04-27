@@ -97,14 +97,15 @@
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
 #define MAX_ENEMIES           8u
-#define TURRET_FIRE_INTERVAL 60u    /* frames between shots */
+#define TURRET_FIRE_INTERVAL 45u    /* frames between shots (~0.75 s at 60 fps) */
+#define TURRET_WIND_UP       30u    /* grace period on spawn before first shot */
 #define TURRET_HP             1u    /* hits to destroy */
 #define TURRET_HIT_RADIUS     4u    /* px radius for collision detection */
 
 /* Projectile pool */
 /* Bullet sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_BULLET). */
 #define MAX_PROJECTILES       8u
-#define PROJ_SPEED            4u    /* px/frame; intentionally faster than gear 1 max speed */
+#define PROJ_SPEED            4u    /* px/frame magnitude — used in PROJ_VEL_DX/DY tables in projectile.c */
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
 
