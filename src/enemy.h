@@ -39,6 +39,7 @@ player_dir_t enemy_dir_to_pixel(uint8_t tx, uint8_t ty,
 uint8_t enemy_get_type(uint8_t i);
 uint8_t enemy_get_dir(uint8_t i);
 uint8_t enemy_get_timer(uint8_t i);
+uint8_t enemy_is_screen_visible(uint8_t i);
 #endif
 
 #endif /* ENEMY_H */

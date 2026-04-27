@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "enemy.h"
 #include "player.h"   /* player_dir_t */
+#include "camera.h"   /* cam_x, cam_y */
 
 void setUp(void) { enemy_init_empty(); }
 void tearDown(void) {}
@@ -79,18 +80,58 @@ void test_enemy_direction_nnw(void) {
     TEST_ASSERT_EQUAL_INT(DIR_NNW, enemy_dir_to_pixel(0u, 0u, -10, -15));
 }
 
-void test_enemy_timer_zero_at_spawn(void) {
+void test_enemy_spawn_timer_is_wind_up(void) {
     enemy_spawn(10u, 20u);
-    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(0u));
+    TEST_ASSERT_EQUAL_UINT8(TURRET_WIND_UP, enemy_get_timer(0u));
 }
 
-void test_enemy_three_turrets_timer_all_zero(void) {
+void test_enemy_three_turrets_timer_at_wind_up(void) {
     enemy_spawn(4u, 22u);
     enemy_spawn(15u, 47u);
     enemy_spawn(5u, 72u);
-    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(0u));
-    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(1u));
-    TEST_ASSERT_EQUAL_UINT8(0u, enemy_get_timer(2u));
+    TEST_ASSERT_EQUAL_UINT8(TURRET_WIND_UP, enemy_get_timer(0u));
+    TEST_ASSERT_EQUAL_UINT8(TURRET_WIND_UP, enemy_get_timer(1u));
+    TEST_ASSERT_EQUAL_UINT8(TURRET_WIND_UP, enemy_get_timer(2u));
+}
+
+void test_enemy_timer_does_not_fire_during_wind_up(void) {
+    enemy_spawn(10u, 20u);
+    TEST_ASSERT_EQUAL_UINT8(TURRET_WIND_UP, enemy_get_timer(0u));
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_count_active());
+}
+
+/* Visibility helper tests — set cam_x/cam_y directly */
+void test_enemy_visible_when_on_screen(void) {
+    /* ty=10: world_y=80. cam_y=0 → vis_y=80-0+16=96 ∈ [0,160) ✓
+     * tx=10: world_oam_x=88. cam_x=0 → vis_x=88 ∈ [0,168) ✓ */
+    cam_y = 0u;
+    cam_x = 0u;
+    enemy_spawn(10u, 10u);
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_is_screen_visible(0u));
+}
+
+void test_enemy_not_visible_when_below_screen(void) {
+    /* ty=20: world_y=160. cam_y=0 → vis_y=160-0+16=176 ≥ 160 → off screen */
+    cam_y = 0u;
+    cam_x = 0u;
+    enemy_spawn(10u, 20u);
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_is_screen_visible(0u));
+}
+
+void test_enemy_not_visible_when_above_screen(void) {
+    /* ty=1: world_y=8. cam_y=100 → vis_y=8-100+16=-76 < 0 → off screen */
+    cam_y = 100u;
+    cam_x = 0u;
+    enemy_spawn(10u, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_is_screen_visible(0u));
+}
+
+void test_enemy_not_visible_when_off_screen_right(void) {
+    /* tx=22: oam_x=22*8+8=184. cam_x=0 → vis_x=184 ≥ 168 → off screen */
+    cam_y = 0u;
+    cam_x = 0u;
+    enemy_spawn(22u, 10u);
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_is_screen_visible(0u));
 }
 
 void test_enemy_spawn_sets_type_turret(void) {
@@ -148,8 +189,13 @@ int main(void) {
     RUN_TEST(test_enemy_direction_wsw);
     RUN_TEST(test_enemy_direction_wnw);
     RUN_TEST(test_enemy_direction_nnw);
-    RUN_TEST(test_enemy_timer_zero_at_spawn);
-    RUN_TEST(test_enemy_three_turrets_timer_all_zero);
+    RUN_TEST(test_enemy_spawn_timer_is_wind_up);
+    RUN_TEST(test_enemy_three_turrets_timer_at_wind_up);
+    RUN_TEST(test_enemy_timer_does_not_fire_during_wind_up);
+    RUN_TEST(test_enemy_visible_when_on_screen);
+    RUN_TEST(test_enemy_not_visible_when_below_screen);
+    RUN_TEST(test_enemy_not_visible_when_above_screen);
+    RUN_TEST(test_enemy_not_visible_when_off_screen_right);
     RUN_TEST(test_enemy_spawn_sets_type_turret);
     RUN_TEST(test_enemy_spawn_sets_dir_none);
     RUN_TEST(test_turret_dir_enum_has_16_values);
