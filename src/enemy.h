@@ -33,13 +33,13 @@ uint8_t enemy_count_active(void) BANKED;
 /* Pure-logic helpers exposed for testing — not for production callers. */
 player_dir_t enemy_dir_to_pixel(uint8_t tx, uint8_t ty,
                                  int16_t player_px, int16_t player_py) BANKED;
-void         enemy_tick_timers(void) BANKED;
 
 /* Test-only accessors — do not call from production code */
 #ifndef __SDCC
 uint8_t enemy_get_type(uint8_t i);
 uint8_t enemy_get_dir(uint8_t i);
 uint8_t enemy_get_timer(uint8_t i);
+uint8_t enemy_is_screen_visible(uint8_t i);
 #endif
 
 #endif /* ENEMY_H */
