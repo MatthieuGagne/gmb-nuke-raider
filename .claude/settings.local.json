@@ -389,7 +389,9 @@
       "Bash(xargs -r kill -9)",
       "Bash(timeout 10 ./build/test_player_tmp *)",
       "Bash(timeout 10 /tmp/test_enemy *)",
-      "Bash(timeout 10 build/test_projectile)"
+      "Bash(timeout 10 build/test_projectile)",
+      "Bash(mkdir -p /home/mathdaman/code/nuke-raider/.claude/worktrees/chore-mm-reference-sprites/assets/reference/micro-machines)",
+      "Bash(cp /tmp/mm_thorough/*.png /home/mathdaman/code/nuke-raider/.claude/worktrees/chore-mm-reference-sprites/assets/reference/micro-machines/)"
     ]
   },
   "hooks": {
