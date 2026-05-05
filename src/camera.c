@@ -209,3 +209,10 @@ void camera_apply_scroll(void) BANKED {
     cam_scy_shadow = (uint8_t)cam_y;
     cam_scx_shadow = (uint8_t)cam_x;
 }
+
+void camera_invalidate_row(uint8_t world_tile_row) BANKED {
+    if (stream_row_buf_len < STREAM_BUF_SIZE) {
+        stream_row_buf[stream_row_buf_len] = world_tile_row;
+        stream_row_buf_len++;
+    }
+}

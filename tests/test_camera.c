@@ -253,6 +253,20 @@ void test_camera_update_snapshots_cam_tile_x(void) {
     TEST_ASSERT_EQUAL_UINT16(16u, cam_x);
 }
 
+/* ---- camera_invalidate_row -------------------------------------------- */
+
+/* Queuing a row via camera_invalidate_row() then flushing must stream it.
+ * Mirrors test_camera_flush_streams_new_top_row spy pattern:
+ * capture call count before flush, assert it is greater after. */
+void test_camera_invalidate_row_queues_a_row_for_flush(void) {
+    int count_after_invalidate;
+    camera_init(80, 80);              /* cam_y=8, rows 1-18 preloaded */
+    camera_invalidate_row(5u);        /* enqueue world tile row 5 */
+    count_after_invalidate = mock_set_bkg_tiles_call_count;
+    camera_flush_vram();              /* must drain the queued row */
+    TEST_ASSERT_GREATER_THAN_INT(count_after_invalidate, mock_set_bkg_tiles_call_count);
+}
+
 /* ---- cam_scx_shadow ---------------------------------------------------- */
 
 /* camera_apply_scroll() sets cam_scx_shadow from cam_x */
@@ -292,5 +306,6 @@ int main(void) {
     RUN_TEST(test_camera_update_crossing_x_tile_right_buffers_column);
     RUN_TEST(test_camera_update_snapshots_cam_tile_x);
     RUN_TEST(test_camera_apply_scroll_sets_cam_scx_shadow);
+    RUN_TEST(test_camera_invalidate_row_queues_a_row_for_flush);
     return UNITY_END();
 }
