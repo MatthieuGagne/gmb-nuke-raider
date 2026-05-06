@@ -116,6 +116,12 @@
 #define DEBUG_LOG_IDX     0xDFC0U  /* WRAM: ring buffer write index (1 byte) */
 #define DEBUG_TICK_ADDR   0xDFC1U  /* WRAM: music_tick() call counter (1 byte, wraps at 256) */
 
+/* Countdown pre-start phase timing and screen position */
+#define CD_SCREEN_COL  9u   /* left tile column of countdown pair on screen */
+#define CD_SCREEN_ROW  8u   /* tile row of countdown pair on screen */
+#define CD_FRAMES_NUM  60u  /* frames per number phase (03, 02, 01) */
+#define CD_FRAMES_GO   45u  /* frames for GO phase */
+
 /* Economy — scrap rewards per track */
 #define NUM_TRACKS     3u
 #define TRACK1_REWARD  50u

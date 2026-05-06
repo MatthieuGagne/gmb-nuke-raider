@@ -391,7 +391,11 @@
       "Bash(timeout 10 /tmp/test_enemy *)",
       "Bash(timeout 10 build/test_projectile)",
       "Bash(mkdir -p /home/mathdaman/code/nuke-raider/.claude/worktrees/chore-mm-reference-sprites/assets/reference/micro-machines)",
-      "Bash(cp /tmp/mm_thorough/*.png /home/mathdaman/code/nuke-raider/.claude/worktrees/chore-mm-reference-sprites/assets/reference/micro-machines/)"
+      "Bash(cp /tmp/mm_thorough/*.png /home/mathdaman/code/nuke-raider/.claude/worktrees/chore-mm-reference-sprites/assets/reference/micro-machines/)",
+      "Bash(timeout 5 ./build/test_state_playing)",
+      "Bash(timeout 5 ./build/test_terrain_physics)",
+      "Bash(timeout 5 ./build/test_track)",
+      "Bash(timeout 5 ./build/test_track_dispatch)"
     ]
   },
   "hooks": {

@@ -21,10 +21,28 @@ BANKREF_EXTERN(state_playing)
 #include "checkpoint.h"
 #include "enemy.h"
 #include "powerup.h"
+#include "config.h"
 
 static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
 static uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
 static uint8_t finish_dir_cache;    /* cached at enter(); CHECKPOINT_DIR_N/S/E/W */
+
+/* Countdown pre-start phase state */
+static uint8_t cd_phase;     /* 0='03', 1='02', 2='01', 3='GO', 4=done */
+static uint8_t cd_frames;    /* frame counter within current phase */
+static uint8_t cd_bg_col;    /* BG map col of the 2 countdown tiles */
+static uint8_t cd_bg_row;    /* BG map row of the 2 countdown tiles */
+static uint8_t cd_world_row; /* world tile row — passed to camera_invalidate_row() */
+
+/* Countdown digit pairs: lo=left tile, hi=right tile.
+ * Phases: 0='03', 1='02', 2='01', 3='GO'
+ * Character arithmetic used throughout — never bare numbers. */
+static const uint8_t cd_lo[4] = {
+    (uint8_t)('0'-' '), (uint8_t)('0'-' '), (uint8_t)('0'-' '), (uint8_t)('G'-' ')
+};
+static const uint8_t cd_hi[4] = {
+    (uint8_t)('3'-' '), (uint8_t)('2'-' '), (uint8_t)('1'-' '), (uint8_t)('O'-' ')
+};
 
 #ifndef __SDCC
 uint8_t
@@ -42,6 +60,17 @@ finish_eval(uint8_t map_type, uint8_t armed,
     else if (finish_dir == CHECKPOINT_DIR_W) { if (pvx >= 0) return 0u; }
     if (map_type == TRACK_TYPE_COMBAT) return 1u;
     return cps_cleared;
+}
+
+/* Pure countdown phase-advance logic — no hardware; exposed for host tests. */
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
+cd_advance(uint8_t phase, uint8_t frames) {
+    uint8_t threshold = (phase == 3u) ? (uint8_t)CD_FRAMES_GO : (uint8_t)CD_FRAMES_NUM;
+    return (frames >= threshold) ? (uint8_t)(phase + 1u) : phase;
 }
 
 static void enter(void) {
@@ -69,10 +98,53 @@ static void enter(void) {
     hud_set_lap(lap_get_current(), lap_get_total());
     camera_apply_scroll();
     player_render();
+    /* Countdown init: reset phase and write initial '03' to BG tilemap. */
+    cd_phase  = 0u;
+    cd_frames = 0u;
+    /* Shift before cast: cam_x/cam_y are uint16_t; cast after shift to avoid truncation. */
+    cd_bg_col    = (uint8_t)(((uint8_t)((uint16_t)cam_x >> 3u) + (uint8_t)CD_SCREEN_COL) & 0x1Fu);
+    cd_bg_row    = (uint8_t)(((uint8_t)((uint16_t)cam_y >> 3u) + (uint8_t)CD_SCREEN_ROW) & 0x1Fu);
+    cd_world_row = (uint8_t)((uint8_t)((uint16_t)cam_y >> 3u) + (uint8_t)CD_SCREEN_ROW);
+    {
+        static uint8_t cd_init_tiles[2];
+        cd_init_tiles[0] = cd_lo[0];
+        cd_init_tiles[1] = cd_hi[0];
+        set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_init_tiles);
+#ifdef __SDCC
+        /* Set CGB BG palette attribute 0x00 for the 2 countdown tiles.
+         * Attribute 0x00 = palette 0 (GBDK console font palette), no flip, no priority.
+         * Palette 0 = white BG / black text — readable against the track. */
+        {
+            static const uint8_t cd_attr_zero[2] = {0x00u, 0x00u};
+            set_bkg_attributes(cd_bg_col, cd_bg_row, 2u, 1u, cd_attr_zero);
+        }
+#endif
+    }
     DISPLAY_ON;
 }
 
 static void update(void) {
+    /* Countdown pre-start phase: freeze all game logic until cd_phase == 4. */
+    if (cd_phase < 4u) {
+        cd_frames++;
+        {
+            uint8_t next = cd_advance(cd_phase, cd_frames);
+            if (next != cd_phase) {
+                cd_phase  = next;
+                cd_frames = 0u;
+                if (cd_phase < 4u) {
+                    static uint8_t cd_t[2];
+                    cd_t[0] = cd_lo[cd_phase];
+                    cd_t[1] = cd_hi[cd_phase];
+                    set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_t);
+                } else {
+                    /* Countdown done: restore underlying track tiles via stream. */
+                    camera_invalidate_row(cd_world_row);
+                }
+            }
+        }
+        return;
+    }
     /* VBlank phase: all VRAM writes immediately after frame_ready */
     player_render();
     projectile_render();
