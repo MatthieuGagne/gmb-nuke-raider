@@ -22,6 +22,9 @@ const uint8_t track3_lap_count = 1u;
 BANKREF(track3_finish_direction)
 const uint8_t track3_finish_direction = 1u; /* S */
 
+BANKREF(track3_start_dir)
+const uint8_t track3_start_dir = 4u; /* S */
+
 BANKREF(track3_map)
 const uint8_t track3_map[522] = {
     /* header */ 20, 26,

@@ -80,6 +80,10 @@ static void enter(void) {
     int16_t sx = track_get_start_x();
     int16_t sy = track_get_start_y();
     player_set_pos(sx, sy);
+    {
+        player_dir_t start_dir = track_get_start_dir();
+        player_set_dir(start_dir);
+    }
     player_reset_vel();
     damage_init();
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));

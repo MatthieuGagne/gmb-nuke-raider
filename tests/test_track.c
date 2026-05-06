@@ -342,6 +342,23 @@ void test_track_select_large_id_clamps_to_0(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, track_get_id());
 }
 
+/* --- track_get_start_dir ------------------------------------------------- */
+
+void test_track_get_start_dir_track0(void) {
+    track_select(0u);
+    TEST_ASSERT_EQUAL_UINT8(4u, track_get_start_dir());  /* S = DIR_B = 4 */
+}
+
+void test_track_get_start_dir_track1(void) {
+    track_select(1u);
+    TEST_ASSERT_EQUAL_UINT8(4u, track_get_start_dir());  /* S = DIR_B = 4 */
+}
+
+void test_track_get_start_dir_track2(void) {
+    track_select(2u);
+    TEST_ASSERT_EQUAL_UINT8(4u, track_get_start_dir());  /* S = DIR_B = 4 */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_track_passable_straight_center);
@@ -396,5 +413,8 @@ int main(void) {
     RUN_TEST(test_track_select_large_id_clamps_to_0);
     RUN_TEST(test_track_passable_oob_tile_idx_is_solid);
     RUN_TEST(test_track_passable_diagonal_inside);
+    RUN_TEST(test_track_get_start_dir_track0);
+    RUN_TEST(test_track_get_start_dir_track1);
+    RUN_TEST(test_track_get_start_dir_track2);
     return UNITY_END();
 }

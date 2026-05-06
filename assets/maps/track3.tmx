@@ -37,6 +37,9 @@
  </layer>
  <objectgroup id="2" name="start">
   <object id="1" x="80" y="16">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
    <point/>
   </object>
  </objectgroup>

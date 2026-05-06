@@ -269,6 +269,24 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
     spawn_x = int(float(start_obj.get('x')))
     spawn_y = int(float(start_obj.get('y')))
 
+    # Read required 'direction' property on the start object
+    start_dir_val = None
+    start_props = start_obj.find('properties')
+    if start_props is not None:
+        for prop in start_props.findall('property'):
+            if prop.get('name') == 'direction':
+                raw = prop.get('value', '')
+                if raw not in DIR_MAP:
+                    raise ValueError(
+                        f"Unknown start direction '{raw}' in '{tmx_path}'. "
+                        f"Valid values: {list(DIR_MAP.keys())}"
+                    )
+                start_dir_val = DIR_MAP[raw]
+    if start_dir_val is None:
+        raise ValueError(
+            f"TMX '{tmx_path}': start object is missing required 'direction' property."
+        )
+
     # Parse "finish" objectgroup for finish line tile row.
     finish_group = next(
         (og for og in root.findall('objectgroup')
@@ -367,6 +385,10 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
         finish_dir_name = {0: 'N', 1: 'S', 2: 'E', 3: 'W'}.get(finish_dir_val, '?')
         f.write(f"const uint8_t {prefix}_finish_direction"
                 f" = {finish_dir_val}u; /* {finish_dir_name} */\n\n")
+        f.write(f"BANKREF({prefix}_start_dir)\n")
+        start_dir_name = {0: 'N', 2: 'E', 4: 'S', 6: 'W'}.get(start_dir_val, '?')
+        f.write(f"const uint8_t {prefix}_start_dir"
+                f" = {start_dir_val}u; /* {start_dir_name} */\n\n")
         f.write(f"BANKREF({prefix}_map)\n")
         total_bytes = 2 + width * height   # 2 header bytes + tile data
         f.write(f"const uint8_t {prefix}_map[{total_bytes}] = {{\n")

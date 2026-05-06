@@ -111,6 +111,9 @@
  </layer>
  <objectgroup id="2" name="start">
   <object id="1" x="104" y="40">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
    <point/>
   </object>
  </objectgroup>
