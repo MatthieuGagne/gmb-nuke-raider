@@ -16,6 +16,9 @@ def make_test_tmx(tiles):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
      width="{width}" height="1" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="{width}" height="1">
   <data encoding="csv">
@@ -23,10 +26,18 @@ def make_test_tmx(tiles):
   </data>
  </layer>
  <objectgroup name="start">
-  <object id="10" x="0" y="0" width="8" height="8"/>
+  <object id="10" x="0" y="0" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup name="finish">
-  <object id="11" x="0" y="8" width="160" height="8"/>
+  <object id="11" x="0" y="8" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>"""
 
@@ -38,6 +49,9 @@ MINIMAL_TMX = """\
 <map version="1.10" orientation="orthogonal"
      width="3" height="2" tilewidth="8" tileheight="8"
      nextlayerid="4" nextobjectid="3">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="3" height="2">
   <data encoding="csv">
@@ -47,11 +61,18 @@ MINIMAL_TMX = """\
  </layer>
  <objectgroup id="2" name="start">
   <object id="1" x="88" y="720">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
    <point/>
   </object>
  </objectgroup>
  <objectgroup id="3" name="finish">
-  <object id="2" x="0" y="8" width="24" height="8"/>
+  <object id="2" x="0" y="8" width="24" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
 """
@@ -90,7 +111,7 @@ class TestTmxToC(unittest.TestCase):
 
     def test_defines_track_map_array(self):
         result = self._convert(MINIMAL_TMX)
-        self.assertIn('track_map[MAP_TILES_H * MAP_TILES_W]', result)
+        self.assertIn('const uint8_t track_map[', result)
 
     def test_wrong_encoding_raises(self):
         bad = MINIMAL_TMX.replace('encoding="csv"', 'encoding="base64"')
@@ -114,6 +135,10 @@ class TestTmxToC(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._convert(no_start)
 
+    def test_start_layer_emits_track_start_dir(self):
+        result = self._convert(MINIMAL_TMX)
+        self.assertIn('track_start_dir', result)
+
 
 # 1×1 map: tile 1 with H-flip (GID = 0x80000001 = 2147483649)
 # After stripping flags: GID 1, firstgid=1 → tile index 0
@@ -121,6 +146,9 @@ HFLIP_TMX = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
      width="1" height="1" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="1" height="1">
   <data encoding="csv">
@@ -128,10 +156,18 @@ HFLIP_TMX = """\
   </data>
  </layer>
  <objectgroup name="start">
-  <object id="10" x="0" y="0" width="8" height="8"/>
+  <object id="10" x="0" y="0" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup name="finish">
-  <object id="11" x="0" y="8" width="160" height="8"/>
+  <object id="11" x="0" y="8" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
 """
@@ -142,6 +178,9 @@ EMPTY_CELL_TMX = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
      width="2" height="1" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="2" height="1">
   <data encoding="csv">
@@ -149,10 +188,18 @@ EMPTY_CELL_TMX = """\
   </data>
  </layer>
  <objectgroup name="start">
-  <object id="10" x="0" y="0" width="8" height="8"/>
+  <object id="10" x="0" y="0" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup name="finish">
-  <object id="11" x="0" y="8" width="160" height="8"/>
+  <object id="11" x="0" y="8" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
 """
@@ -162,6 +209,9 @@ FIRSTGID_2_TMX = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
      width="2" height="1" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="2" source="track.tsx"/>
  <layer id="1" name="Track" width="2" height="1">
   <data encoding="csv">
@@ -169,10 +219,18 @@ FIRSTGID_2_TMX = """\
   </data>
  </layer>
  <objectgroup name="start">
-  <object id="10" x="0" y="0" width="8" height="8"/>
+  <object id="10" x="0" y="0" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup name="finish">
-  <object id="11" x="0" y="8" width="160" height="8"/>
+  <object id="11" x="0" y="8" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>
 """
@@ -310,6 +368,9 @@ class TestFinishLineParsing(unittest.TestCase):
      orientation="orthogonal" renderorder="right-down"
      width="20" height="100" tilewidth="8" tileheight="8"
      infinite="0" nextlayerid="4" nextobjectid="3">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="20" height="100">
   <data encoding="csv">
@@ -317,10 +378,18 @@ class TestFinishLineParsing(unittest.TestCase):
   </data>
  </layer>
  <objectgroup id="2" name="start">
-  <object id="1" x="88" y="720" width="8" height="8"/>
+  <object id="1" x="88" y="720" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="3" name="{finish_name}">
-  <object id="2" x="0" y="{finish_y_px}" width="160" height="8"/>
+  <object id="2" x="0" y="{finish_y_px}" width="160" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
 </map>"""
 
@@ -456,6 +525,9 @@ TMX_WITH_ENEMIES = """\
 <map version="1.10" orientation="orthogonal"
      width="3" height="10" tilewidth="8" tileheight="8"
      nextlayerid="6" nextobjectid="7">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="track.tsx"/>
  <layer id="1" name="Track" width="3" height="10">
   <data encoding="csv">
@@ -472,10 +544,19 @@ TMX_WITH_ENEMIES = """\
   </data>
  </layer>
  <objectgroup id="2" name="start">
-  <object id="1" x="8" y="72"><point/></object>
+  <object id="1" x="8" y="72">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+   <point/>
+  </object>
  </objectgroup>
  <objectgroup id="3" name="finish">
-  <object id="2" x="0" y="8" width="24" height="8"/>
+  <object id="2" x="0" y="8" width="24" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="4" name="enemies">
   <object id="3" name="turret" x="16" y="16"><point/></object>
@@ -577,15 +658,26 @@ class TestEnemiesLayer(unittest.TestCase):
         tmx = f'''<?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal" renderorder="right-down"
      width="10" height="10" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
  <tileset firstgid="1" source="tileset.tsx"/>
  <layer id="1" name="track" width="10" height="10">
   <data encoding="csv">{",".join(["1"]*100)}</data>
  </layer>
  <objectgroup id="2" name="start">
-  <object id="100" x="0" y="0" width="8" height="8"/>
+  <object id="100" x="0" y="0" width="8" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="3" name="finish">
-  <object id="101" x="0" y="8" width="80" height="8"/>
+  <object id="101" x="0" y="8" width="80" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
  </objectgroup>
  <objectgroup id="4" name="enemies">
   {npc_objects}
@@ -635,6 +727,69 @@ class TestEmitHeader(unittest.TestCase):
         self.assertIn('BANKREF_EXTERN(track_npc_dir)', content)
         self.assertIn('#ifndef TRACK_NPC_EXTERNS_H', content)
         self.assertIn('#endif', content)
+
+
+class TestStartDirectionParsing(unittest.TestCase):
+    def _make_tmx(self, start_dir_prop=''):
+        """Minimal TMX with configurable start direction property."""
+        dir_props = f"""
+   <properties>
+    {start_dir_prop}
+   </properties>""" if start_dir_prop else ''
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="2" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="3" height="2">
+  <data encoding="csv">
+1,2,1,
+2,1,2
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="88" y="720">{dir_props}
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="8" width="24" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>"""
+
+    def _convert(self, tmx_text):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(tmx_text)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                return f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_start_dir_s_emits_4(self):
+        result = self._convert(self._make_tmx(
+            '<property name="direction" value="S"/>'))
+        self.assertIn('track_start_dir = 4', result)  # DIR_B = 4
+
+    def test_start_dir_missing_raises(self):
+        with self.assertRaises(ValueError):
+            self._convert(self._make_tmx())  # no direction property
+
+    def test_start_dir_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            self._convert(self._make_tmx(
+                '<property name="direction" value="X"/>'))
 
 
 if __name__ == '__main__':
