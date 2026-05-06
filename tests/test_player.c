@@ -522,6 +522,20 @@ void test_hitbox_cardinal_damage_on_collision(void) {
     TEST_ASSERT_EQUAL_UINT8(hp_before - 1u, damage_get_hp());
 }
 
+/* ===== player_set_dir setter (issue #358) ================================= */
+
+void test_player_set_dir_north(void) {
+    player_init(0u);
+    player_set_dir(DIR_T);
+    TEST_ASSERT_EQUAL_UINT8(DIR_T, player_get_dir());
+}
+
+void test_player_set_dir_south(void) {
+    player_init(0u);
+    player_set_dir(DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(DIR_B, player_get_dir());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -594,5 +608,8 @@ int main(void) {
     RUN_TEST(test_hitbox_cardinal_wall_blocks);
     RUN_TEST(test_hitbox_diagonal_along_wall_passes);
     RUN_TEST(test_hitbox_cardinal_damage_on_collision);
+    /* AC: player_set_dir setter */
+    RUN_TEST(test_player_set_dir_north);
+    RUN_TEST(test_player_set_dir_south);
     return UNITY_END();
 }
