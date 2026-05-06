@@ -110,15 +110,6 @@ static void enter(void) {
         cd_init_tiles[0] = cd_lo[0];
         cd_init_tiles[1] = cd_hi[0];
         set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_init_tiles);
-#ifdef __SDCC
-        /* Set CGB BG palette attribute 0x00 for the 2 countdown tiles.
-         * Attribute 0x00 = palette 0 (GBDK console font palette), no flip, no priority.
-         * Palette 0 = white BG / black text — readable against the track. */
-        {
-            static const uint8_t cd_attr_zero[2] = {0x00u, 0x00u};
-            set_bkg_attributes(cd_bg_col, cd_bg_row, 2u, 1u, cd_attr_zero);
-        }
-#endif
     }
     DISPLAY_ON;
 }
