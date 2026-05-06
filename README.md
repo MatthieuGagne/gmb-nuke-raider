@@ -46,7 +46,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Main loop | `src/main.c` | Frame timing, input polling, state machine dispatch |
 | State manager | `src/state_manager.c/.h` | Game state transitions |
 | Title state | `src/state_title.c/.h` | Title screen |
-| Playing state | `src/state_playing.c/.h` | In-game state handler; detects finish line crossing, awards scrap reward, transitions to Results |
+| Playing state | `src/state_playing.c/.h` | In-game state handler; runs 03→02→01→GO countdown before player gains control; detects finish line crossing, awards scrap reward, transitions to Results |
 | Results state | `src/state_results.c/.h` | Race finish screen: shows scrap earned and total balance; A dismisses to overmap |
 | Pre-race state | `src/state_prerace.c/.h` | Loadout configuration menu shown before each race: select car, armor, weapon1, weapon2; START launches the race, CANCEL returns to overmap |
 | Loadout | `src/loadout.c/.h` | Per-field loadout config (car, armor, weapon1, weapon2); persists across menu re-entries; initialized at boot |

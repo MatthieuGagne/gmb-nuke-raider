@@ -105,6 +105,26 @@ void test_finish_eval_dir_W_invalid_east(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, finish_eval(TRACK_TYPE_RACE, 1u, 1, 0, CHECKPOINT_DIR_W, 1u));
 }
 
+void test_cd_stays_in_phase_before_threshold(void) {
+    /* CD_FRAMES_NUM - 1 = 59 */
+    TEST_ASSERT_EQUAL_UINT8(0u, cd_advance(0u, 59u));
+}
+
+void test_cd_advances_at_60_frames(void) {
+    /* CD_FRAMES_NUM = 60 */
+    TEST_ASSERT_EQUAL_UINT8(1u, cd_advance(0u, 60u));
+}
+
+void test_cd_go_stays_before_45(void) {
+    /* CD_FRAMES_GO - 1 = 44 */
+    TEST_ASSERT_EQUAL_UINT8(3u, cd_advance(3u, 44u));
+}
+
+void test_cd_go_advances_at_45_frames(void) {
+    /* CD_FRAMES_GO = 45 */
+    TEST_ASSERT_EQUAL_UINT8(4u, cd_advance(3u, 45u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_finish_eval_race_all_conditions_met);
@@ -126,5 +146,9 @@ int main(void) {
     RUN_TEST(test_finish_eval_dir_W_valid);
     RUN_TEST(test_finish_eval_dir_W_invalid_zero);
     RUN_TEST(test_finish_eval_dir_W_invalid_east);
+    RUN_TEST(test_cd_stays_in_phase_before_threshold);
+    RUN_TEST(test_cd_advances_at_60_frames);
+    RUN_TEST(test_cd_go_stays_before_45);
+    RUN_TEST(test_cd_go_advances_at_45_frames);
     return UNITY_END();
 }

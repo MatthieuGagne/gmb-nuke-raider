@@ -41,4 +41,11 @@ void camera_flush_vram(void) BANKED;
  * hardware SCY register at the guaranteed-safe VBlank start. */
 void camera_apply_scroll(void) BANKED;
 
+/* Force a specific world tile row to be re-streamed on the next
+ * camera_flush_vram() call. Appends world_tile_row to stream_row_buf
+ * only if stream_row_buf_len < STREAM_BUF_SIZE (same cap as camera_update).
+ * Use when BG tiles in a visible row are changed at runtime (e.g. countdown
+ * overlays, repair-pad state changes) and the BG tilemap must be refreshed. */
+void camera_invalidate_row(uint8_t world_tile_row) BANKED;
+
 #endif /* CAMERA_H */
