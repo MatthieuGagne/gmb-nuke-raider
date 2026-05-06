@@ -36,6 +36,7 @@ static int16_t        active_start_x;
 static int16_t        active_start_y;
 static uint8_t        active_lap_count;
 static uint8_t        active_finish_direction;
+static uint8_t        active_start_dir;
 
 /* WRAM checkpoint buffer — filled by load_checkpoints() (bank-0 loader) at track_select() time.
  * Always accessed from WRAM; never read directly from ROM in banked code. */
@@ -47,12 +48,13 @@ void track_select(uint8_t id) BANKED {
     active_track_id = id;
     load_track_header(id);  /* sets active_map_w/h + loader_active_map_ptr/data_bank */
     load_track_scalars(id, &active_start_x, &active_start_y, &active_map_type,
-                       &active_lap_count, &active_finish_direction);
+                       &active_lap_count, &active_finish_direction, &active_start_dir);
     load_checkpoints(id, wram_checkpoints, &active_checkpoint_count);
 }
 
 uint8_t  track_get_lap_count(void)         BANKED { return active_lap_count;        }
 uint8_t  track_get_finish_direction(void)  BANKED { return active_finish_direction; }
+uint8_t  track_get_start_dir(void)         BANKED { return active_start_dir;        }
 uint8_t  track_get_map_type(void)          BANKED { return active_map_type;         }
 int16_t  track_get_start_x(void)   BANKED { return active_start_x;   }
 int16_t  track_get_start_y(void)   BANKED { return active_start_y;   }
