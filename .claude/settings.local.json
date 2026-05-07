@@ -396,7 +396,8 @@
       "Bash(timeout 5 ./build/test_terrain_physics)",
       "Bash(timeout 5 ./build/test_track)",
       "Bash(timeout 5 ./build/test_track_dispatch)",
-      "Bash(./build/test_player)"
+      "Bash(./build/test_player)",
+      "Bash(awk '{fail+=$3} END {print \"Total failures:\", fail}')"
     ]
   },
   "hooks": {
