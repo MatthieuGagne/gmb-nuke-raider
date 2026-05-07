@@ -40,6 +40,7 @@ int8_t   player_get_vy(void) BANKED;
 #include "track.h"
 
 void player_reset_vel(void) BANKED;
+void player_hide(void) BANKED;
 void player_apply_physics(uint8_t buttons, TileType terrain) BANKED;
 player_dir_t player_get_dir(void) BANKED;
 void player_set_dir(player_dir_t dir) BANKED;

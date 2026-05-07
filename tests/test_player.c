@@ -522,6 +522,24 @@ void test_hitbox_cardinal_damage_on_collision(void) {
     TEST_ASSERT_EQUAL_UINT8(hp_before - 1u, damage_get_hp());
 }
 
+/* ===== player_hide (issue #323) =========================================== */
+
+void test_player_hide_moves_all_sprites_off_screen(void) {
+    /* Position sprites at visible coords first */
+    player_render();
+    /* Verify at least one slot is non-zero before hiding */
+    TEST_ASSERT_NOT_EQUAL(0, mock_sprite_y[0]);
+    player_hide();
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[1]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[1]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[2]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[2]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[3]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[3]);
+}
+
 /* ===== player_set_dir setter (issue #358) ================================= */
 
 void test_player_set_dir_north(void) {
@@ -608,6 +626,8 @@ int main(void) {
     RUN_TEST(test_hitbox_cardinal_wall_blocks);
     RUN_TEST(test_hitbox_diagonal_along_wall_passes);
     RUN_TEST(test_hitbox_cardinal_damage_on_collision);
+    /* AC: player_hide (issue #323) */
+    RUN_TEST(test_player_hide_moves_all_sprites_off_screen);
     /* AC: player_set_dir setter */
     RUN_TEST(test_player_set_dir_north);
     RUN_TEST(test_player_set_dir_south);

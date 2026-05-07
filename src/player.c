@@ -243,6 +243,13 @@ void player_reset_vel(void) BANKED {
     downshift_timer = 0u;
 }
 
+void player_hide(void) BANKED {
+    move_sprite(player_sprite_slot[0], 0u, 0u);
+    move_sprite(player_sprite_slot[1], 0u, 0u);
+    move_sprite(player_sprite_slot[2], 0u, 0u);
+    move_sprite(player_sprite_slot[3], 0u, 0u);
+}
+
 static player_dir_t decode_dir(uint8_t buttons) {
     if ((buttons & J_UP)   && (buttons & J_RIGHT)) return DIR_RT;
     if ((buttons & J_DOWN) && (buttons & J_RIGHT)) return DIR_RB;
