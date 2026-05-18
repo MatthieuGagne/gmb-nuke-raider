@@ -490,7 +490,7 @@ void load_npc_positions(uint8_t id,
 uint8_t load_racer_spawn(uint8_t id,
                           uint8_t *out_tx,
                           uint8_t *out_ty) NONBANKED {
-    uint8_t tx[MAX_NPCS], ty[MAX_NPCS], type[MAX_NPCS], dir[MAX_NPCS];
+    static uint8_t tx[MAX_NPCS], ty[MAX_NPCS], type[MAX_NPCS], dir[MAX_NPCS];
     uint8_t count = 0u;
     uint8_t i;
     load_npc_positions(id, tx, ty, type, dir, &count);
