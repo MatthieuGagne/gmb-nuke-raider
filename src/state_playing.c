@@ -20,6 +20,7 @@ BANKREF_EXTERN(state_playing)
 #include "lap.h"
 #include "checkpoint.h"
 #include "turret.h"
+#include "racer.h"
 #include "powerup.h"
 #include "config.h"
 
@@ -88,6 +89,7 @@ static void enter(void) {
     damage_init();
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
+    racer_init(loader_get_slot(TILE_ASSET_PLAYER));
     powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
@@ -144,6 +146,7 @@ static void update(void) {
     player_render();
     projectile_render();
     turret_render();
+    racer_render();
     powerup_render();
     hud_render();
     camera_flush_vram();
@@ -170,6 +173,10 @@ static void update(void) {
         checkpoint_update(px, py, pvx, pvy);
         projectile_update();
         turret_update(px, py);
+        if (racer_update()) {
+            state_replace(&state_game_over, BANK(state_game_over));
+            return;
+        }
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
