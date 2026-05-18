@@ -487,6 +487,44 @@ void load_npc_positions(uint8_t id,
     SWITCH_ROM(saved);
 }
 
+uint8_t load_racer_spawn(uint8_t id,
+                          uint8_t *out_tx,
+                          uint8_t *out_ty) NONBANKED {
+    uint8_t tx[MAX_NPCS], ty[MAX_NPCS], type[MAX_NPCS], dir[MAX_NPCS];
+    uint8_t count = 0u;
+    uint8_t i;
+    load_npc_positions(id, tx, ty, type, dir, &count);
+    for (i = 0u; i < count; i++) {
+        if (type[i] == NPC_TYPE_CAR) {
+            *out_tx = tx[i];
+            *out_ty = ty[i];
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+void load_racer_waypoints(uint8_t id,
+                           uint8_t *out_tx,
+                           uint8_t *out_ty,
+                           uint8_t *out_count) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t n, i;
+    if (id == 1u) {  /* track2 */
+        SWITCH_ROM(BANK(track2_racer_wp_count));
+        n = track2_racer_wp_count;
+        if (n > MAX_RACER_WAYPOINTS) n = MAX_RACER_WAYPOINTS;
+        for (i = 0u; i < n; i++) {
+            out_tx[i] = track2_racer_wp_tx[i];
+            out_ty[i] = track2_racer_wp_ty[i];
+        }
+        SWITCH_ROM(saved);
+        *out_count = n;
+    } else {
+        *out_count = 0u;
+    }
+}
+
 void load_powerup_positions(uint8_t id,
                              uint8_t *out_tx,
                              uint8_t *out_ty,

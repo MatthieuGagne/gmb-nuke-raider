@@ -53,8 +53,14 @@ void turret_init(uint8_t tile_base) BANKED {
                        turret_tx, turret_ty,
                        turret_type, turret_dir,
                        &count);
-    for (i = 0u; i < count; i++) {
-        _spawn_at(i, turret_tx[i], turret_ty[i], turret_type[i], turret_dir[i]);
+    {
+        uint8_t j = 0u;
+        for (i = 0u; i < count; i++) {
+            if (turret_type[i] == NPC_TYPE_TURRET) {
+                _spawn_at(j, turret_tx[i], turret_ty[i], turret_type[i], turret_dir[i]);
+                j++;
+            }
+        }
     }
 }
 
