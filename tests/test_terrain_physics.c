@@ -5,7 +5,7 @@
 #include "../src/config.h"
 #include "player.h"
 #include "track.h"
-#include "enemy.h"
+#include "turret.h"
 
 void setUp(void) {
     input = 0;
@@ -13,7 +13,7 @@ void setUp(void) {
     mock_vram_clear();
     camera_init(88, 720);
     player_init(0u);  /* resets px, py, vx=0, vy=0 */
-    enemy_init_empty();
+    turret_init_empty();
 }
 void tearDown(void) {}
 
@@ -107,13 +107,13 @@ void test_boost_exceeds_normal_max_speed(void) {
 }
 
 /* After Task 1 the BG tile at turret positions is road (TILE_ROAD), not
- * TILE_TURRET. Collision must be driven by enemy_blocks_tile() alone. */
+ * TILE_TURRET. Collision must be driven by turret_blocks_tile() alone. */
 void test_turret_collision_driven_by_enemy_state_not_bg_tile(void) {
-    /* No enemy spawned -> tile is not blocked, even if BG were turret type */
-    TEST_ASSERT_EQUAL_UINT8(0u, enemy_blocks_tile(4u, 22u));
-    /* Spawn enemy at turret tile (4,22) -> now blocked */
-    enemy_spawn(4u, 22u);
-    TEST_ASSERT_EQUAL_UINT8(1u, enemy_blocks_tile(4u, 22u));
+    /* No turret spawned -> tile is not blocked, even if BG were turret type */
+    TEST_ASSERT_EQUAL_UINT8(0u, turret_blocks_tile(4u, 22u));
+    /* Spawn turret at tile (4,22) -> now blocked */
+    turret_spawn(4u, 22u);
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_blocks_tile(4u, 22u));
 }
 
 int main(void) {
