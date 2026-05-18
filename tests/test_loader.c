@@ -43,7 +43,8 @@ void test_load_npc_positions_id0_returns_count(void) {
 void test_load_npc_positions_id1_returns_count(void) {
     uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
     load_npc_positions(1u, tx, ty, type, dir, &count);
-    TEST_ASSERT_EQUAL_UINT8(0u, count);
+    /* track2 has 1 NPC (NPC_TYPE_CAR racer spawn added in Task 6) */
+    TEST_ASSERT_EQUAL_UINT8(1u, count);
 }
 
 void test_load_npc_positions_id2_returns_count(void) {
