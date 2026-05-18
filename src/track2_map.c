@@ -146,7 +146,7 @@ BANKREF(track2_npc_tx)
 const uint8_t track2_npc_tx[8] = { 13u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_ty)
-const uint8_t track2_npc_ty[8] = { 7u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_ty[8] = { 14u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_type)
 const uint8_t track2_npc_type[8] = { 1u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };

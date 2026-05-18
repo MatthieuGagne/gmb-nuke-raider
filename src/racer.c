@@ -28,6 +28,7 @@ static uint8_t  s_wp_ty[MAX_RACER_WAYPOINTS];
 static uint8_t  s_wp_count;
 static uint8_t  s_finish_dir;
 static uint8_t  s_tile_base;
+static uint8_t  s_laps_done;  /* must complete 1 full wp cycle before finish can trigger */
 
 /* ---- Direction tables — copied from player.c exact values ---- */
 
@@ -133,7 +134,8 @@ void racer_init(uint8_t tile_base) BANKED {
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
     }
-    s_tile_base = tile_base;
+    s_tile_base  = tile_base;
+    s_laps_done  = 0u;
 
     track_id = track_get_id();
     s_finish_dir = track_get_finish_direction();
@@ -170,7 +172,8 @@ void racer_init_empty(void) BANKED {
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
     }
-    s_wp_count = 0u;
+    s_wp_count  = 0u;
+    s_laps_done = 0u;
 }
 
 uint8_t racer_update(void) BANKED {
@@ -213,6 +216,7 @@ uint8_t racer_update(void) BANKED {
             racer_wp_idx[i]++;
             if (racer_wp_idx[i] >= s_wp_count) {
                 racer_wp_idx[i] = 0u;
+                s_laps_done++;
             }
         }
 
@@ -225,7 +229,7 @@ uint8_t racer_update(void) BANKED {
         ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
         raw_tile  = track_get_raw_tile(tx, ty);
         tile_type = track_tile_type_from_index(raw_tile);
-        if (tile_type == TILE_FINISH) {
+        if (s_laps_done > 0u && tile_type == TILE_FINISH) {
             if (racer_dir_matches_finish(dir, s_finish_dir)) {
                 return 1u;
             }
@@ -314,6 +318,7 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     }
     s_wp_count   = wp_count;
     s_finish_dir = finish_dir;
+    s_laps_done  = 1u;
 }
 
 void racer_place_on_finish_for_test(uint8_t tx, uint8_t ty, uint8_t dir) {

@@ -405,7 +405,8 @@
       "Skill(bank-post-build)",
       "Skill(gb-memory-validator)",
       "Skill(bank-pre-write)",
-      "Bash(timeout 10 ./build/test_racer *)"
+      "Bash(timeout 10 ./build/test_racer *)",
+      "Skill(systematic-debugging)"
     ]
   },
   "hooks": {
