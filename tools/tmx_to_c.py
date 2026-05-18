@@ -210,6 +210,43 @@ def parse_powerup_objects(root):
     return powerups
 
 
+def parse_racer_waypoints(root):
+    """Extract racer waypoints from the 'racer_waypoints' object layer.
+
+    Objects must be point objects (have a <point/> child element) snapped to
+    an 8px tile grid. Returns a list of (tx, ty) tuples in XML order.
+    Missing layer returns empty list (safe default for non-race tracks).
+    """
+    for og in root.findall('objectgroup'):
+        if og.get('name') != 'racer_waypoints':
+            continue
+        waypoints = []
+        for obj in og.findall('object'):
+            if obj.find('point') is None:
+                continue  # skip non-point objects
+            x = float(obj.get('x', '0'))
+            y = float(obj.get('y', '0'))
+            tx = int(x / 8)
+            ty = int(y / 8)
+            waypoints.append((tx, ty))
+        return waypoints
+    return []
+
+
+def emit_racer_waypoints(out, prefix, waypoints):
+    """Emit racer waypoint arrays for one track into an open file handle."""
+    n = len(waypoints)
+    tx_vals = ', '.join(f'{t[0]}u' for t in waypoints) if waypoints else '0u'
+    ty_vals = ', '.join(f'{t[1]}u' for t in waypoints) if waypoints else '0u'
+    sz = max(n, 1)
+    out.write(f'BANKREF({prefix}_racer_wp_count)\n')
+    out.write(f'const uint8_t {prefix}_racer_wp_count = {n}u;\n\n')
+    out.write(f'BANKREF({prefix}_racer_wp_tx)\n')
+    out.write(f'const uint8_t {prefix}_racer_wp_tx[{sz}] = {{ {tx_vals} }};\n\n')
+    out.write(f'BANKREF({prefix}_racer_wp_ty)\n')
+    out.write(f'const uint8_t {prefix}_racer_wp_ty[{sz}] = {{ {ty_vals} }};\n\n')
+
+
 def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_map=None):
     tree = ET.parse(tmx_path)
     root = tree.getroot()
@@ -431,6 +468,9 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
         f.write(f"const uint8_t {prefix}_powerup_ty[{MAX_POWERUPS}] = {{ {fmt_arr(pw_ty)} }};\n\n")
         f.write(f"BANKREF({prefix}_powerup_type)\n")
         f.write(f"const uint8_t {prefix}_powerup_type[{MAX_POWERUPS}] = {{ {fmt_arr(pw_type)} }};\n")
+        f.write('\n')
+        waypoints = parse_racer_waypoints(root)
+        emit_racer_waypoints(f, prefix, waypoints)
 
 
 def emit_npc_header(out_path, tmx_paths):
@@ -519,11 +559,51 @@ def emit_powerup_header(out_path, tmx_paths):
         f.write('\n'.join(lines) + '\n')
 
 
+def emit_racer_header(out_path, tmx_paths):
+    """Generate src/track_racer_externs.h with extern declarations for all tracks."""
+    prefixes = []
+    for i, _ in enumerate(tmx_paths):
+        prefixes.append('track' if i == 0 else f'track{i + 1}')
+
+    lines = [
+        '/* GENERATED — do not edit by hand. Regenerate with:',
+        ' *   python3 tools/tmx_to_c.py --emit-racer-header src/track_racer_externs.h \\',
+        ' *     assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx',
+        ' */',
+        '#ifndef TRACK_RACER_EXTERNS_H',
+        '#define TRACK_RACER_EXTERNS_H',
+        '',
+        '#include <stdint.h>',
+        '#include "banking.h"',
+        '',
+    ]
+    for prefix in prefixes:
+        lines += [
+            f'extern const uint8_t  {prefix}_racer_wp_count;',
+            f'extern const uint8_t  {prefix}_racer_wp_tx[];',
+            f'extern const uint8_t  {prefix}_racer_wp_ty[];',
+            f'BANKREF_EXTERN({prefix}_racer_wp_count)',
+            f'BANKREF_EXTERN({prefix}_racer_wp_tx)',
+            f'BANKREF_EXTERN({prefix}_racer_wp_ty)',
+            '',
+        ]
+    lines += ['#endif /* TRACK_RACER_EXTERNS_H */']
+    with open(out_path, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
 if __name__ == '__main__':
     import argparse
     import sys
 
-    if '--emit-powerup-header' in sys.argv:
+    if '--emit-racer-header' in sys.argv:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--emit-racer-header', metavar='OUT_H', required=True,
+                            help='Generate track_racer_externs.h')
+        parser.add_argument('tmx', nargs='+', help='TMX files in track order')
+        args = parser.parse_args()
+        emit_racer_header(args.emit_racer_header, args.tmx)
+    elif '--emit-powerup-header' in sys.argv:
         parser = argparse.ArgumentParser()
         parser.add_argument('--emit-powerup-header', metavar='OUT_H', required=True,
                             help='Generate src/track_powerup_externs.h from all TMX inputs')
