@@ -792,5 +792,181 @@ class TestStartDirectionParsing(unittest.TestCase):
                 '<property name="direction" value="X"/>'))
 
 
+TMX_WITH_RACER_WAYPOINTS = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="10" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="3" height="10">
+  <data encoding="csv">
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="8" y="72">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="8" width="24" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="racer_waypoints">
+  <object id="10" x="8" y="8"><point/></object>
+  <object id="11" x="16" y="16"><point/></object>
+  <object id="12" x="24" y="8"><point/></object>
+ </objectgroup>
+</map>
+"""
+
+TMX_WITH_NON_POINT_WAYPOINTS = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="10" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <layer id="1" name="Track" width="3" height="10">
+  <data encoding="csv">
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2,
+1,2,1,
+2,1,2
+  </data>
+ </layer>
+ <objectgroup id="2" name="start">
+  <object id="1" x="8" y="72">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="finish">
+  <object id="2" x="0" y="8" width="24" height="8">
+   <properties>
+    <property name="direction" value="S"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="racer_waypoints">
+  <object id="10" x="8" y="8" width="8" height="8"/>
+  <object id="11" x="16" y="16"><point/></object>
+ </objectgroup>
+</map>
+"""
+
+
+class TestParseRacerWaypoints(unittest.TestCase):
+
+    def _parse(self, tmx_text):
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(tmx_text)
+        return conv.parse_racer_waypoints(root)
+
+    def test_no_racer_waypoints_layer_returns_empty(self):
+        result = self._parse(MINIMAL_TMX)
+        self.assertEqual(result, [])
+
+    def test_non_point_objects_skipped(self):
+        result = self._parse(TMX_WITH_NON_POINT_WAYPOINTS)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], (2, 2))
+
+    def test_point_objects_parsed_in_order(self):
+        result = self._parse(TMX_WITH_RACER_WAYPOINTS)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0], (1, 1))
+        self.assertEqual(result[1], (2, 2))
+        self.assertEqual(result[2], (3, 1))
+
+    def test_waypoints_emitted_in_generated_c(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(TMX_WITH_RACER_WAYPOINTS)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                content = f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+        self.assertIn('track_racer_wp_count = 3u', content)
+        self.assertIn('track_racer_wp_tx', content)
+        self.assertIn('track_racer_wp_ty', content)
+
+    def test_no_waypoints_emits_stub_arrays(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile('w', suffix='.tmx', delete=False) as tf:
+            tf.write(MINIMAL_TMX)
+            tmx_path = tf.name
+        out_path = tmx_path.replace('.tmx', '.c')
+        try:
+            conv.tmx_to_c(tmx_path, out_path)
+            with open(out_path) as f:
+                content = f.read()
+        finally:
+            os.unlink(tmx_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+        self.assertIn('track_racer_wp_count = 0u', content)
+        self.assertIn('track_racer_wp_tx[1]', content)
+        self.assertIn('track_racer_wp_ty[1]', content)
+
+
+class TestEmitRacerHeader(unittest.TestCase):
+
+    def test_emit_racer_header_contains_all_track_externs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmx_paths = []
+            for name in ['track', 'track2', 'track3']:
+                path = os.path.join(tmpdir, f'{name}.tmx')
+                with open(path, 'w') as f:
+                    f.write(MINIMAL_TMX)
+                tmx_paths.append(path)
+            header_path = os.path.join(tmpdir, 'track_racer_externs.h')
+            conv.emit_racer_header(header_path, tmx_paths)
+            with open(header_path) as f:
+                content = f.read()
+        self.assertIn('GENERATED', content)
+        self.assertIn('#ifndef TRACK_RACER_EXTERNS_H', content)
+        self.assertIn('#endif', content)
+        for prefix in ('track', 'track2', 'track3'):
+            self.assertIn(f'extern const uint8_t  {prefix}_racer_wp_count', content)
+            self.assertIn(f'extern const uint8_t  {prefix}_racer_wp_tx[]', content)
+            self.assertIn(f'extern const uint8_t  {prefix}_racer_wp_ty[]', content)
+            self.assertIn(f'BANKREF_EXTERN({prefix}_racer_wp_count)', content)
+            self.assertIn(f'BANKREF_EXTERN({prefix}_racer_wp_tx)', content)
+            self.assertIn(f'BANKREF_EXTERN({prefix}_racer_wp_ty)', content)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -164,3 +164,13 @@ const uint8_t track_powerup_ty[4] = { 40u, 0u, 0u, 0u };
 
 BANKREF(track_powerup_type)
 const uint8_t track_powerup_type[4] = { 0u, 0u, 0u, 0u };
+
+BANKREF(track_racer_wp_count)
+const uint8_t track_racer_wp_count = 0u;
+
+BANKREF(track_racer_wp_tx)
+const uint8_t track_racer_wp_tx[1] = { 0u };
+
+BANKREF(track_racer_wp_ty)
+const uint8_t track_racer_wp_ty[1] = { 0u };
+

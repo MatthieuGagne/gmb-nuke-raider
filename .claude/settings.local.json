@@ -399,7 +399,14 @@
       "Bash(./build/test_player)",
       "Bash(awk '{fail+=$3} END {print \"Total failures:\", fail}')",
       "Skill(grill-me)",
-      "Skill(executing-plans)"
+      "Skill(executing-plans)",
+      "Skill(test)",
+      "Skill(build)",
+      "Skill(bank-post-build)",
+      "Skill(gb-memory-validator)",
+      "Skill(bank-pre-write)",
+      "Bash(timeout 10 ./build/test_racer *)",
+      "Skill(systematic-debugging)"
     ]
   },
   "hooks": {

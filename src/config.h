@@ -94,6 +94,12 @@
 /* Sentinel: NPC has no fixed facing direction (fires/moves based on runtime logic) */
 #define DIR_NONE             0xFFu
 
+/* Racer enemy */
+#define MAX_RACERS           1u   /* SoA pool capacity; design for N, implement 1 */
+#define RACER_SPEED          5u   /* px/frame per axis; diagonal ≈ 7 px/frame (accepted) */
+#define MAX_RACER_WAYPOINTS 16u   /* WRAM copy buffer; tracks may have fewer */
+#define RACER_WP_THRESHOLD  12u   /* Manhattan advance threshold: ABS(dx)+ABS(dy) < this */
+
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
 #define MAX_ENEMIES           8u

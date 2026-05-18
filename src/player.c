@@ -11,7 +11,7 @@
 #include "damage.h"
 #include "projectile.h"
 #include "sfx.h"
-#include "enemy.h"
+#include "turret.h"
 
 static int16_t px;
 static int16_t py;
@@ -94,7 +94,7 @@ static const uint8_t DIR_FLIP[8] = {
 static uint8_t corner_active_turret(int16_t wx, int16_t wy) {
     uint8_t tx = (uint8_t)((uint16_t)wx >> 3u);
     uint8_t ty = (uint8_t)((uint16_t)wy >> 3u);
-    return enemy_blocks_tile(tx, ty);
+    return turret_blocks_tile(tx, ty);
 }
 
 /* Directional hitbox points indexed by player_dir_t (0-7).

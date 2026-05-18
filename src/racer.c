@@ -1,0 +1,347 @@
+#pragma bank 255
+
+#include <gb/gb.h>
+#include <gb/cgb.h>
+#include "racer.h"
+#include "config.h"
+#include "track.h"
+#include "checkpoint.h"
+#include "loader.h"
+#include "sprite_pool.h"
+#include "player.h"
+#include "banking.h"
+
+/* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
+extern int16_t cam_y;
+
+/* ---- SoA pool ---- */
+static int16_t  racer_px[MAX_RACERS];
+static int16_t  racer_py[MAX_RACERS];
+static uint8_t  racer_dir[MAX_RACERS];
+static uint8_t  racer_wp_idx[MAX_RACERS];
+static uint8_t  racer_active[MAX_RACERS];
+static uint8_t  racer_oam[MAX_RACERS * 4u];
+
+/* ---- Track-level data ---- */
+static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
+static uint8_t  s_wp_ty[MAX_RACER_WAYPOINTS];
+static uint8_t  s_wp_count;
+static uint8_t  s_finish_dir;
+static uint8_t  s_tile_base;
+static uint8_t  s_laps_done;  /* must complete 1 full wp cycle before finish can trigger */
+
+/* ---- Direction tables — copied from player.c exact values ---- */
+
+/* Direction velocity deltas: 0=T, 1=RT, 2=R, 3=RB, 4=B, 5=LB, 6=L, 7=LT */
+static const int8_t RACER_DIR_DX[8] = {  0,  1,  1,  1,  0, -1, -1, -1 };
+static const int8_t RACER_DIR_DY[8] = { -1, -1,  0,  1,  1,  1,  0, -1 };
+
+/* Tile index for each 2x2 OAM slot per direction.
+ * Layout: UP=0-3, RIGHT=4-7, UPRIGHT=8-11, DOWNRIGHT=12-15.
+ * These match player.c exactly so racer uses the same sprite sheet. */
+static const uint8_t RACER_DIR_TILE_TL[8] = {
+     0u, /*  T  */
+     8u, /* RT  */
+     4u, /*  R  */
+    12u, /* RB  */
+     1u, /*  B  */
+    14u, /* LB  */
+     6u, /*  L  */
+    10u, /* LT  */
+};
+static const uint8_t RACER_DIR_TILE_BL[8] = {
+     1u, /*  T  */
+     9u, /* RT  */
+     5u, /*  R  */
+    13u, /* RB  */
+     0u, /*  B  */
+    15u, /* LB  */
+     7u, /*  L  */
+    11u, /* LT  */
+};
+static const uint8_t RACER_DIR_TILE_TR[8] = {
+     2u, /*  T  */
+    10u, /* RT  */
+     6u, /*  R  */
+    14u, /* RB  */
+     3u, /*  B  */
+    12u, /* LB  */
+     4u, /*  L  */
+     8u, /* LT  */
+};
+static const uint8_t RACER_DIR_TILE_BR[8] = {
+     3u, /*  T  */
+    11u, /* RT  */
+     7u, /*  R  */
+    15u, /* RB  */
+     2u, /*  B  */
+    13u, /* LB  */
+     5u, /*  L  */
+     9u, /* LT  */
+};
+static const uint8_t RACER_DIR_FLIP[8] = {
+    0u,      /* T  */
+    0u,      /* RT */
+    0u,      /* R  */
+    0u,      /* RB */
+    S_FLIPY, /* B  */
+    S_FLIPX, /* LB */
+    S_FLIPX, /* L  */
+    S_FLIPX, /* LT */
+};
+
+/* ---- Direction from delta ---- */
+static uint8_t racer_dir_from_delta(int8_t dx, int8_t dy) {
+    int8_t ax = dx < 0 ? -dx : dx;
+    int8_t ay = dy < 0 ? -dy : dy;
+    if (ay > ax) {
+        return (dy < 0) ? DIR_T : DIR_B;
+    } else if (ax > ay) {
+        return (dx < 0) ? DIR_L : DIR_R;
+    } else {
+        /* Diagonal: ax == ay */
+        if (dy < 0 && dx < 0) return DIR_LT;
+        if (dy < 0 && dx > 0) return DIR_RT;
+        if (dy > 0 && dx < 0) return DIR_LB;
+        return DIR_RB;
+    }
+}
+
+/* ---- Finish direction check ---- */
+static uint8_t racer_dir_matches_finish(uint8_t dir, uint8_t finish_dir) {
+    if (finish_dir == CHECKPOINT_DIR_N) {
+        return (dir == DIR_T || dir == DIR_LT || dir == DIR_RT) ? 1u : 0u;
+    }
+    if (finish_dir == CHECKPOINT_DIR_S) {
+        return (dir == DIR_B || dir == DIR_LB || dir == DIR_RB) ? 1u : 0u;
+    }
+    if (finish_dir == CHECKPOINT_DIR_E) {
+        return (dir == DIR_R || dir == DIR_RT || dir == DIR_RB) ? 1u : 0u;
+    }
+    if (finish_dir == CHECKPOINT_DIR_W) {
+        return (dir == DIR_L || dir == DIR_LT || dir == DIR_LB) ? 1u : 0u;
+    }
+    return 0u;
+}
+
+void racer_init(uint8_t tile_base) BANKED {
+    uint8_t i;
+    uint8_t spawn_tx;
+    uint8_t spawn_ty;
+    uint8_t found;
+    uint8_t track_id;
+
+    for (i = 0u; i < MAX_RACERS; i++) {
+        racer_active[i] = 0u;
+    }
+    s_tile_base  = tile_base;
+    s_laps_done  = 0u;
+
+    track_id = track_get_id();
+    s_finish_dir = track_get_finish_direction();
+    load_racer_waypoints(track_id, s_wp_tx, s_wp_ty, &s_wp_count);
+    found = load_racer_spawn(track_id, &spawn_tx, &spawn_ty);
+
+    if (found && s_wp_count > 0u) {
+        racer_active[0] = 1u;
+        racer_px[0] = (int16_t)((uint16_t)spawn_tx * 8u + 4u);
+        racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u + 4u);
+        racer_wp_idx[0] = 0u;
+        racer_dir[0] = DIR_T;
+        for (i = 0u; i < 4u; i++) {
+            racer_oam[i] = get_sprite();
+        }
+    }
+
+#ifdef __SDCC
+    /* CGB sprite palette 1: red tint to distinguish racer from player */
+    {
+        static const uint16_t racer_pal[4] = {
+            RGB(31u, 31u, 31u), /* white        */
+            RGB(31u,  0u,  0u), /* red          */
+            RGB(15u,  0u,  0u), /* dark red     */
+            RGB( 0u,  0u,  0u), /* black        */
+        };
+        set_sprite_palette(1u, 1u, racer_pal);
+    }
+#endif /* __SDCC */
+}
+
+void racer_init_empty(void) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        racer_active[i] = 0u;
+    }
+    s_wp_count  = 0u;
+    s_laps_done = 0u;
+}
+
+uint8_t racer_update(void) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        int16_t target_px;
+        int16_t target_py;
+        int16_t dx16;
+        int16_t dy16;
+        int8_t  dx;
+        int8_t  dy;
+        uint8_t abs_dx;
+        uint8_t abs_dy;
+        uint8_t dir;
+        uint8_t tx;
+        uint8_t ty;
+        uint8_t raw_tile;
+        TileType tile_type;
+
+        if (!racer_active[i]) continue;
+
+        target_px = (int16_t)((uint16_t)s_wp_tx[racer_wp_idx[i]] * 8u + 4u);
+        target_py = (int16_t)((uint16_t)s_wp_ty[racer_wp_idx[i]] * 8u + 4u);
+
+        dx16 = target_px - racer_px[i];
+        dy16 = target_py - racer_py[i];
+
+        /* Clamp to int8 range */
+        if (dx16 >  127) dx16 =  127;
+        if (dx16 < -127) dx16 = -127;
+        if (dy16 >  127) dy16 =  127;
+        if (dy16 < -127) dy16 = -127;
+        dx = (int8_t)dx16;
+        dy = (int8_t)dy16;
+
+        abs_dx = (uint8_t)(dx < 0 ? -dx : dx);
+        abs_dy = (uint8_t)(dy < 0 ? -dy : dy);
+
+        if ((uint8_t)(abs_dx + abs_dy) < RACER_WP_THRESHOLD) {
+            racer_wp_idx[i]++;
+            if (racer_wp_idx[i] >= s_wp_count) {
+                racer_wp_idx[i] = 0u;
+                s_laps_done++;
+            }
+        }
+
+        dir = racer_dir_from_delta(dx, dy);
+        racer_dir[i] = dir;
+
+        /* Finish line detection — check current position before applying velocity.
+         * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
+        tx = (uint8_t)((uint16_t)racer_px[i] >> 3u);
+        ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
+        raw_tile  = track_get_raw_tile(tx, ty);
+        tile_type = track_tile_type_from_index(raw_tile);
+        if (s_laps_done > 0u && tile_type == TILE_FINISH) {
+            if (racer_dir_matches_finish(dir, s_finish_dir)) {
+                return 1u;
+            }
+        }
+
+        racer_px[i] += (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_SPEED;
+        racer_py[i] += (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_SPEED;
+    }
+    return 0u;
+}
+
+void racer_render(void) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        int16_t scr_x;
+        int16_t scr_y;
+        uint8_t hw_x;
+        uint8_t hw_y;
+        uint8_t d;
+        uint8_t flags;
+
+        if (!racer_active[i]) continue;
+
+        scr_x = racer_px[i] + 8;
+        scr_y = racer_py[i] - cam_y + 16;
+
+        /* Skip if off-screen */
+        if (scr_x < 0 || scr_x >= 168 || scr_y < 0 || scr_y >= 160) {
+            move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 1u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 2u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 3u], 0u, 0u);
+            continue;
+        }
+
+        hw_x = (uint8_t)scr_x;
+        hw_y = (uint8_t)scr_y;
+        d    = racer_dir[i];
+
+        set_sprite_tile(racer_oam[i * 4u + 0u], s_tile_base + RACER_DIR_TILE_TL[d]);
+        set_sprite_tile(racer_oam[i * 4u + 1u], s_tile_base + RACER_DIR_TILE_BL[d]);
+        set_sprite_tile(racer_oam[i * 4u + 2u], s_tile_base + RACER_DIR_TILE_TR[d]);
+        set_sprite_tile(racer_oam[i * 4u + 3u], s_tile_base + RACER_DIR_TILE_BR[d]);
+
+        flags = RACER_DIR_FLIP[d];
+
+#ifdef __SDCC
+        /* CGB: use sprite palette 1 for racer, with S_PAL(1) in OBJ attribute */
+        {
+            uint8_t cgb_flags = flags | S_PAL(1u);
+            set_sprite_prop(racer_oam[i * 4u + 0u], cgb_flags);
+            set_sprite_prop(racer_oam[i * 4u + 1u], cgb_flags);
+            set_sprite_prop(racer_oam[i * 4u + 2u], (uint8_t)(cgb_flags | S_FLIPY));
+            set_sprite_prop(racer_oam[i * 4u + 3u], (uint8_t)(cgb_flags | S_FLIPY));
+        }
+#else
+        set_sprite_prop(racer_oam[i * 4u + 0u], flags);
+        set_sprite_prop(racer_oam[i * 4u + 1u], flags);
+        set_sprite_prop(racer_oam[i * 4u + 2u], (uint8_t)(flags | S_FLIPY));
+        set_sprite_prop(racer_oam[i * 4u + 3u], (uint8_t)(flags | S_FLIPY));
+#endif /* __SDCC */
+
+        move_sprite(racer_oam[i * 4u + 0u], hw_x,            hw_y);
+        move_sprite(racer_oam[i * 4u + 1u], hw_x,            (uint8_t)(hw_y + 8u));
+        move_sprite(racer_oam[i * 4u + 2u], (uint8_t)(hw_x + 8u), hw_y);
+        move_sprite(racer_oam[i * 4u + 3u], (uint8_t)(hw_x + 8u), (uint8_t)(hw_y + 8u));
+    }
+}
+
+#ifndef __SDCC
+
+void racer_spawn_for_test(int16_t px, int16_t py,
+                           uint8_t *wp_tx, uint8_t *wp_ty,
+                           uint8_t wp_count, uint8_t finish_dir) {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) racer_active[i] = 0u;
+    racer_active[0] = 1u;
+    racer_px[0] = px;
+    racer_py[0] = py;
+    racer_wp_idx[0] = 0u;
+    racer_dir[0] = DIR_T;
+    racer_oam[0] = racer_oam[1] = racer_oam[2] = racer_oam[3] = 0u;
+    for (i = 0u; i < wp_count && i < MAX_RACER_WAYPOINTS; i++) {
+        s_wp_tx[i] = wp_tx[i];
+        s_wp_ty[i] = wp_ty[i];
+    }
+    s_wp_count   = wp_count;
+    s_finish_dir = finish_dir;
+    s_laps_done  = 1u;
+}
+
+void racer_place_on_finish_for_test(uint8_t tx, uint8_t ty, uint8_t dir) {
+    racer_px[0] = (int16_t)((uint16_t)tx * 8u + 4u);
+    racer_py[0] = (int16_t)((uint16_t)ty * 8u + 4u);
+    racer_dir[0] = dir;
+    /* Move waypoint far away so waypoint-advance threshold doesn't interfere */
+    s_wp_tx[0] = 200u;
+    s_wp_ty[0] = 200u;
+    s_wp_count = 1u;
+}
+
+void racer_set_wp_idx_for_test(uint8_t slot, uint8_t idx) {
+    racer_wp_idx[slot] = idx;
+}
+
+void racer_set_pos_for_test(uint8_t slot, int16_t px, int16_t py) {
+    racer_px[slot] = px;
+    racer_py[slot] = py;
+}
+
+uint8_t racer_get_wp_idx(uint8_t slot) {
+    return racer_wp_idx[slot];
+}
+
+#endif /* __SDCC */
