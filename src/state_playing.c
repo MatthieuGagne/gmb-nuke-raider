@@ -223,6 +223,7 @@ static void update(void) {
 
 static void sp_exit(void) {
     player_hide();
+    racer_hide();
     loader_unload_state();
     HIDE_WIN;
     cam_scx_shadow = 0u;

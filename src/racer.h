@@ -6,6 +6,7 @@
 
 void    racer_init(uint8_t tile_base) BANKED;
 void    racer_init_empty(void) BANKED;
+void    racer_hide(void) BANKED;
 uint8_t racer_update(void) BANKED;
 void    racer_render(void) BANKED;
 

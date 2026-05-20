@@ -179,6 +179,16 @@ void racer_init_empty(void) BANKED {
     s_lap_total = 1u;
 }
 
+void racer_hide(void) BANKED {
+    uint8_t i;
+    uint8_t j;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        for (j = 0u; j < 4u; j++) {
+            move_sprite(racer_oam[i * 4u + j], 0u, 0u);
+        }
+    }
+}
+
 uint8_t racer_update(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) {
@@ -238,8 +248,14 @@ uint8_t racer_update(void) BANKED {
             }
         }
 
-        racer_px[i] += (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_SPEED;
-        racer_py[i] += (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_SPEED;
+        {
+            int16_t new_px = racer_px[i] + (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_SPEED;
+            int16_t new_py = racer_py[i] + (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_SPEED;
+            if (track_passable(new_px, new_py)) {
+                racer_px[i] = new_px;
+                racer_py[i] = new_py;
+            }
+        }
     }
     return 0u;
 }
