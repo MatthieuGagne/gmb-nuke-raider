@@ -170,8 +170,8 @@ BANKREF(track2_racer_wp_count)
 const uint8_t track2_racer_wp_count = 12u;
 
 BANKREF(track2_racer_wp_tx)
-const uint8_t track2_racer_wp_tx[12] = { 13u, 13u, 13u, 13u, 13u, 13u, 6u, 5u, 5u, 5u, 5u, 5u };
+const uint8_t track2_racer_wp_tx[12] = { 14u, 13u, 13u, 13u, 13u, 13u, 6u, 5u, 5u, 5u, 5u, 5u };
 
 BANKREF(track2_racer_wp_ty)
-const uint8_t track2_racer_wp_ty[12] = { 6u, 20u, 40u, 60u, 80u, 95u, 97u, 80u, 60u, 40u, 20u, 2u };
+const uint8_t track2_racer_wp_ty[12] = { 5u, 20u, 40u, 60u, 80u, 95u, 97u, 80u, 60u, 40u, 20u, 2u };
 
