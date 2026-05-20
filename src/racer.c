@@ -285,14 +285,14 @@ void racer_render(void) BANKED {
             uint8_t cgb_flags = flags | S_PAL(1u);
             set_sprite_prop(racer_oam[i * 4u + 0u], cgb_flags);
             set_sprite_prop(racer_oam[i * 4u + 1u], cgb_flags);
-            set_sprite_prop(racer_oam[i * 4u + 2u], (uint8_t)(cgb_flags | S_FLIPY));
-            set_sprite_prop(racer_oam[i * 4u + 3u], (uint8_t)(cgb_flags | S_FLIPY));
+            set_sprite_prop(racer_oam[i * 4u + 2u], cgb_flags);
+            set_sprite_prop(racer_oam[i * 4u + 3u], cgb_flags);
         }
 #else
         set_sprite_prop(racer_oam[i * 4u + 0u], flags);
         set_sprite_prop(racer_oam[i * 4u + 1u], flags);
-        set_sprite_prop(racer_oam[i * 4u + 2u], (uint8_t)(flags | S_FLIPY));
-        set_sprite_prop(racer_oam[i * 4u + 3u], (uint8_t)(flags | S_FLIPY));
+        set_sprite_prop(racer_oam[i * 4u + 2u], flags);
+        set_sprite_prop(racer_oam[i * 4u + 3u], flags);
 #endif /* __SDCC */
 
         move_sprite(racer_oam[i * 4u + 0u], hw_x,            hw_y);
