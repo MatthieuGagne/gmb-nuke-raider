@@ -139,20 +139,44 @@
   </object>
  </objectgroup>
  <objectgroup id="5" name="enemies">
-  <object id="5" name="car" x="104" y="112"/>
+  <object id="5" name="car" x="112" y="40"/>
  </objectgroup>
  <objectgroup id="6" name="racer_waypoints">
-  <object id="6" x="104" y="48"><point/></object>
-  <object id="7" x="104" y="160"><point/></object>
-  <object id="8" x="104" y="320"><point/></object>
-  <object id="9" x="104" y="480"><point/></object>
-  <object id="10" x="104" y="640"><point/></object>
-  <object id="11" x="104" y="760"><point/></object>
-  <object id="12" x="48" y="776"><point/></object>
-  <object id="13" x="40" y="640"><point/></object>
-  <object id="14" x="40" y="480"><point/></object>
-  <object id="15" x="40" y="320"><point/></object>
-  <object id="16" x="40" y="160"><point/></object>
-  <object id="17" x="40" y="16"><point/></object>
+  <object id="6" x="112" y="40">
+   <point/>
+  </object>
+  <object id="7" x="104" y="160">
+   <point/>
+  </object>
+  <object id="8" x="104" y="320">
+   <point/>
+  </object>
+  <object id="9" x="104" y="480">
+   <point/>
+  </object>
+  <object id="10" x="104" y="640">
+   <point/>
+  </object>
+  <object id="11" x="104" y="760">
+   <point/>
+  </object>
+  <object id="12" x="48" y="776">
+   <point/>
+  </object>
+  <object id="13" x="40" y="640">
+   <point/>
+  </object>
+  <object id="14" x="40" y="480">
+   <point/>
+  </object>
+  <object id="15" x="40" y="320">
+   <point/>
+  </object>
+  <object id="16" x="40" y="160">
+   <point/>
+  </object>
+  <object id="17" x="40" y="16">
+   <point/>
+  </object>
  </objectgroup>
 </map>
