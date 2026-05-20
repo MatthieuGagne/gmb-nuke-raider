@@ -28,7 +28,8 @@ static uint8_t  s_wp_ty[MAX_RACER_WAYPOINTS];
 static uint8_t  s_wp_count;
 static uint8_t  s_finish_dir;
 static uint8_t  s_tile_base;
-static uint8_t  s_laps_done;  /* must complete 1 full wp cycle before finish can trigger */
+static uint8_t  s_laps_done;  /* completed wp cycles so far */
+static uint8_t  s_lap_total;  /* number of full wp cycles required to win */
 
 /* ---- Direction tables — copied from player.c exact values ---- */
 
@@ -139,6 +140,7 @@ void racer_init(uint8_t tile_base) BANKED {
 
     track_id = track_get_id();
     s_finish_dir = track_get_finish_direction();
+    s_lap_total  = track_get_lap_count();
     load_racer_waypoints(track_id, s_wp_tx, s_wp_ty, &s_wp_count);
     found = load_racer_spawn(track_id, &spawn_tx, &spawn_ty);
 
@@ -147,7 +149,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_px[0] = (int16_t)((uint16_t)spawn_tx * 8u + 4u);
         racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u + 4u);
         racer_wp_idx[0] = 0u;
-        racer_dir[0] = DIR_T;
+        racer_dir[0] = track_get_start_dir();
         for (i = 0u; i < 4u; i++) {
             racer_oam[i] = get_sprite();
         }
@@ -229,7 +231,7 @@ uint8_t racer_update(void) BANKED {
         ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
         raw_tile  = track_get_raw_tile(tx, ty);
         tile_type = track_tile_type_from_index(raw_tile);
-        if (s_laps_done > 0u && tile_type == TILE_FINISH) {
+        if (s_laps_done >= s_lap_total && tile_type == TILE_FINISH) {
             if (racer_dir_matches_finish(dir, s_finish_dir)) {
                 return 1u;
             }
@@ -303,7 +305,8 @@ void racer_render(void) BANKED {
 
 void racer_spawn_for_test(int16_t px, int16_t py,
                            uint8_t *wp_tx, uint8_t *wp_ty,
-                           uint8_t wp_count, uint8_t finish_dir) {
+                           uint8_t wp_count, uint8_t finish_dir,
+                           uint8_t lap_total) {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) racer_active[i] = 0u;
     racer_active[0] = 1u;
@@ -318,7 +321,12 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     }
     s_wp_count   = wp_count;
     s_finish_dir = finish_dir;
-    s_laps_done  = 1u;
+    s_lap_total  = lap_total;
+    s_laps_done  = lap_total;  /* ready to trigger finish detection */
+}
+
+void racer_set_laps_done_for_test(uint8_t n) {
+    s_laps_done = n;
 }
 
 void racer_place_on_finish_for_test(uint8_t tx, uint8_t ty, uint8_t dir) {
