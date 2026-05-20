@@ -139,7 +139,7 @@
   </object>
  </objectgroup>
  <objectgroup id="5" name="enemies">
-  <object id="5" name="car" x="104" y="112"/>
+  <object id="5" name="car" x="112" y="40"/>
  </objectgroup>
  <objectgroup id="6" name="racer_waypoints">
   <object id="6" x="104" y="48"><point/></object>
