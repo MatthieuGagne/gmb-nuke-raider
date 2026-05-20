@@ -176,6 +176,7 @@ void racer_init_empty(void) BANKED {
     }
     s_wp_count  = 0u;
     s_laps_done = 0u;
+    s_lap_total = 1u;
 }
 
 uint8_t racer_update(void) BANKED {
