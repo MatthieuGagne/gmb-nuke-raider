@@ -113,7 +113,7 @@ def main() -> None:
     )
     parser.add_argument("--rom",        default=str(root / "build" / "nuke-raider.gb"))
     parser.add_argument("--map",        default=str(root / "build" / "nuke-raider.map"))
-    parser.add_argument("--out",        default="/tmp/nuke-raider-screenshot.png")
+    parser.add_argument("--out",        default=str(root / "build" / "screenshot.png"))
     parser.add_argument("--steps",      default="[]")
     parser.add_argument("--steps-file", default=None)
     args = parser.parse_args()

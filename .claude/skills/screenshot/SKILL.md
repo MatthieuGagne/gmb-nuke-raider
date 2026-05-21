@@ -24,7 +24,7 @@ pip install -r requirements.txt
 python3 tools/screenshot.py \
   [--rom  build/nuke-raider.gb]           # default: auto-resolved from script location (worktree-safe)
   [--map  build/nuke-raider.map]           # default: auto-resolved; used for symbol lookup
-  [--out  /tmp/nuke-raider-screenshot.png] # default output path
+  [--out  build/screenshot.png]            # default: build/screenshot.png (worktree-safe)
   [--steps     '[...]']                    # inline JSON steps
   [--steps-file path/to/steps.json]        # steps from file (avoids shell-quoting issues)
 ```
@@ -50,14 +50,14 @@ python3 tools/screenshot.py \
 ```
 - `address`: hex string (`"0xC0B1"`) or SDCC symbol name (`"_game_state"`)
 - `value`: integer to wait for
-- `max_frames`: timeout — on timeout, saves screenshot of current state and exits non-zero
+- `max_frames`: timeout — on timeout, saves screenshot to `--out` path and exits non-zero
 - Symbols resolved from `build/nuke-raider.map`
 
 ### screenshot — save mid-sequence screenshot
 ```json
-{"action": "screenshot", "out": "/tmp/before-press.png"}
+{"action": "screenshot", "out": "build/before-press.png"}
 ```
-If `out` is omitted, uses `--out` default.
+If `out` is omitted, uses `--out` default (`build/screenshot.png`).
 
 ## Button Names
 
@@ -84,7 +84,7 @@ cat > /tmp/steps.json << 'EOF'
   {"action": "advance", "frames": 120},
   {"action": "press", "buttons": ["start"]},
   {"action": "advance", "frames": 60},
-  {"action": "screenshot", "out": "/tmp/title-to-overmap.png"},
+  {"action": "screenshot", "out": "build/mid-overmap.png"},
   {"action": "press", "buttons": ["left"]},
   {"action": "advance", "frames": 60}
 ]
@@ -98,7 +98,7 @@ After running the script, **always use the `Read` tool** on the output path to v
 in the conversation:
 
 ```
-Read("/tmp/nuke-raider-screenshot.png")
+Read("build/screenshot.png")
 ```
 
 Claude is multimodal — the `Read` tool displays PNG files inline. Without this step, you
