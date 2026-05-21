@@ -146,8 +146,8 @@ void racer_init(uint8_t tile_base) BANKED {
 
     if (found && s_wp_count > 0u) {
         racer_active[0] = 1u;
-        racer_px[0] = (int16_t)((uint16_t)spawn_tx * 8u + 4u);
-        racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u + 4u);
+        racer_px[0] = (int16_t)((uint16_t)spawn_tx * 8u);
+        racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u);
         racer_wp_idx[0] = 0u;
         racer_dir[0] = track_get_start_dir();
         for (i = 0u; i < 4u; i++) {
