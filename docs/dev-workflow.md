@@ -158,6 +158,26 @@ Launch command (from worktree directory):
 java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
 ```
 
+### Headless screenshots
+
+`tools/screenshot.py` boots the ROM headlessly via PyBoy and captures a PNG — useful for
+diagnosing visual bugs without launching Emulicious interactively.
+
+```bash
+python3 tools/screenshot.py \
+  [--steps '[...]']          # JSON navigation sequence
+  [--steps-file path.json]   # steps from file (avoids shell-quoting issues)
+  [--out build/screenshot.png]  # default output path (worktree-safe)
+```
+
+Screenshots land in `build/` (worktree-relative) by default — visible from Windows via
+`\\wsl$\Ubuntu\...\build\screenshot.png`.
+
+Invoke the `screenshot` skill before running the script to get the full step API
+(advance, press, wait_memory, mid-sequence screenshot).
+
+After capturing, use the `Read` tool on the output path to view the image inline in conversation.
+
 ---
 
 ## 6. Asset Pipeline
