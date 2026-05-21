@@ -104,6 +104,7 @@ static void enter(void) {
     hud_set_lap(lap_get_current(), lap_get_total());
     camera_apply_scroll();
     player_render();
+    racer_render();
     /* Countdown init: reset phase and write initial '03' to BG tilemap. */
     cd_phase  = 0u;
     cd_frames = 0u;
@@ -223,6 +224,7 @@ static void update(void) {
 
 static void sp_exit(void) {
     player_hide();
+    racer_hide();
     loader_unload_state();
     HIDE_WIN;
     cam_scx_shadow = 0u;
