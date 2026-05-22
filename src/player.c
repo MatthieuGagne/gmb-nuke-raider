@@ -13,8 +13,8 @@
 #include "sfx.h"
 #include "turret.h"
 
-static int16_t px;
-static int16_t py;
+int16_t px;
+int16_t py;
 static int8_t  vx;
 static int8_t  vy;
 

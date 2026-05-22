@@ -554,6 +554,14 @@ void test_player_set_dir_south(void) {
     TEST_ASSERT_EQUAL_UINT8(DIR_B, player_get_dir());
 }
 
+void test_px_py_exported_as_global(void) {
+    extern int16_t px;
+    extern int16_t py;
+    player_set_pos(42, 99);
+    TEST_ASSERT_EQUAL_INT16(42, px);
+    TEST_ASSERT_EQUAL_INT16(99, py);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -631,5 +639,6 @@ int main(void) {
     /* AC: player_set_dir setter */
     RUN_TEST(test_player_set_dir_north);
     RUN_TEST(test_player_set_dir_south);
+    RUN_TEST(test_px_py_exported_as_global);
     return UNITY_END();
 }
