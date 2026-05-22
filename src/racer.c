@@ -19,7 +19,7 @@ static int16_t  racer_px[MAX_RACERS];
 static int16_t  racer_py[MAX_RACERS];
 static uint8_t  racer_dir[MAX_RACERS];
 static uint8_t  racer_wp_idx[MAX_RACERS];
-static uint8_t  racer_active[MAX_RACERS];
+uint8_t  racer_active[MAX_RACERS];
 static uint8_t  racer_oam[MAX_RACERS * 4u];
 
 /* ---- Track-level data ---- */

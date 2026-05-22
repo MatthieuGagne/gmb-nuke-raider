@@ -122,6 +122,12 @@ void test_racer_finishes_after_all_laps_done(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
 }
 
+void test_racer_active_exported_as_global(void) {
+    extern uint8_t racer_active[];
+    racer_init_empty();
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[0]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -131,5 +137,6 @@ int main(void) {
     RUN_TEST(test_racer_wraps_waypoints);
     RUN_TEST(test_racer_no_finish_before_all_laps_done);
     RUN_TEST(test_racer_finishes_after_all_laps_done);
+    RUN_TEST(test_racer_active_exported_as_global);
     return UNITY_END();
 }
