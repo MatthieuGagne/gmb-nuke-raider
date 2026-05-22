@@ -342,6 +342,15 @@ void test_track_select_large_id_clamps_to_0(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, track_get_id());
 }
 
+/* --- active_lap_count exported as global --------------------------------- */
+
+void test_active_lap_count_exported_as_global(void) {
+    extern uint8_t active_lap_count;
+    /* Confirms symbol links as a non-static global.
+     * Value must match track_get_lap_count() since they are the same variable. */
+    TEST_ASSERT_EQUAL_UINT8(track_get_lap_count(), active_lap_count);
+}
+
 /* --- track_get_start_dir ------------------------------------------------- */
 
 void test_track_get_start_dir_track0(void) {
@@ -416,5 +425,6 @@ int main(void) {
     RUN_TEST(test_track_get_start_dir_track0);
     RUN_TEST(test_track_get_start_dir_track1);
     RUN_TEST(test_track_get_start_dir_track2);
+    RUN_TEST(test_active_lap_count_exported_as_global);
     return UNITY_END();
 }

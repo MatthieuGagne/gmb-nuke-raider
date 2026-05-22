@@ -34,7 +34,7 @@ uint8_t active_map_h = 100u;  /* default: track 0 height — overwritten by load
  * to avoid cross-bank dereference from BANKED code. */
 static int16_t        active_start_x;
 static int16_t        active_start_y;
-static uint8_t        active_lap_count;
+uint8_t        active_lap_count;
 static uint8_t        active_finish_direction;
 static uint8_t        active_start_dir;
 
