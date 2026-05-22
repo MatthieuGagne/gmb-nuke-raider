@@ -2,7 +2,7 @@
 #include "damage.h"
 #include "config.h"
 
-static uint8_t hp;
+uint8_t hp;
 static uint8_t invincibility_cooldown;
 
 void damage_init(void) BANKED {
