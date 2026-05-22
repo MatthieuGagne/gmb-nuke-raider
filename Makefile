@@ -165,6 +165,15 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 
 $(TARGET): $(OBJS) | build bank-check
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
+	python3 tools/emit_manifest.py \
+	    --noi   build/nuke-raider.noi \
+	    --overmap assets/maps/overmap.tmx \
+	    --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
+	    --tsx     assets/maps/track.tsx \
+	    --state-overmap src/state_overmap.c \
+	    --state-prerace src/state_prerace.c \
+	    > build/game-manifest.json \
+	    || echo "Warning: emit_manifest.py failed — game-manifest.json may be stale"
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
