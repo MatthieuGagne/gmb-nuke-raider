@@ -36,7 +36,7 @@ void test_racer_finish_triggers_game_over(void) {
         1,1,1,1,1,1,1,1,  /* row 3 */
         1,1,1,1,1,1,1,1,  /* row 4 */
         1,1,1,1,1,1,1,1,  /* row 5 */
-        1,1,1,1,1,12,1,1, /* row 6: tile 12=TILE_FINISH at col 5 */
+        1,1,1,1,1,18,1,1, /* row 6: tile 18=TILE_FINISH at col 5 */
         1,1,1,1,1,1,1,1,  /* row 7 */
     };
     uint8_t wp_tx[1] = { 5u };
@@ -57,7 +57,7 @@ void test_racer_finish_wrong_direction_no_game_over(void) {
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
-        1,1,1,1,1,12,1,1,
+        1,1,1,1,1,18,1,1,
         1,1,1,1,1,1,1,1,
     };
     /* Waypoint directly north of finish at tile (5,0): delta dx=0, dy<0 → DIR_T */
@@ -89,7 +89,7 @@ void test_racer_no_finish_before_all_laps_done(void) {
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
-        1,1,1,1,1,12,1,1,
+        1,1,1,1,1,18,1,1,
         1,1,1,1,1,1,1,1,
     };
     uint8_t wp_tx[1] = { 5u };
@@ -110,7 +110,7 @@ void test_racer_finishes_after_all_laps_done(void) {
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
-        1,1,1,1,1,12,1,1,
+        1,1,1,1,1,18,1,1,
         1,1,1,1,1,1,1,1,
     };
     uint8_t wp_tx[1] = { 5u };

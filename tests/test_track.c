@@ -87,25 +87,19 @@ void test_tile_type_from_index_dashes_is_road(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(2));
 }
 void test_tile_type_from_index_sand(void) {
-    /* 9x2 tileset, column-major: Tiled tile 3 (SAND) -> col 3, row 0 -> C index 6 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type_from_index(6));
+    TEST_ASSERT_EQUAL_UINT8(TILE_SAND, track_tile_type_from_index(9));
 }
 void test_tile_type_from_index_oil(void) {
-    /* Tiled tile 4 (OIL) -> col 4, row 0 -> C index 8 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type_from_index(8));
+    TEST_ASSERT_EQUAL_UINT8(TILE_OIL, track_tile_type_from_index(12));
 }
 void test_tile_type_from_index_boost(void) {
-    /* Tiled tile 5 (BOOST) -> col 5, row 0 -> C index 10 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(10));
+    TEST_ASSERT_EQUAL_UINT8(TILE_BOOST, track_tile_type_from_index(15));
 }
 void test_tile_lut_len_is_nonzero(void) {
     /* TRACK_TILE_LUT_LEN is pipeline-generated — don't hardcode the count */
     TEST_ASSERT_GREATER_THAN_UINT8(0u, TRACK_TILE_LUT_LEN);
-    /* C index 12 = Tiled tile 6 = TILE_FINISH */
-    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(12u));
-    /* C index 14 = Tiled tile 7 = TILE_ROAD */
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(18u));
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(14u));
-    /* C index 16 = Tiled tile 8 = TILE_ROAD */
     TEST_ASSERT_EQUAL_UINT8(TILE_ROAD, track_tile_type_from_index(16u));
 }
 void test_tile_type_from_index_unknown_defaults_to_road(void) {
@@ -117,8 +111,7 @@ void test_track_tile_type_from_index_oob_returns_wall(void) {
     TEST_ASSERT_EQUAL_UINT8(TILE_WALL, track_tile_type_from_index(99));
 }
 void test_finish_tile_is_finish(void) {
-    /* 9x2 tileset: Tiled tile 6 (FINISH) -> col 6, row 0 -> C index 12 */
-    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(12));
+    TEST_ASSERT_EQUAL_UINT8(TILE_FINISH, track_tile_type_from_index(18));
 }
 void test_track_tile_data_count_is_nonzero(void) {
     /* tile count is pipeline-generated — don't hardcode it */
@@ -193,11 +186,9 @@ void test_track_fill_col_road_column(void) {
      * Both 1 and 2 map to TILE_ROAD via the LUT; we assert the raw index. */
     uint8_t buf[3];
     track_fill_col(10u, 0u, 3u, buf);
-    /* 9x2 tileset with base_remap: GID 3 (dashes, Tiled tile 2) -> C index 4;
-     * GID 2 (road, Tiled tile 1) -> C index 2. */
-    TEST_ASSERT_EQUAL_UINT8(4u, buf[0]);  /* row 0, col 10 = dashes tile (C=4) */
-    TEST_ASSERT_EQUAL_UINT8(2u, buf[1]);  /* row 1, col 10 = road tile (C=2) */
-    TEST_ASSERT_EQUAL_UINT8(2u, buf[2]);  /* row 2, col 10 = road tile (C=2) */
+    TEST_ASSERT_EQUAL_UINT8(6u, buf[0]);  /* row 0, col 10 = dashes tile */
+    TEST_ASSERT_EQUAL_UINT8(3u, buf[1]);  /* row 1, col 10 = road tile */
+    TEST_ASSERT_EQUAL_UINT8(3u, buf[2]);  /* row 2, col 10 = road tile */
 }
 
 /* OOB tx: tile x >= active_map_w (20) fills zeros */
