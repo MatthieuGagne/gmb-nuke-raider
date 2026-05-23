@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.10" tiledversion="1.11.2" name="track" tilewidth="8" tileheight="8" tilecount="18" columns="9">
- <image source="tileset.png" width="72" height="16"/>
+<tileset version="1.10" tiledversion="1.11.2" name="track" tilewidth="8" tileheight="8" tilecount="27" columns="9">
+ <image source="tileset.png" width="72" height="24"/>
  <tile id="0">
   <properties>
    <property name="type" value="TILE_WALL"/>
@@ -84,6 +84,11 @@
   </objectgroup>
  </tile>
  <tile id="17">
+  <properties>
+   <property name="type" value="TILE_ROAD"/>
+  </properties>
+ </tile>
+ <tile id="18">
   <properties>
    <property name="type" value="TILE_ROAD"/>
   </properties>

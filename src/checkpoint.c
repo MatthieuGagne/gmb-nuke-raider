@@ -4,7 +4,7 @@
 
 static const CheckpointDef *cp_defs;   /* points to WRAM buffer in track.c */
 static uint8_t cp_count;
-static uint8_t cp_next;
+uint8_t cp_next;
 
 void checkpoint_init(const CheckpointDef *defs, uint8_t count) BANKED {
     if (count > MAX_CHECKPOINTS) count = MAX_CHECKPOINTS;

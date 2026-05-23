@@ -117,6 +117,12 @@ void test_direction_west_requires_negative_vx(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, checkpoint_all_cleared());
 }
 
+void test_cp_next_exported_as_global(void) {
+    extern uint8_t cp_next;
+    checkpoint_init(NULL, 0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, cp_next);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_zero_checkpoints_all_cleared);
@@ -129,5 +135,6 @@ int main(void) {
     RUN_TEST(test_direction_north_requires_negative_vy);
     RUN_TEST(test_direction_east_requires_positive_vx);
     RUN_TEST(test_direction_west_requires_negative_vx);
+    RUN_TEST(test_cp_next_exported_as_global);
     return UNITY_END();
 }

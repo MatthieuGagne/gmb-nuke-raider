@@ -11,6 +11,18 @@ Invoke this skill before running `tools/screenshot.py` so you have the correct A
 Use when the user reports a visual bug or unexpected behavior and you need to *see* the
 game state yourself to diagnose it.
 
+## Game Manifest
+
+Before writing any navigation steps, read `build/game-manifest.json`. It contains:
+
+- `navigation.overmap_to_track` — BFS tile-direction paths from hub_spawn to each track entry; multiply `len(path) * travel_frames_per_tile` for frame delays
+- `navigation.overmap_to_hub` — paths to city hubs
+- `controls` — button mappings per state; `prerace.cursor_to_start` gives the exact DOWN-press count to reach the START row
+- `tracks` — per-track spawn pixel coords, racer waypoints, checkpoint rects
+- `symbols` — WRAM addresses for key debugging state (`_cam_scx_shadow`, `_px`, `_py`, `_hp`, `_active_lap_count`, `_cp_next`, `_racer_active`, etc.)
+
+Prefer manifest values over hardcoded coordinates or guessed paths.
+
 ## Setup
 
 If PyBoy is not installed:

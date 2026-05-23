@@ -155,6 +155,12 @@ void test_heal_from_zero_not_dead_after_heal(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, damage_is_dead());
 }
 
+void test_hp_exported_as_global(void) {
+    extern uint8_t hp;
+    damage_init();
+    TEST_ASSERT_EQUAL_UINT8(damage_get_hp(), hp);
+}
+
 /* --- damage_get_hp --- */
 
 void test_get_hp_after_init(void) {
@@ -200,5 +206,6 @@ int main(void) {
     RUN_TEST(test_get_hp_after_init);
     RUN_TEST(test_get_hp_decrements_with_apply);
     RUN_TEST(test_get_hp_increments_with_heal);
+    RUN_TEST(test_hp_exported_as_global);
     return UNITY_END();
 }

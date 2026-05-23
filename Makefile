@@ -165,6 +165,15 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 
 $(TARGET): $(OBJS) | build bank-check
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
+	python3 tools/emit_manifest.py \
+	    --noi   build/nuke-raider.noi \
+	    --overmap assets/maps/overmap.tmx \
+	    --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
+	    --tsx     assets/maps/track.tsx \
+	    --state-overmap src/state_overmap.c \
+	    --state-prerace src/state_prerace.c \
+	    > build/game-manifest.json \
+	    || echo "Warning: emit_manifest.py failed — game-manifest.json may be stale"
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
@@ -205,7 +214,7 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer -v
+	PYTHONPATH=. python3 -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
