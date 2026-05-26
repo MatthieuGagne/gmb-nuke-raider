@@ -451,6 +451,11 @@ void racer_render(void) BANKED {
 }
 
 int16_t racer_get_py(uint8_t slot) BANKED { return racer_py[slot]; }
+uint8_t racer_get_laps_done(uint8_t slot) BANKED { (void)slot; return s_laps_done; }
+uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED { return racer_wp_idx[slot]; }
+uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
+uint8_t racer_get_wp_tx(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_tx[idx] : 0u; }
+uint8_t racer_get_wp_ty(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_ty[idx] : 0u; }
 
 #ifndef __SDCC
 
