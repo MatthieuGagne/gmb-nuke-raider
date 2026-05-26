@@ -407,7 +407,10 @@
       "Skill(bank-pre-write)",
       "Bash(timeout 10 ./build/test_racer *)",
       "Skill(systematic-debugging)",
-      "Skill(track-build)"
+      "Skill(track-build)",
+      "Bash(awk -F: '$2 ~ /static/ {print NR\": \"$0}')",
+      "Bash(awk -F: '{print $1, $2}')",
+      "Bash(awk *)"
     ]
   },
   "hooks": {
