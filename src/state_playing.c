@@ -178,6 +178,11 @@ static void update(void) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
         }
+        /* Race position indicator: sample racer Y after move, before HUD update */
+        {
+            int16_t rpy = racer_get_py(0u);
+            if (py < rpy) { hud_set_position(1u); } else { hud_set_position(2u); }
+        }
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
