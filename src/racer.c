@@ -175,8 +175,8 @@ void racer_init(uint8_t tile_base) BANKED {
 
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
-        racer_vx[i] = 0;
-        racer_vy[i] = 0;
+        racer_vx[i] = (int8_t)0;
+        racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
     }
@@ -218,8 +218,8 @@ void racer_init_empty(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
-        racer_vx[i] = 0;
-        racer_vy[i] = 0;
+        racer_vx[i] = (int8_t)0;
+        racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
     }
@@ -375,7 +375,7 @@ uint8_t racer_update(void) BANKED {
             if (racer_corners_passable(new_px, racer_py[i], dir)) {
                 racer_px[i] = new_px;
             } else {
-                racer_vx[i] = 0;
+                racer_vx[i] = (int8_t)0;
                 racer_gear[i] = 0u;
                 racer_downshift_timer[i] = 0u;
             }
@@ -383,7 +383,7 @@ uint8_t racer_update(void) BANKED {
             if (racer_corners_passable(racer_px[i], new_py, dir)) {
                 racer_py[i] = new_py;
             } else {
-                racer_vy[i] = 0;
+                racer_vy[i] = (int8_t)0;
                 racer_gear[i] = 0u;
                 racer_downshift_timer[i] = 0u;
             }
@@ -472,8 +472,8 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     s_finish_dir = finish_dir;
     s_lap_total  = lap_total;
     s_laps_done  = lap_total;  /* ready to trigger finish detection */
-    racer_vx[0] = 0;
-    racer_vy[0] = 0;
+    racer_vx[0] = (int8_t)0;
+    racer_vy[0] = (int8_t)0;
     racer_gear[0] = 0u;
     racer_downshift_timer[0] = 0u;
 }
