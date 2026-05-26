@@ -178,6 +178,33 @@ static void update(void) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
         }
+        /* Race position: lap count primary, section-aware ty secondary */
+        {
+            uint8_t player_laps = (uint8_t)(lap_get_current() - 1u);
+            uint8_t racer_laps  = racer_get_laps_done(0u);
+            if (player_laps > racer_laps) {
+                hud_set_position(1u);
+            } else if (player_laps < racer_laps) {
+                hud_set_position(2u);
+            } else {
+                /* Same lap: right side (tx>10) goes DOWN (higher ty=ahead);
+                 * left side (tx<=10) goes UP (lower ty=ahead).
+                 * racer_wp_idx<6 = right side, >=6 = left side. */
+                uint8_t player_tx    = (uint8_t)((uint16_t)px >> 3u);
+                uint8_t player_ty    = (uint8_t)((uint16_t)py >> 3u);
+                uint8_t racer_wp     = racer_get_wp_idx_banked(0u);
+                int16_t rpy_val      = racer_get_py(0u);
+                uint8_t racer_ty     = (uint8_t)((uint16_t)rpy_val >> 3u);
+                uint8_t player_right = (player_tx > 10u) ? 1u : 0u;
+                uint8_t racer_right  = (racer_wp  <  6u) ? 1u : 0u;
+                uint8_t pos;
+                if      ( player_right && !racer_right) { pos = 2u; }
+                else if (!player_right &&  racer_right) { pos = 1u; }
+                else if ( player_right) { pos = (player_ty >= racer_ty) ? 1u : 2u; }
+                else                   { pos = (player_ty <= racer_ty) ? 1u : 2u; }
+                hud_set_position(pos);
+            }
+        }
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);

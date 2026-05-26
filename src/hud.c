@@ -66,6 +66,7 @@ static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
 static uint8_t  hud_lap_current;
 static uint8_t  hud_lap_total;
 static uint8_t  hud_map_type;     /* TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
+static uint8_t  hud_position;     /* 0=hidden, 1=first, 2=second */
 
 /* --- Public API --- */
 
@@ -75,6 +76,7 @@ void hud_init(uint8_t map_type, uint8_t lap_total) BANKED {
     uint8_t i;
 
     hud_map_type    = map_type;
+    hud_position    = 0u;
     hud_hp          = PLAYER_MAX_HP;
     hud_frame_tick  = 0u;
     hud_seconds     = 0u;
@@ -165,6 +167,21 @@ void hud_render(void) BANKED {
         set_win_tiles(6u, 0u, 3u, 1u, lap_tiles);
     }
 
+    /* Update position indicator tiles (cols 10-12, row 0): "P:1", "P:2", or spaces */
+    {
+        uint8_t pos_tiles[3];
+        if (hud_position == 0u) {
+            pos_tiles[0] = HUD_FONT_BASE + HUD_TILE_SPACE;
+            pos_tiles[1] = HUD_FONT_BASE + HUD_TILE_SPACE;
+            pos_tiles[2] = HUD_FONT_BASE + HUD_TILE_SPACE;
+        } else {
+            pos_tiles[0] = HUD_FONT_BASE + HUD_TILE_P;
+            pos_tiles[1] = HUD_FONT_BASE + HUD_TILE_COLON;
+            pos_tiles[2] = HUD_FONT_BASE + hud_position;  /* digit 1 or 2 */
+        }
+        set_win_tiles(10u, 0u, 3u, 1u, pos_tiles);
+    }
+
     hud_dirty = 0u;
 }
 
@@ -178,6 +195,13 @@ void hud_set_lap(uint8_t current, uint8_t total) BANKED {
     hud_lap_current = current;
     hud_lap_total   = total;
     hud_dirty       = 1u;
+}
+
+void hud_set_position(uint8_t pos) BANKED {
+    if (hud_map_type == TRACK_TYPE_COMBAT) return;
+    if (pos == hud_position) return;
+    hud_position = pos;
+    hud_dirty    = 1u;
 }
 
 uint16_t hud_get_seconds(void) BANKED { return hud_seconds; }

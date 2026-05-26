@@ -450,6 +450,13 @@ void racer_render(void) BANKED {
     }
 }
 
+int16_t racer_get_py(uint8_t slot) BANKED { return racer_py[slot]; }
+uint8_t racer_get_laps_done(uint8_t slot) BANKED { (void)slot; return s_laps_done; }
+uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED { return racer_wp_idx[slot]; }
+uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
+uint8_t racer_get_wp_tx(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_tx[idx] : 0u; }
+uint8_t racer_get_wp_ty(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_ty[idx] : 0u; }
+
 #ifndef __SDCC
 
 void racer_spawn_for_test(int16_t px, int16_t py,
@@ -509,7 +516,6 @@ int8_t  racer_get_vx(uint8_t slot)  { return racer_vx[slot]; }
 int8_t  racer_get_vy(uint8_t slot)  { return racer_vy[slot]; }
 uint8_t racer_get_gear(uint8_t slot) { return racer_gear[slot]; }
 int16_t racer_get_px(uint8_t slot)  { return racer_px[slot]; }
-int16_t racer_get_py(uint8_t slot)  { return racer_py[slot]; }
 void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy) {
     racer_vx[slot] = vx;
     racer_vy[slot] = vy;
