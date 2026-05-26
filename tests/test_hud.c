@@ -146,6 +146,34 @@ void test_hud_init_combat_mode_sets_map_type(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
 }
 
+/* --- hud_set_position(): race mode --- */
+void test_set_position_race_sets_dirty(void) {
+    /* setUp() calls hud_init(TRACK_TYPE_RACE, 3u) — dirty starts clear */
+    hud_set_position(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+}
+
+void test_set_position_no_change_no_dirty(void) {
+    hud_set_position(1u);
+    hud_render();                /* clears dirty */
+    hud_set_position(1u);        /* same value — must not dirty */
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+}
+
+void test_set_position_change_sets_dirty(void) {
+    hud_set_position(1u);
+    hud_render();
+    hud_set_position(2u);        /* value changed — must dirty */
+    TEST_ASSERT_EQUAL_UINT8(1u, hud_is_dirty());
+}
+
+/* --- hud_set_position(): combat mode guard --- */
+void test_set_position_combat_noop(void) {
+    hud_init(TRACK_TYPE_COMBAT, 0u);
+    hud_set_position(1u);        /* combat mode — must be ignored */
+    TEST_ASSERT_EQUAL_UINT8(0u, hud_is_dirty());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_seconds_zero);
@@ -164,5 +192,9 @@ int main(void) {
     RUN_TEST(test_set_hp_same_value_no_dirty);
     RUN_TEST(test_set_hp_changed_value_sets_dirty);
     RUN_TEST(test_hud_init_combat_mode_sets_map_type);
+    RUN_TEST(test_set_position_race_sets_dirty);
+    RUN_TEST(test_set_position_no_change_no_dirty);
+    RUN_TEST(test_set_position_change_sets_dirty);
+    RUN_TEST(test_set_position_combat_noop);
     return UNITY_END();
 }

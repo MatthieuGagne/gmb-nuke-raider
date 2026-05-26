@@ -9,6 +9,7 @@ void    hud_update(void) BANKED;        /* call in game logic phase each frame *
 void    hud_render(void) BANKED;        /* call in VBlank phase — writes win tiles when dirty */
 void    hud_set_hp(uint8_t hp) BANKED;  /* wire to player damage system */
 void    hud_set_lap(uint8_t current, uint8_t total) BANKED;
+void    hud_set_position(uint8_t pos) BANKED; /* 1=first, 2=second, 0=hidden; no-op on combat maps */
 
 /* --- Test accessors (also useful for debug) --- */
 uint16_t hud_get_seconds(void) BANKED;  /* total elapsed seconds */
