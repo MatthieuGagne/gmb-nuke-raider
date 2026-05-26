@@ -249,8 +249,9 @@ uint8_t racer_update(void) BANKED {
         }
 
         {
-            int16_t new_px = racer_px[i] + (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_SPEED;
-            int16_t new_py = racer_py[i] + (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_SPEED;
+            /* TODO(Task 3): replace with gear-physics + axis-split collision */
+            int16_t new_px = racer_px[i] + (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_GEAR3_MAX_SPEED;
+            int16_t new_py = racer_py[i] + (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_GEAR3_MAX_SPEED;
             if (track_passable(new_px, new_py)) {
                 racer_px[i] = new_px;
                 racer_py[i] = new_py;
