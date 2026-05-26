@@ -21,6 +21,10 @@ static uint8_t  racer_dir[MAX_RACERS];
 static uint8_t  racer_wp_idx[MAX_RACERS];
 uint8_t  racer_active[MAX_RACERS];
 static uint8_t  racer_oam[MAX_RACERS * 4u];
+static int8_t   racer_vx[MAX_RACERS];
+static int8_t   racer_vy[MAX_RACERS];
+static uint8_t  racer_gear[MAX_RACERS];
+static uint8_t  racer_downshift_timer[MAX_RACERS];
 
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
@@ -91,6 +95,43 @@ static const uint8_t RACER_DIR_FLIP[8] = {
     S_FLIPX, /* LT */
 };
 
+/* ---- Directional hitbox corners — mirrors player.c HITBOX_X/Y ---- */
+static const uint8_t RACER_HITBOX_X[8][4] = {
+    {2u, 13u,  2u, 13u},  /* DIR_T  */
+    {8u, 14u,  1u,  8u},  /* DIR_RT */
+    {0u, 15u,  0u, 15u},  /* DIR_R  */
+    {1u,  8u,  8u, 14u},  /* DIR_RB */
+    {2u, 13u,  2u, 13u},  /* DIR_B  */
+    {8u, 14u,  1u,  8u},  /* DIR_LB */
+    {0u, 15u,  0u, 15u},  /* DIR_L  */
+    {1u,  8u,  8u, 14u},  /* DIR_LT */
+};
+static const uint8_t RACER_HITBOX_Y[8][4] = {
+    {0u,  0u, 15u, 15u},  /* DIR_T  */
+    {1u,  8u,  8u, 14u},  /* DIR_RT */
+    {2u,  2u, 13u, 13u},  /* DIR_R  */
+    {8u,  1u, 14u,  8u},  /* DIR_RB */
+    {0u,  0u, 15u, 15u},  /* DIR_B  */
+    {1u,  8u,  8u, 14u},  /* DIR_LB */
+    {2u,  2u, 13u, 13u},  /* DIR_L  */
+    {8u,  1u, 14u,  8u},  /* DIR_LT */
+};
+
+/* ---- Gear LUTs — racer-specific tuning (RACER_GEAR3_MAX_SPEED=5, player=6) ---- */
+static const uint8_t RACER_GEAR_MAX_SPD[3] = {RACER_GEAR1_MAX_SPEED, RACER_GEAR2_MAX_SPEED, RACER_GEAR3_MAX_SPEED};
+static const uint8_t RACER_GEAR_ACCEL_TBL[3] = {RACER_GEAR1_ACCEL, RACER_GEAR2_ACCEL, RACER_GEAR3_ACCEL};
+
+/* ---- 4-corner passability check (dir-specific hitbox, no turret check for racer) ---- */
+static uint8_t racer_corners_passable(int16_t wx, int16_t wy, uint8_t dir) {
+    uint8_t i;
+    for (i = 0u; i < 4u; i++) {
+        int16_t cx = wx + (int16_t)RACER_HITBOX_X[dir][i];
+        int16_t cy = wy + (int16_t)RACER_HITBOX_Y[dir][i];
+        if (!track_passable(cx, cy)) return 0u;
+    }
+    return 1u;
+}
+
 /* ---- Direction from delta ---- */
 static uint8_t racer_dir_from_delta(int8_t dx, int8_t dy) {
     int8_t ax = dx < 0 ? -dx : dx;
@@ -134,6 +175,10 @@ void racer_init(uint8_t tile_base) BANKED {
 
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
+        racer_vx[i] = 0;
+        racer_vy[i] = 0;
+        racer_gear[i] = 0u;
+        racer_downshift_timer[i] = 0u;
     }
     s_tile_base  = tile_base;
     s_laps_done  = 0u;
@@ -173,6 +218,10 @@ void racer_init_empty(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) {
         racer_active[i] = 0u;
+        racer_vx[i] = 0;
+        racer_vy[i] = 0;
+        racer_gear[i] = 0u;
+        racer_downshift_timer[i] = 0u;
     }
     s_wp_count  = 0u;
     s_laps_done = 0u;
@@ -248,13 +297,95 @@ uint8_t racer_update(void) BANKED {
             }
         }
 
+        /* ---- Gear physics (mirrors player_apply_physics, always full throttle) ---- */
         {
-            /* TODO(Task 3): replace with gear-physics + axis-split collision */
-            int16_t new_px = racer_px[i] + (int16_t)RACER_DIR_DX[dir] * (int16_t)RACER_GEAR3_MAX_SPEED;
-            int16_t new_py = racer_py[i] + (int16_t)RACER_DIR_DY[dir] * (int16_t)RACER_GEAR3_MAX_SPEED;
-            if (track_passable(new_px, new_py)) {
+            uint8_t fric_x;
+            uint8_t fric_y;
+            uint8_t gas;
+            uint8_t j;
+            uint8_t max_speed;
+            uint8_t spd_x;
+            uint8_t spd_y;
+            uint8_t speed;
+
+            gas = (tile_type != TILE_OIL) ? 1u : 0u;
+
+            if (tile_type == TILE_SAND) {
+                fric_x = (gas && RACER_DIR_DX[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+                fric_y = (gas && RACER_DIR_DY[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+            } else if (tile_type == TILE_OIL) {
+                fric_x = 0u;
+                fric_y = 0u;
+                racer_gear[i] = 0u;
+                racer_downshift_timer[i] = 0u;
+            } else {
+                fric_x = (gas && RACER_DIR_DX[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
+                fric_y = (gas && RACER_DIR_DY[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
+            }
+
+            for (j = 0u; j < fric_x; j++) {
+                if      (racer_vx[i] > 0) racer_vx[i] = (int8_t)(racer_vx[i] - 1);
+                else if (racer_vx[i] < 0) racer_vx[i] = (int8_t)(racer_vx[i] + 1);
+            }
+            for (j = 0u; j < fric_y; j++) {
+                if      (racer_vy[i] > 0) racer_vy[i] = (int8_t)(racer_vy[i] - 1);
+                else if (racer_vy[i] < 0) racer_vy[i] = (int8_t)(racer_vy[i] + 1);
+            }
+
+            if (gas) {
+                racer_vx[i] = (int8_t)(racer_vx[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DX[dir]));
+                racer_vy[i] = (int8_t)(racer_vy[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DY[dir]));
+            }
+
+            if (tile_type == TILE_BOOST) {
+                racer_vy[i] = (int8_t)(racer_vy[i] - (int8_t)TERRAIN_BOOST_DELTA);
+            }
+
+            max_speed = (tile_type == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : RACER_GEAR_MAX_SPD[racer_gear[i]];
+            if (racer_vx[i] >  (int8_t)max_speed) racer_vx[i] =  (int8_t)max_speed;
+            if (racer_vx[i] < -(int8_t)max_speed) racer_vx[i] = -(int8_t)max_speed;
+            if (racer_vy[i] >  (int8_t)max_speed) racer_vy[i] =  (int8_t)max_speed;
+            if (racer_vy[i] < -(int8_t)max_speed) racer_vy[i] = -(int8_t)max_speed;
+
+            spd_x = (racer_vx[i] < 0) ? (uint8_t)(-racer_vx[i]) : (uint8_t)racer_vx[i];
+            spd_y = (racer_vy[i] < 0) ? (uint8_t)(-racer_vy[i]) : (uint8_t)racer_vy[i];
+            speed = (spd_x > spd_y) ? spd_x : spd_y;
+
+            if (racer_gear[i] < 2u && speed >= RACER_GEAR_MAX_SPD[racer_gear[i]]) {
+                racer_gear[i]++;
+                racer_downshift_timer[i] = 0u;
+            } else if (racer_gear[i] > 0u) {
+                if (speed < RACER_GEAR_MAX_SPD[racer_gear[i] - 1u]) {
+                    racer_downshift_timer[i]++;
+                    if (racer_downshift_timer[i] >= RACER_GEAR_DOWNSHIFT_FRAMES) {
+                        racer_gear[i]--;
+                        racer_downshift_timer[i] = 0u;
+                    }
+                } else {
+                    racer_downshift_timer[i] = 0u;
+                }
+            }
+        }
+
+        /* ---- Axis-split collision ---- */
+        {
+            int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
+            int16_t new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+
+            if (racer_corners_passable(new_px, racer_py[i], dir)) {
                 racer_px[i] = new_px;
+            } else {
+                racer_vx[i] = 0;
+                racer_gear[i] = 0u;
+                racer_downshift_timer[i] = 0u;
+            }
+
+            if (racer_corners_passable(racer_px[i], new_py, dir)) {
                 racer_py[i] = new_py;
+            } else {
+                racer_vy[i] = 0;
+                racer_gear[i] = 0u;
+                racer_downshift_timer[i] = 0u;
             }
         }
     }
@@ -341,6 +472,10 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     s_finish_dir = finish_dir;
     s_lap_total  = lap_total;
     s_laps_done  = lap_total;  /* ready to trigger finish detection */
+    racer_vx[0] = 0;
+    racer_vy[0] = 0;
+    racer_gear[0] = 0u;
+    racer_downshift_timer[0] = 0u;
 }
 
 void racer_set_laps_done_for_test(uint8_t n) {
@@ -368,6 +503,19 @@ void racer_set_pos_for_test(uint8_t slot, int16_t px, int16_t py) {
 
 uint8_t racer_get_wp_idx(uint8_t slot) {
     return racer_wp_idx[slot];
+}
+
+int8_t  racer_get_vx(uint8_t slot)  { return racer_vx[slot]; }
+int8_t  racer_get_vy(uint8_t slot)  { return racer_vy[slot]; }
+uint8_t racer_get_gear(uint8_t slot) { return racer_gear[slot]; }
+int16_t racer_get_px(uint8_t slot)  { return racer_px[slot]; }
+int16_t racer_get_py(uint8_t slot)  { return racer_py[slot]; }
+void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy) {
+    racer_vx[slot] = vx;
+    racer_vy[slot] = vy;
+}
+void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
+    racer_gear[slot] = gear;
 }
 
 #endif /* __SDCC */
