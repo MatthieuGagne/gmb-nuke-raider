@@ -96,9 +96,17 @@
 
 /* Racer enemy */
 #define MAX_RACERS           1u   /* SoA pool capacity; design for N, implement 1 */
-#define RACER_SPEED          5u   /* px/frame per axis; diagonal ≈ 7 px/frame (accepted) */
 #define MAX_RACER_WAYPOINTS 16u   /* WRAM copy buffer; tracks may have fewer */
 #define RACER_WP_THRESHOLD  12u   /* Manhattan advance threshold: ABS(dx)+ABS(dy) < this */
+/* Racer gear system — separate constants allow independent AI difficulty tuning.
+ * RACER_GEAR3_MAX_SPEED is 5 (< player 6) so the player can beat a perfect AI. */
+#define RACER_GEAR1_MAX_SPEED     2u
+#define RACER_GEAR1_ACCEL         2u
+#define RACER_GEAR2_MAX_SPEED     4u
+#define RACER_GEAR2_ACCEL         1u
+#define RACER_GEAR3_MAX_SPEED     5u
+#define RACER_GEAR3_ACCEL         1u
+#define RACER_GEAR_DOWNSHIFT_FRAMES  8u
 
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */

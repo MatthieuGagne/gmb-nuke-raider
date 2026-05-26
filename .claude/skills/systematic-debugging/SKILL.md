@@ -178,6 +178,7 @@ When triggered:
 
 - **`emulicious-debug`** agent — step-through debugger, EMU_printf, memory/tile/sprite inspection, tracer, profiler
 - **`/compare-prs <N>`** skill — for "worked in PR X, broken now" hypotheses: builds both, lets you compare ROMs and diffs side-by-side
+- **`build/game-manifest.json`** — read before writing any `wait_memory` address or navigation steps; `symbols` section provides WRAM addresses for all key state variables, `navigation` section provides overmap paths — no source reads required
 
 ---
 
