@@ -35,10 +35,6 @@ static uint8_t cd_bg_col;    /* BG map col of the 2 countdown tiles */
 static uint8_t cd_bg_row;    /* BG map row of the 2 countdown tiles */
 static uint8_t cd_world_row; /* world tile row — passed to camera_invalidate_row() */
 
-static uint8_t sp_player_wp_idx;    /* player's next waypoint target index */
-static uint8_t sp_player_laps_done; /* player's completed waypoint cycles */
-static uint8_t sp_wp_count_cache;   /* waypoint count cached at race entry */
-
 /* Countdown digit pairs: lo=left tile, hi=right tile.
  * Phases: 0='03', 1='02', 2='01', 3='GO'
  * Character arithmetic used throughout — never bare numbers. */
@@ -94,9 +90,6 @@ static void enter(void) {
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
-    sp_player_wp_idx    = 0u;
-    sp_player_laps_done = 0u;
-    sp_wp_count_cache   = racer_get_wp_count();
     powerup_init();
     lap_init(track_get_lap_count());
     active_map_type_cache = track_get_map_type();
@@ -185,31 +178,31 @@ static void update(void) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
         }
-        /* Race position: compare waypoint progress scores to avoid Y-flip on winding track */
-        if (sp_wp_count_cache > 0u) {
-            {
-                int16_t wpx = (int16_t)((uint16_t)racer_get_wp_tx(sp_player_wp_idx) * 8u + 4u);
-                int16_t wpy = (int16_t)((uint16_t)racer_get_wp_ty(sp_player_wp_idx) * 8u + 4u);
-                int16_t wdx = px - wpx;
-                int16_t wdy = py - wpy;
-                if (wdx < 0) wdx = -wdx;
-                if (wdy < 0) wdy = -wdy;
-                if (wdx > 127) wdx = 127;
-                if (wdy > 127) wdy = 127;
-                if ((uint8_t)((uint8_t)wdx + (uint8_t)wdy) < (uint8_t)(RACER_WP_THRESHOLD * 2u)) {
-                    sp_player_wp_idx++;
-                    if (sp_player_wp_idx >= sp_wp_count_cache) {
-                        sp_player_wp_idx  = 0u;
-                        sp_player_laps_done++;
-                    }
-                }
-            }
-            {
-                uint8_t racer_laps  = racer_get_laps_done(0u);
-                uint8_t racer_wp    = racer_get_wp_idx_banked(0u);
-                uint8_t player_prog = (uint8_t)(sp_player_laps_done * sp_wp_count_cache + sp_player_wp_idx);
-                uint8_t racer_prog  = (uint8_t)(racer_laps  * sp_wp_count_cache + racer_wp);
-                if (player_prog >= racer_prog) { hud_set_position(1u); } else { hud_set_position(2u); }
+        /* Race position: lap count primary, section-aware ty secondary */
+        {
+            uint8_t player_laps = (uint8_t)(lap_get_current() - 1u);
+            uint8_t racer_laps  = racer_get_laps_done(0u);
+            if (player_laps > racer_laps) {
+                hud_set_position(1u);
+            } else if (player_laps < racer_laps) {
+                hud_set_position(2u);
+            } else {
+                /* Same lap: right side (tx>10) goes DOWN (higher ty=ahead);
+                 * left side (tx<=10) goes UP (lower ty=ahead).
+                 * racer_wp_idx<6 = right side, >=6 = left side. */
+                uint8_t player_tx    = (uint8_t)((uint16_t)px >> 3u);
+                uint8_t player_ty    = (uint8_t)((uint16_t)py >> 3u);
+                uint8_t racer_wp     = racer_get_wp_idx_banked(0u);
+                int16_t rpy_val      = racer_get_py(0u);
+                uint8_t racer_ty     = (uint8_t)((uint16_t)rpy_val >> 3u);
+                uint8_t player_right = (player_tx > 10u) ? 1u : 0u;
+                uint8_t racer_right  = (racer_wp  <  6u) ? 1u : 0u;
+                uint8_t pos;
+                if      ( player_right && !racer_right) { pos = 2u; }
+                else if (!player_right &&  racer_right) { pos = 1u; }
+                else if ( player_right) { pos = (player_ty >= racer_ty) ? 1u : 2u; }
+                else                   { pos = (player_ty <= racer_ty) ? 1u : 2u; }
+                hud_set_position(pos);
             }
         }
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
