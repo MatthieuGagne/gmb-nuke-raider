@@ -457,6 +457,30 @@ uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
 uint8_t racer_get_wp_tx(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_tx[idx] : 0u; }
 uint8_t racer_get_wp_ty(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_ty[idx] : 0u; }
 
+uint8_t racer_blocks_pixel(int16_t wx, int16_t wy) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        if (!racer_active[i]) continue;
+        if (wx >= racer_px[i] && wx < racer_px[i] + 16 &&
+            wy >= racer_py[i] && wy < racer_py[i] + 16) {
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
+uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
+    uint8_t i;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        if (!racer_active[i]) continue;
+        if (px < racer_px[i] + 16 && px + 16 > racer_px[i] &&
+            py < racer_py[i] + 16 && py + 16 > racer_py[i]) {
+            return 1u;
+        }
+    }
+    return 0u;
+}
+
 #ifndef __SDCC
 
 void racer_spawn_for_test(int16_t px, int16_t py,

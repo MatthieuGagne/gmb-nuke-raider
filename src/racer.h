@@ -15,6 +15,8 @@ uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED;
 uint8_t racer_get_wp_count(void) BANKED;
 uint8_t racer_get_wp_tx(uint8_t idx) BANKED;
 uint8_t racer_get_wp_ty(uint8_t idx) BANKED;
+uint8_t racer_blocks_pixel(int16_t wx, int16_t wy) BANKED;
+uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED;
 
 #ifndef __SDCC
 void    racer_spawn_for_test(int16_t px, int16_t py,
