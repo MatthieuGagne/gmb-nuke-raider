@@ -407,7 +407,7 @@ uint8_t racer_update(void) BANKED {
             int16_t scr_cy = racer_py[i] - cam_y + 24;
             if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
                 if (projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy, RACER_HIT_RADIUS)) {
-                    racer_hp[i]--;
+                    racer_hp[i] = (uint8_t)(racer_hp[i] - 1u);
                     racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
                     if (racer_hp[i] == 0u) {
                         racer_active[i] = 0u;
