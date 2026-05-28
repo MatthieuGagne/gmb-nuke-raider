@@ -395,6 +395,26 @@ uint8_t racer_update(void) BANKED {
                 racer_downshift_timer[i] = 0u;
             }
         }
+
+        /* ---- Flash timer tick ---- */
+        if (racer_hit_flash[i] > 0u) {
+            racer_hit_flash[i] = (uint8_t)(racer_hit_flash[i] - 1u);
+        }
+
+        /* ---- Bullet hit detection (screen-space, skipped if off-screen) ---- */
+        {
+            int16_t scr_cx = racer_px[i] + 16;
+            int16_t scr_cy = racer_py[i] - cam_y + 24;
+            if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
+                if (projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy, RACER_HIT_RADIUS)) {
+                    racer_hp[i]--;
+                    racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                    if (racer_hp[i] == 0u) {
+                        racer_active[i] = 0u;
+                    }
+                }
+            }
+        }
     }
     return 0u;
 }
@@ -410,6 +430,15 @@ void racer_render(void) BANKED {
         uint8_t flags;
 
         if (!racer_active[i]) continue;
+
+        /* Hit flash — hide sprite on odd 2-frame intervals */
+        if (racer_hit_flash[i] & 2u) {
+            move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 1u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 2u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 3u], 0u, 0u);
+            continue;
+        }
 
         scr_x = racer_px[i] + 8;
         scr_y = racer_py[i] - cam_y + 16;

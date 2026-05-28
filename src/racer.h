@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "banking.h"
 
+extern uint8_t racer_active[];   /* SoA active flags — exported for state queries */
+
 void    racer_init(uint8_t tile_base) BANKED;
 void    racer_init_empty(void) BANKED;
 void    racer_hide(void) BANKED;
