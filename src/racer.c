@@ -429,7 +429,13 @@ void racer_render(void) BANKED {
         uint8_t d;
         uint8_t flags;
 
-        if (!racer_active[i]) continue;
+        if (!racer_active[i]) {
+            move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 1u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 2u], 0u, 0u);
+            move_sprite(racer_oam[i * 4u + 3u], 0u, 0u);
+            continue;
+        }
 
         /* Hit flash — hide sprite on odd 2-frame intervals */
         if (racer_hit_flash[i] & 2u) {
