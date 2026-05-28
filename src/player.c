@@ -12,6 +12,7 @@
 #include "projectile.h"
 #include "sfx.h"
 #include "turret.h"
+#include "racer.h"
 
 int16_t px;
 int16_t py;
@@ -97,6 +98,10 @@ static uint8_t corner_active_turret(int16_t wx, int16_t wy) {
     return turret_blocks_tile(tx, ty);
 }
 
+static uint8_t corner_active_racer(int16_t wx, int16_t wy) {
+    return racer_blocks_pixel(wx, wy);
+}
+
 /* Directional hitbox points indexed by player_dir_t (0-7).
  * Cardinal dirs: rectangle inset ~2px on sides perpendicular to travel.
  * Diagonal dirs: diamond with points at edge midpoints. */
@@ -127,7 +132,12 @@ static uint8_t corners_passable(int16_t wx, int16_t wy) {
     for (i = 0u; i < 4u; i++) {
         int16_t cx = wx + HITBOX_X[player_dir][i];
         int16_t cy = wy + HITBOX_Y[player_dir][i];
-        if (!track_passable(cx, cy) || corner_active_turret(cx, cy)) return 0u;
+        {
+            uint8_t blocked = !track_passable(cx, cy);
+            if (!blocked) blocked = corner_active_turret(cx, cy);
+            if (!blocked) blocked = corner_active_racer(cx, cy);
+            if (blocked) return 0u;
+        }
     }
     return 1u;
 }
@@ -181,10 +191,24 @@ void player_update(void) BANKED {
     if (new_px >= 0 && new_px <= (int16_t)((uint16_t)active_map_w * 8u - 16u) && corners_passable(new_px, py)) {
         px = new_px;
     } else {
+        uint8_t k;
+        uint8_t racer_hit;
         vx = 0;
         current_gear    = 0u;
         downshift_timer = 0u;
-        damage_apply(1u);
+        racer_hit = 0u;
+        for (k = 0u; k < 4u; k++) {
+            if (corner_active_racer(new_px + HITBOX_X[player_dir][k],
+                                    py     + HITBOX_Y[player_dir][k])) {
+                racer_hit = 1u;
+                break;
+            }
+        }
+        if (racer_hit) {
+            damage_apply(RACER_RAM_DAMAGE);
+        } else {
+            damage_apply(1u);
+        }
         sfx_play(SFX_HIT);
     }
 
@@ -193,10 +217,24 @@ void player_update(void) BANKED {
     if (new_py >= 0 && new_py <= (int16_t)((uint16_t)active_map_h * 8u - 16u) && corners_passable(px, new_py)) {
         py = new_py;
     } else {
+        uint8_t k;
+        uint8_t racer_hit;
         vy = 0;
         current_gear    = 0u;
         downshift_timer = 0u;
-        damage_apply(1u);
+        racer_hit = 0u;
+        for (k = 0u; k < 4u; k++) {
+            if (corner_active_racer(px     + HITBOX_X[player_dir][k],
+                                    new_py + HITBOX_Y[player_dir][k])) {
+                racer_hit = 1u;
+                break;
+            }
+        }
+        if (racer_hit) {
+            damage_apply(RACER_RAM_DAMAGE);
+        } else {
+            damage_apply(1u);
+        }
         sfx_play(SFX_HIT);
     }
 

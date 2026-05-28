@@ -6,6 +6,7 @@
 #include "../src/damage.h"
 #include "../src/track.h"  /* active_map_h — runtime track height */
 #include "projectile.h"
+#include "../src/racer.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
@@ -18,6 +19,7 @@ void setUp(void) {
     mock_move_sprite_reset();
     camera_init(88, 8);  /* cam_y = 0 (clamped) */
     damage_init();
+    racer_init_empty();
     player_init(16u);
 }
 void tearDown(void) {}
@@ -562,6 +564,51 @@ void test_px_py_exported_as_global(void) {
     TEST_ASSERT_EQUAL_INT16(99, py);
 }
 
+/* ---- racer blocking player movement (issue #364) ---- */
+
+static const uint8_t s_road_12x8[8u * 12u] = {
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,
+};
+
+void test_player_blocked_by_racer(void) {
+    uint8_t wp_tx[1] = { 7u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(s_road_12x8, 12u, 8u);
+    racer_spawn_for_test(56, 40, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    player_set_pos(40, 40);
+    input = J_RIGHT;
+    player_update();
+    TEST_ASSERT_EQUAL_INT16(40, player_get_x());
+}
+
+void test_player_takes_racer_ram_damage(void) {
+    uint8_t hp_before;
+    uint8_t wp_tx[1] = { 7u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(s_road_12x8, 12u, 8u);
+    racer_spawn_for_test(56, 40, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    player_set_pos(40, 40);
+    hp_before = damage_get_hp();
+    input = J_RIGHT;
+    player_update();
+    TEST_ASSERT_EQUAL_UINT8(hp_before - RACER_RAM_DAMAGE, damage_get_hp());
+}
+
+void test_player_not_blocked_when_racer_inactive(void) {
+    track_test_set_map(s_road_12x8, 12u, 8u);
+    player_set_pos(40, 40);
+    input = J_RIGHT;
+    player_update();
+    TEST_ASSERT_GREATER_THAN_INT16(40, player_get_x());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -640,5 +687,8 @@ int main(void) {
     RUN_TEST(test_player_set_dir_north);
     RUN_TEST(test_player_set_dir_south);
     RUN_TEST(test_px_py_exported_as_global);
+    RUN_TEST(test_player_blocked_by_racer);
+    RUN_TEST(test_player_takes_racer_ram_damage);
+    RUN_TEST(test_player_not_blocked_when_racer_inactive);
     return UNITY_END();
 }

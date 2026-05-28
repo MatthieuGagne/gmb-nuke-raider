@@ -21,6 +21,7 @@ BANKREF_EXTERN(state_playing)
 #include "checkpoint.h"
 #include "turret.h"
 #include "racer.h"
+#include "sfx.h"
 #include "powerup.h"
 #include "config.h"
 
@@ -177,6 +178,11 @@ static void update(void) {
         if (racer_update()) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
+        }
+        /* Racer drove into stationary player — damage if currently overlapping. */
+        if (racer_overlaps_player(px, py)) {
+            damage_apply(RACER_RAM_DAMAGE);
+            sfx_play(SFX_HIT);
         }
         /* Race position: lap count primary, section-aware ty secondary */
         {
