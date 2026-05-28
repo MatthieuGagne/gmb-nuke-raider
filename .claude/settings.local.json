@@ -410,7 +410,11 @@
       "Skill(track-build)",
       "Bash(awk -F: '$2 ~ /static/ {print NR\": \"$0}')",
       "Bash(awk -F: '{print $1, $2}')",
-      "Bash(awk *)"
+      "Bash(awk *)",
+      "Bash(timeout 5 ./build/test_gamestate)",
+      "Bash(timeout 5 ./build/test_loader)",
+      "Bash(timeout 5 ./build/test_hub_data)",
+      "Bash(node -e ' *)"
     ]
   },
   "hooks": {
