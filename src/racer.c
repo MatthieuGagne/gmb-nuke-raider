@@ -182,7 +182,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
-        racer_hp[i]        = RACER_HP;
+        racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
     }
     s_tile_base  = tile_base;
@@ -227,7 +227,7 @@ void racer_init_empty(void) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
-        racer_hp[i]        = RACER_HP;
+        racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
     }
     s_wp_count  = 0u;
@@ -514,6 +514,8 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     racer_vy[0] = (int8_t)0;
     racer_gear[0] = 0u;
     racer_downshift_timer[0] = 0u;
+    racer_hp[0]        = (uint8_t)RACER_HP;
+    racer_hit_flash[0] = 0u;
 }
 
 void racer_set_laps_done_for_test(uint8_t n) {
