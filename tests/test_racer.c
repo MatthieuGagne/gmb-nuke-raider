@@ -5,12 +5,14 @@
 #include "track.h"
 #include "checkpoint.h"
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
+#include "projectile.h"
 
 extern int16_t cam_y;
 
 void setUp(void) {
     cam_y = 0;
     racer_init_empty();
+    projectile_init(0u);
 }
 void tearDown(void) {}
 
@@ -413,6 +415,15 @@ void test_racer_overlaps_player_when_inactive(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_overlaps_player(32, 32));
 }
 
+void test_racer_hp_initialized_to_racer_hp(void) {
+    /* racer_init_empty() called in setUp; HP must equal RACER_HP */
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
+}
+
+void test_racer_hit_flash_initialized_to_zero(void) {
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hit_flash_for_test(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -439,5 +450,7 @@ int main(void) {
     RUN_TEST(test_racer_overlaps_player_when_overlapping);
     RUN_TEST(test_racer_overlaps_player_when_adjacent);
     RUN_TEST(test_racer_overlaps_player_when_inactive);
+    RUN_TEST(test_racer_hp_initialized_to_racer_hp);
+    RUN_TEST(test_racer_hit_flash_initialized_to_zero);
     return UNITY_END();
 }

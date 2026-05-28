@@ -34,6 +34,9 @@ uint8_t racer_get_gear(uint8_t slot);
 int16_t racer_get_px(uint8_t slot);
 void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy);
 void    racer_set_gear_for_test(uint8_t slot, uint8_t gear);
+uint8_t racer_get_hp_for_test(uint8_t slot);
+void    racer_set_hp_for_test(uint8_t slot, uint8_t hp);
+uint8_t racer_get_hit_flash_for_test(uint8_t slot);
 #endif
 
 #endif /* RACER_H */

@@ -10,6 +10,7 @@
 #include "sprite_pool.h"
 #include "player.h"
 #include "banking.h"
+#include "projectile.h"
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -25,6 +26,8 @@ static int8_t   racer_vx[MAX_RACERS];
 static int8_t   racer_vy[MAX_RACERS];
 static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
+static uint8_t  racer_hp[MAX_RACERS];
+static uint8_t  racer_hit_flash[MAX_RACERS];
 
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
@@ -179,6 +182,8 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
+        racer_hp[i]        = RACER_HP;
+        racer_hit_flash[i] = 0u;
     }
     s_tile_base  = tile_base;
     s_laps_done  = 0u;
@@ -222,6 +227,8 @@ void racer_init_empty(void) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
+        racer_hp[i]        = RACER_HP;
+        racer_hit_flash[i] = 0u;
     }
     s_wp_count  = 0u;
     s_laps_done = 0u;
@@ -547,5 +554,9 @@ void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy) {
 void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
     racer_gear[slot] = gear;
 }
+
+uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
+void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
+uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
 
 #endif /* __SDCC */

@@ -108,6 +108,9 @@
 #define RACER_GEAR3_ACCEL         1u
 #define RACER_GEAR_DOWNSHIFT_FRAMES  8u
 #define RACER_RAM_DAMAGE      5u    /* HP damage on player/racer collision */
+#define RACER_HP               5u   /* bullet hits to destroy racer */
+#define RACER_HIT_RADIUS       8u   /* screen-space px radius for bullet hit check */
+#define RACER_HIT_FLASH_FRAMES 8u   /* frames of hit-blink per bullet hit */
 
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
