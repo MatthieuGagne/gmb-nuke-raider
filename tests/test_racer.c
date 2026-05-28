@@ -356,6 +356,63 @@ void test_racer_terrain_query_uses_top_center(void) {
     TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
 }
 
+/* ---- racer_blocks_pixel ---- */
+
+void test_racer_blocks_pixel_inside(void) {
+    /* Racer at (32,32): bbox [32..47]×[32..47]. Centre pixel (40,40) → inside. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_blocks_pixel(40, 40));
+}
+
+void test_racer_blocks_pixel_boundary(void) {
+    /* px+15=47, py+15=47 are the last valid pixels inside the bbox. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_blocks_pixel(47, 47));
+}
+
+void test_racer_blocks_pixel_outside(void) {
+    /* wx=48: 48 < 32+16=48 is FALSE → outside. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_blocks_pixel(48, 32));
+}
+
+void test_racer_blocks_pixel_inactive(void) {
+    /* setUp called racer_init_empty() — no active racer. */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_blocks_pixel(32, 32));
+}
+
+/* ---- racer_overlaps_player ---- */
+
+void test_racer_overlaps_player_when_overlapping(void) {
+    /* Racer at (32,32): bbox [32..47]×[32..47].
+     * Player at (40,40): bbox [40..55]×[40..55].
+     * Overlap region [40..47]×[40..47] — must return 1. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_overlaps_player(40, 40));
+}
+
+void test_racer_overlaps_player_when_adjacent(void) {
+    /* Racer at (32,32), player at (48,32).
+     * Player bbox starts at 48; racer bbox ends at 47.
+     * Condition: px(48) < racer_px(32)+16=48 → FALSE. No overlap. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_overlaps_player(48, 32));
+}
+
+void test_racer_overlaps_player_when_inactive(void) {
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_overlaps_player(32, 32));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -375,5 +432,12 @@ int main(void) {
     RUN_TEST(test_racer_boost_accelerates_upward);
     RUN_TEST(test_racer_boost_overrides_gear_max_speed);
     RUN_TEST(test_racer_terrain_query_uses_top_center);
+    RUN_TEST(test_racer_blocks_pixel_inside);
+    RUN_TEST(test_racer_blocks_pixel_boundary);
+    RUN_TEST(test_racer_blocks_pixel_outside);
+    RUN_TEST(test_racer_blocks_pixel_inactive);
+    RUN_TEST(test_racer_overlaps_player_when_overlapping);
+    RUN_TEST(test_racer_overlaps_player_when_adjacent);
+    RUN_TEST(test_racer_overlaps_player_when_inactive);
     return UNITY_END();
 }

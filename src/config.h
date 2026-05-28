@@ -107,6 +107,7 @@
 #define RACER_GEAR3_MAX_SPEED     5u
 #define RACER_GEAR3_ACCEL         1u
 #define RACER_GEAR_DOWNSHIFT_FRAMES  8u
+#define RACER_RAM_DAMAGE      5u    /* HP damage on player/racer collision */
 
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
