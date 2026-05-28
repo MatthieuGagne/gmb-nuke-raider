@@ -287,7 +287,7 @@ uint8_t racer_update(void) BANKED {
 
         /* Finish line detection — check current position before applying velocity.
          * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
-        tx = (uint8_t)((uint16_t)racer_px[i] >> 3u);
+        tx = (uint8_t)(((uint16_t)racer_px[i] + 8u) >> 3u);
         ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
         raw_tile  = track_get_raw_tile(tx, ty);
         tile_type = track_tile_type_from_index(raw_tile);
@@ -490,7 +490,7 @@ void racer_set_laps_done_for_test(uint8_t n) {
 }
 
 void racer_place_on_finish_for_test(uint8_t tx, uint8_t ty, uint8_t dir) {
-    racer_px[0] = (int16_t)((uint16_t)tx * 8u + 4u);
+    racer_px[0] = (int16_t)((int16_t)((uint16_t)tx * 8u) - 4);
     racer_py[0] = (int16_t)((uint16_t)ty * 8u + 4u);
     racer_dir[0] = dir;
     /* Move waypoint far away so waypoint-advance threshold doesn't interfere */

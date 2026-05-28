@@ -66,7 +66,7 @@ void test_racer_finish_wrong_direction_no_game_over(void) {
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
     /* Place racer centre at tile (5,6) = pixel (44,52), heading toward waypoint (5,0) */
-    racer_set_pos_for_test(0u, 44, 52);
+    racer_set_pos_for_test(0u, 36, 52);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
 
@@ -331,6 +331,31 @@ void test_racer_boost_overrides_gear_max_speed(void) {
     TEST_ASSERT_LESS_THAN_INT8(-(int8_t)RACER_GEAR3_MAX_SPEED, racer_get_vy(0u));
 }
 
+void test_racer_terrain_query_uses_top_center(void) {
+    /* Mixed map: tile (0,0) = ROAD, tile (1,0) = SAND.
+     * Racer at px=0 -> top-left (0,0)=ROAD, top-center (8,0)=SAND.
+     * Waypoint far south -> DIR_S (DX=0, DY=1).
+     * Inject vx=2 (perpendicular lateral velocity).
+     *
+     * On ROAD: fric_x = PLAYER_FRICTION     = 1 -> vx: 2->1
+     * On SAND: fric_x = PLAYER_FRICTION * 2 = 2 -> vx: 2->0
+     *
+     * Passes only with top-center query (SAND detected). */
+    static const uint8_t mixed_map[4u * 4u] = {
+        1, 9, 1, 1,   /* row 0: road, SAND at (1,0), road, road */
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+    };
+    uint8_t wp_tx[1] = { 0u };
+    uint8_t wp_ty[1] = { 100u };
+    track_test_set_map(mixed_map, 4u, 4u);
+    racer_spawn_for_test(0, 0, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_vel_for_test(0u, 2, 0);
+    racer_update();
+    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -349,5 +374,6 @@ int main(void) {
     RUN_TEST(test_racer_oil_resets_gear);
     RUN_TEST(test_racer_boost_accelerates_upward);
     RUN_TEST(test_racer_boost_overrides_gear_max_speed);
+    RUN_TEST(test_racer_terrain_query_uses_top_center);
     return UNITY_END();
 }
