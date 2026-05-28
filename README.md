@@ -63,7 +63,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | SFX | `src/sfx.c/.h` | One-shot sound effects: CH4 noise (SFX_SHOOT, SFX_HIT) and CH1 tone sweep (SFX_HEAL, SFX_UI); bank-0 NONBANKED |
 | NPC portraits | `src/npc_*_portrait.c/.h` | Per-NPC portrait tile data |
 | Turret | `src/turret.c/.h` | Static turret emplacements: SoA pool, 16-direction aim, fire timer (30-frame wind-up on first appearance, 45-frame interval), screen-visibility gate (no fire or hit-detect while off-screen), collision detection, OAM render |
-| Racer | `src/racer.c/.h` | Rival racer enemy: SoA pool, waypoint-following AI (hand-authored per track), 4-corner hitbox collision + gear-based velocity physics (mirrors player), lap guard (no finish trigger until one full circuit), CGB palette 1 (red tint); triggers game-over if it crosses the finish before the player |
+| Racer | `src/racer.c/.h` | Rival racer enemy: SoA pool, waypoint-following AI (hand-authored per track), 4-corner hitbox collision + gear-based velocity physics (mirrors player), lap guard (no finish trigger until one full circuit), CGB palette 1 (red tint); triggers game-over if it crosses the finish before the player. Shootable: 5 bullet hits destroy the racer (hit flash blink per hit); race continues after death — player must still cross the finish to win |
 | Powerup | `src/powerup.c/.h` | One-shot tile-based powerup system: SoA pool (MAX_POWERUPS=4), OAM sprite per powerup, tile-overlap collect; POWERUP_TYPE_HEAL restores 50 HP and plays SFX_HEAL |
 | Loader | `src/loader.c/.h` | Bank-0 NONBANKED wrappers for VRAM asset loading and map data (NPC/powerup positions) |
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |

@@ -5,12 +5,14 @@
 #include "track.h"
 #include "checkpoint.h"
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
+#include "projectile.h"
 
 extern int16_t cam_y;
 
 void setUp(void) {
     cam_y = 0;
     racer_init_empty();
+    projectile_init(0u);
 }
 void tearDown(void) {}
 
@@ -413,6 +415,80 @@ void test_racer_overlaps_player_when_inactive(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_overlaps_player(32, 32));
 }
 
+void test_racer_hp_initialized_to_racer_hp(void) {
+    /* racer_init_empty() called in setUp; HP must equal RACER_HP */
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
+}
+
+void test_racer_hit_flash_initialized_to_zero(void) {
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hit_flash_for_test(0u));
+}
+
+void test_racer_bullet_hit_reduces_hp(void) {
+    /* cam_y=0 (setUp). Racer at world (32,32).
+     * Screen-space OAM center = (32+16, 32+24) = (48, 56).
+     * Fire player bullet at (48,56). racer_update() must decrement HP by 1. */
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(0u, RACER_HP);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP - 1u, racer_get_hp_for_test(0u));
+}
+
+void test_racer_destroyed_when_hp_reaches_zero(void) {
+    /* Racer at HP=1. One bullet hit deactivates it. */
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(0u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[0]);
+}
+
+void test_racer_dead_does_not_trigger_game_over(void) {
+    /* Racer killed by bullet. Subsequent racer_update must return 0 (no game over). */
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(0u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();              /* kills racer */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_update()); /* no game over after death */
+}
+
+void test_racer_miss_does_not_reduce_hp(void) {
+    /* Bullet fired far from racer — HP must not change. */
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    projectile_fire(8u, 16u, DIR_T, PROJ_OWNER_PLAYER); /* top-left corner, far from racer */
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -439,5 +515,11 @@ int main(void) {
     RUN_TEST(test_racer_overlaps_player_when_overlapping);
     RUN_TEST(test_racer_overlaps_player_when_adjacent);
     RUN_TEST(test_racer_overlaps_player_when_inactive);
+    RUN_TEST(test_racer_hp_initialized_to_racer_hp);
+    RUN_TEST(test_racer_hit_flash_initialized_to_zero);
+    RUN_TEST(test_racer_bullet_hit_reduces_hp);
+    RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
+    RUN_TEST(test_racer_dead_does_not_trigger_game_over);
+    RUN_TEST(test_racer_miss_does_not_reduce_hp);
     return UNITY_END();
 }
