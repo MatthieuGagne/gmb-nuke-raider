@@ -66,7 +66,7 @@ void test_racer_finish_wrong_direction_no_game_over(void) {
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
     /* Place racer centre at tile (5,6) = pixel (44,52), heading toward waypoint (5,0) */
-    racer_set_pos_for_test(0u, 44, 52);
+    racer_set_pos_for_test(0u, 36, 52);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
 
@@ -215,6 +215,147 @@ void test_racer_wall_collision_zeroes_vx_and_gear(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(0u));
 }
 
+/* ---- Terrain interaction tests ---- */
+
+void test_racer_sand_doubles_friction(void) {
+    /* All-sand map (tile 9). Racer at (0,32), waypoint east -> DIR_R (DY=0).
+     * Inject vy=-4 (perpendicular). After 1 frame:
+     *   road: fric_y = PLAYER_FRICTION     = 1 -> vy=-3
+     *   sand: fric_y = PLAYER_FRICTION * 2 = 2 -> vy=-2
+     * sand_vy (-2) > road_vy (-3): less negative = decelerated faster. */
+    static const uint8_t sand_map[8u * 8u] = {
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+        9,9,9,9,9,9,9,9,
+    };
+    static const uint8_t road_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 7u };
+    uint8_t wp_ty[1] = { 4u };
+    int8_t road_vy;
+    int8_t sand_vy;
+
+    /* Road baseline — gear 1 (max_speed=4) prevents gear-cap from collapsing
+     * road_vy=-3 and sand_vy=-2 to the same clamped value. */
+    track_test_set_map(road_map, 8u, 8u);
+    racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
+    racer_set_gear_for_test(0u, 1u);
+    racer_set_vel_for_test(0u, 0, -4);
+    racer_update();
+    road_vy = racer_get_vy(0u);
+
+    /* Sand: same start state */
+    track_test_set_map(sand_map, 8u, 8u);
+    racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
+    racer_set_gear_for_test(0u, 1u);
+    racer_set_vel_for_test(0u, 0, -4);
+    racer_update();
+    sand_vy = racer_get_vy(0u);
+
+    TEST_ASSERT_GREATER_THAN_INT8(road_vy, sand_vy);
+}
+
+void test_racer_oil_resets_gear(void) {
+    /* All-oil map (tile 12). Racer at gear=2 enters oil: gear must reset to 0. */
+    static const uint8_t oil_map[8u * 8u] = {
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+        12,12,12,12,12,12,12,12,
+    };
+    uint8_t wp_tx[1] = { 7u };
+    uint8_t wp_ty[1] = { 4u };
+    track_test_set_map(oil_map, 8u, 8u);
+    racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
+    racer_set_gear_for_test(0u, 2u);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(0u));
+}
+
+void test_racer_boost_accelerates_upward(void) {
+    /* All-boost map (tile 15). Racer heading north with vy=0. After 1 frame vy < 0. */
+    static const uint8_t boost_map[8u * 8u] = {
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(boost_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_update();
+    TEST_ASSERT_LESS_THAN_INT8(0, racer_get_vy(0u));
+}
+
+void test_racer_boost_overrides_gear_max_speed(void) {
+    /* All-boost map. Seed vy near gear3 max; after 1 frame vy must exceed
+     * RACER_GEAR3_MAX_SPEED in magnitude (boost max cap = TERRAIN_BOOST_MAX_SPEED = 8). */
+    static const uint8_t boost_map[8u * 8u] = {
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+        15,15,15,15,15,15,15,15,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(boost_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_vel_for_test(0u, 0, -(int8_t)(RACER_GEAR3_MAX_SPEED - 1u));
+    racer_update();
+    TEST_ASSERT_LESS_THAN_INT8(-(int8_t)RACER_GEAR3_MAX_SPEED, racer_get_vy(0u));
+}
+
+void test_racer_terrain_query_uses_top_center(void) {
+    /* Mixed map: tile (0,0) = ROAD, tile (1,0) = SAND.
+     * Racer at px=0 -> top-left (0,0)=ROAD, top-center (8,0)=SAND.
+     * Waypoint far south -> DIR_S (DX=0, DY=1).
+     * Inject vx=2 (perpendicular lateral velocity).
+     *
+     * On ROAD: fric_x = PLAYER_FRICTION     = 1 -> vx: 2->1
+     * On SAND: fric_x = PLAYER_FRICTION * 2 = 2 -> vx: 2->0
+     *
+     * Passes only with top-center query (SAND detected). */
+    static const uint8_t mixed_map[4u * 4u] = {
+        1, 9, 1, 1,   /* row 0: road, SAND at (1,0), road, road */
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+    };
+    uint8_t wp_tx[1] = { 0u };
+    uint8_t wp_ty[1] = { 100u };
+    track_test_set_map(mixed_map, 4u, 4u);
+    racer_spawn_for_test(0, 0, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_vel_for_test(0u, 2, 0);
+    racer_update();
+    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -229,5 +370,10 @@ int main(void) {
     RUN_TEST(test_racer_slides_along_wall_on_y_collision);
     RUN_TEST(test_racer_accelerates_from_rest);
     RUN_TEST(test_racer_wall_collision_zeroes_vx_and_gear);
+    RUN_TEST(test_racer_sand_doubles_friction);
+    RUN_TEST(test_racer_oil_resets_gear);
+    RUN_TEST(test_racer_boost_accelerates_upward);
+    RUN_TEST(test_racer_boost_overrides_gear_max_speed);
+    RUN_TEST(test_racer_terrain_query_uses_top_center);
     return UNITY_END();
 }
