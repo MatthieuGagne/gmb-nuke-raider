@@ -52,14 +52,14 @@ uint8_t
 static uint8_t
 #endif
 finish_eval(uint8_t map_type, uint8_t armed,
-            int8_t pvx, int8_t pvy,
+            player_dir_t pdir,
             uint8_t finish_dir,
             uint8_t cps_cleared) {
     if (!armed) return 0u;
-    if      (finish_dir == CHECKPOINT_DIR_N) { if (pvy >= 0) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_S) { if (pvy <= 0) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_E) { if (pvx <= 0) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_W) { if (pvx >= 0) return 0u; }
+    if      (finish_dir == CHECKPOINT_DIR_N) { if (pdir != DIR_T  && pdir != DIR_RT && pdir != DIR_LT) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_S) { if (pdir != DIR_B  && pdir != DIR_RB && pdir != DIR_LB) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_E) { if (pdir != DIR_R  && pdir != DIR_RT && pdir != DIR_RB) return 0u; }
+    else if (finish_dir == CHECKPOINT_DIR_W) { if (pdir != DIR_L  && pdir != DIR_LT && pdir != DIR_LB) return 0u; }
     if (map_type == TRACK_TYPE_COMBAT) return 1u;
     return cps_cleared;
 }
@@ -161,6 +161,7 @@ static void update(void) {
         int16_t py   = player_get_y();
         int8_t  pvx  = player_get_vx();
         int8_t  pvy  = player_get_vy();
+        player_dir_t pdir = player_get_dir();
         int16_t y_max;
         TileType ct;
         /* HUD boundary clamp: prevent car from entering HUD zone (screen Y >= HUD_SCANLINE).
@@ -223,12 +224,12 @@ static void update(void) {
         /* Finish line detection:
          * - tile-type check replaces hardcoded Y-row
          * - finish_armed debounces: clears on entry, re-arms on exit
-         * - vy > 0 guard: only count when moving downward (prevents backward crossing)
+         * - pdir check: player facing direction, not velocity — racer-zeroed velocity never blocks detection
          * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
             if (finish_eval(active_map_type_cache, finish_armed,
-                            pvx, pvy, finish_dir_cache,
+                            pdir, finish_dir_cache,
                             checkpoint_all_cleared())) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
