@@ -158,8 +158,6 @@ static void update(void) {
     {
         int16_t px   = player_get_x();
         int16_t py   = player_get_y();
-        int8_t  pvx  = player_get_vx();
-        int8_t  pvy  = player_get_vy();
         uint8_t pdir = (uint8_t)player_get_dir();
         int16_t y_max;
         TileType ct;
@@ -172,7 +170,7 @@ static void update(void) {
             player_set_pos(px, py);
         }
         /* Checkpoint update — runs after player_update() and HUD clamp */
-        checkpoint_update(px, py, pvx, pvy);
+        checkpoint_update(px, py, pdir);
         projectile_update();
         turret_update(px, py);
         if (racer_update()) {
@@ -227,9 +225,10 @@ static void update(void) {
          * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
+            uint8_t cps_ok = checkpoint_all_cleared();
             if (finish_eval(active_map_type_cache, finish_armed,
                             pdir, finish_dir_cache,
-                            checkpoint_all_cleared())) {
+                            cps_ok)) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
                     state_pop();
