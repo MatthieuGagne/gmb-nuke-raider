@@ -7,7 +7,6 @@
 #include "state_overmap.h"
 BANKREF(state_playing)
 BANKREF_EXTERN(state_playing)
-#include "player.h"
 #include "track.h"
 #include "camera.h"
 #include "hud.h"
@@ -52,7 +51,7 @@ uint8_t
 static uint8_t
 #endif
 finish_eval(uint8_t map_type, uint8_t armed,
-            player_dir_t pdir,
+            uint8_t pdir,
             uint8_t finish_dir,
             uint8_t cps_cleared) {
     if (!armed) return 0u;
@@ -161,7 +160,7 @@ static void update(void) {
         int16_t py   = player_get_y();
         int8_t  pvx  = player_get_vx();
         int8_t  pvy  = player_get_vy();
-        player_dir_t pdir = player_get_dir();
+        uint8_t pdir = (uint8_t)player_get_dir();
         int16_t y_max;
         TileType ct;
         /* HUD boundary clamp: prevent car from entering HUD zone (screen Y >= HUD_SCANLINE).
