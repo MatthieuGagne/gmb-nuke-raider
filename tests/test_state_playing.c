@@ -72,8 +72,8 @@ void test_finish_eval_dir_S_invalid_north(void) {
 }
 
 void test_finish_eval_dir_S_racer_blocked_still_counts(void) {
-    /* Regression #382: racer zeroes pvy; player faces south — lap must still count */
-    TEST_ASSERT_EQUAL_UINT8(1u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_B, CHECKPOINT_DIR_S, 1u));
+    /* Regression #382: diagonal SW approach still counts for south finish */
+    TEST_ASSERT_EQUAL_UINT8(1u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_LB, CHECKPOINT_DIR_S, 1u));
 }
 
 /* --- Direction E: fires when facing east (DIR_R, DIR_RT, DIR_RB) --- */
