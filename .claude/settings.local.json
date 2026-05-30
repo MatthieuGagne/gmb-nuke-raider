@@ -414,7 +414,8 @@
       "Bash(timeout 5 ./build/test_gamestate)",
       "Bash(timeout 5 ./build/test_loader)",
       "Bash(timeout 5 ./build/test_hub_data)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(./build/test_state_playing *)"
     ]
   },
   "hooks": {
