@@ -84,7 +84,9 @@
       "Skill(systematic-debugging)",
       "Skill(track-build)",
       "Skill(update-config)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
+      "PowerShell(head *)"
     ]
   },
   "hooks": {
