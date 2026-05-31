@@ -48,7 +48,7 @@ aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.
 make export-sprites
 
 # Convert PNG → GB 2bpp C array
-python3 tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data
+py tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data
 ```
 
 This generates `src/<name>_sprite.c` with:
@@ -61,7 +61,7 @@ const uint8_t <name>_tile_data_count;   /* number of tiles */
 
 Run converter tests after any change:
 ```sh
-python3 -m unittest discover -s tests -p "test_png_to_tiles.py" -v
+py -m unittest discover -s tests -p "test_png_to_tiles.py" -v
 ```
 
 ---
@@ -160,8 +160,8 @@ Document the OAM layout comment at the top of `config.h` so the budget stays aud
 ## Step 8 — Build & Smoketest
 
 ```sh
-GBDK_HOME=/home/mathdaman/gbdk make
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+make
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 Check:

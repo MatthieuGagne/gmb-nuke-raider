@@ -30,12 +30,12 @@ Step-by-step guide to create a new map from scratch. Uses the Tiled → `tmx_to_
 If extending the existing tileset (`assets/maps/tileset.aseprite`):
 - Add new 8×8 tiles in Aseprite (indexed color, 4-shade GBC palette)
 - Export: `make export-sprites` or `aseprite --batch assets/maps/tileset.aseprite --save-as assets/maps/tileset.png`
-- Regenerate tile C array: `python3 tools/png_to_tiles.py --bank <N> assets/maps/tileset.png src/track_tiles.c track_tile_data`
+- Regenerate tile C array: `py tools/png_to_tiles.py --bank <N> assets/maps/tileset.png src/track_tiles.c track_tile_data`
 
 If creating a new tileset for a new map:
 - New `.aseprite` under `assets/maps/<mapname>_tiles.aseprite`
 - Export to `assets/maps/<mapname>_tiles.png`
-- Convert: `python3 tools/png_to_tiles.py --bank <N> assets/maps/<mapname>_tiles.png src/<mapname>_tiles.c <mapname>_tile_data`
+- Convert: `py tools/png_to_tiles.py --bank <N> assets/maps/<mapname>_tiles.png src/<mapname>_tiles.c <mapname>_tile_data`
 
 **Tile budget:** 192 tiles in DMG bank 0, 192 more in CGB bank 1. Keep total unique tiles ≤ 192 for DMG compat.
 
@@ -59,7 +59,7 @@ If creating a new tileset for a new map:
 ## Step 3 — Convert TMX → C
 
 ```sh
-python3 tools/tmx_to_c.py assets/maps/<name>.tmx src/<name>_map.c
+py tools/tmx_to_c.py assets/maps/<name>.tmx src/<name>_map.c
 ```
 
 Outputs `src/<name>_map.c` with:
@@ -68,7 +68,7 @@ Outputs `src/<name>_map.c` with:
 
 Run the conversion tests to verify the tool still works:
 ```sh
-python3 -m unittest discover -s tests -p "test_tmx_to_c.py" -v
+py -m unittest discover -s tests -p "test_tmx_to_c.py" -v
 ```
 
 **Never edit `src/<name>_map.c` by hand** — it is generated. Edit the TMX and re-run.
@@ -124,8 +124,8 @@ Wrap tile data load similarly if `track_tile_data` is in a banked file.
 ## Step 6 — Build & Smoketest
 
 ```sh
-GBDK_HOME=/home/mathdaman/gbdk make
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+make
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 Check:

@@ -33,7 +33,7 @@ pip install -r requirements.txt
 ## Command
 
 ```bash
-python3 tools/screenshot.py \
+py tools/screenshot.py \
   [--rom  build/nuke-raider.gb]           # default: auto-resolved from script location (worktree-safe)
   [--map  build/nuke-raider.map]           # default: auto-resolved; used for symbol lookup
   [--out  build/screenshot.png]            # default: build/screenshot.png (worktree-safe)
@@ -101,7 +101,7 @@ cat > /tmp/steps.json << 'EOF'
   {"action": "advance", "frames": 60}
 ]
 EOF
-python3 tools/screenshot.py --steps-file /tmp/steps.json
+py tools/screenshot.py --steps-file /tmp/steps.json
 ```
 
 ## IMPORTANT: Viewing the Screenshot
@@ -118,7 +118,7 @@ cannot see the result.
 
 ## Error Handling
 
-- **ROM not found**: build first with `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
+- **ROM not found**: build first with `make clean && make`
 - **wait_memory timeout**: screenshot of current state is saved; check the state machine values with `grep "_state" build/nuke-raider.map`
 - **PyBoy crash mid-navigation**: best-effort screenshot saved; exit non-zero
 - **Symbol not found**: run `grep "_your_symbol" build/nuke-raider.map` to find the exact name SDCC emitted

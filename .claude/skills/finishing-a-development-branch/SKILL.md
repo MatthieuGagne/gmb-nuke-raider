@@ -66,7 +66,7 @@ Only continue to Step 4 when it passes.
 
 1. Always do a clean build (master is already merged from Step 1):
    ```bash
-   make clean && GBDK_HOME=/home/mathdaman/gbdk make
+   make clean && make
    ```
 
 3. Run `make memory-check` and report the output. If any budget is FAIL or ERROR, stop and fix before continuing.
@@ -75,7 +75,7 @@ Only continue to Step 4 when it passes.
    from the worktree directory (NEVER from the main repo's `build/` — it may be stale):
    ```bash
    # Run from the worktree directory (cd there first if needed)
-   java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+   java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
    ```
 
 5. Ask them to confirm it looks correct before proceeding.
@@ -171,10 +171,10 @@ If confirmed, remove the worktree first, then delete the branch from the main re
 
 ```bash
 # Step 1: cd to main repo root (CWD may be inside the worktree)
-cd /home/mathdaman/code/nuke-raider
+cd C:/Code/nuke-raider
 
 # Step 2: Remove the worktree
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force <worktree-path>
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
 
 # Step 3: Delete the branch from the main repo
 git -C /home/mathdaman/code/nuke-raider branch -D <feature-branch>
@@ -190,7 +190,7 @@ Only run after the user explicitly confirms the PR was merged — **never preemp
 
 **Step 6a: Confirm worktree exists**
 ```bash
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree list | grep <branch-name>
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree list | grep <branch-name>
 ```
 If not listed, skip removal (already gone).
 
@@ -208,25 +208,25 @@ If the session is NOT inside an active `EnterWorktree` context, continue to Step
 
 Always `cd` first — if the session CWD is inside the worktree and the directory is already deleted, `git` will panic with "Unable to read current working directory":
 ```bash
-cd /home/mathdaman/code/nuke-raider
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove <worktree-path>
+cd C:/Code/nuke-raider
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove <worktree-path>
 ```
 If that fails (e.g. dirty working tree), use `--force` and warn the user:
 ```bash
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree remove --force <worktree-path>
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
 # Warn: "Worktree had uncommitted changes — removed with --force."
 ```
 If `--force` also fails (directory already deleted from disk, stale git ref), clean up manually:
 ```bash
 rm -rf <worktree-path>
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree prune
 # Note: "Worktree directory was already gone — pruned stale ref."
 ```
 Skip Step 6d in this case (prune already ran).
 
 **Step 6d: Prune stale refs**
 ```bash
-GIT_DIR=/home/mathdaman/code/nuke-raider/.git GIT_WORK_TREE=/home/mathdaman/code/nuke-raider git worktree prune
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree prune
 ```
 
 Report: "Worktree at `<path>` removed and pruned."
@@ -251,7 +251,7 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 
 **Wrong emulator or ROM name**
 - **Problem:** Using `mgba-qt` or wrong ROM path loses time and gives wrong results
-- **Fix:** Always use `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
+- **Fix:** Always use `java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb`
 
 **Launching from wrong directory**
 - **Problem:** Main repo's `build/` may be stale; must use worktree's `build/`
@@ -271,7 +271,7 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 
 **`git worktree remove` fails with "Unable to read current working directory"**
 - **Problem:** Session CWD is inside a deleted worktree (non-EnterWorktree case) — git calls `getcwd()` internally and panics
-- **Fix:** Always `cd /home/mathdaman/code/nuke-raider` before any `git worktree remove` command (Step 6c)
+- **Fix:** Always `cd C:/Code/nuke-raider` before any `git worktree remove` command (Step 6c)
 
 **`git worktree remove --force` fails with "is not a working tree"**
 - **Problem:** The worktree directory was already deleted from disk, leaving a stale git ref

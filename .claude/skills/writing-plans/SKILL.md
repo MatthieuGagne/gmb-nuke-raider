@@ -38,7 +38,7 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 | 3 | Invoke `gbdk-expert` agent (HARD GATE) |
 | 4 | Write minimal implementation |
 | 5 | Run tests (`make test` → PASS) |
-| 6 | Build ROM (`GBDK_HOME=/home/mathdaman/gbdk make` → PASS) |
+| 6 | Build ROM (`make` → PASS) |
 | 7 | Invoke `bank-post-build` skill (HARD GATE) |
 | 8 | Refactor checkpoint ("breaks when N > 1?") |
 | 9 | Invoke `gb-c-optimizer` agent (HARD GATE — validate only, report issues, do not apply fixes) |
@@ -98,7 +98,7 @@ git fetch origin && git merge origin/master
 
 **Step 2: Clean build**
 ```bash
-make clean && GBDK_HOME=/home/mathdaman/gbdk make
+make clean && make
 ```
 Expected: ROM at `build/nuke-raider.gb`, zero errors.
 
@@ -110,7 +110,7 @@ Expected: All budgets PASS. Fix any FAIL or ERROR before continuing.
 
 **Step 4: Launch ROM (run from worktree directory)**
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 **Step 5: Confirm with user**
@@ -196,7 +196,7 @@ Expected: PASS
 
 **Step 7: HARD GATE — build**
 
-Invoke the `build` skill (or run: `GBDK_HOME=/home/mathdaman/gbdk make`).
+Invoke the `build` skill (or run: `make`).
 Expected: ROM produced at `build/nuke-raider.gb`, zero errors.
 
 **Step 8: HARD GATE — bank-post-build**

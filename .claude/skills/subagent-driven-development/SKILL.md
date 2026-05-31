@@ -165,7 +165,7 @@ Run after smoketest is confirmed and before pushing or creating a PR. All checks
 | # | Check | How to verify | On failure |
 |---|-------|---------------|------------|
 | 1 | **Full test suite passes** | `make test` → all tests PASS (no early-exit failures) | Fix failing test, re-run from scratch |
-| 2 | **Clean build succeeds** | `make clean && GBDK_HOME=/home/mathdaman/gbdk make` → zero errors | Fix compiler error before continuing |
+| 2 | **Clean build succeeds** | `make clean && make` → zero errors | Fix compiler error before continuing |
 | 3 | **No header includes silently removed** | `git diff master...HEAD -- src/*.h` — every `#include` removal must be intentional and traceable to a task requirement | Restore removed include or justify removal in a commit comment |
 | 4 | **No hardcoded values introduced** | `git diff master...HEAD -- src/*.c src/*.h` — no magic numeric literals that should be constants in `config.h` | Replace with named constant, commit |
 
