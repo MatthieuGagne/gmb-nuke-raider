@@ -49,11 +49,11 @@ Wait for all subagents to complete, then display:
 
 Ask the user: "Which PR's ROM would you like to launch first?"
 
-Then open it in Emulicious **from the worktree directory** so the path resolves correctly:
+Then open it in Emulicious **from the worktree directory** so the path resolves correctly. Use the **PowerShell tool** (Bash exits silently on Windows):
 
-```bash
-cd /tmp/pr-compare-<N>
-java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
+```powershell
+# Set-Location to the worktree directory first if needed
+Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
 ```
 
 Repeat for any additional ROMs the user wants to test.

@@ -108,9 +108,9 @@ make memory-check
 ```
 Expected: All budgets PASS. Fix any FAIL or ERROR before continuing.
 
-**Step 4: Launch ROM (run from worktree directory)**
-```bash
-java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
+**Step 4: Launch ROM (run from worktree directory — use PowerShell tool, not Bash)**
+```powershell
+Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
 ```
 
 **Step 5: Confirm with user**
