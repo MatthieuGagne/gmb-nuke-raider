@@ -4,6 +4,7 @@
 #include "../src/input.h"
 #include "../src/config.h"
 #include "player.h"
+#include "camera.h"
 #include "track.h"
 #include "turret.h"
 

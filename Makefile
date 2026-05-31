@@ -1,4 +1,5 @@
-SHELL     := bash
+SHELL       := bash
+export PYTHONUTF8 := 1
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
@@ -6,7 +7,7 @@ CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
-ROMFLAGS  := -Wm-yc -Wm-yt25 -Wm-yn"NUKE RAIDER"
+ROMFLAGS  := -Wm-yc -Wm-yt25 -Wm-yn"NUKERAIDER"
 
 TARGET    := build/nuke-raider.gb
 OBJ_DIR   := build/obj
@@ -31,7 +32,7 @@ all: $(TARGET)
 build/track_rotation_manifest.json: \
     assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
     tools/tmx_to_c.py | build
-	py tools/tmx_to_c.py --emit-rotation-manifest $@ \
+	python tools/tmx_to_c.py --emit-rotation-manifest $@ \
 	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
 
 # Step 2: Generate tile data + id-map + meta header (src/track_tiles.c rule below)
@@ -41,23 +42,23 @@ build/track_tile_id_map.json src/track_tileset_meta.h: src/track_tiles.c
 
 # Step 3a: track 1 map (uses id-map to resolve rotated GIDs)
 src/track_map.c: assets/maps/track.tmx build/track_tile_id_map.json tools/tmx_to_c.py
-	py tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	python tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
 	    assets/maps/track.tmx src/track_map.c
 
 # Step 3b: track 2 map
 src/track2_map.c: assets/maps/track2.tmx build/track_tile_id_map.json tools/tmx_to_c.py
-	py tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	python tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
 	    --prefix track2 assets/maps/track2.tmx src/track2_map.c
 
 # Step 3c: track 3 map
 src/track3_map.c: assets/maps/track3.tmx build/track_tile_id_map.json tools/tmx_to_c.py
-	py tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
+	python tools/tmx_to_c.py --id-map build/track_tile_id_map.json \
 	    --prefix track3 assets/maps/track3.tmx src/track3_map.c
 
 # Generate shared NPC extern header — included by src/track.h.
 # Checked into git so CI works without Python/Tiled.
 src/track_npc_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx tools/tmx_to_c.py
-	py tools/tmx_to_c.py --emit-header src/track_npc_externs.h \
+	python tools/tmx_to_c.py --emit-header src/track_npc_externs.h \
 	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
 
 $(TARGET): src/track_npc_externs.h
@@ -65,7 +66,7 @@ $(TARGET): src/track_npc_externs.h
 # Generate shared powerup extern header — included by src/loader.c.
 # Checked into git so CI works without Python/Tiled.
 src/track_powerup_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx tools/tmx_to_c.py
-	py tools/tmx_to_c.py --emit-powerup-header src/track_powerup_externs.h \
+	python tools/tmx_to_c.py --emit-powerup-header src/track_powerup_externs.h \
 	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
 
 $(TARGET): src/track_powerup_externs.h
@@ -73,7 +74,7 @@ $(TARGET): src/track_powerup_externs.h
 # Generate shared racer extern header — included by src/track.h.
 # Checked into git so CI works without Python/Tiled.
 src/track_racer_externs.h: assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx tools/tmx_to_c.py
-	py tools/tmx_to_c.py --emit-racer-header src/track_racer_externs.h \
+	python tools/tmx_to_c.py --emit-racer-header src/track_racer_externs.h \
 	    assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx
 
 $(TARGET): src/track_racer_externs.h
@@ -99,7 +100,7 @@ export-sprites: assets/maps/tileset.png $(patsubst assets/sprites/%.aseprite,ass
 src/track_tiles.c: \
     assets/maps/tileset.png assets/maps/track.tsx \
     build/track_rotation_manifest.json tools/png_to_tiles.py | build
-	py tools/png_to_tiles.py --bank 255 \
+	python tools/png_to_tiles.py --bank 255 \
 	    --rotation-manifest build/track_rotation_manifest.json \
 	    --tsx assets/maps/track.tsx \
 	    --id-map-out build/track_tile_id_map.json \
@@ -112,47 +113,47 @@ $(TARGET): src/track_tiles.c
 # src/player_sprite.c is checked into git so CI works without Python.
 # Running `make src/player_sprite.c` (or plain `make`) regenerates it when needed.
 src/player_sprite.c: assets/sprites/player_car.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/player_car.png src/player_sprite.c player_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/sprites/player_car.png src/player_sprite.c player_tile_data
 
 $(TARGET): src/player_sprite.c
 
 src/npc_mechanic_portrait.c: assets/sprites/npc_mechanic.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
+	python tools/png_to_tiles.py --bank 255 assets/sprites/npc_mechanic.png src/npc_mechanic_portrait.c npc_mechanic_portrait
 
 src/npc_trader_portrait.c: assets/sprites/npc_trader.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
+	python tools/png_to_tiles.py --bank 255 assets/sprites/npc_trader.png src/npc_trader_portrait.c npc_trader_portrait
 
 src/npc_drifter_portrait.c: assets/sprites/npc_drifter.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
+	python tools/png_to_tiles.py --bank 255 assets/sprites/npc_drifter.png src/npc_drifter_portrait.c npc_drifter_portrait
 
 $(TARGET): src/npc_mechanic_portrait.c src/npc_trader_portrait.c src/npc_drifter_portrait.c
 
 # src/dialog_border_tiles.c is checked into git so CI works without Python.
 # Run `make src/dialog_border_tiles.c` to regenerate from updated PNG.
 src/turret_sprite.c: assets/sprites/turret.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/turret.png src/turret_sprite.c turret_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/sprites/turret.png src/turret_sprite.c turret_tile_data
 
 $(TARGET): src/turret_sprite.c
 
 src/bullet_sprite.c: assets/sprites/bullet.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/bullet.png src/bullet_sprite.c bullet_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/sprites/bullet.png src/bullet_sprite.c bullet_tile_data
 
 $(TARGET): src/bullet_sprite.c
 
 src/dialog_arrow_sprite.c: assets/sprites/dialog_arrow.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/dialog_arrow.png src/dialog_arrow_sprite.c dialog_arrow_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/sprites/dialog_arrow.png src/dialog_arrow_sprite.c dialog_arrow_tile_data
 
 $(TARGET): src/dialog_arrow_sprite.c
 
 src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_border.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
+	python tools/png_to_tiles.py --bank 255 assets/sprites/dialog_border.png src/dialog_border_tiles.c dialog_border_tiles
 
 $(TARGET): src/dialog_border_tiles.c
 
 # src/dialog_data.c and src/hub_data.c are checked into git so CI works without Python.
 # Run `make dialog_data` to regenerate from updated JSON.
 src/dialog_data.c src/hub_data.c: assets/dialog/npcs.json assets/dialog/hubs.json tools/dialog_to_c.py src/config.h
-	py tools/dialog_to_c.py assets/dialog/npcs.json src/dialog_data.c \
+	python tools/dialog_to_c.py assets/dialog/npcs.json src/dialog_data.c \
 		--hubs-json assets/dialog/hubs.json \
 		--hub-out src/hub_data.c \
 		--config-h src/config.h
@@ -165,8 +166,8 @@ $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS) | build bank-check
-	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-k$(CURDIR)/lib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
-	py tools/emit_manifest.py \
+	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-klib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
+	python tools/emit_manifest.py \
 	    --noi   build/nuke-raider.noi \
 	    --overmap assets/maps/overmap.tmx \
 	    --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
@@ -193,13 +194,13 @@ test: $(TEST_SRCS) | build
 
 # src/overmap_tiles.c is checked into git so CI works without Python/Aseprite.
 src/overmap_tiles.c: assets/maps/overmap_tiles.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tile_data
 
 $(TARGET): src/overmap_tiles.c
 
 # src/overmap_map.c is checked into git so CI works without Python/Tiled.
 src/overmap_map.c: assets/maps/overmap.tmx tools/overmap_to_c.py
-	py tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c
+	python tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c
 
 $(TARGET): src/overmap_map.c
 
@@ -210,25 +211,25 @@ assets/sprites/overmap_car.png: assets/sprites/overmap_car.aseprite
 	aseprite --batch $< --sheet $@ --sheet-type horizontal
 
 src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
-	py tools/png_to_tiles.py --bank 255 assets/sprites/overmap_car.png src/overmap_car_sprite.c overmap_car_tile_data
+	python tools/png_to_tiles.py --bank 255 assets/sprites/overmap_car.png src/overmap_car_sprite.c overmap_car_tile_data
 
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. py -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest -v
+	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
-	py tools/bank_check.py .
+	python tools/bank_check.py .
 
 bank-post-build:
-	py tools/bank_post_build.py .
+	python tools/bank_post_build.py .
 
 memory-check:
-	py tools/memory_check.py .
+	python tools/memory_check.py .
 
 tile-check: $(TARGET)
-	py tools/check_tile_budget.py .
+	python tools/check_tile_budget.py .
 
 build-debug:
 	DEBUG=1 $(MAKE) clean all
