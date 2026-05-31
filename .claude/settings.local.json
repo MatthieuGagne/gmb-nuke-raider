@@ -1,4 +1,8 @@
 {
+  "env": {
+    "GBDK_HOME": "C:/gbdk",
+    "PYTHONUTF8": "1"
+  },
   "permissions": {
     "allow": [
       "Read(**)",
@@ -79,7 +83,10 @@
       "Skill(bank-pre-write)",
       "Skill(systematic-debugging)",
       "Skill(track-build)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "PowerShell(git *)",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
+      "PowerShell(head *)"
     ]
   },
   "hooks": {
