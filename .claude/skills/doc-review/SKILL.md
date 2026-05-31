@@ -55,6 +55,6 @@ Follow the **abbreviated doc-only step sequence** from `CLAUDE.md`:
 1. Edit the doc file(s) identified in Step 1
 2. Fetch + merge: `git fetch origin && git merge origin/master`
 3. Clean build: `make clean && make`
-4. Smoketest: launch ROM in Emulicious; **wait for the user to confirm it looks correct** before continuing
-5. Commit: `git add <files> && git commit -m "docs: <message>"`
+4. Smoketest: launch ROM via **PowerShell tool** (Bash exits silently on Windows): `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`; **wait for the user to confirm it looks correct** before continuing
+5. Commit via **PowerShell tool**: `git add <files>; git commit -m "docs: <message>"`
 6. Push branch and create PR with `Closes #N` in the body

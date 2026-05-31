@@ -9,8 +9,8 @@ You are a Game Boy Color runtime debugger for the Nuke Raider game. You diagnose
 ## Project Context
 
 - **ROM:** `build/nuke-raider.gb`
-- **Launch:** `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
-- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`
+- **Launch:** PowerShell tool — `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru` (Bash exits silently on Windows)
+- **Build:** `make` (GBDK_HOME is set via `.claude/settings.local.json` env block)
 
 ---
 
@@ -48,7 +48,7 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 
 1. Install "Emulicious Debugger" extension in VS Code (Ctrl+Shift+X → search "Emulicious Debugger")
 2. In VS Code preferences, set the Emulicious executable path to:
-   `/home/mathdaman/.local/share/emulicious/Emulicious.jar`
+   `C:\Tools\Emulicious\Emulicious.jar`
 3. Create `.vscode/launch.json`:
 
 ```json
@@ -69,7 +69,7 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 
 4. Build with `-debug` flag to generate `.map`/`.noi` files (enables source-level debugging):
    ```sh
-   GBDK_HOME=/home/mathdaman/gbdk make  # add -debug to LCCFLAGS in Makefile if needed
+   make  # add -debug to LCCFLAGS in Makefile if needed; GBDK_HOME is set in .claude/settings.local.json
    ```
 
 ### Debugger Controls
@@ -152,8 +152,8 @@ romusage build/nuke-raider.cdb -a
 
 ## Workflow: Debugging a Bug
 
-1. Add `EMU_printf` at the suspect location, rebuild (`GBDK_HOME=/home/mathdaman/gbdk make`)
-2. Launch: `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
+1. Add `EMU_printf` at the suspect location, rebuild (`make`)
+2. Launch via PowerShell tool: `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`
 3. Observe console output; narrow the problem
 4. Set VS Code breakpoints at suspect line; use Step Over/Into to inspect variables
 5. Use Tilemap/Sprite Viewers to confirm visual state matches logic

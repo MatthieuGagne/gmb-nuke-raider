@@ -161,7 +161,10 @@ Document the OAM layout comment at the top of `config.h` so the budget stays aud
 
 ```sh
 make
-java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
+```
+Then launch via **PowerShell tool** (Bash exits silently on Windows):
+```powershell
+Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
 ```
 
 Check:

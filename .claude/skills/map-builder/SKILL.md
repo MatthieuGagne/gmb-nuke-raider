@@ -125,7 +125,10 @@ Wrap tile data load similarly if `track_tile_data` is in a banked file.
 
 ```sh
 make
-java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
+```
+Then launch via **PowerShell tool** (Bash exits silently on Windows):
+```powershell
+Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
 ```
 
 Check:

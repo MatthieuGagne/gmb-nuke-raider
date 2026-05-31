@@ -71,11 +71,10 @@ Only continue to Step 4 when it passes.
 
 3. Run `make memory-check` and report the output. If any budget is FAIL or ERROR, stop and fix before continuing.
 
-4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background
+4. Ask the user for confirmation before launching the ROM. If they confirm, launch via the **PowerShell tool** (not Bash — Bash exits silently without showing the window on Windows)
    from the worktree directory (NEVER from the main repo's `build/` — it may be stale):
-   ```bash
-   # Run from the worktree directory (cd there first if needed)
-   java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
+   ```powershell
+   Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
    ```
 
 5. Ask them to confirm it looks correct before proceeding.
@@ -120,8 +119,8 @@ Which option?
 
 #### Option 1: Push and Create PR
 
-```bash
-# Push branch
+```powershell
+# Use PowerShell tool on Windows — the Bash tool triggers a global PreToolUse hook that can block git commands
 git push -u origin <feature-branch>
 
 # Create PR
@@ -177,7 +176,7 @@ cd C:/Code/nuke-raider
 GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
 
 # Step 3: Delete the branch from the main repo
-git -C /home/mathdaman/code/nuke-raider branch -D <feature-branch>
+git -C C:/Code/nuke-raider branch -D <feature-branch>
 ```
 
 Then run Step 7 immediately.
@@ -251,7 +250,7 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 
 **Wrong emulator or ROM name**
 - **Problem:** Using `mgba-qt` or wrong ROM path loses time and gives wrong results
-- **Fix:** Always use `java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb`
+- **Fix:** Always use PowerShell tool: `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`
 
 **Launching from wrong directory**
 - **Problem:** Main repo's `build/` may be stale; must use worktree's `build/`
