@@ -34,7 +34,7 @@ After export, run the `track-build` skill (or `build` skill) to regenerate the g
 `assets/sprites/turret.png` is extracted from the tileset (tile index 8, col 8 row 0). It has no `.aseprite` source of its own. When `tileset.aseprite` changes the turret tile, sync it manually before building:
 
 ```sh
-python3 - <<'EOF'
+py - <<'EOF'
 from PIL import Image
 tileset = Image.open("assets/maps/tileset.png")
 tileset.crop((64, 0, 72, 8)).save("assets/sprites/turret.png")

@@ -92,7 +92,7 @@ For each hypothesis in the queue:
 
 **Then:**
 1. Add instrumentation (use `emulicious-debug` agent for GBC runtime inspection)
-2. Build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
+2. Build: `make clean && make`
 3. Run: launch ROM in Emulicious, observe output/behavior
 4. Conclude — one of:
 

@@ -7,7 +7,7 @@
           {
             "type": "command",
             "if": "Bash(git commit*)",
-            "command": "ROOT=$(git rev-parse --show-toplevel) && make -C \"$ROOT\" clean && GBDK_HOME=/home/mathdaman/gbdk make -C \"$ROOT\"",
+            "command": "bash -c \"ROOT=$(git rev-parse --show-toplevel) && make -C \\\"$ROOT\\\" clean && make -C \\\"$ROOT\\\"\"",
             "timeout": 120,
             "statusMessage": "Pre-commit build gate: clean build..."
           }

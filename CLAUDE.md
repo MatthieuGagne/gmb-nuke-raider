@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```sh
 # Build (GBDK installed at ~/gbdk, not /opt/gbdk)
-GBDK_HOME=/home/mathdaman/gbdk make
+make
 
 # Clean
 make clean
 
 # Run in emulator
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 Output ROM: `build/nuke-raider.gb`
@@ -154,7 +154,7 @@ When the user asks for a brainstorm or PRD: stay at the **requirements and desig
 
 ## Build & Test Rules
 
-- Always use a clean build (`make clean && GBDK_HOME=/home/mathdaman/gbdk make`) when testing historical PRs or comparing versions. Never assume a prior build is still valid.
+- Always use a clean build (`make clean && make`) when testing historical PRs or comparing versions. Never assume a prior build is still valid.
 
 ## Workflow
 
@@ -165,7 +165,7 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **GitHub issue links:** When the user pastes a GitHub issue URL (e.g. `https://github.com/.../issues/N`), first fetch the issue and check its **Files Impacted** or **Out of Scope** sections. If ALL touched files qualify as doc-only (`.md`, `.txt`, `.json` except `bank-manifest.json`, files under `.claude/skills/` or `.claude/agents/`), invoke the `doc-review` skill. Otherwise invoke `writing-plans`. Do not ask for confirmation.
 **TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill). **Early-exit behavior:** the Makefile uses `|| exit 1` — it stops at the first failing test binary (alphabetical order). Test binaries after the first failure do NOT run. Fix all failures starting from the earliest binary; re-run `make test` after each fix to reveal the next hidden failure.
 **Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` hook (`tools/bank_check_hook.py`) and `bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, both bank skills, `bank_check.py`, `gbdk-expert`, `gb-memory-validator`, and this file.
-**Build verification:** `GBDK_HOME=/home/mathdaman/gbdk make` (use `/build` skill)
+**Build verification:** `make` (use `/build` skill)
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
 
@@ -173,9 +173,9 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
-2. Always do a clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
+2. Always do a clean build: `make clean && make`
 3. `make memory-check` fires automatically via PostToolUse hook after step 2 — check the hook output; if any budget is FAIL or ERROR, stop and fix before continuing.
-4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background from the worktree directory (NEVER from the main repo's `build/` — it may be stale): `java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb`
+4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background from the worktree directory (NEVER from the main repo's `build/` — it may be stale): `java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb`
 5. Ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
 
@@ -208,7 +208,7 @@ Not safe to parallelize: writing the same file; multiple actors committing to th
 1. Enter worktree
 2. Edit doc file(s)
 3. Fetch + merge: `git fetch origin && git merge origin/master`
-4. Clean build: `make clean && GBDK_HOME=/home/mathdaman/gbdk make`
+4. Clean build: `make clean && make`
 5. Smoketest: ask user for confirmation, then launch ROM in Emulicious if confirmed, confirm no pre-existing breakage
 6. Commit
 7. Push branch and create PR

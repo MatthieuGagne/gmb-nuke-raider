@@ -53,7 +53,7 @@ Then open it in Emulicious **from the worktree directory** so the path resolves 
 
 ```bash
 cd /tmp/pr-compare-<N>
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 Repeat for any additional ROMs the user wants to test.

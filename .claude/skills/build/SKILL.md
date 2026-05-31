@@ -3,7 +3,7 @@ name: build
 description: Use this skill to build the GBC ROM. Triggers when verifying a build, checking for compiler errors, or confirming the ROM was produced after making changes.
 ---
 
-Run `GBDK_HOME=/home/mathdaman/gbdk make`.
+Run `make`.
 
 On success: report ROM size with `ls -lh build/nuke-raider.gb`.
 

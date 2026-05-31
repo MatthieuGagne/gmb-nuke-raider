@@ -5,7 +5,7 @@ description: Hard gate — invoke after a successful build, before smoketest. Ru
 
 # Bank Post-Build Gate
 
-Run after `GBDK_HOME=/home/mathdaman/gbdk make` succeeds. Block proceeding to smoketest if exit code is 1.
+Run after `make` succeeds. Block proceeding to smoketest if exit code is 1.
 
 ```sh
 make bank-post-build

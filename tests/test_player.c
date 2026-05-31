@@ -7,6 +7,7 @@
 #include "../src/track.h"  /* active_map_h — runtime track height */
 #include "projectile.h"
 #include "../src/racer.h"
+#include "../src/sprite_pool.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 

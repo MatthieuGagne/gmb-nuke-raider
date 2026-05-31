@@ -85,7 +85,7 @@ Expected: PASS — test and all others green.
 
 ### Build verification
 
-Run: `GBDK_HOME=/home/mathdaman/gbdk make`
+Run: `make`
 Expected: Zero errors, ROM produced at `build/nuke-raider.gb`.
 ```
 

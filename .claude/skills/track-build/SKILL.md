@@ -6,7 +6,7 @@ description: Rebuild the track pipeline and ROM after editing a .tmx map or tile
 Run the full build. The Makefile auto-detects which track files changed and regenerates only what's needed (rotation manifest → tile data → map C files → link ROM).
 
 ```sh
-GBDK_HOME=/home/mathdaman/gbdk make
+make
 ```
 
 On success: report ROM size with `ls -lh build/nuke-raider.gb`.
@@ -27,7 +27,7 @@ If the tileset was also edited in Aseprite, run `aseprite-build` first to export
 If the turret tile (col 8, row 0 = tile index 8) changed in the tileset, also sync `turret.png` before building:
 
 ```sh
-python3 - <<'EOF'
+py - <<'EOF'
 from PIL import Image
 tileset = Image.open("assets/maps/tileset.png")
 tileset.crop((64, 0, 72, 8)).save("assets/sprites/turret.png")
