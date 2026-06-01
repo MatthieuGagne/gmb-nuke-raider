@@ -42,3 +42,12 @@ uint8_t checkpoint_all_cleared(void) BANKED {
 void checkpoint_reset(void) BANKED {
     cp_next = 0u;
 }
+
+uint8_t checkpoint_get_cp_next(void) BANKED {
+    return cp_next;
+}
+
+const CheckpointDef *checkpoint_get_next_def(void) BANKED {
+    if (cp_next >= cp_count) return NULL;
+    return &cp_defs[cp_next];
+}

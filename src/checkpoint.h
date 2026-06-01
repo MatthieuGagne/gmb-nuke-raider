@@ -37,4 +37,10 @@ uint8_t checkpoint_all_cleared(void) BANKED;
 /* Resets cp_next to 0. Call after a valid non-final lap. */
 void    checkpoint_reset(void) BANKED;
 
+/* Returns the index of the next checkpoint to clear. */
+uint8_t              checkpoint_get_cp_next(void) BANKED;
+
+/* Returns a pointer to the next CheckpointDef, or NULL if all are cleared. */
+const CheckpointDef *checkpoint_get_next_def(void) BANKED;
+
 #endif /* CHECKPOINT_H */

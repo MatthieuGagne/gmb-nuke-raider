@@ -124,6 +124,33 @@ void test_cp_next_exported_as_global(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, cp_next);
 }
 
+void test_checkpoint_get_next_def_returns_current_and_null(void) {
+    CheckpointDef defs[2];
+    defs[0] = make_cp(10, 20, 8, 8, 0u, CHECKPOINT_DIR_S);
+    defs[1] = make_cp(50, 60, 8, 8, 1u, CHECKPOINT_DIR_N);
+    checkpoint_init(defs, 2u);
+
+    /* cp_next==0 → returns pointer to defs[0] */
+    const CheckpointDef *def = checkpoint_get_next_def();
+    TEST_ASSERT_NOT_NULL(def);
+    TEST_ASSERT_EQUAL_INT16(10, def->x);
+    TEST_ASSERT_EQUAL_UINT8(0u, checkpoint_get_cp_next());
+
+    /* Pass through defs[0]: px=12,py=22,DIR_B (south matches CHECKPOINT_DIR_S) */
+    checkpoint_update(12, 22, DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(1u, checkpoint_get_cp_next());
+    def = checkpoint_get_next_def();
+    TEST_ASSERT_NOT_NULL(def);
+    TEST_ASSERT_EQUAL_INT16(50, def->x);
+
+    /* Pass through defs[1]: px=52,py=62,DIR_T (north matches CHECKPOINT_DIR_N) */
+    checkpoint_update(52, 62, DIR_T);
+    TEST_ASSERT_EQUAL_UINT8(2u, checkpoint_get_cp_next());
+
+    /* All cleared → NULL */
+    TEST_ASSERT_NULL(checkpoint_get_next_def());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_zero_checkpoints_all_cleared);
@@ -137,5 +164,6 @@ int main(void) {
     RUN_TEST(test_direction_east_requires_east_facing);
     RUN_TEST(test_direction_west_requires_west_facing);
     RUN_TEST(test_cp_next_exported_as_global);
+    RUN_TEST(test_checkpoint_get_next_def_returns_current_and_null);
     return UNITY_END();
 }
