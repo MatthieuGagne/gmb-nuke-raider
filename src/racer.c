@@ -248,6 +248,42 @@ void racer_hide(void) BANKED {
     }
 }
 
+/* Advances racer_cp_next[slot] if the racer is inside the current checkpoint AABB
+ * and travelling in the required direction.  Sequential: only the checkpoint at
+ * index racer_cp_next[slot] is tested, so cp[1] cannot clear before cp[0].
+ * static — called only from racer_update() and the test wrapper below. */
+static void racer_checkpoint_update(uint8_t slot) {
+    const CheckpointDef *defs;
+    const CheckpointDef *cp;
+    uint8_t count;
+    uint8_t dir;
+
+    count = track_get_checkpoint_count();
+    if (racer_cp_next[slot] >= count) return;
+    defs = track_get_checkpoints();
+    cp   = &defs[racer_cp_next[slot]];
+    dir  = racer_dir[slot];
+
+    /* AABB test */
+    if (racer_px[slot] < cp->x)                                        return;
+    if (racer_px[slot] >= (int16_t)((uint16_t)cp->x + (uint16_t)cp->w)) return;
+    if (racer_py[slot] < cp->y)                                        return;
+    if (racer_py[slot] >= (int16_t)((uint16_t)cp->y + (uint16_t)cp->h)) return;
+
+    /* Direction test — mirrors racer_dir_matches_finish() logic */
+    if (cp->direction == CHECKPOINT_DIR_N) {
+        if (dir != DIR_T  && dir != DIR_RT && dir != DIR_LT) return;
+    } else if (cp->direction == CHECKPOINT_DIR_S) {
+        if (dir != DIR_B  && dir != DIR_RB && dir != DIR_LB) return;
+    } else if (cp->direction == CHECKPOINT_DIR_E) {
+        if (dir != DIR_R  && dir != DIR_RT && dir != DIR_RB) return;
+    } else if (cp->direction == CHECKPOINT_DIR_W) {
+        if (dir != DIR_L  && dir != DIR_LT && dir != DIR_LB) return;
+    }
+
+    racer_cp_next[slot]++;
+}
+
 uint8_t racer_update(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) {
@@ -289,11 +325,14 @@ uint8_t racer_update(void) BANKED {
             if (racer_wp_idx[i] >= s_wp_count) {
                 racer_wp_idx[i] = 0u;
                 s_laps_done++;
+                racer_cp_next[i] = 0u;
             }
         }
 
         dir = racer_dir_from_delta(dx, dy);
         racer_dir[i] = dir;
+
+        racer_checkpoint_update(i);
 
         /* Finish line detection — check current position before applying velocity.
          * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
@@ -601,5 +640,8 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
 uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
 void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
 uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
+
+void racer_set_dir_for_test(uint8_t slot, uint8_t dir) { racer_dir[slot] = dir; }
+void racer_checkpoint_update_for_test(uint8_t slot)    { racer_checkpoint_update(slot); }
 
 #endif /* __SDCC */

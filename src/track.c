@@ -151,4 +151,16 @@ void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8) {
     for (i = 0u; i < 8u; i++)
         track_collision_mask[((uint16_t)tile_idx << 3u) + i] = rows8[i];
 }
+
+/* Test-only seam — inject checkpoint descriptors directly into WRAM buffer.
+ * Allows host tests to exercise racer_checkpoint_update() without ROM assets.
+ * Not compiled into the GB ROM. */
+void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count) {
+    uint8_t i;
+    if (count > MAX_CHECKPOINTS) count = MAX_CHECKPOINTS;
+    active_checkpoint_count = count;
+    for (i = 0u; i < count; i++) {
+        wram_checkpoints[i] = cpdefs[i];
+    }
+}
 #endif
