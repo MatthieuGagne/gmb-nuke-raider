@@ -8,7 +8,6 @@
 #include "projectile.h"
 
 extern int16_t cam_y;
-extern uint8_t racer_cp_next[];
 
 void setUp(void) {
     cam_y = 0;
@@ -500,7 +499,7 @@ void test_racer_get_cp_next_initial_zero(void) {
 void test_racer_spawn_resets_cp_next(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
-    racer_cp_next[0] = 5u;  /* pre-pollute */
+    racer_set_cp_next_for_test(0u, 5u);  /* pre-pollute */
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
 }

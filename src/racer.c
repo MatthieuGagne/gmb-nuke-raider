@@ -28,7 +28,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
-uint8_t         racer_cp_next[MAX_RACERS];
+static uint8_t  racer_cp_next[MAX_RACERS];
 
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
