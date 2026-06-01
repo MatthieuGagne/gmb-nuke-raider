@@ -17,6 +17,11 @@ uint8_t finish_eval(uint8_t map_type, uint8_t armed,
 /* Test-only seam: pure countdown phase-advance logic, no hardware.
  * Returns next phase (unchanged if frames < threshold, phase+1 if reached). */
 uint8_t cd_advance(uint8_t phase, uint8_t frames);
+/* Test-only seam: direction-aware position comparison.
+ * Returns 1 = player ahead, 2 = racer ahead. */
+uint8_t pos_from_dir(uint8_t dir,
+                     int16_t px,  int16_t py,
+                     int16_t rpx, int16_t rpy);
 #endif
 
 #endif
