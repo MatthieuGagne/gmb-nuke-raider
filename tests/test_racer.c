@@ -8,6 +8,7 @@
 #include "projectile.h"
 
 extern int16_t cam_y;
+extern uint8_t racer_cp_next[];
 
 void setUp(void) {
     cam_y = 0;
@@ -489,6 +490,28 @@ void test_racer_miss_does_not_reduce_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
 }
 
+void test_racer_get_cp_next_initial_zero(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+void test_racer_spawn_resets_cp_next(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_cp_next[0] = 5u;  /* pre-pollute */
+    racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+void test_racer_get_px_returns_spawn_value(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_spawn_for_test(100, 200, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_INT16(100, racer_get_px(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -521,5 +544,8 @@ int main(void) {
     RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
     RUN_TEST(test_racer_dead_does_not_trigger_game_over);
     RUN_TEST(test_racer_miss_does_not_reduce_hp);
+    RUN_TEST(test_racer_get_cp_next_initial_zero);
+    RUN_TEST(test_racer_spawn_resets_cp_next);
+    RUN_TEST(test_racer_get_px_returns_spawn_value);
     return UNITY_END();
 }

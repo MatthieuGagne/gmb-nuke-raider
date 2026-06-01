@@ -28,6 +28,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+uint8_t         racer_cp_next[MAX_RACERS];
 
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
@@ -184,6 +185,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_cp_next[i]   = 0u;
     }
     s_tile_base  = tile_base;
     s_laps_done  = 0u;
@@ -229,6 +231,7 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_cp_next[i]   = 0u;
     }
     s_wp_count  = 0u;
     s_laps_done = 0u;
@@ -492,7 +495,9 @@ void racer_render(void) BANKED {
     }
 }
 
+int16_t racer_get_px(uint8_t slot) BANKED { return racer_px[slot]; }
 int16_t racer_get_py(uint8_t slot) BANKED { return racer_py[slot]; }
+uint8_t racer_get_cp_next(uint8_t slot) BANKED { return racer_cp_next[slot]; }
 uint8_t racer_get_laps_done(uint8_t slot) BANKED { (void)slot; return s_laps_done; }
 uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED { return racer_wp_idx[slot]; }
 uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
@@ -551,6 +556,7 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     racer_downshift_timer[0] = 0u;
     racer_hp[0]        = (uint8_t)RACER_HP;
     racer_hit_flash[0] = 0u;
+    racer_cp_next[0]   = 0u;
 }
 
 void racer_set_laps_done_for_test(uint8_t n) {
@@ -583,7 +589,7 @@ uint8_t racer_get_wp_idx(uint8_t slot) {
 int8_t  racer_get_vx(uint8_t slot)  { return racer_vx[slot]; }
 int8_t  racer_get_vy(uint8_t slot)  { return racer_vy[slot]; }
 uint8_t racer_get_gear(uint8_t slot) { return racer_gear[slot]; }
-int16_t racer_get_px(uint8_t slot)  { return racer_px[slot]; }
+void    racer_set_cp_next_for_test(uint8_t slot, uint8_t val) { racer_cp_next[slot] = val; }
 void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy) {
     racer_vx[slot] = vx;
     racer_vy[slot] = vy;
