@@ -146,6 +146,9 @@ void track_test_set_map(const uint8_t *map, uint8_t w, uint8_t h);
  * rows8[oy] is a bitmask of passable pixels in row oy; LSB = leftmost pixel.
  * Never compiled into the GB ROM. */
 void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8);
+/* Test-only seam: inject checkpoint descriptors directly into the WRAM buffer.
+ * Never compiled into the GB ROM. */
+void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count);
 #endif
 
 #endif /* TRACK_H */

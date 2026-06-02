@@ -489,6 +489,90 @@ void test_racer_miss_does_not_reduce_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
 }
 
+void test_racer_get_cp_next_initial_zero(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+void test_racer_spawn_resets_cp_next(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_set_cp_next_for_test(0u, 5u);  /* pre-pollute */
+    racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+void test_racer_get_px_returns_spawn_value(void) {
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 10u };
+    racer_spawn_for_test(100, 200, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    TEST_ASSERT_EQUAL_INT16(100, racer_get_px(0u));
+}
+
+/* ---- Checkpoint update tests ---- */
+
+/* Shared setup helper for checkpoint tests */
+static void setup_one_checkpoint_south(CheckpointDef *defs) {
+    defs[0].x = 96;  defs[0].y = 400; defs[0].w = 40; defs[0].h = 16;
+    defs[0].index = 0u; defs[0].direction = CHECKPOINT_DIR_S;
+    track_test_set_checkpoints(defs, 1u);
+}
+
+/* AC1: racer_cp_next increments when inside AABB with matching direction */
+void test_racer_cp_next_increments_on_matching_dir(void) {
+    CheckpointDef defs[1];
+    setup_one_checkpoint_south(defs);
+    uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
+    racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
+    racer_set_dir_for_test(0u, DIR_B);
+    racer_checkpoint_update_for_test(0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_get_cp_next(0u));
+}
+
+/* AC2: racer_cp_next does NOT increment with wrong direction */
+void test_racer_cp_next_no_increment_wrong_dir(void) {
+    CheckpointDef defs[1];
+    setup_one_checkpoint_south(defs);
+    uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
+    racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    racer_set_dir_for_test(0u, DIR_T);
+    racer_checkpoint_update_for_test(0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+/* AC3: racer_cp_next resets to 0 on waypoint wrap */
+void test_racer_cp_next_resets_on_lap_wrap(void) {
+    CheckpointDef defs[1];
+    track_test_set_checkpoints(defs, 0u);
+    uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
+    racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
+    racer_set_cp_next_for_test(0u, 2u);
+    racer_set_wp_idx_for_test(0u, 0u);
+    racer_set_pos_for_test(0u, 80, 80);
+    racer_set_laps_done_for_test(0u);
+    static const uint8_t flat[16*16] = {0};
+    track_test_set_map(flat, 16u, 16u);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
+/* AC4: sequential enforcement — cp[1] AABB cannot clear before cp[0] */
+void test_racer_cp_next_sequential_order_enforced(void) {
+    CheckpointDef defs[2];
+    defs[0].x = 200; defs[0].y = 200; defs[0].w = 8;  defs[0].h = 8;
+    defs[0].index = 0u; defs[0].direction = CHECKPOINT_DIR_S;
+    defs[1].x = 96;  defs[1].y = 400; defs[1].w = 40; defs[1].h = 16;
+    defs[1].index = 1u; defs[1].direction = CHECKPOINT_DIR_S;
+    track_test_set_checkpoints(defs, 2u);
+    uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
+    racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
+    racer_set_dir_for_test(0u, DIR_B);
+    racer_checkpoint_update_for_test(0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -521,5 +605,12 @@ int main(void) {
     RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
     RUN_TEST(test_racer_dead_does_not_trigger_game_over);
     RUN_TEST(test_racer_miss_does_not_reduce_hp);
+    RUN_TEST(test_racer_get_cp_next_initial_zero);
+    RUN_TEST(test_racer_spawn_resets_cp_next);
+    RUN_TEST(test_racer_get_px_returns_spawn_value);
+    RUN_TEST(test_racer_cp_next_increments_on_matching_dir);
+    RUN_TEST(test_racer_cp_next_no_increment_wrong_dir);
+    RUN_TEST(test_racer_cp_next_resets_on_lap_wrap);
+    RUN_TEST(test_racer_cp_next_sequential_order_enforced);
     return UNITY_END();
 }

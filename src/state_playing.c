@@ -50,6 +50,20 @@ uint8_t
 #else
 static uint8_t
 #endif
+pos_from_dir(uint8_t dir,
+             int16_t px,  int16_t py,
+             int16_t rpx, int16_t rpy) {
+    if (dir == CHECKPOINT_DIR_N) return (py  <= rpy) ? 1u : 2u;
+    if (dir == CHECKPOINT_DIR_S) return (py  >= rpy) ? 1u : 2u;
+    if (dir == CHECKPOINT_DIR_E) return (px  >= rpx) ? 1u : 2u;
+    return (px <= rpx) ? 1u : 2u;   /* CHECKPOINT_DIR_W */
+}
+
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
 finish_eval(uint8_t map_type, uint8_t armed,
             uint8_t pdir,
             uint8_t finish_dir,
@@ -182,32 +196,31 @@ static void update(void) {
             damage_apply(RACER_RAM_DAMAGE);
             sfx_play(SFX_HIT);
         }
-        /* Race position: lap count primary, section-aware ty secondary */
+        /* Race position: 3-level comparison works on any track layout */
         {
             uint8_t player_laps = (uint8_t)(lap_get_current() - 1u);
             uint8_t racer_laps  = racer_get_laps_done(0u);
+            uint8_t pos;
             if (player_laps > racer_laps) {
-                hud_set_position(1u);
+                pos = 1u;
             } else if (player_laps < racer_laps) {
-                hud_set_position(2u);
+                pos = 2u;
             } else {
-                /* Same lap: right side (tx>10) goes DOWN (higher ty=ahead);
-                 * left side (tx<=10) goes UP (lower ty=ahead).
-                 * racer_wp_idx<6 = right side, >=6 = left side. */
-                uint8_t player_tx    = (uint8_t)((uint16_t)px >> 3u);
-                uint8_t player_ty    = (uint8_t)((uint16_t)py >> 3u);
-                uint8_t racer_wp     = racer_get_wp_idx_banked(0u);
-                int16_t rpy_val      = racer_get_py(0u);
-                uint8_t racer_ty     = (uint8_t)((uint16_t)rpy_val >> 3u);
-                uint8_t player_right = (player_tx > 10u) ? 1u : 0u;
-                uint8_t racer_right  = (racer_wp  <  6u) ? 1u : 0u;
-                uint8_t pos;
-                if      ( player_right && !racer_right) { pos = 2u; }
-                else if (!player_right &&  racer_right) { pos = 1u; }
-                else if ( player_right) { pos = (player_ty >= racer_ty) ? 1u : 2u; }
-                else                   { pos = (player_ty <= racer_ty) ? 1u : 2u; }
-                hud_set_position(pos);
+                uint8_t player_cp = checkpoint_get_cp_next();
+                uint8_t racer_cp  = racer_get_cp_next(0u);
+                if (player_cp > racer_cp) {
+                    pos = 1u;
+                } else if (player_cp < racer_cp) {
+                    pos = 2u;
+                } else {
+                    const CheckpointDef *next = checkpoint_get_next_def();
+                    uint8_t tdir = next ? next->direction : finish_dir_cache;
+                    int16_t rpx  = racer_get_px(0u);
+                    int16_t rpy  = racer_get_py(0u);
+                    pos = pos_from_dir(tdir, px, py, rpx, rpy);
+                }
             }
+            hud_set_position(pos);
         }
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */

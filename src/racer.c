@@ -28,6 +28,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+static uint8_t  racer_cp_next[MAX_RACERS];
 
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
@@ -184,6 +185,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_cp_next[i]   = 0u;
     }
     s_tile_base  = tile_base;
     s_laps_done  = 0u;
@@ -229,6 +231,7 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_cp_next[i]   = 0u;
     }
     s_wp_count  = 0u;
     s_laps_done = 0u;
@@ -243,6 +246,42 @@ void racer_hide(void) BANKED {
             move_sprite(racer_oam[i * 4u + j], 0u, 0u);
         }
     }
+}
+
+/* Advances racer_cp_next[slot] if the racer is inside the current checkpoint AABB
+ * and travelling in the required direction.  Sequential: only the checkpoint at
+ * index racer_cp_next[slot] is tested, so cp[1] cannot clear before cp[0].
+ * static — called only from racer_update() and the test wrapper below. */
+static void racer_checkpoint_update(uint8_t slot) {
+    const CheckpointDef *defs;
+    const CheckpointDef *cp;
+    uint8_t count;
+    uint8_t dir;
+
+    count = track_get_checkpoint_count();
+    if (racer_cp_next[slot] >= count) return;
+    defs = track_get_checkpoints();
+    cp   = &defs[racer_cp_next[slot]];
+    dir  = racer_dir[slot];
+
+    /* AABB test */
+    if (racer_px[slot] < cp->x)                                        return;
+    if (racer_px[slot] >= (int16_t)((uint16_t)cp->x + (uint16_t)cp->w)) return;
+    if (racer_py[slot] < cp->y)                                        return;
+    if (racer_py[slot] >= (int16_t)((uint16_t)cp->y + (uint16_t)cp->h)) return;
+
+    /* Direction test — mirrors racer_dir_matches_finish() logic */
+    if (cp->direction == CHECKPOINT_DIR_N) {
+        if (dir != DIR_T  && dir != DIR_RT && dir != DIR_LT) return;
+    } else if (cp->direction == CHECKPOINT_DIR_S) {
+        if (dir != DIR_B  && dir != DIR_RB && dir != DIR_LB) return;
+    } else if (cp->direction == CHECKPOINT_DIR_E) {
+        if (dir != DIR_R  && dir != DIR_RT && dir != DIR_RB) return;
+    } else if (cp->direction == CHECKPOINT_DIR_W) {
+        if (dir != DIR_L  && dir != DIR_LT && dir != DIR_LB) return;
+    }
+
+    racer_cp_next[slot]++;
 }
 
 uint8_t racer_update(void) BANKED {
@@ -286,11 +325,14 @@ uint8_t racer_update(void) BANKED {
             if (racer_wp_idx[i] >= s_wp_count) {
                 racer_wp_idx[i] = 0u;
                 s_laps_done++;
+                racer_cp_next[i] = 0u;
             }
         }
 
         dir = racer_dir_from_delta(dx, dy);
         racer_dir[i] = dir;
+
+        racer_checkpoint_update(i);
 
         /* Finish line detection — check current position before applying velocity.
          * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
@@ -492,7 +534,9 @@ void racer_render(void) BANKED {
     }
 }
 
+int16_t racer_get_px(uint8_t slot) BANKED { return racer_px[slot]; }
 int16_t racer_get_py(uint8_t slot) BANKED { return racer_py[slot]; }
+uint8_t racer_get_cp_next(uint8_t slot) BANKED { return racer_cp_next[slot]; }
 uint8_t racer_get_laps_done(uint8_t slot) BANKED { (void)slot; return s_laps_done; }
 uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED { return racer_wp_idx[slot]; }
 uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
@@ -551,6 +595,7 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     racer_downshift_timer[0] = 0u;
     racer_hp[0]        = (uint8_t)RACER_HP;
     racer_hit_flash[0] = 0u;
+    racer_cp_next[0]   = 0u;
 }
 
 void racer_set_laps_done_for_test(uint8_t n) {
@@ -583,7 +628,7 @@ uint8_t racer_get_wp_idx(uint8_t slot) {
 int8_t  racer_get_vx(uint8_t slot)  { return racer_vx[slot]; }
 int8_t  racer_get_vy(uint8_t slot)  { return racer_vy[slot]; }
 uint8_t racer_get_gear(uint8_t slot) { return racer_gear[slot]; }
-int16_t racer_get_px(uint8_t slot)  { return racer_px[slot]; }
+void    racer_set_cp_next_for_test(uint8_t slot, uint8_t val) { racer_cp_next[slot] = val; }
 void    racer_set_vel_for_test(uint8_t slot, int8_t vx, int8_t vy) {
     racer_vx[slot] = vx;
     racer_vy[slot] = vy;
@@ -595,5 +640,8 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
 uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
 void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
 uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
+
+void racer_set_dir_for_test(uint8_t slot, uint8_t dir) { racer_dir[slot] = dir; }
+void racer_checkpoint_update_for_test(uint8_t slot)    { racer_checkpoint_update(slot); }
 
 #endif /* __SDCC */

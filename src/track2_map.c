@@ -133,11 +133,12 @@ const uint8_t track2_map[2002] = {
 #include "checkpoint.h"
 
 BANKREF(track2_checkpoints)
-const CheckpointDef track2_checkpoints[2] = {
+const CheckpointDef track2_checkpoints[3] = {
     { 96, 400, 40, 16, 0, CHECKPOINT_DIR_S },
-    { 32, 400, 40, 16, 1, CHECKPOINT_DIR_N },
+    { 96, 744, 24, 16, 1, CHECKPOINT_DIR_S },
+    { 32, 400, 40, 16, 2, CHECKPOINT_DIR_N },
 };
-const uint8_t track2_checkpoint_count = 2;
+const uint8_t track2_checkpoint_count = 3;
 
 BANKREF(track2_npc_count)
 const uint8_t track2_npc_count = 1u;
