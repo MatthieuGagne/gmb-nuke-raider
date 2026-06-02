@@ -1,4 +1,5 @@
 #pragma bank 255
+#include <stddef.h>
 #include "player.h"
 #include "checkpoint.h"
 #include "config.h"
