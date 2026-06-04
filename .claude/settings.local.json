@@ -87,7 +87,9 @@
       "PowerShell(git *)",
       "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
       "PowerShell(head *)",
-      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\fix+race-position-checkpoint\\\\build\\\\nuke-raider.gb\" -PassThru)"
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\fix+race-position-checkpoint\\\\build\\\\nuke-raider.gb\" -PassThru)",
+      "PowerShell(Start-Process \"C:\\\\Code\\\\nuke-raider\\\\assets\\\\maps\\\\track2.tmx\")",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.gb\")"
     ]
   },
   "hooks": {
