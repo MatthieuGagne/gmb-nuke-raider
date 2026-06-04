@@ -92,7 +92,11 @@
       "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.gb\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Code\\\\nuke-raider\\\\src\" -Recurse -File)",
       "Bash(Select-Object FullName)",
-      "Bash(Sort-Object FullName)"
+      "Bash(Sort-Object FullName)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('Top-level keys:', list\\(d.keys\\(\\)\\)\\); print\\('symbols' in d\\)\")",
+      "Bash(python *)",
+      "Bash(powershell *)",
+      "Bash(python3 -c \"import pyboy; print\\(pyboy.__version__\\)\")"
     ]
   },
   "hooks": {
