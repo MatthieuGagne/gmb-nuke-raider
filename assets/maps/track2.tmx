@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="20" height="100" tilewidth="8" tileheight="8" infinite="0" nextlayerid="7" nextobjectid="18">
+<map version="1.10" tiledversion="1.12.1" orientation="orthogonal" renderorder="right-down" width="20" height="100" tilewidth="8" tileheight="8" infinite="0" nextlayerid="7" nextobjectid="20">
  <properties>
   <property name="lap_count" type="int" value="3"/>
   <property name="map_type" value="race"/>
@@ -125,22 +125,28 @@
   </object>
  </objectgroup>
  <objectgroup id="4" name="checkpoints">
-  <object id="3" x="96" y="400" width="40" height="16">
+  <object id="3" x="96" y="400" width="40" height="8">
    <properties>
     <property name="direction" value="S"/>
     <property name="index" type="int" value="0"/>
    </properties>
   </object>
-  <object id="18" x="96" y="744" width="24" height="16">
+  <object id="18" x="80" y="752" width="8" height="40">
    <properties>
-    <property name="direction" value="S"/>
+    <property name="direction" value="W"/>
     <property name="index" type="int" value="1"/>
    </properties>
   </object>
-  <object id="4" x="32" y="400" width="40" height="16">
+  <object id="4" x="32" y="400" width="40" height="8">
    <properties>
     <property name="direction" value="N"/>
     <property name="index" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="19" x="80" y="8" width="8" height="40">
+   <properties>
+    <property name="direction" value="E"/>
+    <property name="index" type="int" value="3"/>
    </properties>
   </object>
  </objectgroup>
