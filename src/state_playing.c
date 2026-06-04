@@ -64,6 +64,25 @@ uint8_t
 #else
 static uint8_t
 #endif
+pos_from_manhattan(int16_t px,  int16_t py,
+                   int16_t rpx, int16_t rpy,
+                   const CheckpointDef *next) {
+    int16_t cx  = next->x + (int16_t)(next->w >> 1u);
+    int16_t cy  = next->y + (int16_t)(next->h >> 1u);
+    int16_t pdx = px  - cx; if (pdx < 0) pdx = -pdx;
+    int16_t pdy = py  - cy; if (pdy < 0) pdy = -pdy;
+    int16_t rdx = rpx - cx; if (rdx < 0) rdx = -rdx;
+    int16_t rdy = rpy - cy; if (rdy < 0) rdy = -rdy;
+    uint16_t pd = (uint16_t)pdx + (uint16_t)pdy;
+    uint16_t rd = (uint16_t)rdx + (uint16_t)rdy;
+    return (pd <= rd) ? 1u : 2u;
+}
+
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
 finish_eval(uint8_t map_type, uint8_t armed,
             uint8_t pdir,
             uint8_t finish_dir,
@@ -214,10 +233,13 @@ static void update(void) {
                     pos = 2u;
                 } else {
                     const CheckpointDef *next = checkpoint_get_next_def();
-                    uint8_t tdir = next ? next->direction : finish_dir_cache;
-                    int16_t rpx  = racer_get_px(0u);
-                    int16_t rpy  = racer_get_py(0u);
-                    pos = pos_from_dir(tdir, px, py, rpx, rpy);
+                    int16_t rpx = racer_get_px(0u);
+                    int16_t rpy = racer_get_py(0u);
+                    if (next) {
+                        pos = pos_from_manhattan(px, py, rpx, rpy, next);
+                    } else {
+                        pos = pos_from_dir(finish_dir_cache, px, py, rpx, rpy);
+                    }
                 }
             }
             hud_set_position(pos);

@@ -141,6 +141,29 @@ void test_pos_from_dir_W_racer_ahead(void) {
     TEST_ASSERT_EQUAL_UINT8(2u, pos_from_dir(CHECKPOINT_DIR_W, 100, 0,  50, 0));
 }
 
+/* pos_from_manhattan: smaller Manhattan distance to checkpoint center = ahead (P1).
+ * Tie (equal distance) favors player → returns 1. */
+void test_pos_from_manhattan_player_closer(void) {
+    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
+    /* center=(110,110). player dist=4, racer dist=40 */
+    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(112, 112, 90, 90, &cp));
+}
+void test_pos_from_manhattan_racer_closer(void) {
+    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
+    /* center=(110,110). player dist=40, racer dist=4 */
+    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_manhattan(90, 90, 112, 112, &cp));
+}
+void test_pos_from_manhattan_equal_distance_favors_player(void) {
+    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
+    /* center=(110,110). player dist=10, racer dist=10 */
+    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(120, 110, 110, 120, &cp));
+}
+void test_pos_from_manhattan_nonsquare_checkpoint(void) {
+    CheckpointDef cp = {0, 0, 40, 10, 0, CHECKPOINT_DIR_E};
+    /* center=(20,5). player dist=1, racer dist=20 */
+    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(21, 5, 0, 5, &cp));
+}
+
 void test_cd_stays_in_phase_before_threshold(void) {
     /* CD_FRAMES_NUM - 1 = 59 */
     TEST_ASSERT_EQUAL_UINT8(0u, cd_advance(0u, 59u));
@@ -195,5 +218,9 @@ int main(void) {
     RUN_TEST(test_pos_from_dir_E_racer_ahead);
     RUN_TEST(test_pos_from_dir_W_player_ahead);
     RUN_TEST(test_pos_from_dir_W_racer_ahead);
+    RUN_TEST(test_pos_from_manhattan_player_closer);
+    RUN_TEST(test_pos_from_manhattan_racer_closer);
+    RUN_TEST(test_pos_from_manhattan_equal_distance_favors_player);
+    RUN_TEST(test_pos_from_manhattan_nonsquare_checkpoint);
     return UNITY_END();
 }
