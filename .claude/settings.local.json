@@ -89,7 +89,10 @@
       "PowerShell(head *)",
       "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\fix+race-position-checkpoint\\\\build\\\\nuke-raider.gb\" -PassThru)",
       "PowerShell(Start-Process \"C:\\\\Code\\\\nuke-raider\\\\assets\\\\maps\\\\track2.tmx\")",
-      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.gb\")"
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.gb\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Code\\\\nuke-raider\\\\src\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)"
     ]
   },
   "hooks": {

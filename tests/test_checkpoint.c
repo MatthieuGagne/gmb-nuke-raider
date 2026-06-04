@@ -151,6 +151,39 @@ void test_checkpoint_get_next_def_returns_current_and_null(void) {
     TEST_ASSERT_NULL(checkpoint_get_next_def());
 }
 
+/* Regression: track2 CP[3] boundary — player going east at py=48 sits exactly
+ * at the AABB bottom (y + h = 8 + 40 = 48), which the AABB rejects.
+ * This simulates a full track2 lap; CP[3] must register before the finish. */
+static CheckpointDef s_track2_cps[4];
+static void setup_track2_cps(void) {
+    s_track2_cps[0] = make_cp( 96, 400, 40,  8, 0u, CHECKPOINT_DIR_S);
+    s_track2_cps[1] = make_cp( 80, 752,  8, 40, 1u, CHECKPOINT_DIR_W);
+    s_track2_cps[2] = make_cp( 32, 400, 40,  8, 2u, CHECKPOINT_DIR_N);
+    s_track2_cps[3] = make_cp( 80,   8,  8, 56, 3u, CHECKPOINT_DIR_E); /* h=56: covers y=8-64 */
+    checkpoint_init(s_track2_cps, 4u);
+}
+
+void test_track2_full_lap_py47_clears_cp3(void) {
+    setup_track2_cps();
+    checkpoint_update(100, 402, DIR_B);   /* CP0 S: right lane going south */
+    checkpoint_update( 82, 760, DIR_L);   /* CP1 W: bottom going west */
+    checkpoint_update( 40, 402, DIR_T);   /* CP2 N: left lane going north */
+    /* CP3 E: player going east at py=47 — inside [8,48) → should clear */
+    checkpoint_update( 82,  47, DIR_R);
+    TEST_ASSERT_EQUAL_UINT8(1u, checkpoint_all_cleared());
+}
+
+void test_track2_cp3_clears_at_finish_boundary(void) {
+    /* Regression guard: py=48 (exact bottom of old h=40 zone) must NOW clear CP3.
+     * Fix: h changed from 40 to 56 → zone is y=8-64, so py=48 < 64 passes. */
+    setup_track2_cps();
+    checkpoint_update(100, 402, DIR_B);
+    checkpoint_update( 82, 760, DIR_L);
+    checkpoint_update( 40, 402, DIR_T);
+    checkpoint_update( 82,  48, DIR_R);   /* py=48, now inside [8,64) with h=56 */
+    TEST_ASSERT_EQUAL_UINT8(1u, checkpoint_all_cleared());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_zero_checkpoints_all_cleared);
@@ -165,5 +198,7 @@ int main(void) {
     RUN_TEST(test_direction_west_requires_west_facing);
     RUN_TEST(test_cp_next_exported_as_global);
     RUN_TEST(test_checkpoint_get_next_def_returns_current_and_null);
+    RUN_TEST(test_track2_full_lap_py47_clears_cp3);
+    RUN_TEST(test_track2_cp3_clears_at_finish_boundary);
     return UNITY_END();
 }

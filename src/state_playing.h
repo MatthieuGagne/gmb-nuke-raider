@@ -22,6 +22,11 @@ uint8_t cd_advance(uint8_t phase, uint8_t frames);
 uint8_t pos_from_dir(uint8_t dir,
                      int16_t px,  int16_t py,
                      int16_t rpx, int16_t rpy);
+/* Test-only seam: Manhattan-distance tiebreaker to checkpoint center.
+ * Returns 1 = player ahead (closer or equal), 2 = racer ahead. */
+uint8_t pos_from_manhattan(int16_t px,  int16_t py,
+                           int16_t rpx, int16_t rpy,
+                           const CheckpointDef *next);
 #endif
 
 #endif

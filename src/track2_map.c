@@ -137,7 +137,7 @@ const CheckpointDef track2_checkpoints[4] = {
     { 96, 400, 40, 8, 0, CHECKPOINT_DIR_S },
     { 80, 752, 8, 40, 1, CHECKPOINT_DIR_W },
     { 32, 400, 40, 8, 2, CHECKPOINT_DIR_N },
-    { 80, 8, 8, 40, 3, CHECKPOINT_DIR_E },
+    { 80, 8, 8, 56, 3, CHECKPOINT_DIR_E },
 };
 const uint8_t track2_checkpoint_count = 4;
 
