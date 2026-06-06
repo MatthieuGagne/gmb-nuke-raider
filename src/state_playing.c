@@ -89,9 +89,9 @@ static void enter(void) {
     damage_init();
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
+    race_state_init(track_get_lap_count());
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
     powerup_init();
-    race_state_init(track_get_lap_count());
     race_state_set_active(PLAYER_SLOT, 1u);
     active_map_type_cache = track_get_map_type();
     finish_dir_cache = track_get_finish_direction();
