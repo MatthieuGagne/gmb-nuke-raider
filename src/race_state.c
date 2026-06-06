@@ -1,29 +1,149 @@
 #pragma bank 255
-#include <gb/gb.h>
 #include "race_state.h"
+#include "state_playing.h" /* pos_from_dir, pos_from_manhattan (non-static under #ifndef __SDCC) */
+#include "track.h"
+#include "player.h"    /* player_get_x(), player_get_y(), DIR_T/B/L/R/... */
+#include "racer.h"     /* racer_get_px(), racer_get_py() */
 
 static uint8_t rs_cp_next[MAX_RACERS];
 static uint8_t rs_laps[MAX_RACERS];
 static uint8_t rs_active[MAX_RACERS];
 static uint8_t rs_lap_total;
 
-void    race_state_init(uint8_t lap_total) BANKED { (void)lap_total; }
-void    race_state_set_active(uint8_t slot, uint8_t active) BANKED { (void)slot; (void)active; }
-void    race_state_update_cp(uint8_t slot, int16_t x, int16_t y, uint8_t dir) BANKED {
-    (void)slot; (void)x; (void)y; (void)dir;
+void race_state_init(uint8_t lap_total) BANKED {
+    uint8_t i;
+    rs_lap_total = lap_total;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        rs_cp_next[i] = 0u;
+        rs_laps[i]    = 0u;
+        rs_active[i]  = 0u;
+    }
 }
-uint8_t race_state_advance_lap(uint8_t slot) BANKED { (void)slot; return 0u; }
-uint8_t race_state_get_cp(uint8_t slot) BANKED { (void)slot; return 0u; }
-uint8_t race_state_get_laps(uint8_t slot) BANKED { (void)slot; return 0u; }
-uint8_t race_state_get_lap_total(void) BANKED { return 0u; }
-uint8_t race_state_all_cp_cleared(uint8_t slot) BANKED { (void)slot; return 0u; }
-uint8_t race_state_rank_player(void) BANKED { return 1u; }
+
+void race_state_set_active(uint8_t slot, uint8_t active) BANKED {
+    rs_active[slot] = active;
+}
+
+void race_state_update_cp(uint8_t slot, int16_t x, int16_t y, uint8_t dir) BANKED {
+    const CheckpointDef *defs;
+    const CheckpointDef *cp;
+    uint8_t count;
+
+    if (!rs_active[slot]) return;
+    count = track_get_checkpoint_count();
+    if (rs_cp_next[slot] >= count) return;
+    defs = track_get_checkpoints();
+    cp   = &defs[rs_cp_next[slot]];
+
+    if (x < cp->x)                                              return;
+    if (x >= (int16_t)((uint16_t)cp->x + (uint16_t)cp->w))    return;
+    if (y < cp->y)                                              return;
+    if (y >= (int16_t)((uint16_t)cp->y + (uint16_t)cp->h))    return;
+
+    if      (cp->direction == CHECKPOINT_DIR_N) { if (dir != DIR_T  && dir != DIR_RT && dir != DIR_LT) return; }
+    else if (cp->direction == CHECKPOINT_DIR_S) { if (dir != DIR_B  && dir != DIR_RB && dir != DIR_LB) return; }
+    else if (cp->direction == CHECKPOINT_DIR_E) { if (dir != DIR_R  && dir != DIR_RT && dir != DIR_RB) return; }
+    else if (cp->direction == CHECKPOINT_DIR_W) { if (dir != DIR_L  && dir != DIR_LT && dir != DIR_LB) return; }
+
+    rs_cp_next[slot]++;
+}
+
+uint8_t race_state_advance_lap(uint8_t slot) BANKED {
+    if ((uint8_t)(rs_laps[slot] + 1u) >= rs_lap_total) {
+        return 1u;
+    }
+    rs_laps[slot]    = (uint8_t)(rs_laps[slot] + 1u);
+    rs_cp_next[slot] = 0u;
+    return 0u;
+}
+
+uint8_t race_state_get_cp(uint8_t slot) BANKED       { return rs_cp_next[slot]; }
+uint8_t race_state_get_laps(uint8_t slot) BANKED     { return rs_laps[slot]; }
+uint8_t race_state_get_lap_total(void) BANKED         { return rs_lap_total; }
+
+uint8_t race_state_all_cp_cleared(uint8_t slot) BANKED {
+    return (rs_cp_next[slot] >= track_get_checkpoint_count()) ? 1u : 0u;
+}
+
+#ifdef __SDCC
+/* In the SDCC ROM build, pos_from_dir and pos_from_manhattan are static in
+ * state_playing.c (each translation unit has its own copy). Define static
+ * copies here too so race_state_rank_player can call them. */
+static uint8_t pos_from_dir(uint8_t dir,
+                             int16_t px,  int16_t py,
+                             int16_t rpx, int16_t rpy) {
+    if (dir == CHECKPOINT_DIR_N) return (py  <= rpy) ? 1u : 2u;
+    if (dir == CHECKPOINT_DIR_S) return (py  >= rpy) ? 1u : 2u;
+    if (dir == CHECKPOINT_DIR_E) return (px  >= rpx) ? 1u : 2u;
+    return (px <= rpx) ? 1u : 2u;   /* CHECKPOINT_DIR_W */
+}
+
+static uint8_t pos_from_manhattan(int16_t px,  int16_t py,
+                                  int16_t rpx, int16_t rpy,
+                                  const CheckpointDef *next) {
+    int16_t cx  = next->x + (int16_t)(next->w >> 1u);
+    int16_t cy  = next->y + (int16_t)(next->h >> 1u);
+    int16_t pdx = px  - cx; if (pdx < 0) pdx = -pdx;
+    int16_t pdy = py  - cy; if (pdy < 0) pdy = -pdy;
+    int16_t rdx = rpx - cx; if (rdx < 0) rdx = -rdx;
+    int16_t rdy = rpy - cy; if (rdy < 0) rdy = -rdy;
+    uint16_t pd = (uint16_t)pdx + (uint16_t)pdy;
+    uint16_t rd = (uint16_t)rdx + (uint16_t)rdy;
+    return (pd <= rd) ? 1u : 2u;
+}
+#endif /* __SDCC */
+
+uint8_t race_state_rank_player(void) BANKED {
+    uint8_t i;
+    uint8_t pos = 1u;
+    uint8_t player_laps = rs_laps[PLAYER_SLOT];
+    uint8_t player_cp   = rs_cp_next[PLAYER_SLOT];
+    int16_t player_px;
+    int16_t player_py;
+    const CheckpointDef *next;
+    uint8_t finish_dir;
+    uint8_t count;
+
+    for (i = 0u; i < MAX_RACERS; i++) {
+        if (i == PLAYER_SLOT) continue;
+        if (!rs_active[i]) continue;
+
+        if (player_laps > rs_laps[i]) {
+            /* player ahead on laps — pos stays 1 */
+        } else if (player_laps < rs_laps[i]) {
+            pos = 2u;
+        } else if (player_cp > rs_cp_next[i]) {
+            /* tied on laps, player ahead on checkpoints — pos stays 1 */
+        } else if (player_cp < rs_cp_next[i]) {
+            pos = 2u;
+        } else {
+            /* Full tie: Manhattan distance to next checkpoint */
+            count = track_get_checkpoint_count();
+
+            player_px = player_get_x();
+            player_py = player_get_y();
+
+            if (player_cp < count) {
+                next = &track_get_checkpoints()[player_cp];
+                if (pos_from_manhattan(player_px, player_py,
+                                       racer_get_px(i), racer_get_py(i),
+                                       next) == 2u) {
+                    pos = 2u;
+                }
+            } else {
+                /* Past all CPs — compare by finish direction */
+                finish_dir = track_get_finish_direction();
+                if (pos_from_dir(finish_dir, player_px, player_py,
+                                 racer_get_px(i), racer_get_py(i)) == 2u) {
+                    pos = 2u;
+                }
+            }
+        }
+    }
+    return pos;
+}
 
 #ifndef __SDCC
-void race_state_set_laps_for_test(uint8_t slot, uint8_t n) { (void)slot; (void)n; }
-void race_state_set_cp_for_test(uint8_t slot, uint8_t n) { (void)slot; (void)n; }
-/* NOTE: pos_from_dir and pos_from_manhattan are defined in state_playing.c for
- * the red phase. They will migrate here in the green phase (Task 5) when
- * state_playing.c's definitions are removed. Do not define them here yet or the
- * host-test link will see duplicate symbols. */
+void race_state_set_laps_for_test(uint8_t slot, uint8_t n) { rs_laps[slot] = n; }
+void race_state_set_cp_for_test(uint8_t slot, uint8_t n)   { rs_cp_next[slot] = n; }
 #endif
