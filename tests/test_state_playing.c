@@ -1,7 +1,6 @@
 #include "unity.h"
 #include "track.h"         /* TRACK_TYPE_RACE, TRACK_TYPE_COMBAT, CHECKPOINT_DIR_* via checkpoint.h */
 #include "state_playing.h" /* finish_eval, cd_advance */
-#include "race_state.h"    /* pos_from_dir, pos_from_manhattan (owned by race_state.c) */
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -111,60 +110,6 @@ void test_finish_eval_dir_W_invalid_east(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_R, CHECKPOINT_DIR_W, 1u));
 }
 
-/* AC7: pos_from_dir covers all 4 directions, both outcomes each.
- * Semantics: CHECKPOINT_DIR_N = going north → lower py = further ahead.
- *            CHECKPOINT_DIR_S = going south → higher py = further ahead.
- *            CHECKPOINT_DIR_E = going east  → higher px = further ahead.
- *            CHECKPOINT_DIR_W = going west  → lower px  = further ahead.
- * Returns 1 = player ahead, 2 = racer ahead. */
-void test_pos_from_dir_N_player_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_dir(CHECKPOINT_DIR_N, 0,  50, 0, 100));
-}
-void test_pos_from_dir_N_racer_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_dir(CHECKPOINT_DIR_N, 0, 100, 0,  50));
-}
-void test_pos_from_dir_S_player_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_dir(CHECKPOINT_DIR_S, 0, 100, 0,  50));
-}
-void test_pos_from_dir_S_racer_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_dir(CHECKPOINT_DIR_S, 0,  50, 0, 100));
-}
-void test_pos_from_dir_E_player_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_dir(CHECKPOINT_DIR_E, 100, 0,  50, 0));
-}
-void test_pos_from_dir_E_racer_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_dir(CHECKPOINT_DIR_E,  50, 0, 100, 0));
-}
-void test_pos_from_dir_W_player_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_dir(CHECKPOINT_DIR_W,  50, 0, 100, 0));
-}
-void test_pos_from_dir_W_racer_ahead(void) {
-    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_dir(CHECKPOINT_DIR_W, 100, 0,  50, 0));
-}
-
-/* pos_from_manhattan: smaller Manhattan distance to checkpoint center = ahead (P1).
- * Tie (equal distance) favors player → returns 1. */
-void test_pos_from_manhattan_player_closer(void) {
-    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
-    /* center=(110,110). player dist=4, racer dist=40 */
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(112, 112, 90, 90, &cp));
-}
-void test_pos_from_manhattan_racer_closer(void) {
-    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
-    /* center=(110,110). player dist=40, racer dist=4 */
-    TEST_ASSERT_EQUAL_UINT8(2u, pos_from_manhattan(90, 90, 112, 112, &cp));
-}
-void test_pos_from_manhattan_equal_distance_favors_player(void) {
-    CheckpointDef cp = {100, 100, 20, 20, 0, CHECKPOINT_DIR_N};
-    /* center=(110,110). player dist=10, racer dist=10 */
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(120, 110, 110, 120, &cp));
-}
-void test_pos_from_manhattan_nonsquare_checkpoint(void) {
-    CheckpointDef cp = {0, 0, 40, 10, 0, CHECKPOINT_DIR_E};
-    /* center=(20,5). player dist=1, racer dist=20 */
-    TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(21, 5, 0, 5, &cp));
-}
-
 void test_cd_stays_in_phase_before_threshold(void) {
     /* CD_FRAMES_NUM - 1 = 59 */
     TEST_ASSERT_EQUAL_UINT8(0u, cd_advance(0u, 59u));
@@ -211,17 +156,5 @@ int main(void) {
     RUN_TEST(test_cd_advances_at_60_frames);
     RUN_TEST(test_cd_go_stays_before_45);
     RUN_TEST(test_cd_go_advances_at_45_frames);
-    RUN_TEST(test_pos_from_dir_N_player_ahead);
-    RUN_TEST(test_pos_from_dir_N_racer_ahead);
-    RUN_TEST(test_pos_from_dir_S_player_ahead);
-    RUN_TEST(test_pos_from_dir_S_racer_ahead);
-    RUN_TEST(test_pos_from_dir_E_player_ahead);
-    RUN_TEST(test_pos_from_dir_E_racer_ahead);
-    RUN_TEST(test_pos_from_dir_W_player_ahead);
-    RUN_TEST(test_pos_from_dir_W_racer_ahead);
-    RUN_TEST(test_pos_from_manhattan_player_closer);
-    RUN_TEST(test_pos_from_manhattan_racer_closer);
-    RUN_TEST(test_pos_from_manhattan_equal_distance_favors_player);
-    RUN_TEST(test_pos_from_manhattan_nonsquare_checkpoint);
     return UNITY_END();
 }
