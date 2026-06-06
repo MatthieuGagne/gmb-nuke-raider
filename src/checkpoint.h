@@ -14,6 +14,8 @@
 /* Static descriptor for one checkpoint — populated by tmx_to_c.py-generated C.
  * Used as a ROM table (generated files) and a WRAM copy buffer (track.c).
  * AoS is correct here: checkpoint_update() reads ALL fields of ONE entry per frame. */
+#ifndef CHECKPOINTDEF_DEFINED
+#define CHECKPOINTDEF_DEFINED
 typedef struct {
     int16_t x;
     int16_t y;
@@ -22,6 +24,7 @@ typedef struct {
     uint8_t index;
     uint8_t direction;
 } CheckpointDef;
+#endif
 
 /* checkpoint_init: call in state_playing enter() via track_get_checkpoints().
  * defs must point to a stable WRAM buffer (WRAM copy from track.c — NOT a ROM pointer). */

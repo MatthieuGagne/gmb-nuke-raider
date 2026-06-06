@@ -35,7 +35,24 @@ extern const int16_t track2_start_y;
 extern uint8_t active_map_w;
 extern uint8_t active_map_h;
 
-#include "checkpoint.h"
+/* Checkpoint direction constants — used by race_state and racer for AABB+direction matching */
+#define CHECKPOINT_DIR_N 0u
+#define CHECKPOINT_DIR_S 1u
+#define CHECKPOINT_DIR_E 2u
+#define CHECKPOINT_DIR_W 3u
+
+/* Per-checkpoint descriptor — stored in ROM, loaded into WRAM buffer by track_init() */
+#ifndef CHECKPOINTDEF_DEFINED
+#define CHECKPOINTDEF_DEFINED
+typedef struct {
+    int16_t x;          /* world-pixel left edge of AABB */
+    int16_t y;          /* world-pixel top edge of AABB */
+    uint8_t w;          /* AABB width in pixels */
+    uint8_t h;          /* AABB height in pixels */
+    uint8_t index;      /* sequential index (0-based) */
+    uint8_t direction;  /* CHECKPOINT_DIR_N/S/E/W */
+} CheckpointDef;
+#endif
 #include "banking.h"
 #include "loader.h"
 BANKREF_EXTERN(track_map)
