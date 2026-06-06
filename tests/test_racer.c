@@ -4,6 +4,7 @@
 #include "config.h"
 #include "track.h"
 #include "checkpoint.h"
+#include "race_state.h"
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
 #include "projectile.h"
 
@@ -98,7 +99,7 @@ void test_racer_no_finish_before_all_laps_done(void) {
     uint8_t wp_ty[1] = { 5u };
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    racer_set_laps_done_for_test(2u);  /* 2 of 3 laps done */
+    race_state_set_laps_for_test(0u, 1u);  /* 1 of 3 laps done — 2 more needed */
     racer_place_on_finish_for_test(5u, 6u, DIR_B);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
@@ -119,7 +120,7 @@ void test_racer_finishes_after_all_laps_done(void) {
     uint8_t wp_ty[1] = { 5u };
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    /* racer_spawn_for_test sets s_laps_done = lap_total = 3 */
+    race_state_set_laps_for_test(0u, 2u);  /* 2 of 3 laps done — one more finishes */
     racer_place_on_finish_for_test(5u, 6u, DIR_B);
     TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
 }
@@ -493,15 +494,15 @@ void test_racer_get_cp_next_initial_zero(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
 void test_racer_spawn_resets_cp_next(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
-    racer_set_cp_next_for_test(0u, 5u);  /* pre-pollute */
+    race_state_set_cp_for_test(0u, 5u);  /* pre-pollute */
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
 void test_racer_get_px_returns_spawn_value(void) {
@@ -526,9 +527,8 @@ void test_racer_cp_next_increments_on_matching_dir(void) {
     setup_one_checkpoint_south(defs);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    racer_set_dir_for_test(0u, DIR_B);
-    racer_checkpoint_update_for_test(0u);
-    TEST_ASSERT_EQUAL_UINT8(1u, racer_get_cp_next(0u));
+    race_state_update_cp(0u, 110, 408, DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(1u, race_state_get_cp(0u));
 }
 
 /* AC2: racer_cp_next does NOT increment with wrong direction */
@@ -537,25 +537,23 @@ void test_racer_cp_next_no_increment_wrong_dir(void) {
     setup_one_checkpoint_south(defs);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    racer_set_dir_for_test(0u, DIR_T);
-    racer_checkpoint_update_for_test(0u);
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+    race_state_update_cp(0u, 110, 408, DIR_T);
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
-/* AC3: racer_cp_next resets to 0 on waypoint wrap */
-void test_racer_cp_next_resets_on_lap_wrap(void) {
+/* AC3: waypoint wrap does NOT reset cp_next — only race_state_advance_lap resets it */
+void test_racer_wp_wrap_does_not_reset_cp(void) {
     CheckpointDef defs[1];
     track_test_set_checkpoints(defs, 0u);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    racer_set_cp_next_for_test(0u, 2u);
+    race_state_set_cp_for_test(0u, 2u);
     racer_set_wp_idx_for_test(0u, 0u);
     racer_set_pos_for_test(0u, 80, 80);
-    racer_set_laps_done_for_test(0u);
     static const uint8_t flat[16*16] = {0};
     track_test_set_map(flat, 16u, 16u);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+    TEST_ASSERT_EQUAL_UINT8(2u, race_state_get_cp(0u));  /* unchanged by wp wrap */
 }
 
 /* AC4: sequential enforcement — cp[1] AABB cannot clear before cp[0] */
@@ -568,9 +566,9 @@ void test_racer_cp_next_sequential_order_enforced(void) {
     track_test_set_checkpoints(defs, 2u);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    racer_set_dir_for_test(0u, DIR_B);
-    racer_checkpoint_update_for_test(0u);
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_cp_next(0u));
+    /* Try to clear cp[1] (at 96,400) while cp[0] (at 200,200) not cleared */
+    race_state_update_cp(0u, 110, 408, DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
 int main(void) {
@@ -610,7 +608,7 @@ int main(void) {
     RUN_TEST(test_racer_get_px_returns_spawn_value);
     RUN_TEST(test_racer_cp_next_increments_on_matching_dir);
     RUN_TEST(test_racer_cp_next_no_increment_wrong_dir);
-    RUN_TEST(test_racer_cp_next_resets_on_lap_wrap);
+    RUN_TEST(test_racer_wp_wrap_does_not_reset_cp);
     RUN_TEST(test_racer_cp_next_sequential_order_enforced);
     return UNITY_END();
 }
