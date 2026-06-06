@@ -5,7 +5,6 @@
 #include "track_tileset_meta.h"
 #include "banking.h"
 #include "loader.h"
-#include "checkpoint.h"
 
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;

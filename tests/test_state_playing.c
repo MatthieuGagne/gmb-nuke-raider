@@ -1,5 +1,5 @@
 #include "unity.h"
-#include "track.h"         /* TRACK_TYPE_RACE, TRACK_TYPE_COMBAT, CHECKPOINT_DIR_* via checkpoint.h */
+#include "track.h"         /* TRACK_TYPE_RACE, TRACK_TYPE_COMBAT, CHECKPOINT_DIR_* */
 #include "state_playing.h" /* finish_eval, cd_advance */
 
 void setUp(void) {}

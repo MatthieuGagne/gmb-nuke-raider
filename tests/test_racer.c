@@ -3,7 +3,6 @@
 #include "racer.h"
 #include "config.h"
 #include "track.h"
-#include "checkpoint.h"
 #include "race_state.h"
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
 #include "projectile.h"

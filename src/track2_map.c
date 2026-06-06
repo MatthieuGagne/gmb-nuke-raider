@@ -130,8 +130,6 @@ const uint8_t track2_map[2002] = {
     /* row 99 */ 0,0,0,36,30,30,30,30,30,30,30,30,30,30,30,30,30,38,0,0,
 };
 
-#include "checkpoint.h"
-
 BANKREF(track2_checkpoints)
 const CheckpointDef track2_checkpoints[4] = {
     { 96, 400, 40, 8, 0, CHECKPOINT_DIR_S },
