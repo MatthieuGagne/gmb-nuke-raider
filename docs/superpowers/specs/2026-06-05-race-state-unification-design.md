@@ -57,10 +57,10 @@ lap state — they call into `race_state`.
 void race_state_init(uint8_t lap_total);
 void race_state_set_active(uint8_t slot, uint8_t active);  /* call on spawn/despawn */
 
-/* Per-frame update — call once per slot per frame */
+/* Per-frame update — call once per slot per frame; caller passes its own coords */
 void race_state_update_cp(uint8_t slot, int16_t x, int16_t y, uint8_t dir);
 
-/* Lap gate — call ONLY after finish tile + direction validated for the slot */
+/* Lap gate — call when finish tile + direction validated */
 /* Returns 1 if the race is over for this slot, 0 if lap incremented */
 uint8_t race_state_advance_lap(uint8_t slot);
 
@@ -87,8 +87,9 @@ static uint8_t rs_lap_total;
 
 AABB + direction check against `track_get_checkpoints()[rs_cp_next[slot]]` — identical
 logic currently duplicated between `checkpoint_update()` and `racer_checkpoint_update()`.
-Caller passes entity world position and direction. Increments `rs_cp_next[slot]` on clear.
-Requires `rs_active[slot] == 1`. Callers: `state_playing.c` (player) and `racer.c` (enemies).
+Caller passes entity world position and direction; `race_state.c` does not reach into
+`player.c` or `racer.c` internals. Increments `rs_cp_next[slot]` on clear.
+Requires `rs_active[slot] == 1`.
 
 ### `race_state_advance_lap(slot)`
 
