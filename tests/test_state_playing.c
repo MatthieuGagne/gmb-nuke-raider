@@ -1,6 +1,7 @@
 #include "unity.h"
 #include "track.h"         /* TRACK_TYPE_RACE, TRACK_TYPE_COMBAT, CHECKPOINT_DIR_* via checkpoint.h */
-#include "state_playing.h" /* finish_eval */
+#include "state_playing.h" /* finish_eval, cd_advance */
+#include "race_state.h"    /* pos_from_dir, pos_from_manhattan (owned by race_state.c) */
 
 void setUp(void) {}
 void tearDown(void) {}

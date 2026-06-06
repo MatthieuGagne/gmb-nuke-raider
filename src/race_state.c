@@ -1,6 +1,5 @@
 #pragma bank 255
 #include "race_state.h"
-#include "state_playing.h" /* pos_from_dir, pos_from_manhattan (non-static under #ifndef __SDCC) */
 #include "track.h"
 #include "player.h"    /* player_get_x(), player_get_y(), DIR_T/B/L/R/... */
 #include "racer.h"     /* racer_get_px(), racer_get_py() */
@@ -65,22 +64,30 @@ uint8_t race_state_all_cp_cleared(uint8_t slot) BANKED {
     return (rs_cp_next[slot] >= track_get_checkpoint_count()) ? 1u : 0u;
 }
 
-#ifdef __SDCC
-/* In the SDCC ROM build, pos_from_dir and pos_from_manhattan are static in
- * state_playing.c (each translation unit has its own copy). Define static
- * copies here too so race_state_rank_player can call them. */
-static uint8_t pos_from_dir(uint8_t dir,
-                             int16_t px,  int16_t py,
-                             int16_t rpx, int16_t rpy) {
+/* Direction-aware position comparison. Static in SDCC build; exposed for host tests. */
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
+pos_from_dir(uint8_t dir,
+             int16_t px,  int16_t py,
+             int16_t rpx, int16_t rpy) {
     if (dir == CHECKPOINT_DIR_N) return (py  <= rpy) ? 1u : 2u;
     if (dir == CHECKPOINT_DIR_S) return (py  >= rpy) ? 1u : 2u;
     if (dir == CHECKPOINT_DIR_E) return (px  >= rpx) ? 1u : 2u;
     return (px <= rpx) ? 1u : 2u;   /* CHECKPOINT_DIR_W */
 }
 
-static uint8_t pos_from_manhattan(int16_t px,  int16_t py,
-                                  int16_t rpx, int16_t rpy,
-                                  const CheckpointDef *next) {
+/* Manhattan-distance tiebreaker. Static in SDCC build; exposed for host tests. */
+#ifndef __SDCC
+uint8_t
+#else
+static uint8_t
+#endif
+pos_from_manhattan(int16_t px,  int16_t py,
+                   int16_t rpx, int16_t rpy,
+                   const CheckpointDef *next) {
     int16_t cx  = next->x + (int16_t)(next->w >> 1u);
     int16_t cy  = next->y + (int16_t)(next->h >> 1u);
     int16_t pdx = px  - cx; if (pdx < 0) pdx = -pdx;
@@ -91,7 +98,6 @@ static uint8_t pos_from_manhattan(int16_t px,  int16_t py,
     uint16_t rd = (uint16_t)rdx + (uint16_t)rdy;
     return (pd <= rd) ? 1u : 2u;
 }
-#endif /* __SDCC */
 
 uint8_t race_state_rank_player(void) BANKED {
     uint8_t i;

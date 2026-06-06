@@ -45,28 +45,21 @@ static const uint8_t cd_hi[4] = {
     (uint8_t)('3'-' '), (uint8_t)('2'-' '), (uint8_t)('1'-' '), (uint8_t)('O'-' ')
 };
 
-#ifndef __SDCC
-uint8_t
-#else
-static uint8_t
-#endif
-pos_from_dir(uint8_t dir,
-             int16_t px,  int16_t py,
-             int16_t rpx, int16_t rpy) {
+/* pos_from_dir / pos_from_manhattan are owned by race_state.c.
+ * These static copies are kept here so state_playing.c can call them without
+ * a cross-module call; they are NEVER exported. */
+static uint8_t pos_from_dir(uint8_t dir,
+                             int16_t px,  int16_t py,
+                             int16_t rpx, int16_t rpy) {
     if (dir == CHECKPOINT_DIR_N) return (py  <= rpy) ? 1u : 2u;
     if (dir == CHECKPOINT_DIR_S) return (py  >= rpy) ? 1u : 2u;
     if (dir == CHECKPOINT_DIR_E) return (px  >= rpx) ? 1u : 2u;
     return (px <= rpx) ? 1u : 2u;   /* CHECKPOINT_DIR_W */
 }
 
-#ifndef __SDCC
-uint8_t
-#else
-static uint8_t
-#endif
-pos_from_manhattan(int16_t px,  int16_t py,
-                   int16_t rpx, int16_t rpy,
-                   const CheckpointDef *next) {
+static uint8_t pos_from_manhattan(int16_t px,  int16_t py,
+                                  int16_t rpx, int16_t rpy,
+                                  const CheckpointDef *next) {
     int16_t cx  = next->x + (int16_t)(next->w >> 1u);
     int16_t cy  = next->y + (int16_t)(next->h >> 1u);
     int16_t pdx = px  - cx; if (pdx < 0) pdx = -pdx;
