@@ -570,6 +570,55 @@ void test_racer_cp_next_sequential_order_enforced(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
+/* === Multi-enemy racer tests (PLAYER_SLOT=0, MAX_ENEMY_RACERS=2) === */
+
+void test_racer_init_activates_both_enemy_slots(void) {
+    /* RED: After racer_init, enemy slots 1..2 must be active; player slot 0 untouched.
+     * Fails until MAX_RACERS=3, PLAYER_SLOT=0, and indexed loader are wired (Tasks 2-5). */
+    racer_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[0]);  /* player slot 0: never set by racer_init */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[2]);  /* enemy 1 active (OOB until Task 2) */
+}
+
+void test_racer_init_skips_slot_when_no_spawn(void) {
+    /* RED: Only 1 car spawn → slot 1 active, slot 2 inactive.
+     * Fails until indexed loader and multi-enemy init are wired (Tasks 4-5). */
+    racer_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no spawn → inactive */
+}
+
+void test_racer_init_skips_slot_when_no_waypoints(void) {
+    /* RED: 2 spawns but only 1 has waypoints → slot 1 active, slot 2 inactive.
+     * Fails until indexed loader and multi-enemy init are wired (Tasks 4-5). */
+    racer_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no waypoints → inactive */
+}
+
+void test_racer_rank_with_two_enemies_player_first(void) {
+    /* Player (PLAYER_SLOT=0) is 1 lap ahead of both enemies → rank 1.
+     * Fails until PLAYER_SLOT=0 and race_state uses correct slot (Tasks 2, 6). */
+    race_state_init(3u);
+    race_state_set_active(0u, 1u);  /* PLAYER_SLOT=0 in target state */
+    race_state_set_active(1u, 1u);  /* enemy 0 */
+    /* NOTE: slot 2 omitted here — OOB until MAX_RACERS=3 in Task 2 */
+    race_state_advance_lap(0u);     /* player (slot 0) completes a lap */
+    TEST_ASSERT_EQUAL_UINT8(1u, race_state_rank_player());
+}
+
+void test_racer_rank_with_two_enemies_player_last(void) {
+    /* Both enemies 1 lap ahead of player → rank 3.
+     * Fails until PLAYER_SLOT=0, MAX_RACERS=3, and ranking loops all slots (Tasks 2, 6). */
+    race_state_init(3u);
+    race_state_set_active(0u, 1u);  /* PLAYER_SLOT=0 in target state */
+    race_state_set_active(1u, 1u);  /* enemy 0 */
+    /* NOTE: slot 2 omitted here — OOB until MAX_RACERS=3 in Task 2 */
+    race_state_advance_lap(1u);     /* enemy 0 (slot 1) completes a lap */
+    TEST_ASSERT_EQUAL_UINT8(3u, race_state_rank_player());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_racer_inactive_after_init_empty);
@@ -609,5 +658,10 @@ int main(void) {
     RUN_TEST(test_racer_cp_next_no_increment_wrong_dir);
     RUN_TEST(test_racer_wp_wrap_does_not_reset_cp);
     RUN_TEST(test_racer_cp_next_sequential_order_enforced);
+    RUN_TEST(test_racer_init_activates_both_enemy_slots);
+    RUN_TEST(test_racer_init_skips_slot_when_no_spawn);
+    RUN_TEST(test_racer_init_skips_slot_when_no_waypoints);
+    RUN_TEST(test_racer_rank_with_two_enemies_player_first);
+    RUN_TEST(test_racer_rank_with_two_enemies_player_last);
     return UNITY_END();
 }
