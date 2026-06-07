@@ -115,13 +115,13 @@ uint8_t race_state_rank_player(void) BANKED {
         if (!rs_active[i]) continue;
 
         if (player_laps > rs_laps[i]) {
-            /* player ahead on laps — pos stays 1 */
+            /* player ahead on laps — pos unaffected */
         } else if (player_laps < rs_laps[i]) {
-            pos = 2u;
+            pos++;
         } else if (player_cp > rs_cp_next[i]) {
-            /* tied on laps, player ahead on checkpoints — pos stays 1 */
+            /* tied on laps, player ahead on checkpoints — pos unaffected */
         } else if (player_cp < rs_cp_next[i]) {
-            pos = 2u;
+            pos++;
         } else {
             /* Full tie: Manhattan distance to next checkpoint */
             count = track_get_checkpoint_count();
@@ -134,14 +134,14 @@ uint8_t race_state_rank_player(void) BANKED {
                 if (pos_from_manhattan(player_px, player_py,
                                        racer_get_px(i), racer_get_py(i),
                                        next) == 2u) {
-                    pos = 2u;
+                    pos++;
                 }
             } else {
                 /* Past all CPs — compare by finish direction */
                 finish_dir = track_get_finish_direction();
                 if (pos_from_dir(finish_dir, player_px, player_py,
                                  racer_get_px(i), racer_get_py(i)) == 2u) {
-                    pos = 2u;
+                    pos++;
                 }
             }
         }

@@ -231,30 +231,30 @@ void test_rank_player_more_laps_is_1(void) {
 void test_rank_player_fewer_laps_is_2(void) {
     track_test_set_checkpoints(NULL, 0u);
     race_state_init(3u);
-    race_state_set_active(0u, 1u);
+    race_state_set_active(1u, 1u);          /* enemy at slot 1 */
     race_state_set_active(PLAYER_SLOT, 1u);
     race_state_set_laps_for_test(PLAYER_SLOT, 1u);
-    race_state_set_laps_for_test(0u, 2u);
+    race_state_set_laps_for_test(1u, 2u);   /* enemy has more laps */
     TEST_ASSERT_EQUAL_UINT8(2u, race_state_rank_player());
 }
 
 void test_rank_player_same_laps_more_cp_is_1(void) {
     track_test_set_checkpoints(NULL, 0u);
     race_state_init(3u);
-    race_state_set_active(0u, 1u);
+    race_state_set_active(1u, 1u);          /* enemy at slot 1 */
     race_state_set_active(PLAYER_SLOT, 1u);
-    race_state_set_cp_for_test(PLAYER_SLOT, 3u);
-    race_state_set_cp_for_test(0u, 1u);
+    race_state_set_cp_for_test(PLAYER_SLOT, 3u); /* player ahead on CPs */
+    race_state_set_cp_for_test(1u, 1u);
     TEST_ASSERT_EQUAL_UINT8(1u, race_state_rank_player());
 }
 
 void test_rank_player_same_laps_fewer_cp_is_2(void) {
     track_test_set_checkpoints(NULL, 0u);
     race_state_init(3u);
-    race_state_set_active(0u, 1u);
+    race_state_set_active(1u, 1u);          /* enemy at slot 1 */
     race_state_set_active(PLAYER_SLOT, 1u);
     race_state_set_cp_for_test(PLAYER_SLOT, 1u);
-    race_state_set_cp_for_test(0u, 3u);
+    race_state_set_cp_for_test(1u, 3u);     /* enemy has more CPs */
     TEST_ASSERT_EQUAL_UINT8(2u, race_state_rank_player());
 }
 

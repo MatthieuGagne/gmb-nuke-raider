@@ -43,8 +43,8 @@ void test_load_npc_positions_id0_returns_count(void) {
 void test_load_npc_positions_id1_returns_count(void) {
     uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
     load_npc_positions(1u, tx, ty, type, dir, &count);
-    /* track2 has 1 NPC (NPC_TYPE_CAR racer spawn added in Task 6) */
-    TEST_ASSERT_EQUAL_UINT8(1u, count);
+    /* track2 has 2 NPC_TYPE_CAR racer spawns */
+    TEST_ASSERT_EQUAL_UINT8(2u, count);
 }
 
 void test_load_npc_positions_id2_returns_count(void) {
@@ -260,11 +260,11 @@ void test_load_racer_spawn_idx0_returns_found_for_track1(void) {
     TEST_ASSERT_NOT_EQUAL(0u, tx); /* must have been filled */
 }
 
-void test_load_racer_spawn_idx1_returns_not_found_for_track1(void) {
+void test_load_racer_spawn_idx1_returns_found_for_track1(void) {
     uint8_t tx = 0u, ty = 0u;
-    /* track2 has only 1 NPC_TYPE_CAR; idx=1 must return 0 */
+    /* track2 now has 2 NPC_TYPE_CAR objects; idx=1 must return 1 */
     uint8_t found = load_racer_spawn(1u, 1u, &tx, &ty);
-    TEST_ASSERT_EQUAL_UINT8(0u, found);
+    TEST_ASSERT_EQUAL_UINT8(1u, found);
 }
 
 void test_load_racer_spawn_idx0_returns_not_found_for_track0(void) {
@@ -360,7 +360,7 @@ int main(void) {
     RUN_TEST(test_load_asset_assigns_bg_slot);
     RUN_TEST(test_load_asset_independent_of_state_flag);
     RUN_TEST(test_load_racer_spawn_idx0_returns_found_for_track1);
-    RUN_TEST(test_load_racer_spawn_idx1_returns_not_found_for_track1);
+    RUN_TEST(test_load_racer_spawn_idx1_returns_found_for_track1);
     RUN_TEST(test_load_racer_spawn_idx0_returns_not_found_for_track0);
     RUN_TEST(test_load_racer_waypoints_idx0_track1_returns_count);
     RUN_TEST(test_load_racer_waypoints_idx1_track1_returns_count);

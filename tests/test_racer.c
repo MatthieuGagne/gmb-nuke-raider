@@ -25,7 +25,7 @@ void test_racer_advances_waypoint_when_close(void) {
     uint8_t wp_ty[2] = { 10u, 10u };
     racer_spawn_for_test(84u, 84u, wp_tx, wp_ty, 2u, CHECKPOINT_DIR_S, 1u);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(1u, racer_get_wp_idx(0u));
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_get_wp_idx(1u));
 }
 
 void test_racer_finish_triggers_game_over(void) {
@@ -68,7 +68,7 @@ void test_racer_finish_wrong_direction_no_game_over(void) {
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
     /* Place racer centre at tile (5,6) = pixel (44,52), heading toward waypoint (5,0) */
-    racer_set_pos_for_test(0u, 36, 52);
+    racer_set_pos_for_test(1u, 36, 52);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
 
@@ -76,10 +76,10 @@ void test_racer_wraps_waypoints(void) {
     uint8_t wp_tx[2] = { 10u, 20u };
     uint8_t wp_ty[2] = { 10u, 10u };
     racer_spawn_for_test(84u, 84u, wp_tx, wp_ty, 2u, CHECKPOINT_DIR_S, 1u);
-    racer_set_wp_idx_for_test(0u, 1u);
-    racer_set_pos_for_test(0u, 164, 84);
+    racer_set_wp_idx_for_test(1u, 1u);
+    racer_set_pos_for_test(1u, 164, 84);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_idx(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_idx(1u));
 }
 
 void test_racer_no_finish_before_all_laps_done(void) {
@@ -98,7 +98,7 @@ void test_racer_no_finish_before_all_laps_done(void) {
     uint8_t wp_ty[1] = { 5u };
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    race_state_set_laps_for_test(0u, 1u);  /* 1 of 3 laps done — 2 more needed */
+    race_state_set_laps_for_test(1u, 1u);  /* 1 of 3 laps done — 2 more needed */
     racer_place_on_finish_for_test(5u, 6u, DIR_B);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
@@ -119,7 +119,7 @@ void test_racer_finishes_after_all_laps_done(void) {
     uint8_t wp_ty[1] = { 5u };
     track_test_set_map(finish_map, 8u, 8u);
     racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    race_state_set_laps_for_test(0u, 2u);  /* 2 of 3 laps done — one more finishes */
+    race_state_set_laps_for_test(1u, 2u);  /* 2 of 3 laps done — one more finishes */
     racer_place_on_finish_for_test(5u, 6u, DIR_B);
     TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
 }
@@ -145,10 +145,10 @@ void test_racer_4corner_blocks_when_corner_hits_wall(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(map, 8u, 4u);
     racer_spawn_for_test(8, 0, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
-    racer_set_vel_for_test(0u, 6, 0);
+    racer_set_vel_for_test(1u, 6, 0);
     racer_update();
-    TEST_ASSERT_EQUAL_INT16(8, racer_get_px(0u));
-    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
+    TEST_ASSERT_EQUAL_INT16(8, racer_get_px(1u));
+    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(1u));
 }
 
 void test_racer_slides_along_wall_on_y_collision(void) {
@@ -168,10 +168,10 @@ void test_racer_slides_along_wall_on_y_collision(void) {
     uint8_t wp_ty[1] = { 7u };
     track_test_set_map(map, 8u, 8u);
     racer_spawn_for_test(8, 8, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
-    racer_set_vel_for_test(0u, 4, 4);
+    racer_set_vel_for_test(1u, 4, 4);
     racer_update();
-    TEST_ASSERT_EQUAL_INT16(8, racer_get_py(0u));
-    TEST_ASSERT_GREATER_THAN_INT16(8, racer_get_px(0u));
+    TEST_ASSERT_EQUAL_INT16(8, racer_get_py(1u));
+    TEST_ASSERT_GREATER_THAN_INT16(8, racer_get_px(1u));
 }
 
 void test_racer_accelerates_from_rest(void) {
@@ -194,7 +194,7 @@ void test_racer_accelerates_from_rest(void) {
     racer_update();
     racer_update();
     racer_update();
-    TEST_ASSERT_LESS_THAN_INT8(0, racer_get_vy(0u));
+    TEST_ASSERT_LESS_THAN_INT8(0, racer_get_vy(1u));
 }
 
 void test_racer_wall_collision_zeroes_vx_and_gear(void) {
@@ -210,11 +210,11 @@ void test_racer_wall_collision_zeroes_vx_and_gear(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(map, 8u, 4u);
     racer_spawn_for_test(0, 0, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
-    racer_set_vel_for_test(0u, 5, 0);
-    racer_set_gear_for_test(0u, 2u);
+    racer_set_vel_for_test(1u, 5, 0);
+    racer_set_gear_for_test(1u, 2u);
     racer_update();
-    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(0u));
+    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(1u));
 }
 
 /* ---- Terrain interaction tests ---- */
@@ -254,18 +254,18 @@ void test_racer_sand_doubles_friction(void) {
      * road_vy=-3 and sand_vy=-2 to the same clamped value. */
     track_test_set_map(road_map, 8u, 8u);
     racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
-    racer_set_gear_for_test(0u, 1u);
-    racer_set_vel_for_test(0u, 0, -4);
+    racer_set_gear_for_test(1u, 1u);
+    racer_set_vel_for_test(1u, 0, -4);
     racer_update();
-    road_vy = racer_get_vy(0u);
+    road_vy = racer_get_vy(1u);
 
     /* Sand: same start state */
     track_test_set_map(sand_map, 8u, 8u);
     racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
-    racer_set_gear_for_test(0u, 1u);
-    racer_set_vel_for_test(0u, 0, -4);
+    racer_set_gear_for_test(1u, 1u);
+    racer_set_vel_for_test(1u, 0, -4);
     racer_update();
-    sand_vy = racer_get_vy(0u);
+    sand_vy = racer_get_vy(1u);
 
     TEST_ASSERT_GREATER_THAN_INT8(road_vy, sand_vy);
 }
@@ -286,9 +286,9 @@ void test_racer_oil_resets_gear(void) {
     uint8_t wp_ty[1] = { 4u };
     track_test_set_map(oil_map, 8u, 8u);
     racer_spawn_for_test(0, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
-    racer_set_gear_for_test(0u, 2u);
+    racer_set_gear_for_test(1u, 2u);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_gear(1u));
 }
 
 void test_racer_boost_accelerates_upward(void) {
@@ -308,7 +308,7 @@ void test_racer_boost_accelerates_upward(void) {
     track_test_set_map(boost_map, 8u, 8u);
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
     racer_update();
-    TEST_ASSERT_LESS_THAN_INT8(0, racer_get_vy(0u));
+    TEST_ASSERT_LESS_THAN_INT8(0, racer_get_vy(1u));
 }
 
 void test_racer_boost_overrides_gear_max_speed(void) {
@@ -328,9 +328,9 @@ void test_racer_boost_overrides_gear_max_speed(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(boost_map, 8u, 8u);
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
-    racer_set_vel_for_test(0u, 0, -(int8_t)(RACER_GEAR3_MAX_SPEED - 1u));
+    racer_set_vel_for_test(1u, 0, -(int8_t)(RACER_GEAR3_MAX_SPEED - 1u));
     racer_update();
-    TEST_ASSERT_LESS_THAN_INT8(-(int8_t)RACER_GEAR3_MAX_SPEED, racer_get_vy(0u));
+    TEST_ASSERT_LESS_THAN_INT8(-(int8_t)RACER_GEAR3_MAX_SPEED, racer_get_vy(1u));
 }
 
 void test_racer_terrain_query_uses_top_center(void) {
@@ -353,9 +353,9 @@ void test_racer_terrain_query_uses_top_center(void) {
     uint8_t wp_ty[1] = { 100u };
     track_test_set_map(mixed_map, 4u, 4u);
     racer_spawn_for_test(0, 0, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
-    racer_set_vel_for_test(0u, 2, 0);
+    racer_set_vel_for_test(1u, 2, 0);
     racer_update();
-    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(0u));
+    TEST_ASSERT_EQUAL_INT8(0, racer_get_vx(1u));
 }
 
 /* ---- racer_blocks_pixel ---- */
@@ -416,12 +416,12 @@ void test_racer_overlaps_player_when_inactive(void) {
 }
 
 void test_racer_hp_initialized_to_racer_hp(void) {
-    /* racer_init_empty() called in setUp; HP must equal RACER_HP */
-    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
+    /* racer_init_empty() called in setUp; HP must equal RACER_HP (check enemy slot 1) */
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
 }
 
 void test_racer_hit_flash_initialized_to_zero(void) {
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hit_flash_for_test(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hit_flash_for_test(1u));
 }
 
 void test_racer_bullet_hit_reduces_hp(void) {
@@ -436,10 +436,10 @@ void test_racer_bullet_hit_reduces_hp(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(flat_map, 8u, 8u);
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
-    racer_set_hp_for_test(0u, RACER_HP);
+    racer_set_hp_for_test(1u, RACER_HP);
     projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(RACER_HP - 1u, racer_get_hp_for_test(0u));
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP - 1u, racer_get_hp_for_test(1u));
 }
 
 void test_racer_destroyed_when_hp_reaches_zero(void) {
@@ -452,10 +452,10 @@ void test_racer_destroyed_when_hp_reaches_zero(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(flat_map, 8u, 8u);
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
-    racer_set_hp_for_test(0u, 1u);
+    racer_set_hp_for_test(1u, 1u);
     projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[1]);
 }
 
 void test_racer_dead_does_not_trigger_game_over(void) {
@@ -468,7 +468,7 @@ void test_racer_dead_does_not_trigger_game_over(void) {
     uint8_t wp_ty[1] = { 0u };
     track_test_set_map(flat_map, 8u, 8u);
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
-    racer_set_hp_for_test(0u, 1u);
+    racer_set_hp_for_test(1u, 1u);
     projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
     racer_update();              /* kills racer */
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update()); /* no game over after death */
@@ -486,29 +486,29 @@ void test_racer_miss_does_not_reduce_hp(void) {
     racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
     projectile_fire(8u, 16u, DIR_T, PROJ_OWNER_PLAYER); /* top-left corner, far from racer */
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(0u));
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
 }
 
 void test_racer_get_cp_next_initial_zero(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(1u));
 }
 
 void test_racer_spawn_resets_cp_next(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
-    race_state_set_cp_for_test(0u, 5u);  /* pre-pollute */
+    race_state_set_cp_for_test(1u, 5u);  /* pre-pollute slot 1 */
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(1u));
 }
 
 void test_racer_get_px_returns_spawn_value(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
     racer_spawn_for_test(100, 200, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    TEST_ASSERT_EQUAL_INT16(100, racer_get_px(0u));
+    TEST_ASSERT_EQUAL_INT16(100, racer_get_px(1u));
 }
 
 /* ---- Checkpoint update tests ---- */
@@ -526,8 +526,8 @@ void test_racer_cp_next_increments_on_matching_dir(void) {
     setup_one_checkpoint_south(defs);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
-    race_state_update_cp(0u, 110, 408, DIR_B);
-    TEST_ASSERT_EQUAL_UINT8(1u, race_state_get_cp(0u));
+    race_state_update_cp(1u, 110, 408, DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(1u, race_state_get_cp(1u));
 }
 
 /* AC2: racer_cp_next does NOT increment with wrong direction */
@@ -536,8 +536,8 @@ void test_racer_cp_next_no_increment_wrong_dir(void) {
     setup_one_checkpoint_south(defs);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    race_state_update_cp(0u, 110, 408, DIR_T);
-    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
+    race_state_update_cp(1u, 110, 408, DIR_T);
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(1u));
 }
 
 /* AC3: waypoint wrap does NOT reset cp_next — only race_state_advance_lap resets it */
@@ -546,13 +546,13 @@ void test_racer_wp_wrap_does_not_reset_cp(void) {
     track_test_set_checkpoints(defs, 0u);
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(80, 80, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 3u);
-    race_state_set_cp_for_test(0u, 2u);
-    racer_set_wp_idx_for_test(0u, 0u);
-    racer_set_pos_for_test(0u, 80, 80);
+    race_state_set_cp_for_test(1u, 2u);
+    racer_set_wp_idx_for_test(1u, 0u);
+    racer_set_pos_for_test(1u, 80, 80);
     static const uint8_t flat[16*16] = {0};
     track_test_set_map(flat, 16u, 16u);
     racer_update();
-    TEST_ASSERT_EQUAL_UINT8(2u, race_state_get_cp(0u));  /* unchanged by wp wrap */
+    TEST_ASSERT_EQUAL_UINT8(2u, race_state_get_cp(1u));  /* unchanged by wp wrap */
 }
 
 /* AC4: sequential enforcement — cp[1] AABB cannot clear before cp[0] */
@@ -566,35 +566,33 @@ void test_racer_cp_next_sequential_order_enforced(void) {
     uint8_t wp_tx[1] = { 10u }, wp_ty[1] = { 10u };
     racer_spawn_for_test(110, 408, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 3u);
     /* Try to clear cp[1] (at 96,400) while cp[0] (at 200,200) not cleared */
-    race_state_update_cp(0u, 110, 408, DIR_B);
-    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
+    race_state_update_cp(1u, 110, 408, DIR_B);
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(1u));
 }
 
 /* === Multi-enemy racer tests (PLAYER_SLOT=0, MAX_ENEMY_RACERS=2) === */
 
 void test_racer_init_activates_both_enemy_slots(void) {
-    /* RED: After racer_init, enemy slots 1..2 must be active; player slot 0 untouched.
-     * Fails until MAX_RACERS=3, PLAYER_SLOT=0, and indexed loader are wired (Tasks 2-5). */
+    /* track2 (id=1) has 2 NPC_TYPE_CAR spawns and 2 indexed waypoint sets */
+    track_test_set_id(1u);
     racer_init(0u);
     TEST_ASSERT_EQUAL_UINT8(0u, racer_active[0]);  /* player slot 0: never set by racer_init */
     TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
-    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[2]);  /* enemy 1 active (OOB until Task 2) */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[2]);  /* enemy 1 active */
 }
 
 void test_racer_init_skips_slot_when_no_spawn(void) {
-    /* RED: Only 1 car spawn → slot 1 active, slot 2 inactive.
-     * Fails until indexed loader and multi-enemy init are wired (Tasks 4-5). */
+    /* track0 (track.tmx) has no NPC_TYPE_CAR → all enemy slots inactive */
+    track_test_set_id(0u);
     racer_init(0u);
-    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no spawn → inactive */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[1]);  /* enemy 0: no spawn on track0 */
 }
 
 void test_racer_init_skips_slot_when_no_waypoints(void) {
-    /* RED: 2 spawns but only 1 has waypoints → slot 1 active, slot 2 inactive.
-     * Fails until indexed loader and multi-enemy init are wired (Tasks 4-5). */
+    /* track0 (track.tmx) has no racer waypoints → all enemy slots inactive */
+    track_test_set_id(0u);
     racer_init(0u);
-    TEST_ASSERT_EQUAL_UINT8(1u, racer_active[1]);  /* enemy 0 active */
-    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no waypoints → inactive */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no waypoints on track0 */
 }
 
 void test_racer_rank_with_two_enemies_player_first(void) {
@@ -609,13 +607,13 @@ void test_racer_rank_with_two_enemies_player_first(void) {
 }
 
 void test_racer_rank_with_two_enemies_player_last(void) {
-    /* Both enemies 1 lap ahead of player → rank 3.
-     * Fails until PLAYER_SLOT=0, MAX_RACERS=3, and ranking loops all slots (Tasks 2, 6). */
+    /* Both enemies 1 lap ahead of player → rank 3 */
     race_state_init(3u);
-    race_state_set_active(0u, 1u);  /* PLAYER_SLOT=0 in target state */
+    race_state_set_active(0u, 1u);  /* player (PLAYER_SLOT=0) */
     race_state_set_active(1u, 1u);  /* enemy 0 */
-    /* NOTE: slot 2 omitted here — OOB until MAX_RACERS=3 in Task 2 */
-    race_state_advance_lap(1u);     /* enemy 0 (slot 1) completes a lap */
+    race_state_set_active(2u, 1u);  /* enemy 1 */
+    race_state_advance_lap(1u);     /* enemy 0 ahead */
+    race_state_advance_lap(2u);     /* enemy 1 ahead */
     TEST_ASSERT_EQUAL_UINT8(3u, race_state_rank_player());
 }
 
