@@ -3,7 +3,7 @@
 
 #include <gb/gb.h>
 #include <stdint.h>
-#include "checkpoint.h"
+#include "track.h"
 
 /* NONBANKED VRAM loaders — bank-0 code, safe to call SWITCH_ROM.
  * Call these from any bank to load asset data into VRAM. */

@@ -42,7 +42,7 @@ DIR_MAP = {
 }
 
 # finish dir string → CHECKPOINT_DIR_* numeric constant.
-# Must match CHECKPOINT_DIR_* in src/checkpoint.h (N=0, S=1, E=2, W=3).
+# Must match CHECKPOINT_DIR_* in src/track.h (N=0, S=1, E=2, W=3).
 FINISH_DIR_MAP = {
     "N": 0,
     "S": 1,
@@ -435,7 +435,6 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
             vals  = ','.join(str(v) for v in tile_ids[start:start + width])
             f.write(f"    /* row {row:2d} */ {vals},\n")
         f.write("};\n\n")
-        f.write('#include "checkpoint.h"\n\n')
         f.write(f"BANKREF({prefix}_checkpoints)\n")
         # SDCC (sm83) rejects empty array initializers — emit a 1-element placeholder
         # when there are no checkpoints so the symbol exists for BANKREF resolution.

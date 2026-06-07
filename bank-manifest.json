@@ -1,6 +1,5 @@
 {
   "src/camera.c":                {"bank": 255, "reason": "autobank"},
-  "src/checkpoint.c":            {"bank": 255, "reason": "autobank"},
   "src/dialog.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog_arrow_sprite.c":   {"bank": 255, "reason": "autobank"},
   "src/dialog_border_tiles.c":   {"bank": 255, "reason": "autobank — no longer needs pinning after state_manager moved to bank 0"},
@@ -29,7 +28,6 @@
   "src/state_playing.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_results.c":         {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
   "src/state_title.c":           {"bank": 255, "reason": "autobank — state callback; invoke() in state_manager.c handles bank switching"},
-  "src/lap.c":                   {"bank": 255, "reason": "autobank"},
   "src/track.c":                 {"bank": 255, "reason": "autobank"},
   "src/track_map.c":             {"bank": 255, "reason": "autobank"},
   "src/track2_map.c":            {"bank": 255, "reason": "autobank — generated from track2.tmx; independently autobanked from track_map.c"},
@@ -43,5 +41,6 @@
   "src/powerup.c":               {"bank": 255, "reason": "autobank — gameplay module called via invoke() in state_manager.c"},
   "src/loadout.c":               {"bank": 255, "reason": "autobank — pure data/accessor module; no SET_BANK calls"},
   "src/state_prerace.c":         {"bank": 255, "reason": "autobank — text-only menu state; no SET_BANK calls"},
-  "src/racer.c":                 {"bank": 255, "reason": "autobank — gameplay module; racer_update/render called from state_playing.c"}
+  "src/racer.c":                 {"bank": 255, "reason": "autobank — gameplay module; racer_update/render called from state_playing.c"},
+  "src/race_state.c":            {"bank": 255, "reason": "autobank — unified per-slot cp/lap tracking; called from state_playing.c and racer.c"}
 }
