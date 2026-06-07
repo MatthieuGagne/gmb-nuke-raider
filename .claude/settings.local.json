@@ -96,7 +96,10 @@
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('Top-level keys:', list\\(d.keys\\(\\)\\)\\); print\\('symbols' in d\\)\")",
       "Bash(python *)",
       "Bash(powershell *)",
-      "Bash(python3 -c \"import pyboy; print\\(pyboy.__version__\\)\")"
+      "Bash(python3 -c \"import pyboy; print\\(pyboy.__version__\\)\")",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\mathd\\\\.claude\\\\usage-data\\\\report-2026-06-03-233452.html\")",
+      "PowerShell(Start-Process \"java\" \"-jar C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-race-state-unification\\\\build\\\\nuke-raider.gb\")",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-race-state-unification\\\\build\\\\nuke-raider.gb\")"
     ]
   },
   "hooks": {
