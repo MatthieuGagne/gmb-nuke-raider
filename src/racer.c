@@ -181,6 +181,10 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_oam[i * 4u + 0u] = get_sprite();
+        racer_oam[i * 4u + 1u] = get_sprite();
+        racer_oam[i * 4u + 2u] = get_sprite();
+        racer_oam[i * 4u + 3u] = get_sprite();
     }
     s_tile_base  = tile_base;
 
@@ -196,9 +200,6 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u);
         racer_wp_idx[0] = 0u;
         racer_dir[0] = track_get_start_dir();
-        for (i = 0u; i < 4u; i++) {
-            racer_oam[i] = get_sprite();
-        }
     }
 
 #ifdef __SDCC
@@ -225,6 +226,10 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]        = (uint8_t)RACER_HP;
         racer_hit_flash[i] = 0u;
+        racer_oam[i * 4u + 0u] = get_sprite();
+        racer_oam[i * 4u + 1u] = get_sprite();
+        racer_oam[i * 4u + 2u] = get_sprite();
+        racer_oam[i * 4u + 3u] = get_sprite();
     }
     s_wp_count  = 0u;
     race_state_init(1u);
