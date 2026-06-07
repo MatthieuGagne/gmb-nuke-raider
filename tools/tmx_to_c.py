@@ -211,40 +211,79 @@ def parse_powerup_objects(root):
 
 
 def parse_racer_waypoints(root):
-    """Extract racer waypoints from the 'racer_waypoints' object layer.
+    """Extract racer waypoints from 'racer_waypoints' and 'racer_waypoints_N' object layers.
 
     Objects must be point objects (have a <point/> child element) snapped to
-    an 8px tile grid. Returns a list of (tx, ty) tuples in XML order.
-    Missing layer returns empty list (safe default for non-race tracks).
+    an 8px tile grid.
+
+    Returns a dict mapping layer index to waypoint list:
+      - None key: from 'racer_waypoints' layer (unindexed, backward compat)
+      - int key N: from 'racer_waypoints_N' layer
+    Missing layers return empty dict (safe default for non-race tracks).
     """
+    result = {}
     for og in root.findall('objectgroup'):
-        if og.get('name') != 'racer_waypoints':
+        name = og.get('name', '')
+        if name == 'racer_waypoints':
+            idx = None
+        elif name.startswith('racer_waypoints_'):
+            suffix = name[len('racer_waypoints_'):]
+            if not suffix.isdigit():
+                continue
+            idx = int(suffix)
+        else:
             continue
         waypoints = []
         for obj in og.findall('object'):
             if obj.find('point') is None:
-                continue  # skip non-point objects
+                continue
             x = float(obj.get('x', '0'))
             y = float(obj.get('y', '0'))
             tx = int(x / 8)
             ty = int(y / 8)
             waypoints.append((tx, ty))
-        return waypoints
-    return []
+        result[idx] = waypoints
+    return result
 
 
-def emit_racer_waypoints(out, prefix, waypoints):
-    """Emit racer waypoint arrays for one track into an open file handle."""
+def _emit_wp_arrays(out, sym_count, sym_tx, sym_ty, waypoints):
+    """Emit BANKREF + array definitions for one waypoint set."""
     n = len(waypoints)
     tx_vals = ', '.join(f'{t[0]}u' for t in waypoints) if waypoints else '0u'
     ty_vals = ', '.join(f'{t[1]}u' for t in waypoints) if waypoints else '0u'
     sz = max(n, 1)
-    out.write(f'BANKREF({prefix}_racer_wp_count)\n')
-    out.write(f'const uint8_t {prefix}_racer_wp_count = {n}u;\n\n')
-    out.write(f'BANKREF({prefix}_racer_wp_tx)\n')
-    out.write(f'const uint8_t {prefix}_racer_wp_tx[{sz}] = {{ {tx_vals} }};\n\n')
-    out.write(f'BANKREF({prefix}_racer_wp_ty)\n')
-    out.write(f'const uint8_t {prefix}_racer_wp_ty[{sz}] = {{ {ty_vals} }};\n\n')
+    out.write(f'BANKREF({sym_count})\n')
+    out.write(f'const uint8_t {sym_count} = {n}u;\n\n')
+    out.write(f'BANKREF({sym_tx})\n')
+    out.write(f'const uint8_t {sym_tx}[{sz}] = {{ {tx_vals} }};\n\n')
+    out.write(f'BANKREF({sym_ty})\n')
+    out.write(f'const uint8_t {sym_ty}[{sz}] = {{ {ty_vals} }};\n\n')
+
+
+def emit_racer_waypoints(out, prefix, waypoints_dict):
+    """Emit racer waypoint arrays for one track into an open file handle.
+
+    waypoints_dict maps None (unindexed) or int N (indexed) to waypoint lists.
+    """
+    if None in waypoints_dict:
+        _emit_wp_arrays(out,
+                        f'{prefix}_racer_wp_count',
+                        f'{prefix}_racer_wp_tx',
+                        f'{prefix}_racer_wp_ty',
+                        waypoints_dict[None])
+    for i in sorted(k for k in waypoints_dict if k is not None):
+        _emit_wp_arrays(out,
+                        f'{prefix}_racer_wp_count_{i}',
+                        f'{prefix}_racer_wp_tx_{i}',
+                        f'{prefix}_racer_wp_ty_{i}',
+                        waypoints_dict[i])
+    if not waypoints_dict:
+        # No layers — emit empty unindexed arrays for non-race tracks
+        _emit_wp_arrays(out,
+                        f'{prefix}_racer_wp_count',
+                        f'{prefix}_racer_wp_tx',
+                        f'{prefix}_racer_wp_ty',
+                        [])
 
 
 def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_map=None):
@@ -468,8 +507,8 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
         f.write(f"BANKREF({prefix}_powerup_type)\n")
         f.write(f"const uint8_t {prefix}_powerup_type[{MAX_POWERUPS}] = {{ {fmt_arr(pw_type)} }};\n")
         f.write('\n')
-        waypoints = parse_racer_waypoints(root)
-        emit_racer_waypoints(f, prefix, waypoints)
+        waypoints_dict = parse_racer_waypoints(root)
+        emit_racer_waypoints(f, prefix, waypoints_dict)
 
 
 def emit_npc_header(out_path, tmx_paths):
@@ -576,16 +615,29 @@ def emit_racer_header(out_path, tmx_paths):
         '#include "banking.h"',
         '',
     ]
-    for prefix in prefixes:
-        lines += [
-            f'extern const uint8_t  {prefix}_racer_wp_count;',
-            f'extern const uint8_t  {prefix}_racer_wp_tx[];',
-            f'extern const uint8_t  {prefix}_racer_wp_ty[];',
-            f'BANKREF_EXTERN({prefix}_racer_wp_count)',
-            f'BANKREF_EXTERN({prefix}_racer_wp_tx)',
-            f'BANKREF_EXTERN({prefix}_racer_wp_ty)',
-            '',
-        ]
+    for prefix, tmx_path in zip(prefixes, tmx_paths):
+        root = ET.parse(tmx_path).getroot()
+        wp_dict = parse_racer_waypoints(root)
+        if None in wp_dict or not wp_dict:
+            lines += [
+                f'extern const uint8_t  {prefix}_racer_wp_count;',
+                f'extern const uint8_t  {prefix}_racer_wp_tx[];',
+                f'extern const uint8_t  {prefix}_racer_wp_ty[];',
+                f'BANKREF_EXTERN({prefix}_racer_wp_count)',
+                f'BANKREF_EXTERN({prefix}_racer_wp_tx)',
+                f'BANKREF_EXTERN({prefix}_racer_wp_ty)',
+                '',
+            ]
+        for i in sorted(k for k in wp_dict if k is not None):
+            lines += [
+                f'extern const uint8_t  {prefix}_racer_wp_count_{i};',
+                f'extern const uint8_t  {prefix}_racer_wp_tx_{i}[];',
+                f'extern const uint8_t  {prefix}_racer_wp_ty_{i}[];',
+                f'BANKREF_EXTERN({prefix}_racer_wp_count_{i})',
+                f'BANKREF_EXTERN({prefix}_racer_wp_tx_{i})',
+                f'BANKREF_EXTERN({prefix}_racer_wp_ty_{i})',
+                '',
+            ]
     lines += ['#endif /* TRACK_RACER_EXTERNS_H */']
     with open(out_path, 'w') as f:
         f.write('\n'.join(lines) + '\n')

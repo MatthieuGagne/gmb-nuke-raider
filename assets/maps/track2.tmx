@@ -152,8 +152,9 @@
  </objectgroup>
  <objectgroup id="5" name="enemies">
   <object id="5" name="car" x="112" y="40"/>
+  <object id="20" name="car" x="112" y="48"/>
  </objectgroup>
- <objectgroup id="6" name="racer_waypoints">
+ <objectgroup id="6" name="racer_waypoints_0">
   <object id="6" x="120" y="40">
    <point/>
   </object>
@@ -188,6 +189,44 @@
    <point/>
   </object>
   <object id="17" x="48" y="24">
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="7" name="racer_waypoints_1">
+  <object id="21" x="120" y="40">
+   <point/>
+  </object>
+  <object id="22" x="104" y="160">
+   <point/>
+  </object>
+  <object id="23" x="104" y="320">
+   <point/>
+  </object>
+  <object id="24" x="120" y="480">
+   <point/>
+  </object>
+  <object id="25" x="120" y="640">
+   <point/>
+  </object>
+  <object id="26" x="120" y="768">
+   <point/>
+  </object>
+  <object id="27" x="48" y="776">
+   <point/>
+  </object>
+  <object id="28" x="48" y="640">
+   <point/>
+  </object>
+  <object id="29" x="48" y="480">
+   <point/>
+  </object>
+  <object id="30" x="48" y="320">
+   <point/>
+  </object>
+  <object id="31" x="40" y="160">
+   <point/>
+  </object>
+  <object id="32" x="48" y="24">
    <point/>
   </object>
  </objectgroup>
