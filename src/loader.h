@@ -28,14 +28,15 @@ void load_npc_positions(uint8_t id,
                          uint8_t *out_dir,
                          uint8_t *out_count) NONBANKED;
 
-/* Returns 1 if NPC_TYPE_CAR found for track id; outputs spawn tile coords.
- * Returns 0 if no racer spawn exists for this track. */
-uint8_t load_racer_spawn(uint8_t id, uint8_t *out_tx, uint8_t *out_ty) NONBANKED;
+/* Returns 1 if the racer_idx-th NPC_TYPE_CAR exists for track id; outputs spawn tile coords.
+ * racer_idx is 0-based enemy index (callers pass slot-1). Returns 0 if not found. */
+uint8_t load_racer_spawn(uint8_t id, uint8_t racer_idx, uint8_t *out_tx, uint8_t *out_ty) NONBANKED;
 
-/* Copies racer waypoints for track id into caller-supplied buffers.
- * Sets *out_count = 0 for tracks without waypoints.
+/* Copies racer waypoints for track id / racer_idx into caller-supplied buffers.
+ * racer_idx is 0-based enemy index. Sets *out_count = 0 for missing waypoints.
  * Buffers must be at least MAX_RACER_WAYPOINTS bytes each. */
 void load_racer_waypoints(uint8_t id,
+                           uint8_t racer_idx,
                            uint8_t *out_tx,
                            uint8_t *out_ty,
                            uint8_t *out_count) NONBANKED;
