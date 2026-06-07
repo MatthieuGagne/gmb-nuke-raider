@@ -28,6 +28,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+static uint8_t  racer_finish_armed[MAX_RACERS];
 /* ---- Track-level data ---- */
 static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
 static uint8_t  s_wp_ty[MAX_RACER_WAYPOINTS];
@@ -179,8 +180,9 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
-        racer_hp[i]        = (uint8_t)RACER_HP;
-        racer_hit_flash[i] = 0u;
+        racer_hp[i]           = (uint8_t)RACER_HP;
+        racer_hit_flash[i]    = 0u;
+        racer_finish_armed[i] = 1u;
         racer_oam[i * 4u + 0u] = get_sprite();
         racer_oam[i * 4u + 1u] = get_sprite();
         racer_oam[i * 4u + 2u] = get_sprite();
@@ -224,12 +226,9 @@ void racer_init_empty(void) BANKED {
         racer_vy[i] = (int8_t)0;
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
-        racer_hp[i]        = (uint8_t)RACER_HP;
-        racer_hit_flash[i] = 0u;
-        racer_oam[i * 4u + 0u] = get_sprite();
-        racer_oam[i * 4u + 1u] = get_sprite();
-        racer_oam[i * 4u + 2u] = get_sprite();
-        racer_oam[i * 4u + 3u] = get_sprite();
+        racer_hp[i]           = (uint8_t)RACER_HP;
+        racer_hit_flash[i]    = 0u;
+        racer_finish_armed[i] = 1u;
     }
     s_wp_count  = 0u;
     race_state_init(1u);
@@ -302,12 +301,15 @@ uint8_t racer_update(void) BANKED {
         tile_type = track_tile_type_from_index(raw_tile);
         if (tile_type == TILE_FINISH) {
             if (racer_dir_matches_finish(dir, s_finish_dir)) {
-                if (race_state_all_cp_cleared(i)) {
+                if (race_state_all_cp_cleared(i) && racer_finish_armed[i]) {
+                    racer_finish_armed[i] = 0u;
                     if (race_state_advance_lap(i)) {
                         return 1u;
                     }
                 }
             }
+        } else {
+            racer_finish_armed[i] = 1u;
         }
 
         /* ---- Gear physics (mirrors player_apply_physics, always full throttle) ---- */
