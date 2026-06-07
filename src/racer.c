@@ -192,8 +192,8 @@ void racer_init(uint8_t tile_base) BANKED {
 
     track_id = track_get_id();
     s_finish_dir = track_get_finish_direction();
-    load_racer_waypoints(track_id, s_wp_tx, s_wp_ty, &s_wp_count);
-    found = load_racer_spawn(track_id, &spawn_tx, &spawn_ty);
+    load_racer_waypoints(track_id, 0u, s_wp_tx, s_wp_ty, &s_wp_count);
+    found = load_racer_spawn(track_id, 0u, &spawn_tx, &spawn_ty);
 
     if (found && s_wp_count > 0u) {
         racer_active[0] = 1u;
