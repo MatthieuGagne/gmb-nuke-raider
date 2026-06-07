@@ -16,8 +16,7 @@ BANKREF_EXTERN(state_playing)
 #include "state_results.h"
 #include "economy.h"
 #include "projectile.h"
-#include "lap.h"
-#include "checkpoint.h"
+#include "race_state.h"
 #include "turret.h"
 #include "racer.h"
 #include "sfx.h"
@@ -45,38 +44,6 @@ static const uint8_t cd_hi[4] = {
     (uint8_t)('3'-' '), (uint8_t)('2'-' '), (uint8_t)('1'-' '), (uint8_t)('O'-' ')
 };
 
-#ifndef __SDCC
-uint8_t
-#else
-static uint8_t
-#endif
-pos_from_dir(uint8_t dir,
-             int16_t px,  int16_t py,
-             int16_t rpx, int16_t rpy) {
-    if (dir == CHECKPOINT_DIR_N) return (py  <= rpy) ? 1u : 2u;
-    if (dir == CHECKPOINT_DIR_S) return (py  >= rpy) ? 1u : 2u;
-    if (dir == CHECKPOINT_DIR_E) return (px  >= rpx) ? 1u : 2u;
-    return (px <= rpx) ? 1u : 2u;   /* CHECKPOINT_DIR_W */
-}
-
-#ifndef __SDCC
-uint8_t
-#else
-static uint8_t
-#endif
-pos_from_manhattan(int16_t px,  int16_t py,
-                   int16_t rpx, int16_t rpy,
-                   const CheckpointDef *next) {
-    int16_t cx  = next->x + (int16_t)(next->w >> 1u);
-    int16_t cy  = next->y + (int16_t)(next->h >> 1u);
-    int16_t pdx = px  - cx; if (pdx < 0) pdx = -pdx;
-    int16_t pdy = py  - cy; if (pdy < 0) pdy = -pdy;
-    int16_t rdx = rpx - cx; if (rdx < 0) rdx = -rdx;
-    int16_t rdy = rpy - cy; if (rdy < 0) rdy = -rdy;
-    uint16_t pd = (uint16_t)pdx + (uint16_t)pdy;
-    uint16_t rd = (uint16_t)rdx + (uint16_t)rdy;
-    return (pd <= rd) ? 1u : 2u;
-}
 
 #ifndef __SDCC
 uint8_t
@@ -122,19 +89,19 @@ static void enter(void) {
     damage_init();
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
+    race_state_init(track_get_lap_count());
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
     powerup_init();
-    lap_init(track_get_lap_count());
+    race_state_set_active(PLAYER_SLOT, 1u);
     active_map_type_cache = track_get_map_type();
     finish_dir_cache = track_get_finish_direction();
     finish_armed = 1u;
     DISPLAY_OFF;
     track_init();
-    checkpoint_init(track_get_checkpoints(), track_get_checkpoint_count());
     camera_set_tile_base(loader_get_slot(TILE_ASSET_TRACK));
     camera_init(player_get_x(), player_get_y());
     hud_init(track_get_map_type(), track_get_lap_count());
-    hud_set_lap(lap_get_current(), lap_get_total());
+    hud_set_lap(race_state_get_laps(PLAYER_SLOT) + 1u, race_state_get_lap_total());
     camera_apply_scroll();
     player_render();
     racer_render();
@@ -203,7 +170,7 @@ static void update(void) {
             player_set_pos(px, py);
         }
         /* Checkpoint update — runs after player_update() and HUD clamp */
-        checkpoint_update(px, py, pdir);
+        race_state_update_cp(PLAYER_SLOT, px, py, pdir);
         projectile_update();
         turret_update(px, py);
         if (racer_update()) {
@@ -215,35 +182,7 @@ static void update(void) {
             damage_apply(RACER_RAM_DAMAGE);
             sfx_play(SFX_HIT);
         }
-        /* Race position: 3-level comparison works on any track layout */
-        {
-            uint8_t player_laps = (uint8_t)(lap_get_current() - 1u);
-            uint8_t racer_laps  = racer_get_laps_done(0u);
-            uint8_t pos;
-            if (player_laps > racer_laps) {
-                pos = 1u;
-            } else if (player_laps < racer_laps) {
-                pos = 2u;
-            } else {
-                uint8_t player_cp = checkpoint_get_cp_next();
-                uint8_t racer_cp  = racer_get_cp_next(0u);
-                if (player_cp > racer_cp) {
-                    pos = 1u;
-                } else if (player_cp < racer_cp) {
-                    pos = 2u;
-                } else {
-                    const CheckpointDef *next = checkpoint_get_next_def();
-                    int16_t rpx = racer_get_px(0u);
-                    int16_t rpy = racer_get_py(0u);
-                    if (next) {
-                        pos = pos_from_manhattan(px, py, rpx, rpy, next);
-                    } else {
-                        pos = pos_from_dir(finish_dir_cache, px, py, rpx, rpy);
-                    }
-                }
-            }
-            hud_set_position(pos);
-        }
+        hud_set_position(race_state_rank_player());
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
@@ -257,10 +196,10 @@ static void update(void) {
          * - tile-type check replaces hardcoded Y-row
          * - finish_armed debounces: clears on entry, re-arms on exit
          * - pdir check: player facing direction, not velocity — racer-zeroed velocity never blocks detection
-         * - checkpoint_all_cleared() gate: all CPs must be crossed in order */
+         * - race_state_all_cp_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
-            uint8_t cps_ok = checkpoint_all_cleared();
+            uint8_t cps_ok = race_state_all_cp_cleared(PLAYER_SLOT);
             if (finish_eval(active_map_type_cache, finish_armed,
                             pdir, finish_dir_cache,
                             cps_ok)) {
@@ -269,7 +208,7 @@ static void update(void) {
                     state_pop();
                     return;
                 }
-                if (lap_advance()) {
+                if (race_state_advance_lap(PLAYER_SLOT)) {
                     /* Final lap complete — award scrap and show results */
                     {
                         uint16_t reward = track_get_reward();
@@ -279,9 +218,8 @@ static void update(void) {
                     state_replace(&state_results, BANK(state_results));
                     return;
                 }
-                /* Lap complete — reset checkpoints for next lap, update HUD */
-                checkpoint_reset();
-                hud_set_lap(lap_get_current(), lap_get_total());
+                /* Lap complete — checkpoint reset is internal to race_state_advance_lap */
+                hud_set_lap(race_state_get_laps(PLAYER_SLOT) + 1u, race_state_get_lap_total());
             }
         } else {
             finish_armed = 1u;

@@ -95,7 +95,8 @@
 #define DIR_NONE             0xFFu
 
 /* Racer enemy */
-#define MAX_RACERS           1u   /* SoA pool capacity; design for N, implement 1 */
+#define MAX_RACERS           2u   /* SoA pool capacity; slot 0 = enemy, slot 1 = player */
+#define PLAYER_SLOT          1u   /* race_state slot index for the human player */
 #define MAX_RACER_WAYPOINTS 16u   /* WRAM copy buffer; tracks may have fewer */
 #define RACER_WP_THRESHOLD  12u   /* Manhattan advance threshold: ABS(dx)+ABS(dy) < this */
 /* Racer gear system — separate constants allow independent AI difficulty tuning.
