@@ -2,6 +2,7 @@
 #include "race_state.h"
 #include "track.h"
 #include "player.h"    /* DIR_T, DIR_B, DIR_L, DIR_R, DIR_LT, DIR_RT, DIR_LB, DIR_RB */
+#include "racer.h"     /* racer_set_pos_for_test */
 
 void setUp(void) {
     race_state_init(3u);
@@ -128,6 +129,34 @@ void test_update_cp_all_4_directions(void) {
     race_state_set_active(0u, 1u);
     race_state_update_cp(0u, 5, 5, DIR_L);
     TEST_ASSERT_EQUAL_UINT8(1u, race_state_get_cp(0u));
+}
+
+/* ---- CP top-edge regression (track2 CP3) ---- */
+
+/* track2 CP3 box is {80,0,8,48,E}. A player hugging the top wall crosses col 10
+ * at top-left py=6 (the east-facing hitbox is inset 2px, so py can dip below 8).
+ * The box must start at y=0 so py=6 still clears it. */
+void test_update_cp_clears_at_top_edge_py6(void) {
+    CheckpointDef defs[1];
+    defs[0].x = 80; defs[0].y = 0; defs[0].w = 8; defs[0].h = 48;
+    defs[0].index = 0u; defs[0].direction = CHECKPOINT_DIR_E;
+    track_test_set_checkpoints(defs, 1u);
+    race_state_init(3u);
+    race_state_set_active(0u, 1u);
+    race_state_update_cp(0u, 83, 6, DIR_R);   /* py=6, heading east */
+    TEST_ASSERT_EQUAL_UINT8(1u, race_state_get_cp(0u));
+}
+
+/* Documents the bug: the old box (y=8) rejects a py=6 crossing -> lap skip. */
+void test_update_cp_old_top_edge_y8_skips_py6(void) {
+    CheckpointDef defs[1];
+    defs[0].x = 80; defs[0].y = 8; defs[0].w = 8; defs[0].h = 40;
+    defs[0].index = 0u; defs[0].direction = CHECKPOINT_DIR_E;
+    track_test_set_checkpoints(defs, 1u);
+    race_state_init(3u);
+    race_state_set_active(0u, 1u);
+    race_state_update_cp(0u, 83, 6, DIR_R);   /* py=6 < 8 -> skipped */
+    TEST_ASSERT_EQUAL_UINT8(0u, race_state_get_cp(0u));
 }
 
 /* ---- race_state_all_cp_cleared ---- */
@@ -284,6 +313,40 @@ void test_rank_player_inactive_enemy_not_counted(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, race_state_rank_player());
 }
 
+/* ---- P:3 ranking (3-car field) ---- */
+
+/* Two enemies both ahead on checkpoints -> player is 3rd. */
+void test_rank_player_two_enemies_ahead_cp_is_3(void) {
+    track_test_set_checkpoints(NULL, 0u);
+    race_state_init(3u);
+    race_state_set_active(PLAYER_SLOT, 1u);
+    race_state_set_active(1u, 1u);
+    race_state_set_active(2u, 1u);
+    race_state_set_cp_for_test(PLAYER_SLOT, 1u);
+    race_state_set_cp_for_test(1u, 3u);
+    race_state_set_cp_for_test(2u, 3u);
+    TEST_ASSERT_EQUAL_UINT8(3u, race_state_rank_player());
+}
+
+/* Regression for the tiebreaker cap: both enemies tie player on laps+cp but are
+ * closer to the next checkpoint by distance -> each must increment pos -> P:3.
+ * The earlier 'cap at 2' bug returned 2 here. */
+void test_rank_player_two_enemies_closer_by_distance_is_3(void) {
+    CheckpointDef defs[1];
+    defs[0].x = 100; defs[0].y = 100; defs[0].w = 20; defs[0].h = 20;  /* center (110,110) */
+    defs[0].index = 0u; defs[0].direction = CHECKPOINT_DIR_S;
+    track_test_set_checkpoints(defs, 1u);
+    race_state_init(3u);
+    race_state_set_active(PLAYER_SLOT, 1u);
+    race_state_set_active(1u, 1u);
+    race_state_set_active(2u, 1u);
+    /* all tied on laps(0) + cp(0); positions decide */
+    player_set_pos(10, 10);                 /* player far from cp center */
+    racer_set_pos_for_test(1u, 110, 110);   /* enemy 1 on the cp center */
+    racer_set_pos_for_test(2u, 110, 110);   /* enemy 2 on the cp center */
+    TEST_ASSERT_EQUAL_UINT8(3u, race_state_rank_player());
+}
+
 /* ---- pos_from_dir (moved from test_state_playing.c) ---- */
 
 void test_pos_from_dir_N_player_ahead(void) {
@@ -378,5 +441,9 @@ int main(void) {
     RUN_TEST(test_pos_from_manhattan_racer_closer);
     RUN_TEST(test_pos_from_manhattan_equal_distance_favors_player);
     RUN_TEST(test_pos_from_manhattan_nonsquare_checkpoint);
+    RUN_TEST(test_update_cp_clears_at_top_edge_py6);
+    RUN_TEST(test_update_cp_old_top_edge_y8_skips_py6);
+    RUN_TEST(test_rank_player_two_enemies_ahead_cp_is_3);
+    RUN_TEST(test_rank_player_two_enemies_closer_by_distance_is_3);
     return UNITY_END();
 }

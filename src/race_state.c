@@ -104,11 +104,16 @@ uint8_t race_state_rank_player(void) BANKED {
     uint8_t pos = 1u;
     uint8_t player_laps = rs_laps[PLAYER_SLOT];
     uint8_t player_cp   = rs_cp_next[PLAYER_SLOT];
-    int16_t player_px;
-    int16_t player_py;
-    const CheckpointDef *next;
-    uint8_t finish_dir;
-    uint8_t count;
+    /* Full-tie inputs are loop-invariant for one call; compute lazily on the
+     * first full tie, then reuse for every subsequent full-tie rival. Each
+     * value comes from a BANKED accessor, so caching avoids repeat trampolines. */
+    int16_t player_px = 0;
+    int16_t player_py = 0;
+    const CheckpointDef *next = 0;
+    uint8_t finish_dir = 0u;
+    uint8_t count = 0u;
+    uint8_t tie_ready = 0u;
+    uint8_t past_all_cps = 0u;
 
     for (i = 0u; i < MAX_RACERS; i++) {
         if (i == PLAYER_SLOT) continue;
@@ -123,22 +128,30 @@ uint8_t race_state_rank_player(void) BANKED {
         } else if (player_cp < rs_cp_next[i]) {
             pos++;
         } else {
-            /* Full tie: Manhattan distance to next checkpoint */
-            count = track_get_checkpoint_count();
+            /* Full tie: Manhattan distance / finish direction.
+             * Each rival ahead by distance increments pos (a 3-car field can
+             * resolve to P:3). Same laps->CPs->distance order for every rival. */
+            if (!tie_ready) {
+                count     = track_get_checkpoint_count();
+                player_px = player_get_x();
+                player_py = player_get_y();
+                if (player_cp < count) {
+                    next = &track_get_checkpoints()[player_cp];
+                } else {
+                    /* Past all CPs — compare by finish direction */
+                    finish_dir   = track_get_finish_direction();
+                    past_all_cps = 1u;
+                }
+                tie_ready = 1u;
+            }
 
-            player_px = player_get_x();
-            player_py = player_get_y();
-
-            if (player_cp < count) {
-                next = &track_get_checkpoints()[player_cp];
+            if (!past_all_cps) {
                 if (pos_from_manhattan(player_px, player_py,
                                        racer_get_px(i), racer_get_py(i),
                                        next) == 2u) {
                     pos++;
                 }
             } else {
-                /* Past all CPs — compare by finish direction */
-                finish_dir = track_get_finish_direction();
                 if (pos_from_dir(finish_dir, player_px, player_py,
                                  racer_get_px(i), racer_get_py(i)) == 2u) {
                     pos++;
