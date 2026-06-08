@@ -487,13 +487,6 @@ void load_npc_positions(uint8_t id,
     SWITCH_ROM(saved);
 }
 
-extern const uint8_t track2_racer_wp_count_0;
-extern const uint8_t track2_racer_wp_tx_0[];
-extern const uint8_t track2_racer_wp_ty_0[];
-extern const uint8_t track2_racer_wp_count_1;
-extern const uint8_t track2_racer_wp_tx_1[];
-extern const uint8_t track2_racer_wp_ty_1[];
-
 uint8_t load_racer_spawn(uint8_t id,
                           uint8_t racer_idx,
                           uint8_t *out_tx,
