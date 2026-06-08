@@ -110,7 +110,7 @@
 </data>
  </layer>
  <objectgroup id="2" name="start">
-  <object id="1" x="96" y="40">
+  <object id="1" x="96" y="16">
    <properties>
     <property name="direction" value="S"/>
    </properties>
@@ -151,8 +151,8 @@
   </object>
  </objectgroup>
  <objectgroup id="5" name="enemies">
-  <object id="5" name="car" x="112" y="40"/>
-  <object id="20" name="car" x="112" y="48"/>
+  <object id="5" name="car" x="112" y="16"/>
+  <object id="20" name="car" x="112" y="32"/>
  </objectgroup>
  <objectgroup id="6" name="racer_waypoints_0">
   <object id="6" x="120" y="40">

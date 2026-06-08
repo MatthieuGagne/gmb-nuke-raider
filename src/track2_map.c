@@ -8,7 +8,7 @@
 BANKREF(track2_start_x)
 const int16_t track2_start_x = 96;
 BANKREF(track2_start_y)
-const int16_t track2_start_y = 40;
+const int16_t track2_start_y = 16;
 
 BANKREF(track2_finish_line_y)
 const uint8_t track2_finish_line_y = 6;
@@ -146,7 +146,7 @@ BANKREF(track2_npc_tx)
 const uint8_t track2_npc_tx[8] = { 14u, 14u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_ty)
-const uint8_t track2_npc_ty[8] = { 5u, 6u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_ty[8] = { 2u, 4u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_type)
 const uint8_t track2_npc_type[8] = { 1u, 1u, 0u, 0u, 0u, 0u, 0u, 0u };
