@@ -30,10 +30,11 @@ static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
 static uint8_t  racer_finish_armed[MAX_RACERS];
 /* ---- Track-level data ---- */
-static uint8_t  s_wp_tx[MAX_RACER_WAYPOINTS];
-static uint8_t  s_wp_ty[MAX_RACER_WAYPOINTS];
-static uint8_t  s_wp_count;
-static uint8_t  s_finish_dir;
+/* Per-enemy waypoint arrays: enemy slot i (i>=1) maps to index (i-1). */
+static uint8_t  s_wp_tx[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
+static uint8_t  s_wp_ty[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
+static uint8_t  s_wp_count[MAX_ENEMY_RACERS];
+static uint8_t  s_finish_dir;  /* shared track-level value */
 static uint8_t  s_tile_base;
 
 /* ---- Direction tables — copied from player.c exact values ---- */
@@ -192,16 +193,21 @@ void racer_init(uint8_t tile_base) BANKED {
 
     track_id = track_get_id();
     s_finish_dir = track_get_finish_direction();
-    load_racer_waypoints(track_id, s_wp_tx, s_wp_ty, &s_wp_count);
-    found = load_racer_spawn(track_id, &spawn_tx, &spawn_ty);
 
-    if (found && s_wp_count > 0u) {
-        racer_active[0] = 1u;
-        race_state_set_active(0u, 1u);
-        racer_px[0] = (int16_t)((uint16_t)spawn_tx * 8u);
-        racer_py[0] = (int16_t)((uint16_t)spawn_ty * 8u);
-        racer_wp_idx[0] = 0u;
-        racer_dir[0] = track_get_start_dir();
+    /* Load each enemy slot (slots 1..MAX_RACERS-1; enemy index = i-1). */
+    for (i = 1u; i < MAX_RACERS; i++) {
+        load_racer_waypoints(track_id, i - 1u,
+                             s_wp_tx[i - 1u], s_wp_ty[i - 1u],
+                             &s_wp_count[i - 1u]);
+        found = load_racer_spawn(track_id, i - 1u, &spawn_tx, &spawn_ty);
+        if (found && s_wp_count[i - 1u] > 0u) {
+            racer_active[i] = 1u;
+            race_state_set_active(i, 1u);
+            racer_px[i] = (int16_t)((uint16_t)spawn_tx * 8u);
+            racer_py[i] = (int16_t)((uint16_t)spawn_ty * 8u);
+            racer_wp_idx[i] = 0u;
+            racer_dir[i] = track_get_start_dir();
+        }
     }
 
 #ifdef __SDCC
@@ -230,7 +236,9 @@ void racer_init_empty(void) BANKED {
         racer_hit_flash[i]    = 0u;
         racer_finish_armed[i] = 1u;
     }
-    s_wp_count  = 0u;
+    for (i = 0u; i < MAX_ENEMY_RACERS; i++) {
+        s_wp_count[i] = 0u;
+    }
     race_state_init(1u);
 }
 
@@ -264,8 +272,8 @@ uint8_t racer_update(void) BANKED {
 
         if (!racer_active[i]) continue;
 
-        target_px = (int16_t)((uint16_t)s_wp_tx[racer_wp_idx[i]] * 8u + 4u);
-        target_py = (int16_t)((uint16_t)s_wp_ty[racer_wp_idx[i]] * 8u + 4u);
+        target_px = (int16_t)((uint16_t)s_wp_tx[i - 1u][racer_wp_idx[i]] * 8u + 4u);
+        target_py = (int16_t)((uint16_t)s_wp_ty[i - 1u][racer_wp_idx[i]] * 8u + 4u);
 
         dx16 = target_px - racer_px[i];
         dy16 = target_py - racer_py[i];
@@ -283,7 +291,7 @@ uint8_t racer_update(void) BANKED {
 
         if ((uint8_t)(abs_dx + abs_dy) < RACER_WP_THRESHOLD) {
             racer_wp_idx[i]++;
-            if (racer_wp_idx[i] >= s_wp_count) {
+            if (racer_wp_idx[i] >= s_wp_count[i - 1u]) {
                 racer_wp_idx[i] = 0u;
             }
         }
@@ -503,9 +511,20 @@ void racer_render(void) BANKED {
 int16_t racer_get_px(uint8_t slot) BANKED { return racer_px[slot]; }
 int16_t racer_get_py(uint8_t slot) BANKED { return racer_py[slot]; }
 uint8_t racer_get_wp_idx_banked(uint8_t slot) BANKED { return racer_wp_idx[slot]; }
-uint8_t racer_get_wp_count(void) BANKED { return s_wp_count; }
-uint8_t racer_get_wp_tx(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_tx[idx] : 0u; }
-uint8_t racer_get_wp_ty(uint8_t idx) BANKED { return (idx < s_wp_count) ? s_wp_ty[idx] : 0u; }
+/* slot: 1-based enemy slot (same convention as the rest of the API).
+ * Returns 0 for out-of-range slots. */
+uint8_t racer_get_wp_count(uint8_t slot) BANKED {
+    if (slot == 0u || slot > MAX_ENEMY_RACERS) return 0u;
+    return s_wp_count[slot - 1u];
+}
+uint8_t racer_get_wp_tx(uint8_t slot, uint8_t idx) BANKED {
+    if (slot == 0u || slot > MAX_ENEMY_RACERS) return 0u;
+    return (idx < s_wp_count[slot - 1u]) ? s_wp_tx[slot - 1u][idx] : 0u;
+}
+uint8_t racer_get_wp_ty(uint8_t slot, uint8_t idx) BANKED {
+    if (slot == 0u || slot > MAX_ENEMY_RACERS) return 0u;
+    return (idx < s_wp_count[slot - 1u]) ? s_wp_ty[slot - 1u][idx] : 0u;
+}
 
 uint8_t racer_blocks_pixel(int16_t wx, int16_t wy) BANKED {
     uint8_t i;
@@ -533,42 +552,45 @@ uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
 
 #ifndef __SDCC
 
+/* Spawns the first enemy slot (slot 1, enemy index 0) for unit tests.
+ * PLAYER_SLOT=0 is reserved for the player and is left inactive. */
 void racer_spawn_for_test(int16_t px, int16_t py,
                            uint8_t *wp_tx, uint8_t *wp_ty,
                            uint8_t wp_count, uint8_t finish_dir,
                            uint8_t lap_total) {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) racer_active[i] = 0u;
-    racer_active[0] = 1u;
-    racer_px[0] = px;
-    racer_py[0] = py;
-    racer_wp_idx[0] = 0u;
-    racer_dir[0] = DIR_T;
-    racer_oam[0] = racer_oam[1] = racer_oam[2] = racer_oam[3] = 0u;
+    racer_active[1] = 1u;
+    racer_px[1] = px;
+    racer_py[1] = py;
+    racer_wp_idx[1] = 0u;
+    racer_dir[1] = DIR_T;
+    racer_oam[4] = racer_oam[5] = racer_oam[6] = racer_oam[7] = 0u;
     for (i = 0u; i < wp_count && i < MAX_RACER_WAYPOINTS; i++) {
-        s_wp_tx[i] = wp_tx[i];
-        s_wp_ty[i] = wp_ty[i];
+        s_wp_tx[0][i] = wp_tx[i];  /* enemy index 0 = slot 1 - 1 */
+        s_wp_ty[0][i] = wp_ty[i];
     }
-    s_wp_count   = wp_count;
-    s_finish_dir = finish_dir;
-    racer_vx[0] = (int8_t)0;
-    racer_vy[0] = (int8_t)0;
-    racer_gear[0] = 0u;
-    racer_downshift_timer[0] = 0u;
-    racer_hp[0]        = (uint8_t)RACER_HP;
-    racer_hit_flash[0] = 0u;
+    s_wp_count[0] = wp_count;      /* enemy index 0 */
+    s_finish_dir  = finish_dir;
+    racer_vx[1] = (int8_t)0;
+    racer_vy[1] = (int8_t)0;
+    racer_gear[1] = 0u;
+    racer_downshift_timer[1] = 0u;
+    racer_hp[1]        = (uint8_t)RACER_HP;
+    racer_hit_flash[1] = 0u;
     race_state_init(lap_total);
-    race_state_set_active(0u, 1u);
+    race_state_set_active(1u, 1u);
 }
 
+/* Places the first enemy slot (slot 1) on a finish tile for testing. */
 void racer_place_on_finish_for_test(uint8_t tx, uint8_t ty, uint8_t dir) {
-    racer_px[0] = (int16_t)((int16_t)((uint16_t)tx * 8u) - 4);
-    racer_py[0] = (int16_t)((uint16_t)ty * 8u + 4u);
-    racer_dir[0] = dir;
+    racer_px[1] = (int16_t)((int16_t)((uint16_t)tx * 8u) - 4);
+    racer_py[1] = (int16_t)((uint16_t)ty * 8u + 4u);
+    racer_dir[1] = dir;
     /* Move waypoint far away so waypoint-advance threshold doesn't interfere */
-    s_wp_tx[0] = 200u;
-    s_wp_ty[0] = 200u;
-    s_wp_count = 1u;
+    s_wp_tx[0][0] = 200u;  /* enemy index 0 = slot 1 - 1 */
+    s_wp_ty[0][0] = 200u;
+    s_wp_count[0] = 1u;
 }
 
 void racer_set_wp_idx_for_test(uint8_t slot, uint8_t idx) {

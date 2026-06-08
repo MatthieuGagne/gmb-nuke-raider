@@ -162,4 +162,9 @@ void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count) {
         wram_checkpoints[i] = cpdefs[i];
     }
 }
+
+/* Test-only seam — set active_track_id without a full track_select() (avoids ROM load). */
+void track_test_set_id(uint8_t id) {
+    active_track_id = id;
+}
 #endif

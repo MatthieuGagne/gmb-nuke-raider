@@ -8,7 +8,7 @@
 BANKREF(track2_start_x)
 const int16_t track2_start_x = 96;
 BANKREF(track2_start_y)
-const int16_t track2_start_y = 40;
+const int16_t track2_start_y = 16;
 
 BANKREF(track2_finish_line_y)
 const uint8_t track2_finish_line_y = 6;
@@ -135,24 +135,24 @@ const CheckpointDef track2_checkpoints[4] = {
     { 96, 400, 40, 8, 0, CHECKPOINT_DIR_S },
     { 80, 752, 8, 40, 1, CHECKPOINT_DIR_W },
     { 32, 400, 40, 8, 2, CHECKPOINT_DIR_N },
-    { 80, 8, 8, 56, 3, CHECKPOINT_DIR_E },
+    { 80, 0, 8, 48, 3, CHECKPOINT_DIR_E },
 };
 const uint8_t track2_checkpoint_count = 4;
 
 BANKREF(track2_npc_count)
-const uint8_t track2_npc_count = 1u;
+const uint8_t track2_npc_count = 2u;
 
 BANKREF(track2_npc_tx)
-const uint8_t track2_npc_tx[8] = { 14u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_tx[8] = { 14u, 14u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_ty)
-const uint8_t track2_npc_ty[8] = { 5u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_ty[8] = { 2u, 4u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_type)
-const uint8_t track2_npc_type[8] = { 1u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_type[8] = { 1u, 1u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_npc_dir)
-const uint8_t track2_npc_dir[8] = { 255u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track2_npc_dir[8] = { 255u, 255u, 0u, 0u, 0u, 0u, 0u, 0u };
 
 BANKREF(track2_powerup_count)
 const uint8_t track2_powerup_count = 0u;
@@ -166,12 +166,21 @@ const uint8_t track2_powerup_ty[4] = { 0u, 0u, 0u, 0u };
 BANKREF(track2_powerup_type)
 const uint8_t track2_powerup_type[4] = { 0u, 0u, 0u, 0u };
 
-BANKREF(track2_racer_wp_count)
-const uint8_t track2_racer_wp_count = 12u;
+BANKREF(track2_racer_wp_count_0)
+const uint8_t track2_racer_wp_count_0 = 12u;
 
-BANKREF(track2_racer_wp_tx)
-const uint8_t track2_racer_wp_tx[12] = { 15u, 13u, 13u, 15u, 15u, 15u, 6u, 6u, 6u, 6u, 5u, 6u };
+BANKREF(track2_racer_wp_tx_0)
+const uint8_t track2_racer_wp_tx_0[12] = { 15u, 13u, 13u, 15u, 15u, 15u, 6u, 6u, 6u, 6u, 5u, 6u };
 
-BANKREF(track2_racer_wp_ty)
-const uint8_t track2_racer_wp_ty[12] = { 5u, 20u, 40u, 60u, 80u, 96u, 97u, 80u, 60u, 40u, 20u, 3u };
+BANKREF(track2_racer_wp_ty_0)
+const uint8_t track2_racer_wp_ty_0[12] = { 5u, 20u, 40u, 60u, 80u, 96u, 97u, 80u, 60u, 40u, 20u, 3u };
+
+BANKREF(track2_racer_wp_count_1)
+const uint8_t track2_racer_wp_count_1 = 12u;
+
+BANKREF(track2_racer_wp_tx_1)
+const uint8_t track2_racer_wp_tx_1[12] = { 15u, 13u, 13u, 15u, 15u, 15u, 6u, 6u, 6u, 6u, 5u, 6u };
+
+BANKREF(track2_racer_wp_ty_1)
+const uint8_t track2_racer_wp_ty_1[12] = { 5u, 20u, 40u, 60u, 80u, 96u, 97u, 80u, 60u, 40u, 20u, 3u };
 

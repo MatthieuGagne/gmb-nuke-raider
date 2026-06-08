@@ -97,7 +97,10 @@
       "Bash(python *)",
       "Bash(powershell *)",
       "Bash(python3 -c \"import pyboy; print\\(pyboy.__version__\\)\")",
-      "PowerShell(Start-Process \"C:\\\\Users\\\\mathd\\\\.claude\\\\usage-data\\\\report-2026-06-03-233452.html\")"
+      "PowerShell(Start-Process \"C:\\\\Users\\\\mathd\\\\.claude\\\\usage-data\\\\report-2026-06-03-233452.html\")",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\Tiled\\\\tiled.exe\" -ArgumentList \"C:\\\\Code\\\\nuke-raider\\\\assets\\\\maps\\\\track2.tmx\")",
+      "PowerShell(gh issue *)",
+      "PowerShell($gitDir = \\(git rev-parse --git-dir 2>$null\\); $gitCommon = \\(git rev-parse --git-common-dir 2>$null\\); $branch = \\(git branch --show-current\\); Write-Output \"GIT_DIR=$gitDir\"; Write-Output \"GIT_COMMON=$gitCommon\"; Write-Output \"BRANCH=$branch\"; if \\($gitDir -ne $gitCommon\\) { Write-Output \"ALREADY_IN_WORKTREE=true\" } else { Write-Output \"ALREADY_IN_WORKTREE=false\" })"
     ]
   },
   "hooks": {

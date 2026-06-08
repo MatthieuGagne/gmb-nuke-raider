@@ -166,6 +166,8 @@ void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8);
 /* Test-only seam: inject checkpoint descriptors directly into the WRAM buffer.
  * Never compiled into the GB ROM. */
 void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count);
+/* Test-only seam: set active_track_id without a full track_select() (avoids ROM load). */
+void track_test_set_id(uint8_t id);
 #endif
 
 #endif /* TRACK_H */
