@@ -100,7 +100,13 @@
       "PowerShell(Start-Process \"C:\\\\Users\\\\mathd\\\\.claude\\\\usage-data\\\\report-2026-06-03-233452.html\")",
       "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\Tiled\\\\tiled.exe\" -ArgumentList \"C:\\\\Code\\\\nuke-raider\\\\assets\\\\maps\\\\track2.tmx\")",
       "PowerShell(gh issue *)",
-      "PowerShell($gitDir = \\(git rev-parse --git-dir 2>$null\\); $gitCommon = \\(git rev-parse --git-common-dir 2>$null\\); $branch = \\(git branch --show-current\\); Write-Output \"GIT_DIR=$gitDir\"; Write-Output \"GIT_COMMON=$gitCommon\"; Write-Output \"BRANCH=$branch\"; if \\($gitDir -ne $gitCommon\\) { Write-Output \"ALREADY_IN_WORKTREE=true\" } else { Write-Output \"ALREADY_IN_WORKTREE=false\" })"
+      "PowerShell($gitDir = \\(git rev-parse --git-dir 2>$null\\); $gitCommon = \\(git rev-parse --git-common-dir 2>$null\\); $branch = \\(git branch --show-current\\); Write-Output \"GIT_DIR=$gitDir\"; Write-Output \"GIT_COMMON=$gitCommon\"; Write-Output \"BRANCH=$branch\"; if \\($gitDir -ne $gitCommon\\) { Write-Output \"ALREADY_IN_WORKTREE=true\" } else { Write-Output \"ALREADY_IN_WORKTREE=false\" })",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\",\"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\",\"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-multiple-racer-enemies\\\\build\\\\nuke-raider.gb\" -NoNewWindow)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\Tiled\\\\tiled.exe\" -ArgumentList \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-multiple-racer-enemies\\\\assets\\\\maps\\\\track2.tmx\")",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\",\"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\",\"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\master-laptest\\\\build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\",\"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\",\"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-multiple-racer-enemies\\\\build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
+      "PowerShell(py *)",
+      "PowerShell(Get-Process *)"
     ]
   },
   "hooks": {
