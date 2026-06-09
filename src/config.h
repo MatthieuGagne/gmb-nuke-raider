@@ -129,6 +129,11 @@
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
 
+/* Music catch-up cap: max music_tick() calls music_service() runs in one frame to
+ * resync tempo after a frame overrun. Bounds the catch-up so a multi-frame stall
+ * cannot spiral or produce an audible fast-forward. Above this, excess ticks drop. */
+#define MUSIC_MAX_CATCHUP 3u
+
 /* Debug ring buffer — EMU_printf / Emulicious debug output (DEBUG=1 only).
  * Fixed WRAM addresses in the last 66 bytes — well above static data (~0xC000-0xC242). */
 #define DEBUG_LOG_ADDR    0xDF80U  /* WRAM: ring buffer content (64 bytes) */

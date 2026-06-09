@@ -11,12 +11,14 @@
 #include <gb/gb.h>
 #include <gb/hardware.h>
 #include "banking.h"
+#include "config.h"
 #include "hUGEDriver.h"
 #include "music_data.h"
 #include "music.h"
 #include "debug.h"
 
 static uint8_t current_song_bank = 0;
+static volatile uint8_t music_ticks_owed = 0u;
 
 void music_init(void) {
     NR52_REG = 0x80;  /* enable APU */
@@ -38,6 +40,7 @@ void music_start(uint8_t bank, const hUGESong_t *song) {
         hUGE_init(song);
         SWITCH_ROM(_saved_bank);
     }
+    music_resync();   /* fresh song has no backlog to honor */
 }
 
 void music_tick(void) {
@@ -53,15 +56,40 @@ void music_tick(void) {
     }
 }
 
+void music_notify_vblank(void) {
+    if (music_ticks_owed < 255u) music_ticks_owed++;
+}
+
+uint8_t music_service(void) {
+    uint8_t owed;
+    uint8_t i;
+    __critical { owed = music_ticks_owed; music_ticks_owed = 0u; }
+    if (owed > MUSIC_MAX_CATCHUP) owed = MUSIC_MAX_CATCHUP;
+    for (i = 0u; i < owed; i++) {
+        music_tick();
+    }
+    return owed;
+}
+
+void music_resync(void) {
+    __critical { music_ticks_owed = 0u; }
+}
+
+uint8_t music_ticks_owed_peek(void) {
+    return music_ticks_owed;
+}
+
 void vbl_sync(void) {
     while (!frame_ready);
     frame_ready = 0;
     music_tick();
+    __critical { if (music_ticks_owed) music_ticks_owed--; }
 }
 
 void vbl_display_off(void) {
     while (!frame_ready);      /* wait for VBlank start */
     frame_ready = 0;
     music_tick();              /* tick music for this VBlank */
-    LCDC_REG &= ~0x80U;       /* disable LCD — safe: we're in VBlank */
+    __critical { if (music_ticks_owed) music_ticks_owed--; }  /* account for this VBlank so music_service wont re-tick it */
+    LCDC_REG &= ~0x80U;        /* disable LCD - safe: we are in VBlank */
 }
