@@ -38,6 +38,7 @@ volatile uint8_t frame_ready = 0;
 
 static void vbl_isr(void) {
     move_bkg(cam_scx_shadow, cam_scy_shadow);  /* apply shadow SCX/SCY at VBlank start */
+    music_notify_vblank();                      /* count this VBlank (no bank switch - ISR safe) */
     frame_ready = 1;
 }
 
@@ -61,7 +62,7 @@ void main(void) {
     while (1) {
         while (!frame_ready);
         frame_ready = 0;
-        music_tick();
+        music_service();          /* catch up music for every elapsed VBlank */
         sfx_tick();
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();

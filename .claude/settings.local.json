@@ -116,7 +116,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py C:\\Code\\nuke-raider\\tools\\bank_check_hook.py",
+            "command": "py C:/Code/nuke-raider/tools/bank_check_hook.py",
             "statusMessage": "bank-pre-write check..."
           }
         ]
@@ -139,7 +139,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py C:\\Code\\nuke-raider\\tools\\post_build_hook.py",
+            "command": "py C:/Code/nuke-raider/tools/post_build_hook.py",
             "statusMessage": "bank-post-build + memory-check..."
           }
         ]

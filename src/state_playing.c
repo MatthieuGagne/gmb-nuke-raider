@@ -20,6 +20,7 @@ BANKREF_EXTERN(state_playing)
 #include "turret.h"
 #include "racer.h"
 #include "sfx.h"
+#include "music.h"
 #include "powerup.h"
 #include "config.h"
 
@@ -119,6 +120,7 @@ static void enter(void) {
         set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_init_tiles);
     }
     DISPLAY_ON;
+    music_resync();   /* zero catch-up backlog so the race start does not burp */
 }
 
 static void update(void) {
