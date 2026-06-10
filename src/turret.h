@@ -30,10 +30,6 @@ uint8_t turret_blocks_tile(uint8_t tx, uint8_t ty) BANKED;
 /* Returns number of active turrets — used by tests. */
 uint8_t turret_count_active(void) BANKED;
 
-/* Pure-logic helpers exposed for testing — not for production callers. */
-player_dir_t turret_dir_to_pixel(uint8_t tx, uint8_t ty,
-                                 int16_t player_px, int16_t player_py) BANKED;
-
 /* Test-only accessors — do not call from production code */
 #ifndef __SDCC
 uint8_t turret_get_type(uint8_t i);
