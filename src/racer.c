@@ -12,6 +12,7 @@
 #include "banking.h"
 #include "projectile.h"
 #include "enemy_common.h"  /* enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
+#include "vehicle_physics.h"  /* shared terrain physics + slide collision */
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -299,10 +300,7 @@ uint8_t racer_update(void) BANKED {
 
         /* ---- Gear physics (mirrors player_apply_physics, always full throttle) ---- */
         {
-            uint8_t fric_x;
-            uint8_t fric_y;
             uint8_t gas;
-            uint8_t j;
             uint8_t max_speed;
             uint8_t spd_x;
             uint8_t spd_y;
@@ -310,42 +308,24 @@ uint8_t racer_update(void) BANKED {
 
             gas = (tile_type != TILE_OIL) ? 1u : 0u;
 
-            if (tile_type == TILE_SAND) {
-                fric_x = (gas && RACER_DIR_DX[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-                fric_y = (gas && RACER_DIR_DY[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-            } else if (tile_type == TILE_OIL) {
-                fric_x = 0u;
-                fric_y = 0u;
+            /* Gear-reset-on-oil stays here (gear state is the caller's). */
+            if (tile_type == TILE_OIL) {
                 racer_gear[i] = 0u;
                 racer_downshift_timer[i] = 0u;
-            } else {
-                fric_x = (gas && RACER_DIR_DX[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
-                fric_y = (gas && RACER_DIR_DY[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
             }
 
-            for (j = 0u; j < fric_x; j++) {
-                if      (racer_vx[i] > 0) racer_vx[i] = (int8_t)(racer_vx[i] - 1);
-                else if (racer_vx[i] < 0) racer_vx[i] = (int8_t)(racer_vx[i] + 1);
-            }
-            for (j = 0u; j < fric_y; j++) {
-                if      (racer_vy[i] > 0) racer_vy[i] = (int8_t)(racer_vy[i] - 1);
-                else if (racer_vy[i] < 0) racer_vy[i] = (int8_t)(racer_vy[i] + 1);
-            }
+            /* Friction (pre-accel) via the shared helper. */
+            vehicle_apply_friction(&racer_vx[i], &racer_vy[i], tile_type, gas, dir);
 
+            /* Racer gear accel stays inline — caller-specific, between friction and boost. */
             if (gas) {
                 racer_vx[i] = (int8_t)(racer_vx[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DX[dir]));
                 racer_vy[i] = (int8_t)(racer_vy[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DY[dir]));
             }
 
-            if (tile_type == TILE_BOOST) {
-                racer_vy[i] = (int8_t)(racer_vy[i] - (int8_t)TERRAIN_BOOST_DELTA);
-            }
-
+            /* Boost-delta + clamp (post-accel) via the shared helper. */
             max_speed = (tile_type == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : RACER_GEAR_MAX_SPD[racer_gear[i]];
-            if (racer_vx[i] >  (int8_t)max_speed) racer_vx[i] =  (int8_t)max_speed;
-            if (racer_vx[i] < -(int8_t)max_speed) racer_vx[i] = -(int8_t)max_speed;
-            if (racer_vy[i] >  (int8_t)max_speed) racer_vy[i] =  (int8_t)max_speed;
-            if (racer_vy[i] < -(int8_t)max_speed) racer_vy[i] = -(int8_t)max_speed;
+            vehicle_apply_boost_clamp(&racer_vx[i], &racer_vy[i], tile_type, max_speed);
 
             spd_x = (racer_vx[i] < 0) ? (uint8_t)(-racer_vx[i]) : (uint8_t)racer_vx[i];
             spd_y = (racer_vy[i] < 0) ? (uint8_t)(-racer_vy[i]) : (uint8_t)racer_vy[i];
@@ -367,12 +347,14 @@ uint8_t racer_update(void) BANKED {
             }
         }
 
-        /* ---- Axis-split collision ---- */
+        /* ---- Axis-split collision (shared helper + dir-specific gate) ---- */
         {
             int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
-            int16_t new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+            int16_t new_py;
 
-            if (racer_corners_passable(new_px, racer_py[i], dir)) {
+            /* X: shared in-bounds+static-terrain step AND the racer's dir hitbox. */
+            if (vehicle_step_axis_x(racer_px[i], racer_py[i], racer_vx[i]) == new_px &&
+                racer_corners_passable(new_px, racer_py[i], dir)) {
                 racer_px[i] = new_px;
             } else {
                 racer_vx[i] = (int8_t)0;
@@ -380,7 +362,10 @@ uint8_t racer_update(void) BANKED {
                 racer_downshift_timer[i] = 0u;
             }
 
-            if (racer_corners_passable(racer_px[i], new_py, dir)) {
+            /* Y uses the post-X racer_px[i] (slide), matching the original. */
+            new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+            if (vehicle_step_axis_y(racer_px[i], racer_py[i], racer_vy[i]) == new_py &&
+                racer_corners_passable(racer_px[i], new_py, dir)) {
                 racer_py[i] = new_py;
             } else {
                 racer_vy[i] = (int8_t)0;
