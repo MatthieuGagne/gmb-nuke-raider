@@ -184,3 +184,12 @@ const uint8_t track2_racer_wp_tx_1[12] = { 15u, 13u, 13u, 15u, 15u, 15u, 6u, 6u,
 BANKREF(track2_racer_wp_ty_1)
 const uint8_t track2_racer_wp_ty_1[12] = { 5u, 20u, 40u, 60u, 80u, 96u, 97u, 80u, 60u, 40u, 20u, 3u };
 
+BANKREF(track2_patrol_route_count_0)
+const uint8_t track2_patrol_route_count_0 = 0u;
+
+BANKREF(track2_patrol_route_tx_0)
+const uint8_t track2_patrol_route_tx_0[1] = { 0u };
+
+BANKREF(track2_patrol_route_ty_0)
+const uint8_t track2_patrol_route_ty_0[1] = { 0u };
+

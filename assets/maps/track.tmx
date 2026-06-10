@@ -1,4 +1,4 @@
-<map version="1.10" tiledversion="1.10.0" orientation="orthogonal" renderorder="right-down" width="20" height="100" tilewidth="8" tileheight="8" infinite="0" nextlayerid="5" nextobjectid="6">
+<map version="1.10" tiledversion="1.10.0" orientation="orthogonal" renderorder="right-down" width="20" height="100" tilewidth="8" tileheight="8" infinite="0" nextlayerid="6" nextobjectid="11">
  <properties>
   <property name="lap_count" type="int" value="1"/>
   <property name="map_type" value="race"/>
@@ -34,5 +34,15 @@
   <object id="5" name="turret" x="40" y="576">
    <point />
   </object>
+  <object id="6" name="patrol" x="88" y="240">
+   <point />
+  </object>
  </objectgroup>
-<objectgroup name="powerups"><object id="200" name="heal" x="96" y="320" width="8" height="8" /></objectgroup></map>
+<objectgroup name="powerups"><object id="200" name="heal" x="96" y="320" width="8" height="8" /></objectgroup>
+ <objectgroup id="5" name="patrol_route_0">
+  <object id="7" x="88" y="240"><point /></object>
+  <object id="8" x="120" y="240"><point /></object>
+  <object id="9" x="120" y="320"><point /></object>
+  <object id="10" x="88" y="320"><point /></object>
+ </objectgroup>
+</map>
