@@ -98,3 +98,12 @@ const uint8_t track3_racer_wp_tx[1] = { 0u };
 BANKREF(track3_racer_wp_ty)
 const uint8_t track3_racer_wp_ty[1] = { 0u };
 
+BANKREF(track3_patrol_route_count_0)
+const uint8_t track3_patrol_route_count_0 = 0u;
+
+BANKREF(track3_patrol_route_tx_0)
+const uint8_t track3_patrol_route_tx_0[1] = { 0u };
+
+BANKREF(track3_patrol_route_ty_0)
+const uint8_t track3_patrol_route_ty_0[1] = { 0u };
+

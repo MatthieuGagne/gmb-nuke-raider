@@ -540,6 +540,29 @@ void load_racer_waypoints(uint8_t id,
     }
 }
 
+void load_patrol_waypoints(uint8_t id,
+                            uint8_t idx,
+                            uint8_t *out_tx,
+                            uint8_t *out_ty,
+                            uint8_t *out_count) NONBANKED {
+    uint8_t saved = CURRENT_BANK;
+    uint8_t n, i;
+    /* v1: only Track 1 (id 0), patrol index 0 has a route. */
+    if (id == 0u && idx == 0u) {
+        SWITCH_ROM(BANK(track_patrol_route_count_0));
+        n = track_patrol_route_count_0;
+        if (n > PATROL_MAX_WAYPOINTS) n = PATROL_MAX_WAYPOINTS;
+        for (i = 0u; i < n; i++) {
+            out_tx[i] = track_patrol_route_tx_0[i];
+            out_ty[i] = track_patrol_route_ty_0[i];
+        }
+        SWITCH_ROM(saved);
+        *out_count = n;
+    } else {
+        *out_count = 0u;
+    }
+}
+
 void load_powerup_positions(uint8_t id,
                              uint8_t *out_tx,
                              uint8_t *out_ty,

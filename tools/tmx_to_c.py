@@ -30,6 +30,7 @@ NPC_TYPE_MAP = {
     "turret":     0,
     "car":        1,
     "pedestrian": 2,
+    "patrol":     3,
 }
 
 # dir string → numeric constant. Must match player_dir_t in src/player.h.
@@ -246,6 +247,33 @@ def parse_racer_waypoints(root):
     return result
 
 
+def parse_patrol_routes(root):
+    """Extract patrol routes from 'patrol_route_N' object layers.
+
+    Objects must be point objects snapped to the 8px tile grid.
+    Returns a dict mapping int index N -> list of (tx, ty).
+    Missing layers return {} (safe default for tracks without patrols).
+    """
+    result = {}
+    for og in root.findall('objectgroup'):
+        name = og.get('name', '')
+        if not name.startswith('patrol_route_'):
+            continue
+        suffix = name[len('patrol_route_'):]
+        if not suffix.isdigit():
+            continue
+        idx = int(suffix)
+        waypoints = []
+        for obj in og.findall('object'):
+            if obj.find('point') is None:
+                continue
+            x = float(obj.get('x', '0'))
+            y = float(obj.get('y', '0'))
+            waypoints.append((int(x / 8), int(y / 8)))
+        result[idx] = waypoints
+    return result
+
+
 def _emit_wp_arrays(out, sym_count, sym_tx, sym_ty, waypoints):
     """Emit BANKREF + array definitions for one waypoint set."""
     n = len(waypoints)
@@ -283,6 +311,24 @@ def emit_racer_waypoints(out, prefix, waypoints_dict):
                         f'{prefix}_racer_wp_count',
                         f'{prefix}_racer_wp_tx',
                         f'{prefix}_racer_wp_ty',
+                        [])
+
+
+def emit_patrol_routes(out, prefix, routes_dict):
+    """Emit patrol route arrays for one track into an open file handle."""
+    for i in sorted(routes_dict):
+        _emit_wp_arrays(out,
+                        f'{prefix}_patrol_route_count_{i}',
+                        f'{prefix}_patrol_route_tx_{i}',
+                        f'{prefix}_patrol_route_ty_{i}',
+                        routes_dict[i])
+    if not routes_dict:
+        # No patrol layers — emit an empty index-0 set so load_patrol_waypoints
+        # for id==0 always links (loader returns count 0 at runtime anyway).
+        _emit_wp_arrays(out,
+                        f'{prefix}_patrol_route_count_0',
+                        f'{prefix}_patrol_route_tx_0',
+                        f'{prefix}_patrol_route_ty_0',
                         [])
 
 
@@ -509,6 +555,8 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
         f.write('\n')
         waypoints_dict = parse_racer_waypoints(root)
         emit_racer_waypoints(f, prefix, waypoints_dict)
+        routes_dict = parse_patrol_routes(root)
+        emit_patrol_routes(f, prefix, routes_dict)
 
 
 def emit_npc_header(out_path, tmx_paths):
@@ -636,6 +684,18 @@ def emit_racer_header(out_path, tmx_paths):
                 f'BANKREF_EXTERN({prefix}_racer_wp_count_{i})',
                 f'BANKREF_EXTERN({prefix}_racer_wp_tx_{i})',
                 f'BANKREF_EXTERN({prefix}_racer_wp_ty_{i})',
+                '',
+            ]
+        routes_dict = parse_patrol_routes(root)
+        patrol_indices = sorted(routes_dict) if routes_dict else [0]
+        for i in patrol_indices:
+            lines += [
+                f'extern const uint8_t  {prefix}_patrol_route_count_{i};',
+                f'extern const uint8_t  {prefix}_patrol_route_tx_{i}[];',
+                f'extern const uint8_t  {prefix}_patrol_route_ty_{i}[];',
+                f'BANKREF_EXTERN({prefix}_patrol_route_count_{i})',
+                f'BANKREF_EXTERN({prefix}_patrol_route_tx_{i})',
+                f'BANKREF_EXTERN({prefix}_patrol_route_ty_{i})',
                 '',
             ]
     lines += ['#endif /* TRACK_RACER_EXTERNS_H */']

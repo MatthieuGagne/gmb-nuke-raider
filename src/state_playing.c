@@ -19,6 +19,7 @@ BANKREF_EXTERN(state_playing)
 #include "race_state.h"
 #include "turret.h"
 #include "racer.h"
+#include "patrol.h"
 #include "sfx.h"
 #include "music.h"
 #include "powerup.h"
@@ -92,6 +93,7 @@ static void enter(void) {
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
     race_state_init(track_get_lap_count());
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
+    patrol_init(loader_get_slot(TILE_ASSET_PLAYER));
     powerup_init();
     race_state_set_active(PLAYER_SLOT, 1u);
     active_map_type_cache = track_get_map_type();
@@ -106,6 +108,7 @@ static void enter(void) {
     camera_apply_scroll();
     player_render();
     racer_render();
+    patrol_render();
     /* Countdown init: reset phase and write initial '03' to BG tilemap. */
     cd_phase  = 0u;
     cd_frames = 0u;
@@ -150,6 +153,7 @@ static void update(void) {
     projectile_render();
     turret_render();
     racer_render();
+    patrol_render();
     powerup_render();
     hud_render();
     camera_flush_vram();
@@ -175,6 +179,7 @@ static void update(void) {
         race_state_update_cp(PLAYER_SLOT, px, py, pdir);
         projectile_update();
         turret_update(px, py);
+        patrol_update(px, py);
         if (racer_update()) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
@@ -232,6 +237,7 @@ static void update(void) {
 static void sp_exit(void) {
     player_hide();
     racer_hide();
+    patrol_hide();
     loader_unload_state();
     HIDE_WIN;
     cam_scx_shadow = 0u;

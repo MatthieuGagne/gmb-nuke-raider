@@ -137,19 +137,19 @@ const CheckpointDef track_checkpoints[1] = {
 const uint8_t track_checkpoint_count = 0;
 
 BANKREF(track_npc_count)
-const uint8_t track_npc_count = 3u;
+const uint8_t track_npc_count = 4u;
 
 BANKREF(track_npc_tx)
-const uint8_t track_npc_tx[8] = { 4u, 15u, 5u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track_npc_tx[8] = { 4u, 15u, 5u, 11u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_ty)
-const uint8_t track_npc_ty[8] = { 22u, 47u, 72u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track_npc_ty[8] = { 22u, 47u, 72u, 11u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_type)
-const uint8_t track_npc_type[8] = { 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track_npc_type[8] = { 0u, 0u, 0u, 3u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_dir)
-const uint8_t track_npc_dir[8] = { 255u, 255u, 255u, 0u, 0u, 0u, 0u, 0u };
+const uint8_t track_npc_dir[8] = { 255u, 255u, 255u, 255u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_powerup_count)
 const uint8_t track_powerup_count = 1u;
@@ -171,4 +171,13 @@ const uint8_t track_racer_wp_tx[1] = { 0u };
 
 BANKREF(track_racer_wp_ty)
 const uint8_t track_racer_wp_ty[1] = { 0u };
+
+BANKREF(track_patrol_route_count_0)
+const uint8_t track_patrol_route_count_0 = 4u;
+
+BANKREF(track_patrol_route_tx_0)
+const uint8_t track_patrol_route_tx_0[4] = { 6u, 13u, 13u, 6u };
+
+BANKREF(track_patrol_route_ty_0)
+const uint8_t track_patrol_route_ty_0[4] = { 8u, 8u, 16u, 16u };
 
