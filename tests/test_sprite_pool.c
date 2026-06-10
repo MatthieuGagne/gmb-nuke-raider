@@ -81,6 +81,28 @@ void test_clear_sprites_from_zero_frees_all(void) {
     TEST_ASSERT_NOT_EQUAL(SPRITE_POOL_INVALID, get_sprite());
 }
 
+/* --- sprite_pool_active_count (host-test seam) ---------------------- */
+
+/* Fresh pool reports zero active slots */
+void test_active_count_zero_after_init(void) {
+    TEST_ASSERT_EQUAL_UINT8(0u, sprite_pool_active_count());
+}
+
+/* Each get_sprite() increments the active count */
+void test_active_count_tracks_allocations(void) {
+    get_sprite();
+    get_sprite();
+    TEST_ASSERT_EQUAL_UINT8(2u, sprite_pool_active_count());
+}
+
+/* clear_sprite() decrements the active count */
+void test_active_count_decrements_on_clear(void) {
+    uint8_t s0 = get_sprite();
+    get_sprite();
+    clear_sprite(s0);
+    TEST_ASSERT_EQUAL_UINT8(1u, sprite_pool_active_count());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_all_slots_free);
@@ -91,5 +113,8 @@ int main(void) {
     RUN_TEST(test_clear_sprite_hides_sprite);
     RUN_TEST(test_clear_sprites_from_frees_range);
     RUN_TEST(test_clear_sprites_from_zero_frees_all);
+    RUN_TEST(test_active_count_zero_after_init);
+    RUN_TEST(test_active_count_tracks_allocations);
+    RUN_TEST(test_active_count_decrements_on_clear);
     return UNITY_END();
 }

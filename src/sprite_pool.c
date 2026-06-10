@@ -35,3 +35,14 @@ void clear_sprites_from(uint8_t i) BANKED {
         clear_sprite(j);
     }
 }
+
+#ifndef __SDCC
+uint8_t sprite_pool_active_count(void) {
+    uint8_t i;
+    uint8_t n = 0u;
+    for (i = 0u; i < MAX_SPRITES; i++) {
+        if (spr_act[i]) n++;
+    }
+    return n;
+}
+#endif
