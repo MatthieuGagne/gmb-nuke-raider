@@ -2,6 +2,7 @@
 #include "turret.h"
 #include "player.h"   /* player_dir_t */
 #include "camera.h"   /* cam_x, cam_y */
+#include "enemy_common.h"
 
 void setUp(void) { turret_init_empty(); }
 void tearDown(void) {}
@@ -35,49 +36,49 @@ void test_turret_blocks_tile_wrong_position(void) {
 
 void test_turret_direction_to_player_right(void) {
     /* Turret at tile (0,0) = pixel (0,0); player at pixel (64,0) → DIR_R */
-    TEST_ASSERT_EQUAL_INT(DIR_R, turret_dir_to_pixel(0u, 0u, 64, 0));
+    TEST_ASSERT_EQUAL_INT(DIR_R, enemy_aim_dir(0u, 0u, 64, 0));
 }
 
 void test_turret_direction_to_player_down(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_B, turret_dir_to_pixel(0u, 0u, 0, 64));
+    TEST_ASSERT_EQUAL_INT(DIR_B, enemy_aim_dir(0u, 0u, 0, 64));
 }
 
 /* ax == ay tie → toward_x = (ax > ay) = 0 → NNE-side direction */
 void test_turret_direction_to_player_down_right(void) {
     /* Was DIR_RB; 3-threshold: ax=ay=64, toward_x=0, SE quadrant → DIR_SSE */
-    TEST_ASSERT_EQUAL_INT(DIR_SSE, turret_dir_to_pixel(0u, 0u, 64, 64));
+    TEST_ASSERT_EQUAL_INT(DIR_SSE, enemy_aim_dir(0u, 0u, 64, 64));
 }
 void test_turret_direction_to_player_up_left(void) {
     /* Was DIR_LT; 3-threshold: ax=ay=80, toward_x=0, NW quadrant → DIR_NNW */
-    TEST_ASSERT_EQUAL_INT(DIR_NNW, turret_dir_to_pixel(10u, 10u, 0, 0));
+    TEST_ASSERT_EQUAL_INT(DIR_NNW, enemy_aim_dir(10u, 10u, 0, 0));
 }
 
 /* 16-direction tests — intermediate sectors */
 void test_turret_direction_nne(void) {
     /* ax=10 < ay=15, NE quadrant → DIR_NNE */
-    TEST_ASSERT_EQUAL_INT(DIR_NNE, turret_dir_to_pixel(0u, 0u, 10, -15));
+    TEST_ASSERT_EQUAL_INT(DIR_NNE, enemy_aim_dir(0u, 0u, 10, -15));
 }
 void test_turret_direction_ene(void) {
     /* ax=15 > ay=10, NE quadrant → DIR_ENE */
-    TEST_ASSERT_EQUAL_INT(DIR_ENE, turret_dir_to_pixel(0u, 0u, 15, -10));
+    TEST_ASSERT_EQUAL_INT(DIR_ENE, enemy_aim_dir(0u, 0u, 15, -10));
 }
 void test_turret_direction_ese(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_ESE, turret_dir_to_pixel(0u, 0u, 15, 10));
+    TEST_ASSERT_EQUAL_INT(DIR_ESE, enemy_aim_dir(0u, 0u, 15, 10));
 }
 void test_turret_direction_sse(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_SSE, turret_dir_to_pixel(0u, 0u, 10, 15));
+    TEST_ASSERT_EQUAL_INT(DIR_SSE, enemy_aim_dir(0u, 0u, 10, 15));
 }
 void test_turret_direction_ssw(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_SSW, turret_dir_to_pixel(0u, 0u, -10, 15));
+    TEST_ASSERT_EQUAL_INT(DIR_SSW, enemy_aim_dir(0u, 0u, -10, 15));
 }
 void test_turret_direction_wsw(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_WSW, turret_dir_to_pixel(0u, 0u, -15, 10));
+    TEST_ASSERT_EQUAL_INT(DIR_WSW, enemy_aim_dir(0u, 0u, -15, 10));
 }
 void test_turret_direction_wnw(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_WNW, turret_dir_to_pixel(0u, 0u, -15, -10));
+    TEST_ASSERT_EQUAL_INT(DIR_WNW, enemy_aim_dir(0u, 0u, -15, -10));
 }
 void test_turret_direction_nnw(void) {
-    TEST_ASSERT_EQUAL_INT(DIR_NNW, turret_dir_to_pixel(0u, 0u, -10, -15));
+    TEST_ASSERT_EQUAL_INT(DIR_NNW, enemy_aim_dir(0u, 0u, -10, -15));
 }
 
 void test_turret_spawn_timer_is_wind_up(void) {
