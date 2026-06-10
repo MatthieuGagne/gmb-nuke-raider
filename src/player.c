@@ -13,6 +13,7 @@
 #include "sfx.h"
 #include "turret.h"
 #include "racer.h"
+#include "vehicle_physics.h"
 
 int16_t px;
 int16_t py;
@@ -306,43 +307,24 @@ int8_t player_dir_dx(player_dir_t dir) BANKED { return DIR_DX[dir]; }
 int8_t player_dir_dy(player_dir_t dir) BANKED { return DIR_DY[dir]; }
 
 void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
-    uint8_t i;
-    uint8_t fric_x;
-    uint8_t fric_y;
     uint8_t gas;
 
     player_dir = decode_dir(buttons);
     gas = (terrain != TILE_OIL && (buttons & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) ? 1u : 0u;
 
-    if (terrain == TILE_SAND) {
-        fric_x = (gas && DIR_DX[player_dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-        fric_y = (gas && DIR_DY[player_dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-    } else if (terrain == TILE_OIL) {
-        fric_x = 0u;
-        fric_y = 0u;
-        current_gear    = 0u;   /* gear resets immediately on oil */
+    /* Gear-reset-on-oil stays here (gear state is the caller's). */
+    if (terrain == TILE_OIL) {
+        current_gear    = 0u;
         downshift_timer = 0u;
-    } else {
-        fric_x = (gas && DIR_DX[player_dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
-        fric_y = (gas && DIR_DY[player_dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
     }
 
-    for (i = 0u; i < fric_x; i++) {
-        if      (vx > 0) vx = (int8_t)(vx - 1);
-        else if (vx < 0) vx = (int8_t)(vx + 1);
-    }
-    for (i = 0u; i < fric_y; i++) {
-        if      (vy > 0) vy = (int8_t)(vy - 1);
-        else if (vy < 0) vy = (int8_t)(vy + 1);
-    }
+    /* Friction (pre-accel) via the shared helper. */
+    vehicle_apply_friction(&vx, &vy, terrain, gas, player_dir);
 
+    /* Gear accel stays inline — caller-specific, lands between friction and boost. */
     if (gas) {
         vx = (int8_t)(vx + (int8_t)((int8_t)GEAR_ACCEL[current_gear] * DIR_DX[player_dir]));
         vy = (int8_t)(vy + (int8_t)((int8_t)GEAR_ACCEL[current_gear] * DIR_DY[player_dir]));
-    }
-
-    if (terrain == TILE_BOOST) {
-        vy = (int8_t)(vy - (int8_t)TERRAIN_BOOST_DELTA);
     }
 
     {
@@ -352,10 +334,8 @@ void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
         uint8_t spd_y;
         uint8_t speed;
 
-        if (vx >  (int8_t)max_speed) vx =  (int8_t)max_speed;
-        if (vx < -(int8_t)max_speed) vx = -(int8_t)max_speed;
-        if (vy >  (int8_t)max_speed) vy =  (int8_t)max_speed;
-        if (vy < -(int8_t)max_speed) vy = -(int8_t)max_speed;
+        /* Boost-delta + clamp (post-accel) via the shared helper. */
+        vehicle_apply_boost_clamp(&vx, &vy, terrain, max_speed);
 
         /* Gear shift: compute speed magnitude (no multiply, no stdlib abs) */
         spd_x = (vx < 0) ? (uint8_t)(-vx) : (uint8_t)vx;
