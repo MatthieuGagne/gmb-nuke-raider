@@ -41,6 +41,15 @@ void load_racer_waypoints(uint8_t id,
                            uint8_t *out_ty,
                            uint8_t *out_count) NONBANKED;
 
+/* Copies patrol waypoints for track `id` / patrol index `idx` into caller buffers.
+ * Only track id 0 (Track 1) has patrol routes in v1; all others set *out_count=0.
+ * Buffers must be at least PATROL_MAX_WAYPOINTS bytes each. */
+void load_patrol_waypoints(uint8_t id,
+                            uint8_t idx,
+                            uint8_t *out_tx,
+                            uint8_t *out_ty,
+                            uint8_t *out_count) NONBANKED;
+
 /* Copies powerup spawn arrays for track `id` (0=track, 1=track2, 2=track3).
  * Output buffers must be at least MAX_POWERUPS bytes each.
  * out_type receives POWERUP_TYPE_* values. */
