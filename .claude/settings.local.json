@@ -106,7 +106,9 @@
       "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\",\"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\",\"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\master-laptest\\\\build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
       "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\",\"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\",\"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-multiple-racer-enemies\\\\build\\\\nuke-raider.gb\" -PassThru | Select-Object Id, HasExited)",
       "PowerShell(py *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Process java -ArgumentList '-jar','C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar','build/nuke-raider.gb'; \"Launched PR4 ROM: $\\(\\(Get-Location\\).Path\\)\\\\build\\\\nuke-raider.gb\")",
+      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe\" -c \"grep -E 'track_start_x|track_start_y|start_dir|finish' src/track_map.c | head -8; echo '=== player spawn use ==='; grep -n 'track_get_start_x\\\\|track_get_start_y\\\\|player_set_pos\\\\|spawn' src/state_playing.c src/player.c | head -8; echo '=== camera dir ==='; grep -n 'cam_y' src/camera.c | head -10\")"
     ]
   },
   "hooks": {
