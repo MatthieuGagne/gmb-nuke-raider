@@ -215,7 +215,14 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             patrol_vx[i] = (int8_t)(patrol_vx[i] + (int8_t)((int8_t)PATROL_SPEED * VEH_DIR_DX[dir]));
             patrol_vy[i] = (int8_t)(patrol_vy[i] + (int8_t)((int8_t)PATROL_SPEED * VEH_DIR_DY[dir]));
         }
-        vehicle_apply_boost_clamp(&patrol_vx[i], &patrol_vy[i], terrain, (uint8_t)PATROL_SPEED);
+        {
+            /* Boost pads let the patrol exceed its normal top speed (AC4),
+             * mirroring racer.c; otherwise clamp to PATROL_SPEED. */
+            uint8_t max_speed = (tt == TILE_BOOST)
+                                ? (uint8_t)TERRAIN_BOOST_MAX_SPEED
+                                : (uint8_t)PATROL_SPEED;
+            vehicle_apply_boost_clamp(&patrol_vx[i], &patrol_vy[i], terrain, max_speed);
+        }
         patrol_px[i] = vehicle_step_axis_x(patrol_px[i], patrol_py[i], patrol_vx[i]);
         if (patrol_px[i] == vehicle_step_axis_x(patrol_px[i], patrol_py[i], 0)) {
             /* x blocked → kill x velocity so it does not pin against the wall */
