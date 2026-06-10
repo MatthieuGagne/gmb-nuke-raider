@@ -6,6 +6,7 @@
 #include "race_state.h"
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
 #include "projectile.h"
+#include "sprite_pool.h"
 
 extern int16_t cam_y;
 
@@ -595,6 +596,48 @@ void test_racer_init_skips_slot_when_no_waypoints(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_active[2]);  /* enemy 1: no waypoints on track0 */
 }
 
+/* === Lazy OAM allocation (PR3) === */
+
+/* Track 0 (track.tmx) has no racers → racer_init must allocate ZERO sprites. */
+void test_racer_init_allocates_no_sprites_when_no_racers(void) {
+    sprite_pool_init();
+    track_test_set_id(0u);
+    racer_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(0u, sprite_pool_active_count());
+}
+
+/* Track 1 (id=1, track2.tmx) has 2 active enemy racers → 2 * 4 = 8 sprites,
+ * NOT 12 (the old unconditional 4 * MAX_RACERS pre-allocation). */
+void test_racer_init_allocates_four_per_active_racer(void) {
+    sprite_pool_init();
+    track_test_set_id(1u);
+    racer_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(8u, sprite_pool_active_count());
+}
+
+/* === Render/hide safe with SPRITE_POOL_INVALID slots (PR3) === */
+
+/* After racer_init on a track with no racers, all OAM handles are INVALID.
+ * racer_hide must NOT call move_sprite on any of them. */
+void test_racer_hide_skips_invalid_slots(void) {
+    sprite_pool_init();
+    track_test_set_id(0u);   /* no racers → all slots INVALID */
+    racer_init(0u);
+    mock_move_sprite_reset();
+    racer_hide();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+/* racer_render with no active racers (all INVALID) must NOT move_sprite. */
+void test_racer_render_skips_invalid_slots(void) {
+    sprite_pool_init();
+    track_test_set_id(0u);
+    racer_init(0u);
+    mock_move_sprite_reset();
+    racer_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
 void test_racer_rank_with_two_enemies_player_first(void) {
     /* Player (PLAYER_SLOT=0) is 1 lap ahead of both enemies → rank 1.
      * Fails until PLAYER_SLOT=0 and race_state uses correct slot (Tasks 2, 6). */
@@ -659,6 +702,10 @@ int main(void) {
     RUN_TEST(test_racer_init_activates_both_enemy_slots);
     RUN_TEST(test_racer_init_skips_slot_when_no_spawn);
     RUN_TEST(test_racer_init_skips_slot_when_no_waypoints);
+    RUN_TEST(test_racer_init_allocates_no_sprites_when_no_racers);
+    RUN_TEST(test_racer_init_allocates_four_per_active_racer);
+    RUN_TEST(test_racer_hide_skips_invalid_slots);
+    RUN_TEST(test_racer_render_skips_invalid_slots);
     RUN_TEST(test_racer_rank_with_two_enemies_player_first);
     RUN_TEST(test_racer_rank_with_two_enemies_player_last);
     return UNITY_END();

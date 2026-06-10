@@ -169,10 +169,12 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
         racer_finish_armed[i] = 1u;
-        racer_oam[i * 4u + 0u] = get_sprite();
-        racer_oam[i * 4u + 1u] = get_sprite();
-        racer_oam[i * 4u + 2u] = get_sprite();
-        racer_oam[i * 4u + 3u] = get_sprite();
+        /* Lazy OAM: inactive slots hold the sentinel; handles are claimed below
+         * only when the slot becomes active. Reclaims all 12 slots on Track 1. */
+        racer_oam[i * 4u + 0u] = SPRITE_POOL_INVALID;
+        racer_oam[i * 4u + 1u] = SPRITE_POOL_INVALID;
+        racer_oam[i * 4u + 2u] = SPRITE_POOL_INVALID;
+        racer_oam[i * 4u + 3u] = SPRITE_POOL_INVALID;
     }
     s_tile_base  = tile_base;
 
@@ -192,6 +194,11 @@ void racer_init(uint8_t tile_base) BANKED {
             racer_py[i] = (int16_t)((uint16_t)spawn_ty * 8u);
             racer_wp_idx[i] = 0u;
             racer_dir[i] = track_get_start_dir();
+            /* Lazy OAM: claim 4 sprite handles now that the slot is active. */
+            racer_oam[i * 4u + 0u] = get_sprite();
+            racer_oam[i * 4u + 1u] = get_sprite();
+            racer_oam[i * 4u + 2u] = get_sprite();
+            racer_oam[i * 4u + 3u] = get_sprite();
         }
     }
 
@@ -232,7 +239,10 @@ void racer_hide(void) BANKED {
     uint8_t j;
     for (i = 0u; i < MAX_RACERS; i++) {
         for (j = 0u; j < 4u; j++) {
-            move_sprite(racer_oam[i * 4u + j], 0u, 0u);
+            uint8_t h = racer_oam[i * 4u + j];
+            if (h != SPRITE_POOL_INVALID) {
+                move_sprite(h, 0u, 0u);
+            }
         }
     }
 }
@@ -406,6 +416,11 @@ void racer_render(void) BANKED {
         uint8_t hw_y;
         uint8_t d;
         uint8_t flags;
+
+        /* Unallocated slot (lazy OAM): no handles to move. */
+        if (racer_oam[i * 4u + 0u] == SPRITE_POOL_INVALID) {
+            continue;
+        }
 
         if (!racer_active[i]) {
             move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
