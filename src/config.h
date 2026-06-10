@@ -5,8 +5,9 @@
  * not AoS (struct arrays). See CLAUDE.md "Entity management" for rationale. */
 
 #define MAX_NPCS     8
-/* OAM budget: player=4, dialog_arrow=1 (fixed), projectiles≤8, turrets≤8; hardware cap=40 */
-#define MAX_SPRITES  28
+/* OAM budget: player=4, dialog_arrow=1 (fixed), projectiles≤8, turrets≤8, racer pool (lazy,
+ * ≤8 = 2 active enemies × 4) + patrol=4 (PR4). 32 + 3 fixed = 35 ≤ hardware cap 40. */
+#define MAX_SPRITES  32
 
 /* OAM slot assignments (fixed HUD sprites — after player's 4 pool slots 0-3) */
 #define DIALOG_ARROW_OAM_SLOT      4u  /* OAM slot 4 — hub dialog overflow indicator */
