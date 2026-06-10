@@ -125,8 +125,8 @@ static const uint8_t road_map_8x8[8u * 8u] = {
 
 /* X step into a wall column is blocked: px returned unchanged. */
 void test_veh_step_x_blocked_by_wall(void) {
-    static const uint8_t road_pass[8] = {0,0,0,0,0,0,0,0}; /* all 8 px passable */
-    static const uint8_t wall_block[8] = {255,255,255,255,255,255,255,255};
+    static const uint8_t road_pass[8] = {255,255,255,255,255,255,255,255}; /* all 8 px passable */
+    static const uint8_t wall_block[8] = {0,0,0,0,0,0,0,0};
     track_test_set_map(road_map_8x8, 8u, 8u);
     track_test_set_collision_mask(1u, road_pass);   /* tile 1 ROAD: fully passable */
     track_test_set_collision_mask(0u, wall_block);  /* tile 0 WALL: fully blocked */
@@ -139,8 +139,8 @@ void test_veh_step_x_blocked_by_wall(void) {
 
 /* X step on clear road advances by vx. */
 void test_veh_step_x_clear_advances(void) {
-    static const uint8_t road_pass[8] = {0,0,0,0,0,0,0,0};
-    static const uint8_t wall_block[8] = {255,255,255,255,255,255,255,255};
+    static const uint8_t road_pass[8] = {255,255,255,255,255,255,255,255};
+    static const uint8_t wall_block[8] = {0,0,0,0,0,0,0,0};
     static const uint8_t all_road[8u * 8u] = {
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
@@ -156,8 +156,8 @@ void test_veh_step_x_clear_advances(void) {
 
 /* Y step into a wall row is blocked: py returned unchanged. */
 void test_veh_step_y_blocked_by_wall(void) {
-    static const uint8_t road_pass[8] = {0,0,0,0,0,0,0,0};
-    static const uint8_t wall_block[8] = {255,255,255,255,255,255,255,255};
+    static const uint8_t road_pass[8] = {255,255,255,255,255,255,255,255};
+    static const uint8_t wall_block[8] = {0,0,0,0,0,0,0,0};
     static const uint8_t row_wall[8u * 8u] = {
         1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1,
@@ -179,7 +179,7 @@ void test_veh_step_y_blocked_by_wall(void) {
 
 /* In-bounds clamp: moving X past the right map edge is blocked. */
 void test_veh_step_x_oob_right_blocked(void) {
-    static const uint8_t road_pass[8] = {0,0,0,0,0,0,0,0};
+    static const uint8_t road_pass[8] = {255,255,255,255,255,255,255,255};
     static const uint8_t all_road[8u * 8u] = {
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
@@ -195,7 +195,7 @@ void test_veh_step_x_oob_right_blocked(void) {
 
 /* In-bounds clamp: moving X below 0 is blocked. */
 void test_veh_step_x_oob_left_blocked(void) {
-    static const uint8_t road_pass[8] = {0,0,0,0,0,0,0,0};
+    static const uint8_t road_pass[8] = {255,255,255,255,255,255,255,255};
     static const uint8_t all_road[8u * 8u] = {
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
         1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
