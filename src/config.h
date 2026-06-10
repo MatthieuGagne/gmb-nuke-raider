@@ -95,6 +95,23 @@
 /* Sentinel: NPC has no fixed facing direction (fires/moves based on runtime logic) */
 #define DIR_NONE             0xFFu
 
+/* Patrol enemy (mobile combat AI — Issue #144) */
+#define NPC_TYPE_PATROL      3u   /* must match NPC_TYPE_MAP["patrol"] in tools/tmx_to_c.py */
+#define MAX_PATROLS          1u   /* v1 pool ceiling — N>1 needs an OAM re-audit */
+#define PATROL_MAX_WAYPOINTS 4u   /* WRAM route buffer per patrol */
+#define PATROL_HP            RACER_HP          /* 5 bullet hits to destroy */
+#define PATROL_HIT_RADIUS    RACER_HIT_RADIUS  /* 8 px screen-space bullet hit radius */
+#define PATROL_SPEED         3u   /* max speed magnitude in both PATROL and CHASE */
+#define PATROL_DETECT_RADIUS 24u  /* Manhattan dist to ENTER chase (~3 tiles) */
+#define PATROL_LEAVE_RADIUS  32u  /* Manhattan dist to RETURN to patrol (~4 tiles) */
+#define PATROL_FIRE_RADIUS   12u  /* Manhattan dist within which a chasing patrol fires */
+#define PATROL_WP_THRESHOLD  12u  /* Manhattan advance threshold for route waypoints */
+#define PATROL_FIRE_INTERVAL 45u  /* frames between shots (== TURRET_FIRE_INTERVAL) */
+
+/* FSM modes — uint8_t #defines, NOT a C enum (SDCC widens enums to 16-bit). */
+#define PATROL_MODE_PATROL   0u
+#define PATROL_MODE_CHASE    1u
+
 /* Racer enemy */
 #define PLAYER_SLOT          0u          /* player always slot 0 — stable regardless of enemy count */
 #define MAX_ENEMY_RACERS     2u          /* enemy racer pool — slots 1..MAX_RACERS-1 */
