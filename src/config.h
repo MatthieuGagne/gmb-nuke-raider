@@ -101,10 +101,10 @@
 #define PATROL_MAX_WAYPOINTS 4u   /* WRAM route buffer per patrol */
 #define PATROL_HP            RACER_HP          /* 5 bullet hits to destroy */
 #define PATROL_HIT_RADIUS    RACER_HIT_RADIUS  /* 8 px screen-space bullet hit radius */
-#define PATROL_SPEED         3u   /* max speed magnitude in both PATROL and CHASE */
-#define PATROL_DETECT_RADIUS 24u  /* Manhattan dist to ENTER chase (~3 tiles) */
-#define PATROL_LEAVE_RADIUS  32u  /* Manhattan dist to RETURN to patrol (~4 tiles) */
-#define PATROL_FIRE_RADIUS   12u  /* Manhattan dist within which a chasing patrol fires */
+#define PATROL_SPEED         5u   /* max speed magnitude — matches racer gear-3 AI (< player 6) */
+#define PATROL_DETECT_RADIUS 64u  /* Manhattan dist to ENTER chase (~8 tiles) */
+#define PATROL_LEAVE_RADIUS  192u /* Manhattan dist to RETURN to patrol (~24 tiles — sticky pursuit) */
+#define PATROL_FIRE_RADIUS   64u  /* Manhattan dist within which a chasing patrol fires */
 #define PATROL_WP_THRESHOLD  12u  /* Manhattan advance threshold for route waypoints */
 #define PATROL_FIRE_INTERVAL 45u  /* frames between shots (== TURRET_FIRE_INTERVAL) */
 

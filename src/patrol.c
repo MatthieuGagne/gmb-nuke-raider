@@ -233,6 +233,16 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             patrol_vy[i] = (int8_t)0;
         }
 
+        /* --- Ram contact: car-vs-car 16x16 overlap deals contact damage.
+         * damage.c i-frames (DAMAGE_INVINCIBILITY_FRAMES) rate-limit it. --- */
+        {
+            int16_t rdx = px - patrol_px[i];
+            int16_t rdy = py - patrol_py[i];
+            if (rdx > -16 && rdx < 16 && rdy > -16 && rdy < 16) {
+                damage_apply(RACER_RAM_DAMAGE);
+            }
+        }
+
         /* --- On-screen gating: fire + hit only when visible --- */
         {
             int16_t scr_cx = patrol_px[i] + 16;          /* center x, OAM space */

@@ -19,39 +19,42 @@ void setUp(void) {
 }
 void tearDown(void) {}
 
-/* ---- patrol_fsm_next: hysteresis (R2 / AC1) ---- */
+/* ---- patrol_fsm_next: hysteresis (R2 / AC1) ----
+ * Deltas are derived from the config radii so retuning PATROL_DETECT_RADIUS /
+ * PATROL_LEAVE_RADIUS never silently breaks these tests:
+ *   FSM_IN  : Manhattan 2*FSM_IN  <  DETECT          (inside detect)
+ *   FSM_MID : DETECT <= 2*FSM_MID <  LEAVE           (hysteresis band)
+ *   FSM_OUT : Manhattan 2*FSM_OUT >= LEAVE           (outside leave)   */
+#define FSM_IN  ((int16_t)(PATROL_DETECT_RADIUS / 2u - 1u))
+#define FSM_MID ((int16_t)((PATROL_DETECT_RADIUS + PATROL_LEAVE_RADIUS) / 4u))
+#define FSM_OUT ((int16_t)(PATROL_LEAVE_RADIUS / 2u + 4u))
 
 void test_fsm_enters_chase_when_inside_detect(void) {
-    /* Manhattan |dx|+|dy| = 10 < 24 → enter CHASE from PATROL */
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_CHASE,
-        patrol_fsm_next(PATROL_MODE_PATROL, 6, 4));
+        patrol_fsm_next(PATROL_MODE_PATROL, FSM_IN, FSM_IN));
 }
 
 void test_fsm_stays_patrol_outside_detect(void) {
-    /* Manhattan = 40 >= 24 → stay PATROL */
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_PATROL,
-        patrol_fsm_next(PATROL_MODE_PATROL, 20, 20));
+        patrol_fsm_next(PATROL_MODE_PATROL, FSM_OUT, FSM_OUT));
 }
 
 void test_fsm_returns_patrol_when_beyond_leave(void) {
-    /* Manhattan = 40 >= 32 → CHASE returns to PATROL */
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_PATROL,
-        patrol_fsm_next(PATROL_MODE_CHASE, 20, 20));
+        patrol_fsm_next(PATROL_MODE_CHASE, FSM_OUT, FSM_OUT));
 }
 
 void test_fsm_no_flicker_in_hysteresis_band(void) {
-    /* Manhattan = 28: >= detect(24) but < leave(32).
-     * PATROL stays PATROL; CHASE stays CHASE — no flicker. */
+    /* In the band: PATROL stays PATROL; CHASE stays CHASE — no flicker. */
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_PATROL,
-        patrol_fsm_next(PATROL_MODE_PATROL, 14, 14));
+        patrol_fsm_next(PATROL_MODE_PATROL, FSM_MID, FSM_MID));
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_CHASE,
-        patrol_fsm_next(PATROL_MODE_CHASE, 14, 14));
+        patrol_fsm_next(PATROL_MODE_CHASE, FSM_MID, FSM_MID));
 }
 
 void test_fsm_handles_negative_deltas(void) {
-    /* |dx|+|dy| = 10 < 24, negative components → CHASE */
     TEST_ASSERT_EQUAL_UINT8(PATROL_MODE_CHASE,
-        patrol_fsm_next(PATROL_MODE_PATROL, -6, -4));
+        patrol_fsm_next(PATROL_MODE_PATROL, (int16_t)-FSM_IN, (int16_t)-FSM_IN));
 }
 
 /* ---- spawn / init (R8 / AC3 setup) ---- */
@@ -109,22 +112,29 @@ void test_no_fire_when_off_screen(void) {
 /* ---- on-screen + chase + in fire radius → fires (R4 / AC2) ---- */
 
 void test_fires_when_on_screen_chasing_in_range(void) {
-    /* Patrol at world (88,16): scr_y = 16 - cam_y(0) + 16 = 32 ∈ [0,160),
-     * scr_x = 88 - cam_x(0) + 8 ... on-screen. Player adjacent (point blank).
-     * A chasing patrol at point-blank fires AND its bullet hits the player the
-     * same frame (consumed by the end-of-update enemy-bullet-vs-player check),
-     * dealing damage. Asserting "player took damage" is the robust proxy for
-     * "the patrol fired" — counting a surviving projectile is fragile because a
-     * close-range enemy shot is consumed on the firing frame. */
+    /* Patrol at world (88,16), on-screen. Player 24px to the right: outside
+     * the 16x16 ram overlap (so ram damage cannot confound the assertion) but
+     * well within PATROL_FIRE_RADIUS; the bullet does not reach the player on
+     * the firing frame, so a live projectile proves the patrol fired. */
     static uint8_t wtx[1] = {11u};
     static uint8_t wty[1] = {2u};
-    damage_init();                       /* player HP = PLAYER_MAX_HP */
     patrol_spawn_for_test(88, 16, wtx, wty, 1u);
     patrol_set_mode_for_test(0u, PATROL_MODE_CHASE);
     /* drive the fire timer to 0 so the first on-screen frame fires */
     patrol_set_fire_timer_for_test(0u, 0u);
-    patrol_update(88, 16);   /* player on top → Manhattan 0 < PATROL_FIRE_RADIUS */
-    TEST_ASSERT_TRUE(damage_get_hp() < PLAYER_MAX_HP);  /* fired and hit player */
+    patrol_update(112, 16);  /* Manhattan ~19 after move < PATROL_FIRE_RADIUS */
+    TEST_ASSERT_EQUAL_UINT8(1u, projectile_count_active());
+}
+
+/* ---- ram contact: car-vs-car overlap damages the player ---- */
+
+void test_ram_contact_damages_player(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();                       /* player HP = PLAYER_MAX_HP */
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_update(40, 32);   /* player 8px right → 16x16 boxes overlap → ram */
+    TEST_ASSERT_TRUE(damage_get_hp() < PLAYER_MAX_HP);
 }
 
 /* ---- hit → hp-- → destroy + free (R6 / AC3) ---- */
@@ -166,6 +176,7 @@ int main(void) {
     RUN_TEST(test_wp_advances_when_reached_then_wraps);
     RUN_TEST(test_no_fire_when_off_screen);
     RUN_TEST(test_fires_when_on_screen_chasing_in_range);
+    RUN_TEST(test_ram_contact_damages_player);
     RUN_TEST(test_bullet_hit_decrements_hp);
     RUN_TEST(test_fatal_hit_destroys_and_deactivates);
     return UNITY_END();

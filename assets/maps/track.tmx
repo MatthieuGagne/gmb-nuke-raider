@@ -34,15 +34,15 @@
   <object id="5" name="turret" x="40" y="576">
    <point />
   </object>
-  <object id="6" name="patrol" x="88" y="240">
+  <object id="6" name="patrol" x="88" y="88">
    <point />
   </object>
  </objectgroup>
 <objectgroup name="powerups"><object id="200" name="heal" x="96" y="320" width="8" height="8" /></objectgroup>
  <objectgroup id="5" name="patrol_route_0">
-  <object id="7" x="88" y="240"><point /></object>
-  <object id="8" x="120" y="240"><point /></object>
-  <object id="9" x="120" y="320"><point /></object>
-  <object id="10" x="88" y="320"><point /></object>
+  <object id="7" x="48" y="64"><point /></object>
+  <object id="8" x="104" y="64"><point /></object>
+  <object id="9" x="104" y="128"><point /></object>
+  <object id="10" x="48" y="128"><point /></object>
  </objectgroup>
 </map>

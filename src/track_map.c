@@ -143,7 +143,7 @@ BANKREF(track_npc_tx)
 const uint8_t track_npc_tx[8] = { 4u, 15u, 5u, 11u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_ty)
-const uint8_t track_npc_ty[8] = { 22u, 47u, 72u, 30u, 0u, 0u, 0u, 0u };
+const uint8_t track_npc_ty[8] = { 22u, 47u, 72u, 11u, 0u, 0u, 0u, 0u };
 
 BANKREF(track_npc_type)
 const uint8_t track_npc_type[8] = { 0u, 0u, 0u, 3u, 0u, 0u, 0u, 0u };
@@ -176,8 +176,8 @@ BANKREF(track_patrol_route_count_0)
 const uint8_t track_patrol_route_count_0 = 4u;
 
 BANKREF(track_patrol_route_tx_0)
-const uint8_t track_patrol_route_tx_0[4] = { 11u, 15u, 15u, 11u };
+const uint8_t track_patrol_route_tx_0[4] = { 6u, 13u, 13u, 6u };
 
 BANKREF(track_patrol_route_ty_0)
-const uint8_t track_patrol_route_ty_0[4] = { 30u, 30u, 40u, 40u };
+const uint8_t track_patrol_route_ty_0[4] = { 8u, 8u, 16u, 16u };
 
