@@ -205,15 +205,17 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         terrain = (uint8_t)tt;
 
         /* --- Shared vehicle physics + axis-separated slide collision (R10) ---
-         * Split API: friction (pre-accel) → constant-throttle accel toward the
-         * movement direction → boost+clamp. The gearless vehicle_apply_physics
-         * convenience has no accel term, so the patrol must add its own thrust
-         * here (mirrors racer's gear-accel between the two helpers) or it never
-         * moves. PATROL_SPEED is both the accel magnitude and the clamp. */
+         * Split API: friction (pre-accel) → per-axis homing thrust → boost+clamp.
+         * Thrust is applied independently on each axis toward the target (NOT
+         * along the 8-way facing dir): dominant-axis-only thrust stalls against
+         * walls and corner-camps; per-axis thrust closes both deltas at once
+         * and slides along walls. ±2px deadzone avoids jitter at the target. */
         vehicle_apply_friction(&patrol_vx[i], &patrol_vy[i], terrain, gas, dir);
         if (gas) {
-            patrol_vx[i] = (int8_t)(patrol_vx[i] + (int8_t)((int8_t)PATROL_SPEED * VEH_DIR_DX[dir]));
-            patrol_vy[i] = (int8_t)(patrol_vy[i] + (int8_t)((int8_t)PATROL_SPEED * VEH_DIR_DY[dir]));
+            if      (dx >  2) patrol_vx[i] = (int8_t)(patrol_vx[i] + (int8_t)PATROL_SPEED);
+            else if (dx < -2) patrol_vx[i] = (int8_t)(patrol_vx[i] - (int8_t)PATROL_SPEED);
+            if      (dy >  2) patrol_vy[i] = (int8_t)(patrol_vy[i] + (int8_t)PATROL_SPEED);
+            else if (dy < -2) patrol_vy[i] = (int8_t)(patrol_vy[i] - (int8_t)PATROL_SPEED);
         }
         {
             /* Boost pads let the patrol exceed its normal top speed (AC4),
@@ -223,14 +225,19 @@ void patrol_update(int16_t px, int16_t py) BANKED {
                                 : (uint8_t)PATROL_SPEED;
             vehicle_apply_boost_clamp(&patrol_vx[i], &patrol_vy[i], terrain, max_speed);
         }
-        patrol_px[i] = vehicle_step_axis_x(patrol_px[i], patrol_py[i], patrol_vx[i]);
-        if (patrol_px[i] == vehicle_step_axis_x(patrol_px[i], patrol_py[i], 0)) {
-            /* x blocked → kill x velocity so it does not pin against the wall */
-            patrol_vx[i] = (int8_t)0;
-        }
-        patrol_py[i] = vehicle_step_axis_y(patrol_px[i], patrol_py[i], patrol_vy[i]);
-        if (patrol_py[i] == vehicle_step_axis_y(patrol_px[i], patrol_py[i], 0)) {
-            patrol_vy[i] = (int8_t)0;
+        {
+            /* Axis-separated slide; a blocked axis zeroes its velocity so the
+             * free axis keeps closing (wall slide, no corner pinning). */
+            int16_t old_p = patrol_px[i];
+            patrol_px[i] = vehicle_step_axis_x(old_p, patrol_py[i], patrol_vx[i]);
+            if (patrol_px[i] == old_p && patrol_vx[i] != 0) {
+                patrol_vx[i] = (int8_t)0;
+            }
+            old_p = patrol_py[i];
+            patrol_py[i] = vehicle_step_axis_y(patrol_px[i], old_p, patrol_vy[i]);
+            if (patrol_py[i] == old_p && patrol_vy[i] != 0) {
+                patrol_vy[i] = (int8_t)0;
+            }
         }
 
         /* --- Ram contact: car-vs-car 16x16 overlap deals contact damage.
