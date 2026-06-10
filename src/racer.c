@@ -347,12 +347,14 @@ uint8_t racer_update(void) BANKED {
             }
         }
 
-        /* ---- Axis-split collision ---- */
+        /* ---- Axis-split collision (shared helper + dir-specific gate) ---- */
         {
             int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
-            int16_t new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+            int16_t new_py;
 
-            if (racer_corners_passable(new_px, racer_py[i], dir)) {
+            /* X: shared in-bounds+static-terrain step AND the racer's dir hitbox. */
+            if (vehicle_step_axis_x(racer_px[i], racer_py[i], racer_vx[i]) == new_px &&
+                racer_corners_passable(new_px, racer_py[i], dir)) {
                 racer_px[i] = new_px;
             } else {
                 racer_vx[i] = (int8_t)0;
@@ -360,7 +362,10 @@ uint8_t racer_update(void) BANKED {
                 racer_downshift_timer[i] = 0u;
             }
 
-            if (racer_corners_passable(racer_px[i], new_py, dir)) {
+            /* Y uses the post-X racer_px[i] (slide), matching the original. */
+            new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+            if (vehicle_step_axis_y(racer_px[i], racer_py[i], racer_vy[i]) == new_py &&
+                racer_corners_passable(racer_px[i], new_py, dir)) {
                 racer_py[i] = new_py;
             } else {
                 racer_vy[i] = (int8_t)0;
