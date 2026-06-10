@@ -8,6 +8,7 @@
 #include "sprite_pool.h"
 #include "loader.h"    /* load_npc_positions(), loader_get_slot() — NONBANKED helpers */
 #include "camera.h"    /* cam_y — needed for OAM y coordinate calculations */
+#include "enemy_common.h"  /* enemy_aim_dir — shared aim math */
 
 static uint8_t s_turret_tile_base;  /* OBJ tile index set by turret_init() */
 
@@ -83,30 +84,6 @@ uint8_t turret_spawn(uint8_t tx, uint8_t ty) BANKED {
     return 0u;
 }
 
-player_dir_t turret_dir_to_pixel(uint8_t tx, uint8_t ty,
-                                  int16_t player_px, int16_t player_py) BANKED {
-    int16_t dx = player_px - (int16_t)((uint16_t)tx * 8u);
-    int16_t dy = player_py - (int16_t)((uint16_t)ty * 8u);
-    int16_t ax = dx < 0 ? -dx : dx;
-    int16_t ay = dy < 0 ? -dy : dy;
-    uint8_t toward_x;
-
-    /* Threshold 1: cardinal E/W — |dx| > 2*|dy| */
-    if (ax > (int16_t)(ay << 1)) {
-        return dx > 0 ? DIR_R : DIR_L;
-    }
-    /* Threshold 2: cardinal N/S — |dy| > 2*|dx| */
-    if (ay > (int16_t)(ax << 1)) {
-        return dy > 0 ? DIR_B : DIR_T;
-    }
-    /* Threshold 3: intermediate sector — |dx| vs |dy| */
-    toward_x = (uint8_t)(ax > ay);
-    if (dx >= 0 && dy < 0) { return toward_x ? DIR_ENE : DIR_NNE; }
-    if (dx >= 0)            { return toward_x ? DIR_ESE : DIR_SSE; }
-    if (dy >= 0)            { return toward_x ? DIR_WSW : DIR_SSW; }
-    return toward_x ? DIR_WNW : DIR_NNW;
-}
-
 void turret_update(int16_t player_px, int16_t player_py) BANKED {
     uint8_t i;
     /* Player OAM-space position — must match projectile coordinate space.
@@ -146,7 +123,7 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
         if (turret_timer[i] > 0u) {
             turret_timer[i]--;
         } else {
-            player_dir_t dir = turret_dir_to_pixel(
+            player_dir_t dir = enemy_aim_dir(
                 turret_tx[i], turret_ty[i], player_px, player_py);
             projectile_fire(scr_x, scr_y, dir, PROJ_OWNER_ENEMY);
             turret_timer[i] = TURRET_FIRE_INTERVAL;

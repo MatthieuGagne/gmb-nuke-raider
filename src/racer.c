@@ -11,6 +11,7 @@
 #include "player.h"
 #include "banking.h"
 #include "projectile.h"
+#include "enemy_common.h"  /* enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -134,23 +135,6 @@ static uint8_t racer_corners_passable(int16_t wx, int16_t wy, uint8_t dir) {
     return 1u;
 }
 
-/* ---- Direction from delta ---- */
-static uint8_t racer_dir_from_delta(int8_t dx, int8_t dy) {
-    int8_t ax = dx < 0 ? -dx : dx;
-    int8_t ay = dy < 0 ? -dy : dy;
-    if (ay > ax) {
-        return (dy < 0) ? DIR_T : DIR_B;
-    } else if (ax > ay) {
-        return (dx < 0) ? DIR_L : DIR_R;
-    } else {
-        /* Diagonal: ax == ay */
-        if (dy < 0 && dx < 0) return DIR_LT;
-        if (dy < 0 && dx > 0) return DIR_RT;
-        if (dy > 0 && dx < 0) return DIR_LB;
-        return DIR_RB;
-    }
-}
-
 /* ---- Finish direction check ---- */
 static uint8_t racer_dir_matches_finish(uint8_t dir, uint8_t finish_dir) {
     if (finish_dir == CHECKPOINT_DIR_N) {
@@ -262,8 +246,6 @@ uint8_t racer_update(void) BANKED {
         int16_t dy16;
         int8_t  dx;
         int8_t  dy;
-        uint8_t abs_dx;
-        uint8_t abs_dy;
         uint8_t dir;
         uint8_t tx;
         uint8_t ty;
@@ -286,17 +268,12 @@ uint8_t racer_update(void) BANKED {
         dx = (int8_t)dx16;
         dy = (int8_t)dy16;
 
-        abs_dx = (uint8_t)(dx < 0 ? -dx : dx);
-        abs_dy = (uint8_t)(dy < 0 ? -dy : dy);
+        racer_wp_idx[i] = enemy_wp_advance(
+            racer_wp_idx[i],
+            s_wp_count[i - 1u],
+            enemy_wp_reached(dx, dy, RACER_WP_THRESHOLD));
 
-        if ((uint8_t)(abs_dx + abs_dy) < RACER_WP_THRESHOLD) {
-            racer_wp_idx[i]++;
-            if (racer_wp_idx[i] >= s_wp_count[i - 1u]) {
-                racer_wp_idx[i] = 0u;
-            }
-        }
-
-        dir = racer_dir_from_delta(dx, dy);
+        dir = enemy_dir_from_delta(dx, dy);
         racer_dir[i] = dir;
 
         race_state_update_cp(i, racer_px[i], racer_py[i], dir);
