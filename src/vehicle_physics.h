@@ -18,7 +18,7 @@
 extern const int8_t VEH_DIR_DX[8];
 extern const int8_t VEH_DIR_DY[8];
 
-/* Friction portion (PRE gear-accel). Applies SAND/OIL/ROAD friction to *vx/*vy.
+/* Friction portion (PRE gear-accel). Applies SAND/OIL/ROAD friction to vx/vy.
  *  terrain : TileType at the vehicle centre (SAND doubles friction; OIL zeroes it)
  *  gas     : 1 if the vehicle is under power this frame, else 0 (caller decides)
  *  dir     : facing 0..7 — indexes VEH_DIR_DX/DY to pick the gas-relieved axis
