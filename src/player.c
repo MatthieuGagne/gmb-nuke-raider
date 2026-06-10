@@ -189,7 +189,9 @@ void player_update(void) BANKED {
      * SFX_HIT targets CH4; SFX_SHOOT (in projectile_fire) also targets CH4.
      * Same-frame contention: last caller wins — HIT overwrites SHOOT if both fire. */
     new_px = (int16_t)(px + (int16_t)vx);
-    if (new_px >= 0 && new_px <= (int16_t)((uint16_t)active_map_w * 8u - 16u) && corners_passable(new_px, py)) {
+    /* Shared in-bounds + static-terrain corner check, then the player's
+     * directional hitbox + dynamic-blocker gate. Block iff either rejects. */
+    if (vehicle_step_axis_x(px, py, vx) == new_px && corners_passable(new_px, py)) {
         px = new_px;
     } else {
         uint8_t k;
@@ -215,7 +217,7 @@ void player_update(void) BANKED {
 
     /* Apply Y velocity — Y clamp: [0, active_map_h*8 - 16] */
     new_py = (int16_t)(py + (int16_t)vy);
-    if (new_py >= 0 && new_py <= (int16_t)((uint16_t)active_map_h * 8u - 16u) && corners_passable(px, new_py)) {
+    if (vehicle_step_axis_y(px, py, vy) == new_py && corners_passable(px, new_py)) {
         py = new_py;
     } else {
         uint8_t k;
