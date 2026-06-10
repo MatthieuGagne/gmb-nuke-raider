@@ -37,7 +37,8 @@ void test_load_checkpoints_id2_returns_zero_count(void) {
 void test_load_npc_positions_id0_returns_count(void) {
     uint8_t tx[8], ty[8], type[8], dir[8], count = 99u;
     load_npc_positions(0u, tx, ty, type, dir, &count);
-    TEST_ASSERT_EQUAL_UINT8(3u, count);
+    /* track1 (track.tmx): 3 turrets + 1 patrol spawn (NPC_TYPE_PATROL, #144) */
+    TEST_ASSERT_EQUAL_UINT8(4u, count);
 }
 
 void test_load_npc_positions_id1_returns_count(void) {
