@@ -43,5 +43,6 @@
   "src/loadout.c":               {"bank": 255, "reason": "autobank — pure data/accessor module; no SET_BANK calls"},
   "src/state_prerace.c":         {"bank": 255, "reason": "autobank — text-only menu state; no SET_BANK calls"},
   "src/racer.c":                 {"bank": 255, "reason": "autobank — gameplay module; racer_update/render called from state_playing.c"},
-  "src/race_state.c":            {"bank": 255, "reason": "autobank — unified per-slot cp/lap tracking; called from state_playing.c and racer.c"}
+  "src/race_state.c":            {"bank": 255, "reason": "autobank — unified per-slot cp/lap tracking; called from state_playing.c and racer.c"},
+  "src/vehicle_physics.c":       {"bank": 255, "reason": "autobank — shared vehicle terrain physics + axis-separated slide collision; called by player.c and racer.c (and patrol.c in PR4)"}
 }
