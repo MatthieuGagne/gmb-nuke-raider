@@ -104,7 +104,6 @@ static uint8_t find_next_node(int8_t dx, int8_t dy, uint8_t *out_tx, uint8_t *ou
 
 static void overmap_check_tile_effect(void) {
     uint8_t tile = overmap_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
-    EMU_printf("tile_effect tile=%hu\n", tile);
     if (tile == OVERMAP_TILE_CITY_HUB) {
         traveling = 0u;
         current_hub_id = overmap_id_map[(uint16_t)car_ty * OVERMAP_W + car_tx];
@@ -124,7 +123,6 @@ void overmap_set_returning(void) { om_returning = 1u; }
 
 /* ── State callbacks ─────────────────────────────────────────────────────────── */
 static void enter(void) {
-    EMU_printf("OVERMAP enter\n");
     loader_load_state(k_overmap_assets, k_overmap_assets_count);
     s_car_tile_base = loader_get_slot(TILE_ASSET_OVERMAP_CAR);
     { SET_BANK(overmap_map);    /* also covers overmap_id_map and spawn scalars — same bank */
