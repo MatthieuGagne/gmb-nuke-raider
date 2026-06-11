@@ -179,6 +179,8 @@ When triggered:
 - **`emulicious-debug`** agent — step-through debugger, EMU_printf, memory/tile/sprite inspection, tracer, profiler
 - **`/compare-prs <N>`** skill — for "worked in PR X, broken now" hypotheses: builds both, lets you compare ROMs and diffs side-by-side
 - **`build/game-manifest.json`** — read before writing any `wait_memory` address or navigation steps; `symbols` section provides WRAM addresses for all key state variables, `navigation` section provides overmap paths — no source reads required
+- **DEBUG=1 build** — `DEBUG=1 GBDK_HOME=/home/mathdaman/gbdk make` enables `EMU_printf` output in Emulicious. Use `DBG_INT(label, val)` from `src/debug.h` — one value per call. `EMU_printf` with 4+ format args causes `error 101: too many parameters` under SDCC — split into multiple `DBG_INT` calls or separate `EMU_printf(fmt, single_arg)` calls.
+- **Headless WRAM read** — export `uint8_t`/`int8_t` debug globals, find their addresses via `grep` on `build/nuke-raider.map`, then read `pyboy.memory[addr]` after scripted navigation. See the `screenshot` skill for the full pattern and the `window='null'` / no-`cgb_mode` caveats.
 
 ---
 
@@ -193,3 +195,5 @@ When triggered:
 **Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, use `find_wram_read_in_fn(noi_path, rom_path, "_getter_fn")` from `tests/integration/helpers.py`. It decodes the getter function's disassembly from the ROM binary to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
 
 **"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, read `SCY`/`SCX` in Emulicious — non-zero values mean the tilemap is rendering off-screen.
+
+**`finish_eval()` direction-velocity race:** Any `BANKED` physics blocker (e.g. `racer_blocks_pixel()`) can zero `vy` on the same frame the player reaches a finish/checkpoint tile. If `finish_eval()` gates on `pvy > 0`, that check silently fails even though the player crossed correctly. Prefer `player_get_dir()` facing-direction over instantaneous velocity. Confirm headlessly: export `dbg_pvy` and read it via PyBoy at the crossing frame — if `pvy=0` despite correct facing direction, this is the cause (tracked in issue #382).
