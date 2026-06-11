@@ -67,6 +67,7 @@ For each task (whether parallel or sequential):
    - **Music C task** (creates or modifies `src/music_data.c`, `src/music_data.h`, or any new song `.c` file): dispatch `music-expert` agent (Agent tool) with prompt `"implement this task: <full task text from plan>"`. `music-expert` owns the full music pipeline (export, BANKREF declarations, `music_song_validate.py`, `music_wire_check.py`, bank-pre-write gate, build, bank-post-build gate, commit) for this task.
    - **C task** (creates or modifies other `src/*.c` or `src/*.h` files): dispatch `gbdk-expert` agent (Agent tool) with prompt `"implement this task: <full task text from plan>"`. `gbdk-expert` owns the full TDD cycle, bank gates, build, `gb-c-optimizer` review AND fix (fixes applied in-place before commit), and commit for this task.
    - **Non-C task** (docs, Python, JSON, assets): follow each step exactly as written in the plan.
+   - **`gbdk-expert` consultation gate** (plan step says "HARD GATE — gbdk-expert: Confirm X" or similar): do NOT mark this step complete until the agent has actually run and returned findings. Reading the plan's description of the consultation is NOT sufficient — the agent must execute. (Lesson from PR #362: the Y-comparison consultation was skipped and a broken approach reached a commit.)
 2a. **Post-dispatch commit verification (all implementer agents):** After the agent returns, run:
    ```bash
    git log --oneline -1

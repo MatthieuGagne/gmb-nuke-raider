@@ -108,7 +108,15 @@
       "PowerShell(py *)",
       "PowerShell(Get-Process *)",
       "PowerShell(Start-Process java -ArgumentList '-jar','C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar','build/nuke-raider.gb'; \"Launched PR4 ROM: $\\(\\(Get-Location\\).Path\\)\\\\build\\\\nuke-raider.gb\")",
-      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe\" -c \"grep -E 'track_start_x|track_start_y|start_dir|finish' src/track_map.c | head -8; echo '=== player spawn use ==='; grep -n 'track_get_start_x\\\\|track_get_start_y\\\\|player_set_pos\\\\|spawn' src/state_playing.c src/player.c | head -8; echo '=== camera dir ==='; grep -n 'cam_y' src/camera.c | head -10\")"
+      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe\" -c \"grep -E 'track_start_x|track_start_y|start_dir|finish' src/track_map.c | head -8; echo '=== player spawn use ==='; grep -n 'track_get_start_x\\\\|track_get_start_y\\\\|player_set_pos\\\\|spawn' src/state_playing.c src/player.c | head -8; echo '=== camera dir ==='; grep -n 'cam_y' src/camera.c | head -10\")",
+      "PowerShell(gh issue list --state open --limit 20 --json number,title,labels,updatedAt | ConvertFrom-Json | Sort-Object updatedAt -Descending | ForEach-Object { \"#{0}: {1} [{2}]\" -f $_.number, $_.title, \\($_.labels.name -join ', '\\) })",
+      "PowerShell(gh issue view 267 --json title,body,state,labels | ConvertFrom-Json | Select-Object title, state, @{n='body';e={$_.body.Substring\\(0,[Math]::Min\\(800,$_.body.Length\\)\\)}})",
+      "PowerShell(gh issue view 267 --json title,body | ConvertFrom-Json | ForEach-Object { $_.body })",
+      "PowerShell(gh issue view 151 --json title,body | ConvertFrom-Json | ForEach-Object { $_.body })",
+      "PowerShell(gh issue view 375 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== #375 ===\"; $_.title; \"\"; $_.body })",
+      "PowerShell(gh issue view 377 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== #377 ===\"; $_.title; \"\"; $_.body })",
+      "PowerShell(gh issue view 384 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== #384 ===\"; $_.title; \"\"; $_.body })",
+      "PowerShell($GIT_DIR = \\(git rev-parse --git-dir 2>$null\\); $GIT_COMMON = \\(git rev-parse --git-common-dir 2>$null\\); $BRANCH = \\(git branch --show-current\\); \"GIT_DIR=$GIT_DIR\"; \"GIT_COMMON=$GIT_COMMON\"; \"BRANCH=$BRANCH\")"
     ]
   },
   "hooks": {

@@ -122,3 +122,39 @@ cannot see the result.
 - **wait_memory timeout**: screenshot of current state is saved; check the state machine values with `grep "_state" build/nuke-raider.map`
 - **PyBoy crash mid-navigation**: best-effort screenshot saved; exit non-zero
 - **Symbol not found**: run `grep "_your_symbol" build/nuke-raider.map` to find the exact name SDCC emitted
+
+## Headless WRAM Read (State Inspection)
+
+Use when the symptom is a wrong WRAM value, not a visual glitch — faster than launching Emulicious.
+
+### Pattern
+
+**1. Export debug globals in `src/foo.c` alongside the static variables:**
+```c
+uint8_t dbg_foo_armed;
+int8_t  dbg_foo_pvy;
+uint8_t dbg_foo_cps;
+```
+
+**2. Find their addresses after building:**
+```bash
+grep "dbg_foo" build/nuke-raider.map
+```
+Addresses shift if WRAM layout changes — always re-grep after a new build.
+
+**3. Read them via PyBoy:**
+```python
+from pyboy import PyBoy
+pyboy = PyBoy('build/nuke-raider.gb', window='null')   # no cgb_mode kwarg — causes KeyError
+pyboy.set_emulation_speed(0)
+# ... navigate with pyboy.send_input() + pyboy.advance_frame() ...
+val = pyboy.memory[0xC373]   # address from .map grep
+```
+
+**CRITICAL:** `window='null'` is the correct headless flag. Do NOT pass `cgb_mode=True` — it raises `KeyError: Unknown keyword argument`.
+
+### Combined workflow
+
+1. Use `screenshot.py` with `wait_memory` steps to navigate to the exact game state
+2. Then read multiple adjacent WRAM bytes directly from `pyboy.memory[addr]`
+3. Compare values against expected to confirm/rule out hypotheses without opening Emulicious

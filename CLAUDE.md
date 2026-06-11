@@ -25,6 +25,22 @@ States: `STATE_INIT` → `STATE_TITLE` → `STATE_OVERMAP` → `STATE_PLAYING` �
 
 Each game system lives in `src/<system>.c` + `src/<system>.h`. Asset source files (sprites, tiles, music) live under `assets/` and must be converted to C data arrays before use. Converted headers go in `src/`. All `.c` files in `src/` are automatically compiled by the Makefile.
 
+## State Machine Rules
+
+Three legal transitions (defined in `src/state_manager.c`, `STACK_MAX = 2`):
+
+| Call | Effect | Use when |
+|------|--------|----------|
+| `state_push(next, args)` | depth +1 | Entering a sub-state (e.g. overmap → prerace) |
+| `state_pop()` | depth -1 | Returning to the previous state (e.g. game_over → overmap) |
+| `state_replace(next, args)` | depth unchanged | Lateral swap at the same level (e.g. prerace → playing) |
+
+**WARNING: `state_replace` never reduces stack depth.** Using it to "go back" is a silent bug — the stack leaks one slot per navigation cycle. With `STACK_MAX = 2`, a leaked slot means the next `state_push` silently no-ops (push skipped, no error, no crash).
+
+Canonical race path: `title(0) → overmap(0) → prerace(+1=1) → playing(1) → game_over(1) → state_pop() → overmap(0)`
+
+`state_results` already uses `state_pop()` — follow this pattern for any "race ended" transition.
+
 ## Game Design & Influences
 
 Full design doc: [`docs/game/game-design.md`](docs/game/game-design.md) — consult before making feature, tone, or UX decisions.
@@ -147,6 +163,19 @@ These live in `.claude/skills/` and take precedence over the global superpowers 
 - **One variable per test**: Never make two changes between test runs. Instrument, build, observe, conclude — one hypothesis at a time.
 - **Worktree CWD**: Before every `make` or emulator launch, verify the current directory is the correct worktree directory (`pwd`). After any worktree cleanup, `cd` to a valid directory before running further commands.
 - **PR navigation**: When the user says "go back again", "next one", or any relative reference during sequential PR testing, state the exact PR number out loud and confirm before doing the checkout.
+
+## Game Logic Sharp Edges
+
+**Race position — raw Y coordinate is not a valid "who is ahead" metric on winding tracks:**
+Track2 is an oval: down the right side (ty increases), up the left side (ty decreases). Two competitors at the same Y value can be at completely different positions on the track — the comparison flips randomly. Use section-aware comparison:
+- Detect side: `player_tx > 10` = right side; `racer_wp_idx < 6` = right side
+- Right side (going down): higher `ty` = further ahead
+- Left side (going up): lower `ty` = further ahead
+- Different sides: the competitor on the left side is further along
+- General rule: use waypoint progress scores (`laps × wp_count + wp_idx`), not raw pixel coordinates.
+
+**Player waypoint tracking uses different thresholds than the racer:**
+The racer steers toward waypoints; the player drives freely. `RACER_WP_THRESHOLD * 2 = 24px` is too tight for player WP detection on track2 (player start at (96,40), WP0 at (124,44) — 32px east, never within 24px). Use ≥32px threshold or initialize to nearest waypoint at race start.
 
 ## PRD vs Implementation Plan
 
