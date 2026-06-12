@@ -1,4 +1,4 @@
-# Wasteland Driver
+# Nuke Raider
 Game Design Document (Draft v0.2)
 
 ---

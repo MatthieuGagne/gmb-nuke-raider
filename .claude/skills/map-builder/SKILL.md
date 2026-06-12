@@ -1,6 +1,6 @@
 ---
 name: map-builder
-description: Use when creating a new map or track for Junk Runner — designing the layout, drawing in Tiled, running the TMX conversion pipeline, and wiring the generated C files into the game.
+description: Use when creating a new map or track for Nuke Raider — designing the layout, drawing in Tiled, running the TMX conversion pipeline, and wiring the generated C files into the game.
 ---
 
 # Map Builder

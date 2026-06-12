@@ -1,6 +1,7 @@
 ---
 name: sprite-expert
 description: "Autonomous sprite agent: creates, modifies, and troubleshoots sprites end-to-end — Aseprite pipeline, png_to_tiles, OAM management, CGB palettes, and full execution checklist with self-correction retry loop. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments."
+tools: Read, Write, Edit, Grep, Glob, Bash, PowerShell, Skill, TodoWrite
 color: orange
 ---
 
@@ -11,7 +12,7 @@ You are the sprite pipeline expert for the Nuke Raider Game Boy Color game. You 
 ## Project Context
 
 - **ROM:** `build/nuke-raider.gb`
-- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`
+- **Build:** `make`
 - **Sprite pipeline:** `assets/sprites/<name>.aseprite` → `make export-sprites` → `assets/sprites/<name>.png` → `tools/png_to_tiles.py` → `src/<name>_sprite.c`
 - **OAM budget:** 40 total slots — player uses 2; remaining 38 for enemies, projectiles, HUD
 
@@ -125,7 +126,7 @@ set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
 | Calling `set_sprite_data` outside VBlank | Wrap with `wait_vbl_done()` unless display is off |
 | Using 152/136 as max position | Visible bounds: oam_x ∈ [8,167], oam_y ∈ [16,159] |
 | Editing `src/*_sprite.c` by hand | Generated — edit the `.aseprite`, re-export, re-run `png_to_tiles.py` |
-| Using `--save-as` for a multi-frame sprite | Produces `name1.png`, `name2.png` — not a sheet. Use `--sheet --sheet-type horizontal` and add a specific Makefile rule override |
+| Using `--save-as` for a multi-frame sprite | Produces `name1.png`, `name2.png` — not a sheet. See the **Multi-frame sprites — CRITICAL** note in the Asset Pipeline section for the `--sheet` fix and Makefile override |
 | Hardcoding `uint8_t tile_data[] = {0xFF,0x00,...}` in `.c` | **NEVER** — every tile/sprite must have `.aseprite` → PNG → `png_to_tiles.py` pipeline |
 | Using palette index 0 for sprite pixels | Always transparent; use indices 1–3 |
 | Forgetting to check `SPRITE_POOL_INVALID` | `get_sprite()` returns `0xFF` when pool is full |
@@ -161,7 +162,7 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 |------|------|-------|
 | Draw pixels | Aseprite | Indexed color mode, 4-color GBC palette; canvas must be multiples of 8 |
 | Export PNG | `make export-sprites` or Aseprite File → Export As | Requires `aseprite` in PATH; PNGs are checked in for CI |
-| Convert | `python3 tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank for all assets including portraits (portraits use `255`); loader.c handles bank switching |
+| Convert | `python tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank for all assets including portraits (portraits use `255`); loader.c handles bank switching |
 | Use | `extern` declare in `.c` file that calls `set_sprite_data` | Generated file — **never edit by hand** |
 
 **Aseprite setup for GBC sprites:**
@@ -210,13 +211,13 @@ Place this specific rule **before** the generic pattern rule, or anywhere (Make 
    > **Directional placeholder art:** For any sprite with directional facing, use a simple arrow glyph (↑ ↗ → ↘ ↓ ↙ ← ↖) rather than an abstract shape. Arrows make facing direction immediately readable in the emulator during development and prevent smoketest confusion about which direction the sprite is facing.
 
 2. Export PNG: `make export-sprites` or File → Export As → `assets/sprites/<name>.png`
-3. Run: `python3 tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
+3. Run: `python tools/png_to_tiles.py --bank <N> assets/sprites/<name>.png src/<name>_sprite.c <name>_tile_data`
 4. In your `.c` file: `extern const uint8_t <name>_tile_data[]; extern const uint8_t <name>_tile_data_count;`
 5. In init: `wait_vbl_done(); set_sprite_data(base_tile, <name>_tile_data_count, <name>_tile_data);`
 6. Allocate OAM slots via `get_sprite()` — one per 8×8 tile used on screen at once
 7. Position with `move_sprite(slot, sx + 8, sy + 16)`
 8. Update `config.h` capacity constants if pool budget changes
-9. Build: `GBDK_HOME=/home/mathdaman/gbdk make` → ROM at `build/nuke-raider.gb`, zero errors
+9. Build: `make` → ROM at `build/nuke-raider.gb`, zero errors
 10. Smoketest: launch in Emulicious, confirm sprite appears at the correct position with no tile corruption or flicker
 
 ---
@@ -237,9 +238,9 @@ Apply this loop to any step in the Execution Checklist that produces an error:
 
 | Pattern | Detection | Typical Cause | Fix |
 |---------|-----------|---------------|-----|
-| `make` non-zero exit | Exit code ≠ 0 from `GBDK_HOME=... make` | Compilation error in generated or hand-written C | Read SDCC error output; verify `extern` symbol names match generated arrays; check `#pragma bank` |
-| `png_to_tiles.py` non-zero exit | Exit code ≠ 0 from `python3 tools/png_to_tiles.py` | Wrong PNG dimensions, wrong color mode, or missing file | Canvas must be multiples of 8; color mode must be Indexed; re-export from Aseprite |
-| Aseprite `--batch` error | Non-zero exit or no output PNG produced | Wrong CLI flag, source file not found, wrong export mode for multi-frame | Invoke `aseprite` skill for correct flags; check `.aseprite` path; use `--sheet --sheet-type horizontal` for multi-frame |
+| `make` non-zero exit | Exit code ≠ 0 from `make` | Compilation error in generated or hand-written C | Read SDCC error output; verify `extern` symbol names match generated arrays; check `#pragma bank` |
+| `png_to_tiles.py` non-zero exit | Exit code ≠ 0 from `python tools/png_to_tiles.py` | Wrong PNG dimensions, wrong color mode, or missing file | Canvas must be multiples of 8; color mode must be Indexed; re-export from Aseprite |
+| Aseprite `--batch` error | Non-zero exit or no output PNG produced | Wrong CLI flag, source file not found, wrong export mode for multi-frame | Invoke `aseprite` skill for correct flags; check `.aseprite` path; for multi-frame see the Asset Pipeline `--sheet` note |
 | Missing tile output file | `src/<name>_sprite.c` absent after `png_to_tiles.py` | Converter did not run or output path was wrong | Re-run with explicit output path; verify `tools/png_to_tiles.py` is present |
 | Tile count mismatch | `<name>_tile_data_count` differs from expected in-game | Canvas dimensions changed, wrong export resolution | Expected count = `(px_width / 8) × (px_height / 8)` per frame; re-export PNG and re-run converter |
 

@@ -52,3 +52,6 @@ Emulicious.jar
 # Implementation plans (local only, never pushed)
 docs/plans/
 
+# Personal / machine-specific Claude instructions
+CLAUDE.local.md
+

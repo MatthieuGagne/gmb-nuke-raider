@@ -183,60 +183,7 @@ Then run Step 7 immediately.
 
 ### Step 7: Cleanup Worktree
 
-#### After merge confirmation (Option 1 only)
-
-Only run after the user explicitly confirms the PR was merged — **never preemptively**.
-
-**Step 6a: Confirm worktree exists**
-```bash
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree list | grep <branch-name>
-```
-If not listed, skip removal (already gone).
-
-**Step 6b: Exit the EnterWorktree session if still active**
-
-If the current session was started with `EnterWorktree` and is still inside this worktree, Claude Code will block all Bash commands once the directory is deleted. Use `ExitWorktree` first — it removes the directory, clears the session CWD, and returns to the main repo:
-```
-ExitWorktree(action="remove", discard_changes=true)
-```
-After `ExitWorktree` returns, skip to Step 6d — the worktree is already removed.
-
-If the session is NOT inside an active `EnterWorktree` context, continue to Step 6c.
-
-**Step 6c: cd to main repo root and remove the worktree**
-
-Always `cd` first — if the session CWD is inside the worktree and the directory is already deleted, `git` will panic with "Unable to read current working directory":
-```bash
-cd C:/Code/nuke-raider
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove <worktree-path>
-```
-If that fails (e.g. dirty working tree), use `--force` and warn the user:
-```bash
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
-# Warn: "Worktree had uncommitted changes — removed with --force."
-```
-If `--force` also fails (directory already deleted from disk, stale git ref), clean up manually:
-```bash
-rm -rf <worktree-path>
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree prune
-# Note: "Worktree directory was already gone — pruned stale ref."
-```
-Skip Step 6d in this case (prune already ran).
-
-**Step 6d: Prune stale refs**
-```bash
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree prune
-```
-
-Report: "Worktree at `<path>` removed and pruned."
-
-#### Immediately after discard confirmation (Option 3)
-
-Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user types 'discard'. Skip Step 6b if already at main repo root.
-
-#### Option 2: Keep As-Is
-
-**Do NOT run Step 6.** Report: "Keeping branch `<name>`. Worktree preserved at `<path>`."
+See `references/cleanup.md` for the full worktree-cleanup fallback ladders (Step 6a–6d, the `--force` and `rm -rf` + `prune` fallbacks, and the per-option triggers).
 
 ## Quick Reference
 
@@ -246,72 +193,34 @@ Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user ty
 | 2. Keep as-is | - | - | Never |
 | 3. Discard | - | ✓ | After 'discard' typed |
 
-## Common Mistakes
-
-**Wrong emulator or ROM name**
-- **Problem:** Using `mgba-qt` or wrong ROM path loses time and gives wrong results
-- **Fix:** Always use PowerShell tool: `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`
-
-**Launching from wrong directory**
-- **Problem:** Main repo's `build/` may be stale; must use worktree's `build/`
-- **Fix:** Run emulator command from the worktree directory, not the main repo
-
-**Skipping bank gates**
-- **Problem:** Undetected bank overflow causes blank screen / ~1-2 FPS
-- **Fix:** Always run bank-post-build and `make memory-check` before smoketest
-
-**Using bare `git merge master`**
-- **Problem:** Local master ref may be stale; silently merges old code
-- **Fix:** Always `git fetch origin && git merge origin/master`
-
-**Bash commands blocked with "Path does not exist" after merge**
-- **Problem:** Session was started with `EnterWorktree` and is still active inside the worktree — Claude Code blocks all Bash commands when the worktree directory is deleted
-- **Fix:** Use `ExitWorktree(action="remove", discard_changes=true)` first (Step 6b); it removes the directory and restores the session CWD
-
-**`git worktree remove` fails with "Unable to read current working directory"**
-- **Problem:** Session CWD is inside a deleted worktree (non-EnterWorktree case) — git calls `getcwd()` internally and panics
-- **Fix:** Always `cd C:/Code/nuke-raider` before any `git worktree remove` command (Step 6c)
-
-**`git worktree remove --force` fails with "is not a working tree"**
-- **Problem:** The worktree directory was already deleted from disk, leaving a stale git ref
-- **Fix:** Fall back to `rm -rf <path> && git worktree prune` to clean up the stale ref
-
-**Merging directly to main**
-- **Problem:** Bypasses review, violates branch policy
-- **Fix:** Always use a PR — never `git merge` to main locally
-
-**Skipping test verification**
-- **Problem:** Merge broken code, create failing PR
-- **Fix:** Always verify tests before offering options
-
-## Red Flags
+## Common Mistakes & Red Flags
 
 **Never:**
-- Commit directly to `master`
-- Merge feature branch locally without a PR
-- Proceed with failing tests
-- Delete work without confirmation
-- Force-push without explicit request
-- Use `mgba-qt` (wrong emulator)
-- Reference `wasteland-racer.gb` (wrong ROM name)
-- Launch emulator from main repo's `build/` (may be stale)
-- Skip bank-post-build or `make memory-check` before smoketest
-- Clean up worktree immediately after PR creation (wait for merge confirmation)
-- Skip Step 4.5 when skills, agents, or CLAUDE.md were modified
+- Commit directly to `master`, or merge a feature branch locally without a PR (bypasses review, violates branch policy)
+- Proceed with failing tests, or skip test verification before offering options (merges broken code / creates a failing PR)
+- Delete work without typed confirmation, or force-push without explicit request
+- Use `mgba-qt` (wrong emulator) or reference `wasteland-racer.gb` (wrong ROM name) — both waste time and give wrong results
+- Launch the emulator from the main repo's `build/` (may be stale; must use the worktree's `build/`)
+- Skip `bank-post-build` or `make memory-check` before smoketest (undetected bank overflow → blank screen / ~1-2 FPS)
+- Use bare `git merge master` (local master ref may be stale; silently merges old code)
 - Push without running Step 1 (fetch/merge) — even doc-only branches can have conflicts
+- Skip Step 4.5 / doc updates when skills, agents, or CLAUDE.md were modified
+- Clean up the worktree immediately after PR creation — wait for merge confirmation
 
 **Always:**
-- Work on a feature branch
-- Integrate via PR only
+- Work on a feature branch and integrate via PR only
 - Verify tests before offering options
-- Run bank-post-build + `make memory-check` before smoketest
-- Fetch + merge origin/master at Step 1 (concurrent with manifest review) — unconditionally, before any build or push
-- Launch Emulicious from worktree directory
-- Present exactly 3 options
-- Get typed confirmation for Option 3
+- Run `bank-post-build` + `make memory-check` before smoketest
+- `git fetch origin && git merge origin/master` at Step 1 (concurrent with manifest review) — unconditionally, before any build or push
+- Launch Emulicious via the PowerShell tool from the worktree directory: `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`
+- Present exactly 3 options; get typed confirmation for Option 3
 - Update `docs/dev-workflow.md` in the same PR as any skill/agent/CLAUDE.md change
-- After PR creation (Option 1): tell user the worktree path and ask them to confirm when merged
-- After merge confirmation: cd to main repo root → git worktree remove → --force fallback → rm -rf + prune fallback → git worktree prune
+- After PR creation (Option 1): tell the user the worktree path and ask them to confirm when merged
+
+**Cleanup failure recovery (see `references/cleanup.md`):**
+- Bash blocked with "Path does not exist" after merge → session is inside an active `EnterWorktree`; use `ExitWorktree(action="remove", discard_changes=true)` first
+- `git worktree remove` fails with "Unable to read current working directory" → `cd C:/Code/nuke-raider` before any `git worktree remove`
+- `git worktree remove --force` fails with "is not a working tree" → directory already deleted; fall back to `rm -rf <path> && git worktree prune`
 
 ## Integration
 

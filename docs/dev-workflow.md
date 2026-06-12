@@ -51,7 +51,7 @@ When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatc
 1. Write failing test → `make test` → FAIL
 2. Invoke `bank-pre-write` skill (hard gate)
 3. Write minimal implementation → `make test` → PASS
-4. `GBDK_HOME=/home/mathdaman/gbdk make` → ROM builds
+4. `make` → ROM builds
 5. Invoke `bank-post-build` skill (hard gate)
 6. Run refactor checkpoint: "Does this generalize, or hard-coded for N=1?"
 7. Invoke `gb-c-optimizer` agent on new/modified C files — **review AND fix** (applies edits directly, then rebuilds to verify)
@@ -77,8 +77,8 @@ make test-tools          # Python tool tests (png_to_tiles, tmx_to_c)
 ### ROM build
 
 ```bash
-GBDK_HOME=/home/mathdaman/gbdk make
-make clean && GBDK_HOME=/home/mathdaman/gbdk make   # clean build (required before smoketest)
+make
+make clean && make   # clean build (required before smoketest)
 ```
 
 ### Bank gates (C files only)
@@ -155,7 +155,7 @@ Key tools in Emulicious:
 
 Launch command (from worktree directory):
 ```bash
-java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raider.gb
+java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb
 ```
 
 ### Headless screenshots
@@ -164,7 +164,7 @@ java -jar /home/mathdaman/.local/share/emulicious/Emulicious.jar build/nuke-raid
 diagnosing visual bugs without launching Emulicious interactively.
 
 ```bash
-python3 tools/screenshot.py \
+python tools/screenshot.py \
   [--steps '[...]']          # JSON navigation sequence
   [--steps-file path.json]   # steps from file (avoids shell-quoting issues)
   [--out build/screenshot.png]  # default output path (worktree-safe)
@@ -222,7 +222,7 @@ Before pushing and creating a PR, verify all of the following:
 - [ ] `make memory-check` passes (no FAIL/ERROR budgets)
 - [ ] Smoketest in Emulicious confirmed by user
 - [ ] `git fetch origin && git merge origin/master` merged from latest master
-- [ ] Clean build (`make clean && GBDK_HOME=/home/mathdaman/gbdk make`) succeeds
+- [ ] Clean build (`make clean && make`) succeeds
 - [ ] **If user-visible behavior changed:** README module table updated
 - [ ] **If any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed:** this file (`docs/dev-workflow.md`) updated
 - [ ] PR body includes `Closes #N` for the related issue

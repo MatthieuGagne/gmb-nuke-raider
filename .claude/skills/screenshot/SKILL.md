@@ -1,6 +1,6 @@
 ---
 name: screenshot
-description: Invoke before running tools/screenshot.py to get the current API — navigation step format, button names, address syntax, and how to view the result in conversation.
+description: Use when capturing a headless screenshot to diagnose a visual bug or inspect game/WRAM state without launching Emulicious — invoke before running tools/screenshot.py to get the current API (navigation step format, button names, address syntax, viewing the result in conversation).
 ---
 
 # screenshot — Headless Game Boy Screenshot Capture
