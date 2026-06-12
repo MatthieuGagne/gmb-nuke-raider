@@ -146,6 +146,7 @@ When a hypothesis is **Confirmed + clean** or **Confirmed + shifted** (or when i
 | Autobanker reassignment (data added to a full bank → autobanker pushes a file to a new bank → BANKED functions that assumed co-location silently read garbage) | `bank-post-build` skill + `gbdk-expert` agent | Compare `___bank_*` symbols in `.noi` between master and branch; fix: route reads through NONBANKED helpers in `loader.c` |
 | Regression ("worked in PR X, broken now") | `compare-prs` skill | Sequential |
 | Runtime memory / registers / VRAM | `emulicious-debug` agent | Single |
+| Runtime diagnosis with no GUI available, or an interaction-free differential/automated test | `pyboy-debug` agent | Single — headless alternative to `emulicious-debug` |
 | Compile error / GBDK API misuse | `gbdk-expert` agent | Single |
 
 **Conflicting findings:** When parallel agents return contradictory conclusions, surface both findings to the user verbatim and ask for direction. Do NOT attempt to reconcile conflicting findings autonomously.
@@ -192,8 +193,4 @@ When triggered:
 
 ## GBC-Specific Diagnostic Hints
 
-**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, use `find_wram_read_in_fn(noi_path, rom_path, "_getter_fn")` from `tests/integration/helpers.py`. It decodes the getter function's disassembly from the ROM binary to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
-
-**"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, read `SCY`/`SCX` in Emulicious — non-zero values mean the tilemap is rendering off-screen.
-
-**`finish_eval()` direction-velocity race:** Any `BANKED` physics blocker (e.g. `racer_blocks_pixel()`) can zero `vy` on the same frame the player reaches a finish/checkpoint tile. If `finish_eval()` gates on `pvy > 0`, that check silently fails even though the player crossed correctly. Prefer `player_get_dir()` facing-direction over instantaneous velocity. Confirm headlessly: export `dbg_pvy` and read it via PyBoy at the crossing frame — if `pvy=0` despite correct facing direction, this is the cause (tracked in issue #382).
+See `references/diagnostic-hints.md` for war-story heuristics (static WRAM symbol lookup, grey-screen scroll-register check, `finish_eval()` direction-velocity race).

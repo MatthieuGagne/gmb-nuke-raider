@@ -1,0 +1,9 @@
+# GBC-Specific Diagnostic Hints
+
+War-story heuristics distilled from past investigations. Consult when a hypothesis matches one of these shapes.
+
+**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table, so a plain `grep` on `build/nuke-raider.map` only resolves non-`static` globals. To inspect a `static` WRAM variable, export a non-`static` debug global alongside it (e.g. `uint8_t dbg_foo;`), rebuild, then `grep "dbg_foo" build/nuke-raider.map` to get its address and read it via `pyboy.memory[addr]`. See the `screenshot` skill's "Headless WRAM Read" pattern for the full workflow. (If you only have a getter function and cannot add a debug global, disassemble the getter in Emulicious and read the `LD A,(nn)` operand to recover the address manually.)
+
+**"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, read `SCY`/`SCX` in Emulicious — non-zero values mean the tilemap is rendering off-screen.
+
+**`finish_eval()` direction-velocity race:** Any `BANKED` physics blocker (e.g. `racer_blocks_pixel()`) can zero `vy` on the same frame the player reaches a finish/checkpoint tile. If `finish_eval()` gates on `pvy > 0`, that check silently fails even though the player crossed correctly. Prefer `player_get_dir()` facing-direction over instantaneous velocity. Confirm headlessly: export `dbg_pvy` and read it via PyBoy at the crossing frame — if `pvy=0` despite correct facing direction, this is the cause (tracked in issue #382).

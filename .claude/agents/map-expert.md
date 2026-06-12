@@ -1,6 +1,7 @@
 ---
 name: map-expert
-description: "Use when creating a new map, editing an existing map, or running the map conversion pipeline for Nuke Raider — executes end-to-end autonomously. Also use for: Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles, gen_tileset), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
+description: "Use when creating a new map, editing an existing map, or running the map conversion pipeline for Nuke Raider — executes end-to-end autonomously. Also use for: Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
+tools: Read, Write, Edit, Grep, Glob, Bash, PowerShell, Skill, TodoWrite
 color: green
 ---
 
@@ -11,7 +12,7 @@ You are the map pipeline expert for the Nuke Raider Game Boy Color game. You han
 ## Project Context
 
 - **ROM:** `build/nuke-raider.gb`
-- **Build:** `GBDK_HOME=/home/mathdaman/gbdk make`
+- **Build:** `make`
 - **Map source of truth:** `assets/maps/track.tmx` and `assets/maps/overmap.tmx` — never edit generated files directly
 - **Map dimensions:** 40×36 tiles (W×H)
 
@@ -25,9 +26,9 @@ The Makefile runs the full track pipeline automatically. Manual invocations for 
 |------|---------|-------|
 | `png_to_tiles.py` | see Makefile | Invoked with `--rotation-manifest`, `--tsx`, `--id-map-out`, `--meta-header-out`; do not invoke manually for tracks |
 | `tmx_to_c.py` | see Makefile | Invoked with `--id-map` for tracks, `--emit-rotation-manifest` first pass |
-| `tmx_to_array_c.py` | `python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h` | Overmap only |
+| `tmx_to_array_c.py` | `python tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h` | Overmap only |
 
-**Test:** `python3 -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
+**Test:** `python -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
 
 ---
 
@@ -108,12 +109,12 @@ On any error in the steps below, follow the **Self-Correction Policy** section.
    ```
 2. **Convert tileset to tiles:**
    ```bash
-   python3 tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tiles
+   python tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tiles
    ```
 3. **Paint map in Tiled** — open `assets/maps/overmap.tmx`, update the layer as needed (CSV encoding).
 4. **Convert map** (note: different converter and extra `config.h` arg):
    ```bash
-   python3 tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
+   python tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
    ```
 5. **Wire into game** — `extern`-declare generated symbols; load tile data then tilemap during VBlank.
 6. **OAM sprites on the map** — delegate to the **`sprite-expert`** agent if needed.
@@ -160,7 +161,7 @@ When any pipeline step fails, apply this policy:
 | Assuming RGB PNG from Aseprite | Aseprite exports indexed color (type 3) — check IHDR before reading pixels |
 | Finish line at the map y-boundary | `player.c` resets `vy = 0` when the player hits `active_map_h * 8 - 16` — if the finish row is exactly at that boundary the player arrives with zero velocity and `finish_eval` never fires. Always leave at least 4–6 road rows below the finish line so the player can cross with positive downward velocity. |
 
-**For full Python implementation code, PNG read/write utilities, Aseprite sync, GB hardware deep-dive (VRAM layout, LCDC bits, scroll registers, CGB attributes), and Tiled format reference — see [`REFERENCE.md`](../skills/map-expert/REFERENCE.md).**
+**Implementation details for the Python pipeline tools live in `tools/` (read the relevant `tools/*.py` source directly); the `map-builder` skill (`.claude/skills/map-builder/SKILL.md`) covers the end-to-end map-creation workflow.**
 
 ---
 

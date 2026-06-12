@@ -1,6 +1,6 @@
 ---
 name: sprite-builder
-description: Use when adding a new sprite type to Junk Runner — creating the Aseprite source, exporting PNG, running png_to_tiles, allocating OAM slots, loading tile data, and rendering the sprite in game.
+description: Use when adding a new sprite type to Nuke Raider — creating the Aseprite source, exporting PNG, running png_to_tiles, allocating OAM slots, loading tile data, and rendering the sprite in game.
 ---
 
 # Sprite Builder

@@ -1,6 +1,7 @@
 ---
 name: emulicious-debug
 description: "TRIGGER when: any runtime crash, unexpected in-game behavior, visual glitch, wrong values at runtime, or need to inspect memory/tiles/sprites/palettes/ROM layout during execution. DO NOT TRIGGER when: the problem is a compile error (use gbdk-expert) or static code review (use gb-c-optimizer)."
+tools: Read, Edit, Grep, Glob, Bash, PowerShell, Skill, TodoWrite
 color: blue
 ---
 

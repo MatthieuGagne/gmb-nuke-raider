@@ -1,6 +1,7 @@
 ---
 name: pyboy-debug
 description: "TRIGGER when: automated headless diagnosis needed, no GUI available, want a no-interaction alternative to emulicious-debug. Accepts a bug description; boots the ROM via PyBoy, reads memory + screenshots, runs unit tests, iterates at least 2 rounds, produces a structured diagnostic. DO NOT TRIGGER when: step-through breakpoints are needed (use emulicious-debug) or compile errors (use gbdk-expert)."
+tools: Read, Write, Bash, PowerShell, Grep, Glob, TodoWrite
 color: purple
 ---
 
@@ -61,16 +62,7 @@ finally:
 | Read a little-endian word | `pyboy.memory[addr] \| (pyboy.memory[addr+1] << 8)` |
 | Save screenshot | `pyboy.tick(1, render=True); pyboy.screen.image.save("path.png")` |
 
-**Critical — rendered tick before every button press:** This game uses `KEY_TICKED` (rising-edge detection: pressed this frame, not pressed last frame). PyBoy only updates the game's joypad register on rendered frames (`render=True`). Always call `pyboy.tick(1, render=True)` **before** `pyboy.button()`, or the press will be silently missed.
-
-```python
-def press(pyboy, btn, delay=4, settle=0):
-    pyboy.tick(1, render=True)      # required — arms the input polling
-    pyboy.button(btn, delay)
-    pyboy.tick(delay, render=False)
-    if settle:
-        pyboy.tick(settle, render=False)
-```
+**Critical — rendered tick before every button press:** This game uses `KEY_TICKED` (rising-edge detection: pressed this frame, not pressed last frame). PyBoy only updates the game's joypad register on rendered frames (`render=True`). Always call `pyboy.tick(1, render=True)` **before** `pyboy.button()`, or the press will be silently missed. The canonical `press()` helper that encapsulates this is defined in the **Script Template** below.
 
 ## Script Template
 
@@ -129,7 +121,7 @@ python {WORKTREE_ROOT}/build/pyboy_debug_round1.py
 
 Use manifest data — never hardcode frame counts or button sequences.
 
-Use the `press()` helper defined in the PyBoy API section above for every button press — it ensures `tick(1, render=True)` fires first.
+Use the `press()` helper defined in the Script Template above for every button press — it ensures `tick(1, render=True)` fires first.
 
 **Boot → Title screen:** `pyboy.tick(360, render=False)` then one rendered tick to arm input.
 
