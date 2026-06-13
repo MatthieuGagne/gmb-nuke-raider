@@ -11,6 +11,10 @@
  * Must be called after track_select(). */
 void    turret_init(uint8_t tile_base) BANKED;
 
+/* Cache the explosion tile base so turret_update() can hand an OAM slot to
+ * explosion_spawn() on death.  Call after explosion_init() in state_playing.enter(). */
+void    turret_set_explosion_base(uint8_t base) BANKED;
+
 /* Zero the pool without map scan — host-test helper only. */
 void    turret_init_empty(void) BANKED;
 

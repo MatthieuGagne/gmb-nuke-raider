@@ -9,8 +9,10 @@
 #include "loader.h"    /* load_npc_positions(), loader_get_slot() — NONBANKED helpers */
 #include "camera.h"    /* cam_y — needed for OAM y coordinate calculations */
 #include "enemy_common.h"  /* enemy_aim_dir — shared aim math */
+#include "explosion.h" /* explosion_spawn() — OAM hand-off on turret death */
 
 static uint8_t s_turret_tile_base;  /* OBJ tile index set by turret_init() */
+static uint8_t s_explosion_base;    /* OBJ tile index set by turret_set_explosion_base() */
 
 /* SoA turret pool — tile coordinates + cached OAM x (never changes for turrets) */
 static uint8_t turret_tx[MAX_ENEMIES];
@@ -73,6 +75,10 @@ void turret_init_empty(void) BANKED {
     }
 }
 
+void turret_set_explosion_base(uint8_t base) BANKED {
+    s_explosion_base = base;
+}
+
 uint8_t turret_spawn(uint8_t tx, uint8_t ty) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_ENEMIES; i++) {
@@ -112,7 +118,10 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
             if (turret_hp[i] == 0u) {
                 turret_active[i] = 0u;
                 if (turret_oam[i] != SPRITE_POOL_INVALID) {
-                    clear_sprite(turret_oam[i]);
+                    /* Hand the OAM slot to the explosion pool.
+                     * Do NOT clear_sprite here — explosion now owns this slot
+                     * and will call clear_sprite when the animation finishes. */
+                    explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u);
                     turret_oam[i] = SPRITE_POOL_INVALID;
                 }
                 continue;

@@ -99,6 +99,7 @@ static void enter(void) {
     {
         uint8_t exp_base = loader_get_slot(TILE_ASSET_EXPLOSION);
         explosion_init(exp_base, (uint8_t)(exp_base + 3u));
+        turret_set_explosion_base(exp_base);
     }
     race_state_set_active(PLAYER_SLOT, 1u);
     active_map_type_cache = track_get_map_type();
