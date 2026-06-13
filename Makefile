@@ -150,6 +150,11 @@ src/dialog_border_tiles.c src/dialog_border_tiles.h: assets/sprites/dialog_borde
 
 $(TARGET): src/dialog_border_tiles.c
 
+src/explosion_sprite.c: assets/sprites/explosion.png tools/png_to_tiles.py
+	python tools/png_to_tiles.py --bank 255 assets/sprites/explosion.png src/explosion_sprite.c explosion_tile_data
+
+$(TARGET): src/explosion_sprite.c
+
 # src/dialog_data.c and src/hub_data.c are checked into git so CI works without Python.
 # Run `make dialog_data` to regenerate from updated JSON.
 src/dialog_data.c src/hub_data.c: assets/dialog/npcs.json assets/dialog/hubs.json tools/dialog_to_c.py src/config.h

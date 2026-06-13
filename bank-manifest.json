@@ -45,5 +45,7 @@
   "src/racer.c":                 {"bank": 255, "reason": "autobank — gameplay module; racer_update/render called from state_playing.c"},
   "src/race_state.c":            {"bank": 255, "reason": "autobank — unified per-slot cp/lap tracking; called from state_playing.c and racer.c"},
   "src/vehicle_physics.c":       {"bank": 255, "reason": "autobank — shared vehicle terrain physics + axis-separated slide collision; called by player.c and racer.c (and patrol.c in PR4)"},
-  "src/patrol.c":                {"bank": 255, "reason": "autobank — patrol gameplay module; patrol_update/render called from state_playing.c"}
+  "src/patrol.c":                {"bank": 255, "reason": "autobank — patrol gameplay module; patrol_update/render called from state_playing.c"},
+  "src/explosion.c":             {"bank": 255, "reason": "autobank — gameplay module; explosion_update/render called from state_playing.c"},
+  "src/explosion_sprite.c":      {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"}
 }
