@@ -132,6 +132,11 @@
 #define RACER_HIT_RADIUS       8u   /* screen-space px radius for bullet hit check */
 #define RACER_HIT_FLASH_FRAMES 8u   /* frames of hit-blink per bullet hit */
 
+/* Explosion pool */
+#define MAX_EXPLOSIONS        12u  /* simultaneous explosion instances (turret + car quadrants) */
+#define EXPLOSION_NUM_FRAMES   3u  /* frames in the explosion sprite sheet */
+#define EXPLOSION_FRAME_TICKS 40u  /* ticks per frame (~0.67 s total at 60 fps) */
+
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
 #define MAX_ENEMIES           8u
