@@ -8,7 +8,6 @@ uint8_t mock_sprite_x[40];
 uint8_t mock_sprite_y[40];
 uint8_t mock_sprite_tile[40];
 uint8_t mock_sprite_prop[40];
-
 void mock_move_sprite_reset(void) {
     uint8_t i;
     mock_move_sprite_last_nb    = 0;
