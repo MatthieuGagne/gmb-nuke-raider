@@ -125,7 +125,9 @@
       "Bash(New-Item *)",
       "Bash(Test-Path *)",
       "PowerShell(Test-Path \"C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\references\\\\\" -PathType Container; if \\(-not \\(Test-Path \"C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\references\\\\\" -PathType Container\\)\\) { New-Item -ItemType Directory -Path \"C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\references\\\\\" -Force | Out-Null }; Test-Path \"C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\references\\\\\")",
-      "PowerShell(python -c \"import yaml; f=open\\(r'C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\SKILL.md',encoding='utf-8'\\).read\\(\\); fm=f.split\\('---'\\)[1]; d=yaml.safe_load\\(fm\\); assert d['name']=='optimize-context'; assert d['disable-model-invocation'] is True; print\\('frontmatter OK:', list\\(d.keys\\(\\)\\)\\)\")"
+      "PowerShell(python -c \"import yaml; f=open\\(r'C:\\\\Users\\\\mathd\\\\.claude\\\\skills\\\\optimize-context\\\\SKILL.md',encoding='utf-8'\\).read\\(\\); fm=f.split\\('---'\\)[1]; d=yaml.safe_load\\(fm\\); assert d['name']=='optimize-context'; assert d['disable-model-invocation'] is True; print\\('frontmatter OK:', list\\(d.keys\\(\\)\\)\\)\")",
+      "PowerShell(foreach \\($n in 409,267,214,205,151,148,147,139,258\\) { Write-Output \"===== #$n =====\"; gh issue view $n --json title,body --jq '.title, \\(.body | .[0:500]\\)'; Write-Output \"\" })",
+      "PowerShell(git log *)"
     ]
   },
   "hooks": {
