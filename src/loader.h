@@ -96,7 +96,8 @@ typedef enum {
     TILE_ASSET_NPC_MECHANIC   = 9,
     TILE_ASSET_NPC_TRADER     = 10,
     TILE_ASSET_DIALOG_BORDER  = 11,
-    TILE_ASSET_COUNT          = 12
+    TILE_ASSET_EXPLOSION      = 12,
+    TILE_ASSET_COUNT          = 13
 } tile_asset_t;
 
 /* Registry struct — ROM-resident; bank stored separately in loader_asset_bank[]. */

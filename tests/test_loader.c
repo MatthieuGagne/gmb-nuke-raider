@@ -113,7 +113,7 @@ void test_get_asset_slot_returns_sentinel_initially(void) {
 }
 
 void test_tile_asset_count_is_correct(void) {
-    TEST_ASSERT_EQUAL_UINT8(12u, (uint8_t)TILE_ASSET_COUNT);
+    TEST_ASSERT_EQUAL_UINT8(13u, (uint8_t)TILE_ASSET_COUNT);
 }
 
 /* ---- Registry tests ---- */
@@ -303,7 +303,7 @@ void test_load_racer_waypoints_track0_returns_zero(void) {
 }
 
 void test_playing_manifest_count_is_correct(void) {
-    TEST_ASSERT_EQUAL_UINT8(4u, k_playing_assets_count);
+    TEST_ASSERT_EQUAL_UINT8(5u, k_playing_assets_count);
 }
 
 void test_overmap_manifest_count_is_correct(void) {
