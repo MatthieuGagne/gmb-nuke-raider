@@ -121,7 +121,9 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
                     /* Hand the OAM slot to the explosion pool.
                      * Do NOT clear_sprite here — explosion now owns this slot
                      * and will call clear_sprite when the animation finishes. */
-                    explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u);
+                    explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u,
+                                    turret_oam_x[i],        /* world pixel x = tx*8+8 */
+                                    turret_ty[i]);           /* world tile y */
                     turret_oam[i] = SPRITE_POOL_INVALID;
                 }
                 continue;
