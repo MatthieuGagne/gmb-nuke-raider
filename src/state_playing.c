@@ -202,10 +202,14 @@ static void update(void) {
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
         hud_update();
-        /* Death check */
+        /* Death: keep the world live (D6); play the car blast, then game-over (D7). */
         if (damage_is_dead()) {
-            state_replace(&state_game_over, BANK(state_game_over));
-            return;
+            player_kill();                 /* spawn-once guarded internally */
+            if (explosion_is_done()) {    /* car blast finished (~2s) */
+                state_replace(&state_game_over, BANK(state_game_over));
+                return;
+            }
+            /* else: fall through — world keeps updating, explosion_update already ran this frame */
         }
         /* Finish line detection:
          * - tile-type check replaces hardcoded Y-row
