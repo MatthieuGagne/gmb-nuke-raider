@@ -36,6 +36,8 @@ int16_t  player_get_x(void) BANKED;
 int16_t  player_get_y(void) BANKED;
 int8_t   player_get_vx(void) BANKED;
 int8_t   player_get_vy(void) BANKED;
+void     player_kill(void) BANKED;
+uint8_t  player_is_dead(void) BANKED;
 
 #include "track.h"
 

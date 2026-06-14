@@ -3,8 +3,14 @@
 #include "player.h"   /* player_dir_t */
 #include "camera.h"   /* cam_x, cam_y */
 #include "enemy_common.h"
+#include "projectile.h"
+#include "explosion.h"
 
-void setUp(void) { turret_init_empty(); }
+void setUp(void) {
+    turret_init_empty();
+    projectile_init(0u);
+    explosion_init(10u, 13u);
+}
 void tearDown(void) {}
 
 /* turret_init_empty() zeros the pool without scanning the map —
@@ -170,6 +176,21 @@ void test_turret_constants_values(void) {
     TEST_ASSERT_EQUAL_UINT8(30u, TURRET_WIND_UP);
 }
 
+/* turret at tile (10,10): oam_x=88, oam_y=80-cam_y+16=96 when cam_y=0.
+ * Fire a player bullet at (88,96) → projectile_check_hit_enemy hits → turret dies.
+ * Expects turret inactive and one explosion spawned on its OAM slot. */
+void test_turret_death_spawns_explosion(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    turret_set_explosion_base(10u);
+    turret_spawn(10u, 10u);
+    /* fire player bullet at turret OAM position */
+    projectile_fire(88u, 96u, DIR_T, PROJ_OWNER_PLAYER);
+    turret_update(0, 0);
+    TEST_ASSERT_EQUAL_UINT8(0u, turret_count_active());
+    TEST_ASSERT_EQUAL_UINT8(1u, explosion_active_count());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_npc_type_constants_defined);
@@ -201,5 +222,6 @@ int main(void) {
     RUN_TEST(test_turret_spawn_sets_dir_none);
     RUN_TEST(test_turret_dir_enum_has_16_values);
     RUN_TEST(test_turret_constants_values);
+    RUN_TEST(test_turret_death_spawns_explosion);
     return UNITY_END();
 }

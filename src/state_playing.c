@@ -23,6 +23,7 @@ BANKREF_EXTERN(state_playing)
 #include "sfx.h"
 #include "music.h"
 #include "powerup.h"
+#include "explosion.h"
 #include "config.h"
 
 static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
@@ -95,6 +96,11 @@ static void enter(void) {
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
     patrol_init(loader_get_slot(TILE_ASSET_PLAYER));
     powerup_init();
+    {
+        uint8_t exp_base = loader_get_slot(TILE_ASSET_EXPLOSION);
+        explosion_init(exp_base, (uint8_t)(exp_base + 3u));
+        turret_set_explosion_base(exp_base);
+    }
     race_state_set_active(PLAYER_SLOT, 1u);
     active_map_type_cache = track_get_map_type();
     finish_dir_cache = track_get_finish_direction();
@@ -155,6 +161,7 @@ static void update(void) {
     racer_render();
     patrol_render();
     powerup_render();
+    explosion_render();
     hud_render();
     camera_flush_vram();
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
@@ -191,13 +198,18 @@ static void update(void) {
         }
         hud_set_position(race_state_rank_player());
         powerup_update((uint8_t)((uint16_t)px >> 3u), (uint8_t)((uint16_t)py >> 3u));
+        explosion_update();
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
         hud_update();
-        /* Death check */
+        /* Death: keep the world live (D6); play the car blast, then game-over (D7). */
         if (damage_is_dead()) {
-            state_replace(&state_game_over, BANK(state_game_over));
-            return;
+            player_kill();                 /* spawn-once guarded internally */
+            if (explosion_is_done()) {    /* car blast finished (~2s) */
+                state_replace(&state_game_over, BANK(state_game_over));
+                return;
+            }
+            /* else: fall through — world keeps updating, explosion_update already ran this frame */
         }
         /* Finish line detection:
          * - tile-type check replaces hardcoded Y-row

@@ -14,6 +14,7 @@
 #include "turret.h"
 #include "racer.h"
 #include "vehicle_physics.h"
+#include "explosion.h"
 
 int16_t px;
 int16_t py;
@@ -31,6 +32,7 @@ static uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
 static uint8_t player_flicker_tick;
 static player_dir_t player_dir = DIR_T;
 static uint8_t s_player_tile_base;
+static uint8_t s_player_dead;
 
 /* Direction → velocity delta tables. Indexed by player_dir_t (0=T..7=LT). */
 static const int8_t DIR_DX[8] = {  0,  1,  1,  1,  0, -1, -1, -1 };
@@ -162,6 +164,7 @@ void player_init(uint8_t tile_base) BANKED {
     downshift_timer = 0u;
     player_dir = DIR_T;
     player_flicker_tick = 0u;
+    s_player_dead = 0u;
     SHOW_SPRITES;
 }
 
@@ -169,6 +172,8 @@ void player_update(void) BANKED {
     int16_t new_px;
     int16_t new_py;
     TileType terrain;
+
+    if (s_player_dead) return;   /* corpse doesn't drive */
 
     damage_tick();
 
@@ -244,9 +249,15 @@ void player_update(void) BANKED {
 }
 
 void player_render(void) BANKED {
-    uint8_t hw_x = (uint8_t)(px + 8u);
-    uint8_t hw_y = (uint8_t)(py - cam_y + 16);
-    uint8_t flip = DIR_FLIP[player_dir];
+    uint8_t hw_x;
+    uint8_t hw_y;
+    uint8_t flip;
+
+    if (s_player_dead) return;   /* explosion_render owns the 4 OAM slots now */
+
+    hw_x = (uint8_t)(px + 8u);
+    hw_y = (uint8_t)(py - cam_y + 16);
+    flip = DIR_FLIP[player_dir];
 
     set_sprite_tile(player_sprite_slot[0], s_player_tile_base + DIR_TILE_TL[player_dir]);
     set_sprite_tile(player_sprite_slot[1], s_player_tile_base + DIR_TILE_BL[player_dir]);
@@ -276,6 +287,22 @@ int16_t player_get_x(void) BANKED  { return px; }
 int16_t player_get_y(void) BANKED  { return py; }
 int8_t  player_get_vx(void) BANKED { return vx; }
 int8_t  player_get_vy(void) BANKED { return vy; }
+
+uint8_t player_is_dead(void) BANKED { return s_player_dead; }
+
+void player_kill(void) BANKED {
+    uint8_t base;
+    if (s_player_dead) return;          /* spawn-once guard */
+    s_player_dead = 1u;
+    base = (uint8_t)(loader_get_slot(TILE_ASSET_EXPLOSION) + 3u); /* car art frame 0 */
+    /* 4 quadrant entries: flip maps to player_sprite_slot layout:
+       slot[0]=TL (no flip), slot[2]=TR (FLIPX), slot[1]=BL (FLIPY), slot[3]=BR (FLIPX|FLIPY)
+       wx=0, wty=0 because player_render handles positioning for car entries */
+    explosion_spawn(player_sprite_slot[0], base, 0u,                         1u, 0u, 0u);
+    explosion_spawn(player_sprite_slot[2], base, S_FLIPX,                    1u, 0u, 0u);
+    explosion_spawn(player_sprite_slot[1], base, S_FLIPY,                    1u, 0u, 0u);
+    explosion_spawn(player_sprite_slot[3], base, (uint8_t)(S_FLIPX|S_FLIPY), 1u, 0u, 0u);
+}
 
 void player_reset_vel(void) BANKED {
     vx = 0;

@@ -25,6 +25,10 @@ extern const uint8_t turret_tile_data[];
 extern const uint8_t turret_tile_data_count;
 BANKREF_EXTERN(turret_tile_data)
 
+extern const uint8_t explosion_tile_data[];
+extern const uint8_t explosion_tile_data_count;
+BANKREF_EXTERN(explosion_tile_data)
+
 extern const uint8_t overmap_tile_data[];
 extern const uint8_t overmap_tile_data_count;
 BANKREF_EXTERN(overmap_tile_data)
@@ -300,6 +304,7 @@ const uint8_t k_playing_assets[] = {
     TILE_ASSET_PLAYER,
     TILE_ASSET_BULLET,
     TILE_ASSET_TURRET,
+    TILE_ASSET_EXPLOSION,
     TILE_ASSET_TRACK,
 };
 const uint8_t k_playing_assets_count = (uint8_t)(sizeof(k_playing_assets) / sizeof(k_playing_assets[0]));
@@ -403,6 +408,7 @@ static const tile_registry_entry_t loader_registry_tbl[TILE_ASSET_COUNT] = {
     { npc_mechanic_portrait,  &npc_mechanic_portrait_count,  0u }, /* NPC_MECHANIC  — BG     */
     { npc_trader_portrait,    &npc_trader_portrait_count,    0u }, /* NPC_TRADER    — BG     */
     { dialog_border_tiles,    &dialog_border_tiles_count,    0u }, /* DIALOG_BORDER — BG     */
+    { explosion_tile_data,    &explosion_tile_data_count,    1u }, /* EXPLOSION     — sprite */
 };
 
 /* Per-track BG tile registry — indexed by loader_active_track (0-2).
@@ -442,6 +448,7 @@ uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
         case TILE_ASSET_NPC_MECHANIC:  return BANK(npc_mechanic_portrait);
         case TILE_ASSET_NPC_TRADER:    return BANK(npc_trader_portrait);
         case TILE_ASSET_DIALOG_BORDER: return BANK(dialog_border_tiles);
+        case TILE_ASSET_EXPLOSION:     return BANK(explosion_tile_data);
         default:                       return 0u;
     }
 }
