@@ -21,9 +21,9 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug
+.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
 
-all: $(TARGET)
+all: $(TARGET) sync-docs
 
 # ── Generated sources ─────────────────────────────────────────────────────────
 # ── Tile rotation pipeline ──────────────────────────────────────────────────
@@ -221,7 +221,7 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest -v
+	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data -v
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:
@@ -232,6 +232,11 @@ bank-post-build:
 
 memory-check:
 	python tools/memory_check.py .
+
+# Keep docs/memory-explained.html's OAM scene model in sync with src/config.h.
+# Idempotent: only changes bytes when config.h actually changes (no build churn).
+sync-docs:
+	python tools/sync_scene_data.py .
 
 tile-check: $(TARGET)
 	python tools/check_tile_budget.py .
