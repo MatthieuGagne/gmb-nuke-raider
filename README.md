@@ -139,3 +139,4 @@ gmb-nuke-raider/
 - [Asset pipeline](docs/asset-pipeline.md) — full asset authoring and conversion workflow
 - [Tile system reference](docs/TILES.md) — hardware limits, per-state tile budgets, and pipeline workflow
 - [Developer workflow](docs/dev-workflow.md) — build gates, debugging, and contribution conventions
+- [Memory explained](docs/memory-explained.html) — interactive ROM-memory tour (banks, VRAM, per-scene OAM); its OAM scene model auto-syncs with `config.h` on every `make`

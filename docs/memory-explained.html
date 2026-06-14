@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuke Raider — How the ROM's Memory Works (Click Everything)</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2330; --ink:#e6edf3; --dim:#8b949e;
+    --line:#30363d; --accent:#f0883e; --green:#3fb950; --amber:#d29922; --red:#f85149;
+    --blue:#58a6ff; --purple:#bc8cff; --teal:#39c5cf;
+    --mono:'Consolas','SF Mono',Menlo,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6}
+  header{padding:32px 24px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1a2230,#0e1117)}
+  header h1{margin:0 0 4px;font-size:28px;letter-spacing:.5px}
+  header h1 span{color:var(--accent)}
+  header p{margin:0;color:var(--dim);max-width:720px}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .lede{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:8px;padding:16px 20px;margin:24px 0}
+  .lede b{color:var(--accent)}
+  h2{margin:40px 0 6px;font-size:21px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  h2 .num{color:var(--accent);font-family:var(--mono);margin-right:8px}
+  .sub{color:var(--dim);margin:0 0 18px;font-size:14px}
+  .hint{font-size:12px;color:var(--teal);font-style:italic}
+
+  /* budgets */
+  .budgets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:20px 0}
+  .bcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer;transition:.15s}
+  .bcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .bcard .label{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .bcard .val{font-size:26px;font-weight:700;font-family:var(--mono);margin:4px 0}
+  .bar{height:10px;border-radius:6px;background:#222b38;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;border-radius:6px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:8px}
+  .tag.pass{background:rgba(63,185,80,.15);color:var(--green)}
+  .tag.warn{background:rgba(210,153,34,.18);color:var(--amber)}
+
+  /* clickable regions */
+  .region,.bankcell,.tilecell,.oamcell{cursor:pointer;transition:.12s}
+  .region:hover,.bankcell:hover,.tilecell:hover,.oamcell:hover{filter:brightness(1.25);outline:2px solid var(--ink)}
+  .active-el{outline:3px solid var(--accent)!important;box-shadow:0 0 14px rgba(240,136,62,.5)}
+
+  /* memory map */
+  .memmap{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:13px;max-width:560px}
+  .region{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-radius:6px;color:#0e1117;font-weight:600}
+  .region .addr{font-size:11px;opacity:.8}
+  .r-rom0{background:#7ee787}
+  .r-romx{background:#f0883e}
+  .r-vram{background:#79c0ff}
+  .r-sram{background:#a371f7}
+  .r-wram{background:#56d4dd}
+  .r-echo{background:#484f58;color:#c9d1d9}
+  .r-oam{background:#ff7b72}
+  .r-io{background:#d2a8ff}
+  .r-hram{background:#ffa657}
+
+  /* banks grid */
+  .bankgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;max-width:640px}
+  .bankcell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;color:#0e1117;text-align:center;padding:2px}
+  .bk-home{background:#7ee787}
+  .bk-auto{background:#388bfd}
+  .bk-music{background:#bc8cff}
+  .bankcell small{font-size:8px;font-weight:400;opacity:.85;line-height:1.1}
+
+  /* tile strip */
+  .tilestrip{display:flex;height:46px;border-radius:6px;overflow:hidden;max-width:640px;font-family:var(--mono);font-size:11px;font-weight:700}
+  .tilecell{display:flex;align-items:center;justify-content:center;color:#0e1117;text-align:center;padding:0 6px}
+  .t-font{background:#8b949e}
+  .t-hud{background:#f0883e}
+  .t-pool{background:#56d4dd}
+  .t-free{background:#30363d;color:#8b949e}
+
+  /* oam grid */
+  .oamgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;max-width:520px}
+  .oamcell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10px;font-weight:700;color:#0e1117}
+  .o-free{background:#30363d;color:#6e7681}
+
+  /* scene selector */
+  .scenebtns{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .scenebtn{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    font-family:var(--sans);font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;transition:.12s}
+  .scenebtn:hover{border-color:var(--accent)}
+  .scenebtn.sel{background:var(--accent);color:#0e1117;border-color:var(--accent)}
+  .scenebtn small{display:block;font-size:10px;font-weight:400;opacity:.8}
+  .scene-readout{font-family:var(--mono);font-size:13px;margin:6px 0 2px;padding:10px 14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px}
+  .scene-readout b{color:var(--accent)}
+  .scene-readout .st-pass{color:var(--green)} .scene-readout .st-warn{color:var(--amber)} .scene-readout .st-fail{color:var(--red)}
+  .mythbuster{background:rgba(88,166,255,.08);border-left:3px solid var(--blue);border-radius:4px;
+    padding:10px 14px;margin:8px 0 4px;font-size:13px}
+  .mythbuster b{color:var(--blue)}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0;font-size:12px;color:var(--dim)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+  /* detail panel */
+  #detail{position:sticky;bottom:0;margin-top:20px;background:var(--panel2);border:1px solid var(--accent);
+    border-radius:10px;padding:18px 20px;min-height:96px;box-shadow:0 -4px 24px rgba(0,0,0,.4)}
+  #detail h3{margin:0 0 8px;font-size:17px;color:var(--accent)}
+  #detail p{margin:6px 0;font-size:14px}
+  #detail .meta{font-family:var(--mono);font-size:12px;color:var(--teal);margin-bottom:8px}
+  #detail .analogy{background:rgba(88,166,255,.08);border-left:3px solid var(--blue);padding:8px 12px;
+    border-radius:4px;margin-top:10px;font-size:13px}
+  #detail .analogy b{color:var(--blue)}
+  #detail .placeholder{color:var(--dim);font-style:italic}
+
+  table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+  td.mono{font-family:var(--mono);color:var(--teal)}
+  footer{color:var(--dim);font-size:12px;text-align:center;padding:30px;border-top:1px solid var(--line);margin-top:40px}
+  code{background:#22272e;padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 <span>Nuke Raider</span> — How the ROM's Memory Works</h1>
+  <p>An explain-it-like-I'm-five tour of Game Boy memory: cartridge banks, VRAM, OAM and WRAM.
+     <b style="color:var(--accent)">Click any colored box</b> — the panel at the bottom tells you what it is.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="lede">
+    <b>The 30-second version.</b> A Game Boy is a tiny computer with almost no memory. The big game lives
+    on the cartridge as <b>ROM</b> (read-only, can't change). But the CPU can only "see" a small window of it
+    at a time, so the cartridge swaps chunks in and out — those chunks are called <b>banks</b>.
+    The console's own scratch memory is split into special-purpose rooms: <b>VRAM</b> (the picture book of
+    tiles & colors), <b>OAM</b> (the list of moving sprites), and <b>WRAM</b> (variables & game state).
+    Everything below is real, measured from <em>this</em> build of the ROM.
+  </div>
+
+  <!-- ===================== LIVE BUDGETS ===================== -->
+  <h2><span class="num">①</span>The scoreboard <span class="hint">(real numbers from this build)</span></h2>
+  <p class="sub">How full is each memory area right now? Click a card for what it means and where the number comes from.</p>
+  <div class="budgets" id="budgets">
+    <div class="bcard" data-key="rom">
+      <div class="label">ROM (cartridge)</div>
+      <div class="val">512 <small style="font-size:14px">KB</small></div>
+      <div class="bar"><i style="width:100%;background:var(--accent)"></i></div>
+      <span class="tag pass">32 / 32 banks declared</span>
+    </div>
+    <div class="bcard" data-key="wram">
+      <div class="label">WRAM (work RAM)</div>
+      <div class="val">1,205 <small style="font-size:14px">/ 8,192 B</small></div>
+      <div class="bar"><i style="width:14%;background:var(--green)"></i></div>
+      <span class="tag pass">14% · PASS</span>
+    </div>
+    <div class="bcard" data-key="vram">
+      <div class="label">VRAM (tiles)</div>
+      <div class="val">74 <small style="font-size:14px">/ 384 tiles</small></div>
+      <div class="bar"><i style="width:19%;background:var(--green)"></i></div>
+      <span class="tag pass">19% · PASS</span>
+    </div>
+    <div class="bcard" data-key="oam">
+      <div class="label">OAM (busiest scene)</div>
+      <div class="val">32 <small style="font-size:14px">/ 40 slots</small></div>
+      <div class="bar"><i style="width:80%;background:var(--amber)"></i></div>
+      <span class="tag warn">80% · ⚠ WARN</span>
+    </div>
+  </div>
+
+  <!-- ===================== MEMORY MAP ===================== -->
+  <h2><span class="num">②</span>The whole memory map <span class="hint">(what the CPU sees)</span></h2>
+  <p class="sub">The CPU has 65,536 addresses (0x0000–0xFFFF). Each stripe below is a "room" with a fixed job.
+     Click a stripe to learn what lives there.</p>
+  <div class="memmap" id="memmap">
+    <div class="region r-rom0" data-key="rom0"><span>ROM Bank 0 — always loaded (HOME)</span><span class="addr">0000–3FFF</span></div>
+    <div class="region r-romx" data-key="romx"><span>ROM Bank 1–31 — swappable window</span><span class="addr">4000–7FFF</span></div>
+    <div class="region r-vram" data-key="vram"><span>VRAM — tiles &amp; maps (the picture book)</span><span class="addr">8000–9FFF</span></div>
+    <div class="region r-sram" data-key="sram"><span>Cartridge RAM — save data (unused here)</span><span class="addr">A000–BFFF</span></div>
+    <div class="region r-wram" data-key="wram"><span>WRAM — variables &amp; game state</span><span class="addr">C000–DFFF</span></div>
+    <div class="region r-echo" data-key="echo"><span>Echo RAM — mirror, don't touch</span><span class="addr">E000–FDFF</span></div>
+    <div class="region r-oam" data-key="oam"><span>OAM — the 40-sprite list</span><span class="addr">FE00–FE9F</span></div>
+    <div class="region r-io" data-key="io"><span>I/O Registers — knobs &amp; dials</span><span class="addr">FF00–FF7F</span></div>
+    <div class="region r-hram" data-key="hram"><span>HRAM — tiny ultra-fast scratchpad</span><span class="addr">FF80–FFFE</span></div>
+  </div>
+
+  <!-- ===================== BANKS ===================== -->
+  <h2><span class="num">③</span>The cartridge banks <span class="hint">(why we don't run out of room)</span></h2>
+  <p class="sub">The swappable window (orange stripe above) is only 16&nbsp;KB. But the cart holds 512&nbsp;KB.
+     So the game is sliced into <b>32 banks</b> of 16&nbsp;KB each, and the cart swaps one into the window when needed.
+     <b>Bank 0 is special</b> — it's <em>always</em> visible, so the most important code lives there.
+     Click any bank.</p>
+  <div class="legend">
+    <span><i class="bk-home"></i> Bank 0 — HOME (always mapped)</span>
+    <span><i class="bk-auto"></i> Auto-banked (compiler assigns)</span>
+    <span><i class="bk-music"></i> Bank 31 — music data (pinned)</span>
+  </div>
+  <div class="bankgrid" id="bankgrid"></div>
+
+  <!-- ===================== VRAM ===================== -->
+  <h2><span class="num">④</span>VRAM — the picture book <span class="hint">(tiles)</span></h2>
+  <p class="sub">The Game Boy can't draw free-form pixels. It draws <b>8×8 tiles</b> — like LEGO bricks.
+     VRAM stores up to <b>384 tile pictures</b> (192 per color bank × 2 on the GBC).
+     Backgrounds and the HUD all share one strip. Click a section.</p>
+  <div class="tilestrip" id="tilestrip">
+    <div class="tilecell t-font" data-key="t-font" style="flex:128">0–127<br>font</div>
+    <div class="tilecell t-hud" data-key="t-hud" style="flex:15">128–142<br>HUD</div>
+    <div class="tilecell t-pool" data-key="t-pool" style="flex:112">143–254<br>game pool</div>
+    <div class="tilecell t-free" data-key="t-free" style="flex:129">255+ free</div>
+  </div>
+  <p class="hint" style="margin-top:8px">Widths are roughly to scale across the 384-tile budget. "Sprites" use the same tile memory as backgrounds.</p>
+
+  <!-- ===================== OAM ===================== -->
+  <h2><span class="num">⑤</span>OAM — the moving things <span class="hint">(per scene!)</span></h2>
+  <p class="sub">A <b>sprite</b> is a tile that moves freely (your car, bullets, enemies). The hardware allows
+     exactly <b>40</b> sprite slots — no more, ever. But here's the trick: <b>every scene reuses the same pool.</b>
+     When the game changes scene it wipes the sprite list and refills it, so only <em>one</em> scene's sprites
+     are ever on screen. The budget that matters is the <b>busiest single scene</b> — not the whole game added up.</p>
+  <div class="mythbuster">
+    <b>Myth-buster:</b> the old "35/40" was a build-time worst-case <em>sum</em>. Real OAM is per-scene,
+    and the only scene that gets close to the wall is <b>Playing</b> (32/40). Pick a scene below and watch
+    the 40 slots fill differently.
+  </div>
+  <div class="scenebtns" id="scenebtns"></div>
+  <div class="scene-readout" id="sceneReadout"></div>
+  <div class="legend" id="oamLegend"></div>
+  <div class="oamgrid" id="oamgrid"></div>
+
+  <!-- ===================== DETAIL PANEL ===================== -->
+  <div id="detail">
+    <p class="placeholder">👆 Click anything above — colored stripes, banks, tiles, sprite slots, or the scoreboard cards — and the explanation appears here.</p>
+  </div>
+
+</div>
+
+<footer>
+  Generated for Nuke Raider · figures measured from <code>build/nuke-raider.gb</code> (512&nbsp;KB, MBC5, CGB-compatible).<br>
+  Sources: <code>bank-manifest.json</code>, <code>src/config.h</code>, <code>tools/memory_check.py</code>.
+</footer>
+
+<script>
+/* ---------- detail content ---------- */
+const D = {
+  /* budgets */
+  rom:{t:"ROM — the cartridge chip",m:"512 KB · 32 banks · MBC5 mapper · -Wm-yt25 -Wm-yc",
+    h:"This is the game itself: all code, art, maps and music, burned in and read-only. It can never change while playing. Bigger games need more banks; we declared 32 (the max for this layout) and currently use all 512 KB of address space.",
+    a:"Like a printed book — every page is already there, you just can't write new pages while reading."},
+  wram:{t:"WRAM — work RAM",m:"1,205 / 8,192 bytes used (14%) · status PASS",
+    h:"The console's scratchpad for things that change every frame: your position, speed, HP, enemy arrays, the score. Measured from the s__HEAP_E symbol in the build map. We're using only 14% — lots of headroom.",
+    a:"Like a whiteboard you erase and rewrite constantly during play."},
+  vram:{t:"VRAM budget — tile pictures",m:"74 / 384 tiles used (19%) · status PASS",
+    h:"How many unique 8×8 tile images are loaded. Counted from every *_count value in src/*_tiles.c. 384 = 192 tiles × 2 GBC color banks. Plenty of room left.",
+    a:"Like a box of 384 unique LEGO bricks — you're only using 74 designs so far."},
+  oam:{t:"OAM budget — busiest scene",m:"32 / 40 slots (80%) · status ⚠ WARN · scene: Playing",
+    h:"The hardware hard-limits you to 40 moving sprites, period. Scenes are mutually exclusive and share one recycling pool, so the number that matters is the busiest single scene — Playing, at 32/40. The build's memory_check.py also cross-checks that the pool size (MAX_SPRITES=32) exactly matches this peak. This is the budget to watch.",
+    a:"Like a 40-seat theater that hosts one show at a time. The biggest show (Playing) seats 32; the others use far fewer. You only ever need the biggest show to fit."},
+
+  /* memory map */
+  rom0:{t:"ROM Bank 0 — HOME (0x0000–0x3FFF)",m:"Always visible · never swapped out",
+    h:"The 16 KB that's ALWAYS loaded. Anything that must work no matter which bank is swapped in lives here: the game entry/loop (main.c), the bank-switching dispatcher (state_manager.c), the VRAM loaders (loader.c), and audio (music.c, sfx.c) — because audio runs during interrupts and must never vanish mid-swap.",
+    a:"The lobby of a hotel — every floor changes, but the lobby is always there."},
+  romx:{t:"ROM Bank 1–31 — the swap window (0x4000–0x7FFF)",m:"16 KB window · one bank visible at a time",
+    h:"A 16 KB 'porthole' onto the rest of the cartridge. The MBC5 chip slides whichever bank you ask for into this window. Only bank-0 code is allowed to trigger a swap (via SWITCH_ROM), so a swap can't pull the rug out from under the code doing the swapping.",
+    a:"A single window with 31 interchangeable backdrops — you slide the one you need into view."},
+  sram:{t:"Cartridge RAM (0xA000–0xBFFF)",m:"Unused in Nuke Raider",
+    h:"Battery-backed save memory on the cart. Nuke Raider doesn't save progress, so this room sits empty.",
+    a:"A safe-deposit box we never rented."},
+  echo:{t:"Echo RAM (0xE000–0xFDFF)",m:"Hardware mirror of WRAM — do not use",
+    h:"The hardware mirrors WRAM here as a quirk. Nintendo says don't touch it. We don't.",
+    a:"A funhouse mirror of the whiteboard — looks real, but writing on it is asking for trouble."},
+  io:{t:"I/O Registers (0xFF00–0xFF7F)",m:"Hardware control knobs",
+    h:"Memory-mapped dials: which buttons are pressed, scroll position (SCX/SCY), sound channels, the LCD controller, interrupt flags. You change the hardware by writing to these addresses.",
+    a:"The control panel — flip a switch by writing a number to its address."},
+  hram:{t:"HRAM (0xFF80–0xFFFE)",m:"127 bytes · fastest memory",
+    h:"A tiny sliver of ultra-fast RAM the CPU can reach even during certain operations when other memory is locked. Used for the most timing-critical scratch values (and the DMA sprite-copy routine).",
+    a:"The sticky note on your hand — tiniest space, but instantly reachable."},
+
+  /* banks */
+  "bank-home":{t:"Bank 0 — HOME",m:"Always mapped · src/main.c, loader.c, music.c, sfx.c, state_manager.c, state_hub.c, state_overmap.c, hub_data.c",
+    h:"The always-on bank. Holds the game loop, the state dispatcher that performs every bank switch, the VRAM loaders, and the audio engine (audio runs in the VBlank interrupt and must never be swapped away). Files here have NO #pragma bank.",
+    a:"The hotel lobby — always there, holds the front desk and the elevator controls."},
+  "bank-music":{t:"Bank 31 — music data (pinned)",m:"src/music_data.c · ~11 KB · explicitly pinned",
+    h:"The song data is large (~11 KB) and is deliberately nailed to the last bank so it can never collide with growing game-data banks. Pinning = we chose its bank by hand instead of letting the compiler decide.",
+    a:"A reserved parking spot at the far end of the lot, so nobody else ever parks there."},
+  "bank-auto":{t:"Auto-banked pool (banks 1–30)",m:"~40 files · {\"bank\":255} = compiler assigns",
+    h:"Most of the game — gameplay modules (player, racer, turret, patrol, projectile, explosion…), sprite art, tilesets, track maps, and per-state screens — is marked 'autobank' (255). The linker packs them into whichever banks have room. The state dispatcher swaps the right one in before calling into it.",
+    a:"General parking — you don't pick a spot, the attendant fits each car wherever it lands."},
+
+  /* tiles */
+  "t-font":{t:"Tiles 0–127 — system font",m:"Loaded by GBDK at boot",
+    h:"The built-in ASCII font that printf() uses. It's written automatically when the game starts, occupying the first 128 tile slots.",
+    a:"The pre-printed alphabet stamps that come in the box."},
+  "t-hud":{t:"Tiles 128–142 — HUD font",m:"15 tiles · HUD_FONT_BASE in config.h",
+    h:"Custom digits and symbols (H, P, :, /, space, 0–9) for the heads-up display — HP and lap counters. Loaded by hud_init().",
+    a:"A custom rubber-stamp set just for the scoreboard."},
+  "t-pool":{t:"Tiles 143–254 — game tile pool",m:"loader-managed · LOADER_BG_START",
+    h:"The flexible pool the loader fills at runtime with whatever the current screen needs: track tiles, overmap tiles, NPC portraits, powerup icons. Reused as you move between screens.",
+    a:"A shared bin of LEGO bricks — dumped out and refilled depending on what you're building right now."},
+  "t-free":{t:"Tiles 255+ — free headroom",m:"unused budget",
+    h:"The remaining slots toward the 384-tile cap (192 per GBC color bank × 2). Room to grow.",
+    a:"Empty shelves in the brick cupboard."},
+
+  /* oam consumers (per-scene) */
+  "c-player":{t:"Player car — 4 slots",m:"4 get_sprite() calls in player_init",
+    h:"Your car is 16×16 = 4 hardware sprites. It grabs the first 4 pool slots when the race starts and keeps them for the whole race.",
+    a:"The lead actor — front row, reserved for the whole show."},
+  "c-projectiles":{t:"Projectiles — up to 8 slots",m:"MAX_PROJECTILES = 8",
+    h:"Bullets you fire. Each takes one pool slot on spawn and frees it when it expires or hits something.",
+    a:"Quick cameo actors — on stage for a second, then they free the seat."},
+  "c-turrets":{t:"Turrets / static enemies — up to 8 slots",m:"MAX_ENEMIES = 8",
+    h:"Stationary gun emplacements, one pool slot each. When a turret dies its slot becomes the explosion, then frees — no extra slot needed.",
+    a:"Sentries posted around the stage; when one falls, its seat becomes the smoke puff, then empties."},
+  "c-racers":{t:"Enemy racers — up to 8 slots",m:"MAX_ENEMY_RACERS (2) × 4 slots each",
+    h:"Rival cars, also 16×16 = 4 slots each, allocated lazily as they appear. Two enemy racers = 8 slots.",
+    a:"Two rival drivers, each needing four seats for their crew."},
+  "c-patrol":{t:"Patrol car — 4 slots",m:"MAX_PATROLS (1) × 4 slots",
+    h:"The mobile combat AI that chases you. One car, 16×16 = 4 slots.",
+    a:"A roaming heckler who takes four seats wherever it goes."},
+  "c-car":{t:"Overmap car — 1 slot",m:"slot 0 (overmap clears slots 1–39)",
+    h:"On the world map you're a single small sprite driving between hubs. Just one slot; everything else is background tiles.",
+    a:"A lone game piece sliding across the board."},
+  "c-dialog_arrow":{t:"Dialog arrow — 1 slot",m:"DIALOG_ARROW_OAM_SLOT (slot 4)",
+    h:"The 'more text' indicator in hub conversations. The only sprite in the hub — NPC portraits are background tiles, not sprites.",
+    a:"A single blinking 'continue' light on an otherwise still stage."},
+  "c-free":{t:"Free slot",m:"unused this scene",
+    h:"Empty in this scene. Because the pool is reused per scene, slots free here may be busy in another scene — only the busiest scene's peak counts against the 40 cap.",
+    a:"An empty seat for this particular show."},
+};
+
+/* ---------- build the bank grid (32 banks) ---------- */
+const bankgrid = document.getElementById('bankgrid');
+for(let i=0;i<32;i++){
+  const c=document.createElement('div');
+  c.className='bankcell';
+  let key,label;
+  if(i===0){c.classList.add('bk-home');key='bank-home';label='HOME';}
+  else if(i===31){c.classList.add('bk-music');key='bank-music';label='music';}
+  else{c.classList.add('bk-auto');key='bank-auto';label='auto';}
+  c.dataset.key=key;
+  c.innerHTML=`${i}<small>${label}</small>`;
+  bankgrid.appendChild(c);
+}
+
+/* ---------- OAM: per-scene model ----------
+   SOURCE OF TRUTH: tools/memory_check.py (SCENE_CONSUMERS); auto-synced by
+   tools/sync_scene_data.py on every `make`. Do NOT hand-edit between the markers. */
+/* SCENE_DATA:BEGIN */
+const SCENE_DATA = {
+  "budget": 40,
+  "pool": 32,
+  "worst_scene": "Playing",
+  "scenes": {
+    "Title": {
+      "peak": 0,
+      "consumers": []
+    },
+    "Overmap": {
+      "peak": 1,
+      "consumers": [
+        {
+          "label": "car",
+          "slots": 1
+        }
+      ]
+    },
+    "Hub": {
+      "peak": 1,
+      "consumers": [
+        {
+          "label": "dialog_arrow",
+          "slots": 1
+        }
+      ]
+    },
+    "Prerace": {
+      "peak": 0,
+      "consumers": []
+    },
+    "Playing": {
+      "peak": 32,
+      "consumers": [
+        {
+          "label": "player",
+          "slots": 4
+        },
+        {
+          "label": "projectiles",
+          "slots": 8
+        },
+        {
+          "label": "turrets",
+          "slots": 8
+        },
+        {
+          "label": "racers",
+          "slots": 8
+        },
+        {
+          "label": "patrol",
+          "slots": 4
+        }
+      ]
+    },
+    "Results": {
+      "peak": 0,
+      "consumers": []
+    },
+    "GameOver": {
+      "peak": 0,
+      "consumers": []
+    }
+  }
+};
+/* SCENE_DATA:END */
+
+const CONSUMER_COLOR={player:'#7ee787',projectiles:'#58a6ff',turrets:'#ff7b72',
+  racers:'#bc8cff',patrol:'#ffa657',car:'#39c5cf',dialog_arrow:'#f0883e'};
+const CONSUMER_LABEL={player:'Player',projectiles:'Bullets',turrets:'Turrets',
+  racers:'Racers',patrol:'Patrol',car:'Car',dialog_arrow:'Dialog arrow'};
+const FREE_COLOR='#30363d';
+
+const oamgrid=document.getElementById('oamgrid');
+const sceneReadout=document.getElementById('sceneReadout');
+const oamLegend=document.getElementById('oamLegend');
+const scenebtns=document.getElementById('scenebtns');
+
+function utilStatus(peak){const f=peak/SCENE_DATA.budget;return f>=1?'fail':f>=0.8?'warn':'pass';}
+
+function renderScene(name){
+  const sc=SCENE_DATA.scenes[name];
+  [...scenebtns.children].forEach(b=>b.classList.toggle('sel',b.dataset.scene===name));
+
+  /* legend */
+  oamLegend.innerHTML = sc.consumers.length
+    ? sc.consumers.map(c=>`<span><i style="background:${CONSUMER_COLOR[c.label]}"></i> ${CONSUMER_LABEL[c.label]||c.label} ×${c.slots}</span>`).join('')
+      + `<span><i style="background:${FREE_COLOR}"></i> Free ×${SCENE_DATA.budget-sc.peak}</span>`
+    : `<span><i style="background:${FREE_COLOR}"></i> No sprites — all ${SCENE_DATA.budget} slots free (text / background only)</span>`;
+
+  /* readout */
+  const st=utilStatus(sc.peak), pct=Math.round(sc.peak/SCENE_DATA.budget*100);
+  let cc='';
+  if(name===SCENE_DATA.worst_scene){
+    cc=` · cross-check vs pool MAX_SPRITES=${SCENE_DATA.pool}: `
+      +(sc.peak>SCENE_DATA.pool?'<span class="st-fail">FAIL</span>'
+        :sc.peak<SCENE_DATA.pool?'<span class="st-warn">WARN (over-provisioned)</span>'
+        :'<span class="st-pass">PASS (exact match)</span>');
+  }
+  sceneReadout.innerHTML=`<b>${name}</b> &nbsp; ${sc.peak} / ${SCENE_DATA.budget} slots (${pct}%) `
+    +`<span class="st-${st}">${st.toUpperCase()}</span>`
+    +(name===SCENE_DATA.worst_scene?' · busiest scene':'')+cc;
+
+  /* grid */
+  const fill=[];
+  sc.consumers.forEach(c=>{for(let k=0;k<c.slots;k++)fill.push(c.label);});
+  oamgrid.innerHTML='';
+  for(let i=0;i<SCENE_DATA.budget;i++){
+    const c=document.createElement('div');
+    c.className='oamcell';
+    const label=fill[i];
+    if(label){c.style.background=CONSUMER_COLOR[label];c.style.color='#0e1117';c.dataset.key='c-'+label;}
+    else{c.style.background=FREE_COLOR;c.style.color='#6e7681';c.dataset.key='c-free';}
+    c.textContent=i;
+    c.addEventListener('click',()=>show(c.dataset.key,c));
+    oamgrid.appendChild(c);
+  }
+}
+
+Object.keys(SCENE_DATA.scenes).forEach(name=>{
+  const b=document.createElement('button');
+  b.className='scenebtn'; b.dataset.scene=name;
+  b.innerHTML=`${name}<small>${SCENE_DATA.scenes[name].peak} slots</small>`;
+  b.addEventListener('click',()=>renderScene(name));
+  scenebtns.appendChild(b);
+});
+renderScene(SCENE_DATA.worst_scene);   /* default: the busiest scene (Playing) */
+
+/* ---------- click handling ---------- */
+const detail=document.getElementById('detail');
+let activeEl=null;
+function show(key,el){
+  const d=D[key];
+  if(!d)return;
+  if(activeEl)activeEl.classList.remove('active-el');
+  activeEl=el; el.classList.add('active-el');
+  detail.innerHTML=`
+    <h3>${d.t}</h3>
+    <div class="meta">${d.m}</div>
+    <p>${d.h}</p>
+    <div class="analogy"><b>🧠 Plain-English:</b> ${d.a}</div>`;
+  detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+/* OAM cells bind their own click in renderScene; bind everything else here. */
+document.querySelectorAll('[data-key]:not(.oamcell)').forEach(el=>{
+  el.addEventListener('click',()=>show(el.dataset.key,el));
+});
+</script>
+</body>
+</html>
