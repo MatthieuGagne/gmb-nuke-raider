@@ -88,6 +88,17 @@ void test_car_blast_gates_done(void) {
     TEST_ASSERT_TRUE(explosion_is_done());   /* car blast finished */
 }
 
+void test_racer_blast_does_not_gate_done(void) {
+    explosion_init(T_BASE, C_BASE);
+    /* Racer-kind car blast must animate but NOT make explosion_is_done() false. */
+    explosion_spawn(0u, C_BASE, 0u,                          EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(2u, C_BASE, S_FLIPX,                     EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(1u, C_BASE, S_FLIPY,                     EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(3u, C_BASE, (uint8_t)(S_FLIPX|S_FLIPY),  EXPLOSION_KIND_RACER, 0u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(4u, explosion_active_count());  /* 4 blasts active */
+    TEST_ASSERT_TRUE(explosion_is_done());                  /* but game-over gate stays clear */
+}
+
 /* ── pool capacity ─────────────────────────────────────────────────────── */
 
 void test_pool_full_drops_extra(void) {
@@ -107,6 +118,7 @@ int main(void) {
     RUN_TEST(test_completes_and_frees_oam_after_120_ticks);
     RUN_TEST(test_two_explosions_independent_frames);
     RUN_TEST(test_car_blast_gates_done);
+    RUN_TEST(test_racer_blast_does_not_gate_done);
     RUN_TEST(test_pool_full_drops_extra);
     return UNITY_END();
 }

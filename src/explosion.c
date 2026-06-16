@@ -38,7 +38,7 @@ void explosion_spawn(uint8_t oam, uint8_t tile_base, uint8_t flip, uint8_t is_ca
             exp_car[i]    = is_car;
             exp_wx[i]     = wx;
             exp_wty[i]    = wty;
-            if (is_car) s_car_active++;
+            if (is_car == EXPLOSION_KIND_PLAYER) s_car_active++;
             return;
         }
     }
@@ -54,7 +54,7 @@ void explosion_update(void) BANKED {
             exp_frame[i]++;
             if (exp_frame[i] >= EXPLOSION_NUM_FRAMES) {
                 exp_active[i] = 0u;
-                if (exp_car[i] && s_car_active) s_car_active--;
+                if (exp_car[i] == EXPLOSION_KIND_PLAYER && s_car_active) s_car_active--;
                 clear_sprite(exp_oam[i]);
             }
         }
