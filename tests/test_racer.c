@@ -425,6 +425,12 @@ void test_racer_hit_flash_initialized_to_zero(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hit_flash_for_test(1u));
 }
 
+void test_racer_not_dying_after_init(void) {
+    /* racer_init_empty() called in setUp; no racer is dying yet. */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_is_dying_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_death_timer_for_test(1u));
+}
+
 void test_racer_bullet_hit_reduces_hp(void) {
     /* cam_y=0 (setUp). Racer at world (32,32).
      * Screen-space OAM center = (32+16, 32+24) = (48, 56).
@@ -688,6 +694,7 @@ int main(void) {
     RUN_TEST(test_racer_overlaps_player_when_inactive);
     RUN_TEST(test_racer_hp_initialized_to_racer_hp);
     RUN_TEST(test_racer_hit_flash_initialized_to_zero);
+    RUN_TEST(test_racer_not_dying_after_init);
     RUN_TEST(test_racer_bullet_hit_reduces_hp);
     RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
     RUN_TEST(test_racer_dead_does_not_trigger_game_over);

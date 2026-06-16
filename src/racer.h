@@ -38,6 +38,9 @@ uint8_t racer_get_hp_for_test(uint8_t slot);
 void    racer_set_hp_for_test(uint8_t slot, uint8_t hp);
 uint8_t racer_get_hit_flash_for_test(uint8_t slot);
 void    racer_set_dir_for_test(uint8_t slot, uint8_t dir);
+uint8_t racer_is_dying_for_test(uint8_t slot);
+uint8_t racer_get_death_timer_for_test(uint8_t slot);
+void    racer_set_oam_for_test(uint8_t slot, uint8_t h0, uint8_t h1, uint8_t h2, uint8_t h3);
 #endif
 
 #endif /* RACER_H */

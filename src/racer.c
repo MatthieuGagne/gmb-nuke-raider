@@ -13,6 +13,7 @@
 #include "projectile.h"
 #include "enemy_common.h"  /* enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
 #include "vehicle_physics.h"  /* shared terrain physics + slide collision */
+#include "explosion.h"        /* car-blast spawn on death (#411) */
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -30,6 +31,8 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+static uint8_t  racer_dying[MAX_RACERS];       /* 1 = playing death blast, frozen */
+static uint8_t  racer_death_timer[MAX_RACERS]; /* counts down RACER_DEATH_TICKS while dying */
 static uint8_t  racer_finish_armed[MAX_RACERS];
 /* ---- Track-level data ---- */
 /* Per-enemy waypoint arrays: enemy slot i (i>=1) maps to index (i-1). */
@@ -168,6 +171,8 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_dying[i]        = 0u;
+        racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
         /* Lazy OAM: inactive slots hold the sentinel; handles are claimed below
          * only when the slot becomes active. Reclaims all 12 slots on Track 1. */
@@ -226,6 +231,8 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_dying[i]        = 0u;
+        racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
     }
     for (i = 0u; i < MAX_ENEMY_RACERS; i++) {
@@ -555,6 +562,8 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     racer_downshift_timer[1] = 0u;
     racer_hp[1]        = (uint8_t)RACER_HP;
     racer_hit_flash[1] = 0u;
+    racer_dying[1]       = 0u;
+    racer_death_timer[1] = 0u;
     race_state_init(lap_total);
     race_state_set_active(1u, 1u);
 }
@@ -597,6 +606,14 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
 uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
 void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
 uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
+uint8_t racer_is_dying_for_test(uint8_t slot)        { return racer_dying[slot]; }
+uint8_t racer_get_death_timer_for_test(uint8_t slot) { return racer_death_timer[slot]; }
+void    racer_set_oam_for_test(uint8_t slot, uint8_t h0, uint8_t h1, uint8_t h2, uint8_t h3) {
+    racer_oam[slot * 4u + 0u] = h0;
+    racer_oam[slot * 4u + 1u] = h1;
+    racer_oam[slot * 4u + 2u] = h2;
+    racer_oam[slot * 4u + 3u] = h3;
+}
 
 void racer_set_dir_for_test(uint8_t slot, uint8_t dir) { racer_dir[slot] = dir; }
 
