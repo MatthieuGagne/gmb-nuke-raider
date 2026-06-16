@@ -20,6 +20,11 @@ void test_explosion_init_empty(void) {
     TEST_ASSERT_TRUE(explosion_is_done());   /* no car blast => done */
 }
 
+void test_car_base_returns_init_value(void) {
+    explosion_init(T_BASE, C_BASE);
+    TEST_ASSERT_EQUAL_UINT8(C_BASE, explosion_car_base());
+}
+
 /* ── spawn + render ────────────────────────────────────────────────────── */
 
 void test_turret_spawn_starts_frame0(void) {
@@ -96,6 +101,7 @@ void test_pool_full_drops_extra(void) {
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_explosion_init_empty);
+    RUN_TEST(test_car_base_returns_init_value);
     RUN_TEST(test_turret_spawn_starts_frame0);
     RUN_TEST(test_frame_advances_every_40_ticks);
     RUN_TEST(test_completes_and_frees_oam_after_120_ticks);
