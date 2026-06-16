@@ -270,6 +270,18 @@ uint8_t racer_update(void) BANKED {
         uint8_t raw_tile;
         TileType tile_type;
 
+        /* Dying: frozen while the death blast plays. No AI, physics, or finish
+         * detection. When the timer expires, drop fully inactive (#411). */
+        if (racer_dying[i]) {
+            if (racer_death_timer[i] != 0u) {
+                racer_death_timer[i]--;
+                if (racer_death_timer[i] == 0u) {
+                    racer_dying[i] = 0u;
+                }
+            }
+            continue;
+        }
+
         if (!racer_active[i]) continue;
 
         target_px = (int16_t)((uint16_t)s_wp_tx[i - 1u][racer_wp_idx[i]] * 8u + 4u);
