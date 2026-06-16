@@ -133,7 +133,11 @@
       "PowerShell($noi = Get-Content build/nuke-raider.noi; $banks = @{}; foreach \\($line in $noi\\) { if \\($line -match '^DEF\\\\s+\\\\S'\\) {} }; Write-Output \"=== Sample of .noi \\(DEF lines with addresses\\) ===\"; $noi | Select-String '^DEF' | Select-Object -First 5; Write-Output \"=== Searching map for Area/bank summary ===\"; Select-String -Path build/nuke-raider.map -Pattern '_CODE_|ROM bank|_HOME|HEADER' | Select-Object -First 30 | ForEach-Object { $_.Line })",
       "PowerShell(Start-Process \"docs/memory-explained.html\")",
       "PowerShell(Copy-Item *)",
-      "PowerShell(python -m pytest tests/test_memory_check.py -q 2>&1 | Select-Object -Last 15)"
+      "PowerShell(python -m pytest tests/test_memory_check.py -q 2>&1 | Select-Object -Last 15)",
+      "PowerShell(git fetch *)",
+      "PowerShell(gh pr list --state open --json number,title,headRefName)",
+      "PowerShell(gh issue list --state open --limit 40 --json number,title,labels | ConvertFrom-Json | Sort-Object number | ForEach-Object { \"#$\\($_.number\\) [$\\($_.labels.name -join ','\\)] $\\($_.title\\)\" })",
+      "PowerShell(gh pr list --state open --limit 20 --json number,title,headRefName | ConvertFrom-Json | ForEach-Object { \"#$\\($_.number\\) $\\($_.title\\) \\($\\($_.headRefName\\)\\)\" })"
     ]
   },
   "hooks": {
