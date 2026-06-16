@@ -55,7 +55,10 @@ void explosion_update(void) BANKED {
             if (exp_frame[i] >= EXPLOSION_NUM_FRAMES) {
                 exp_active[i] = 0u;
                 if (exp_car[i] == EXPLOSION_KIND_PLAYER && s_car_active) s_car_active--;
-                clear_sprite(exp_oam[i]);
+                /* Racer-kind: the racer owns hiding its own slots (it keeps
+                 * positioning them while dying). Clearing here would flash
+                 * tile 0 for a frame. Turret/player blasts still self-clear. */
+                if (exp_car[i] != EXPLOSION_KIND_RACER) clear_sprite(exp_oam[i]);
             }
         }
     }

@@ -99,6 +99,16 @@ void test_racer_blast_does_not_gate_done(void) {
     TEST_ASSERT_TRUE(explosion_is_done());                  /* but game-over gate stays clear */
 }
 
+void test_racer_blast_skips_clear_sprite_on_done(void) {
+    uint8_t i;
+    explosion_init(T_BASE, C_BASE);
+    mock_move_sprite_reset();
+    explosion_spawn(5u, C_BASE, 0u, EXPLOSION_KIND_RACER, 0u, 0u);
+    for (i = 0u; i < 120u; i++) explosion_update();   /* run to completion */
+    TEST_ASSERT_EQUAL_UINT8(0, explosion_active_count());     /* pool entry freed */
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);    /* but NO clear_sprite */
+}
+
 /* ── pool capacity ─────────────────────────────────────────────────────── */
 
 void test_pool_full_drops_extra(void) {
@@ -119,6 +129,7 @@ int main(void) {
     RUN_TEST(test_two_explosions_independent_frames);
     RUN_TEST(test_car_blast_gates_done);
     RUN_TEST(test_racer_blast_does_not_gate_done);
+    RUN_TEST(test_racer_blast_skips_clear_sprite_on_done);
     RUN_TEST(test_pool_full_drops_extra);
     return UNITY_END();
 }
