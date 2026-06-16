@@ -7,6 +7,7 @@
 #include "player.h"    /* player_dir_t: DIR_T, DIR_B, etc. */
 #include "projectile.h"
 #include "sprite_pool.h"
+#include "explosion.h"
 
 extern int16_t cam_y;
 
@@ -465,6 +466,56 @@ void test_racer_destroyed_when_hp_reaches_zero(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_active[1]);
 }
 
+void test_racer_death_enters_dying_state(void) {
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    explosion_init(20u, 23u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();   /* lethal hit */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[1]);                 /* stops racing immediately */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_is_dying_for_test(1u));     /* now dying */
+    TEST_ASSERT_EQUAL_UINT8(RACER_DEATH_TICKS, racer_get_death_timer_for_test(1u));
+}
+
+void test_racer_death_spawns_four_car_blasts(void) {
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    explosion_init(20u, 23u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();   /* lethal hit */
+    TEST_ASSERT_EQUAL_UINT8(4u, explosion_active_count());   /* 4 quadrant car blasts */
+}
+
+void test_racer_death_does_not_gate_game_over(void) {
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    track_test_set_map(flat_map, 8u, 8u);
+    explosion_init(20u, 23u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();   /* lethal hit — racer blasts must NOT gate the player game-over */
+    TEST_ASSERT_TRUE(explosion_is_done());
+}
+
 void test_racer_dead_does_not_trigger_game_over(void) {
     /* Racer killed by bullet. Subsequent racer_update must return 0 (no game over). */
     static const uint8_t flat_map[8u * 8u] = {
@@ -697,6 +748,9 @@ int main(void) {
     RUN_TEST(test_racer_not_dying_after_init);
     RUN_TEST(test_racer_bullet_hit_reduces_hp);
     RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
+    RUN_TEST(test_racer_death_enters_dying_state);
+    RUN_TEST(test_racer_death_spawns_four_car_blasts);
+    RUN_TEST(test_racer_death_does_not_gate_game_over);
     RUN_TEST(test_racer_dead_does_not_trigger_game_over);
     RUN_TEST(test_racer_miss_does_not_reduce_hp);
     RUN_TEST(test_racer_get_cp_next_initial_zero);

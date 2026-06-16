@@ -405,7 +405,20 @@ uint8_t racer_update(void) BANKED {
                     racer_hp[i] = (uint8_t)(racer_hp[i] - 1u);
                     racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
                     if (racer_hp[i] == 0u) {
-                        racer_active[i] = 0u;
+                        /* Stop racing/colliding immediately; play the car blast
+                         * on this racer's own 4 OAM slots (#411). Quadrant flip
+                         * + slot order mirror player_kill() and racer_render():
+                         * slot0=TL, slot1=BL, slot2=TR, slot3=BR. */
+                        uint8_t base = explosion_car_base();
+                        racer_active[i]       = 0u;
+                        racer_dying[i]        = 1u;
+                        racer_death_timer[i]  = (uint8_t)RACER_DEATH_TICKS;
+                        racer_vx[i]           = (int8_t)0;
+                        racer_vy[i]           = (int8_t)0;
+                        explosion_spawn(racer_oam[i * 4u + 0u], base, 0u,                          EXPLOSION_KIND_RACER, 0u, 0u);
+                        explosion_spawn(racer_oam[i * 4u + 1u], base, S_FLIPY,                      EXPLOSION_KIND_RACER, 0u, 0u);
+                        explosion_spawn(racer_oam[i * 4u + 2u], base, S_FLIPX,                      EXPLOSION_KIND_RACER, 0u, 0u);
+                        explosion_spawn(racer_oam[i * 4u + 3u], base, (uint8_t)(S_FLIPX | S_FLIPY), EXPLOSION_KIND_RACER, 0u, 0u);
                     }
                 }
             }
