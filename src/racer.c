@@ -454,6 +454,28 @@ void racer_render(void) BANKED {
             continue;
         }
 
+        /* Dying: keep the 4 slots positioned at the frozen world pos so the
+         * car blast tracks the scrolling camera. explosion_render owns the
+         * tiles/props; here we only position (off-screen aware) (#411). */
+        if (racer_dying[i]) {
+            scr_x = racer_px[i] + 8;
+            scr_y = racer_py[i] - cam_y + 16;
+            if (scr_x < 0 || scr_x >= 168 || scr_y < 0 || scr_y >= 160) {
+                move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
+                move_sprite(racer_oam[i * 4u + 1u], 0u, 0u);
+                move_sprite(racer_oam[i * 4u + 2u], 0u, 0u);
+                move_sprite(racer_oam[i * 4u + 3u], 0u, 0u);
+            } else {
+                hw_x = (uint8_t)scr_x;
+                hw_y = (uint8_t)scr_y;
+                move_sprite(racer_oam[i * 4u + 0u], hw_x,                 hw_y);
+                move_sprite(racer_oam[i * 4u + 1u], hw_x,                 (uint8_t)(hw_y + 8u));
+                move_sprite(racer_oam[i * 4u + 2u], (uint8_t)(hw_x + 8u), hw_y);
+                move_sprite(racer_oam[i * 4u + 3u], (uint8_t)(hw_x + 8u), (uint8_t)(hw_y + 8u));
+            }
+            continue;
+        }
+
         if (!racer_active[i]) {
             move_sprite(racer_oam[i * 4u + 0u], 0u, 0u);
             move_sprite(racer_oam[i * 4u + 1u], 0u, 0u);
