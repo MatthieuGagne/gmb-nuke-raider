@@ -7,8 +7,8 @@
           {
             "type": "command",
             "if": "Bash(git commit*)",
-            "command": "bash -c \"ROOT=$(git rev-parse --show-toplevel) && make -C \\\"$ROOT\\\" clean && make -C \\\"$ROOT\\\"\"",
-            "timeout": 120,
+            "command": "powershell -NoProfile -Command \"$r = git rev-parse --show-toplevel; $env:GBDK_HOME='C:/gbdk'; $env:PATH='C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\usr\\bin;' + $env:PATH; Set-Location $r; make clean; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; make; exit $LASTEXITCODE\"",
+            "timeout": 300,
             "statusMessage": "Pre-commit build gate: clean build..."
           }
         ]
