@@ -137,6 +137,11 @@
 #define EXPLOSION_NUM_FRAMES   3u  /* frames in the explosion sprite sheet */
 #define EXPLOSION_FRAME_TICKS 40u  /* ticks per frame (~0.67 s total at 60 fps) */
 
+/* Racer death blast: dying racer holds its 4 OAM slots for the full car-blast
+ * length so the 16x16 explosion (#411) plays out before the slot is freed.
+ * Equals the explosion lifetime: EXPLOSION_NUM_FRAMES * EXPLOSION_FRAME_TICKS = 120 ticks (~2 s). */
+#define RACER_DEATH_TICKS     (EXPLOSION_NUM_FRAMES * EXPLOSION_FRAME_TICKS)
+
 /* Enemy pool */
 /* Turret sprite: slot assigned at runtime via loader_get_slot(TILE_ASSET_TURRET). */
 #define MAX_ENEMIES           8u
