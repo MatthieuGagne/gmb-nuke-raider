@@ -19,6 +19,10 @@ uint8_t racer_get_wp_tx(uint8_t slot, uint8_t idx) BANKED;
 uint8_t racer_get_wp_ty(uint8_t slot, uint8_t idx) BANKED;
 uint8_t racer_blocks_pixel(int16_t wx, int16_t wy) BANKED;
 uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED;
+/* If any active racer overlaps the player AABB, applies RACER_RAM_DAMAGE and
+ * returns 1 (caller plays SFX). Returns 0 on no overlap. Dying racers (active=0)
+ * are excluded via the shared racer_overlaps_player predicate (#412). */
+uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED;
 
 #ifndef __SDCC
 void    racer_spawn_for_test(int16_t px, int16_t py,

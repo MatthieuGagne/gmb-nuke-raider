@@ -8,6 +8,7 @@
 #include "projectile.h"
 #include "sprite_pool.h"
 #include "explosion.h"
+#include "damage.h"     /* damage_init, damage_apply, damage_get_hp (#412) */
 
 extern int16_t cam_y;
 
@@ -417,6 +418,34 @@ void test_racer_overlaps_player_when_inactive(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_overlaps_player(32, 32));
 }
 
+/* ---- racer_apply_contact_damage (#412) ---- */
+
+void test_racer_contact_damage_drains_player_hp(void) {
+    /* Active racer at (32,32), player overlapping at (40,40): contact deals
+     * RACER_RAM_DAMAGE to the player and reports that it hit. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();                       /* player HP = PLAYER_MAX_HP, i-frames clear */
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(40, 40));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PLAYER_MAX_HP - RACER_RAM_DAMAGE), damage_get_hp());
+}
+
+void test_racer_dying_deals_no_contact_damage(void) {
+    /* A racer killed this frame is frozen mid-explosion (dying, active=0).
+     * It must NOT deal contact damage even while the player overlaps it (#411 x #412). */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();                      /* lethal hit -> dying, active=0 */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_is_dying_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_apply_contact_damage(40, 40));  /* no hit reported */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)PLAYER_MAX_HP, damage_get_hp()); /* HP untouched */
+}
+
 void test_racer_hp_initialized_to_racer_hp(void) {
     /* racer_init_empty() called in setUp; HP must equal RACER_HP (check enemy slot 1) */
     TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
@@ -812,6 +841,8 @@ int main(void) {
     RUN_TEST(test_racer_overlaps_player_when_overlapping);
     RUN_TEST(test_racer_overlaps_player_when_adjacent);
     RUN_TEST(test_racer_overlaps_player_when_inactive);
+    RUN_TEST(test_racer_contact_damage_drains_player_hp);
+    RUN_TEST(test_racer_dying_deals_no_contact_damage);
     RUN_TEST(test_racer_hp_initialized_to_racer_hp);
     RUN_TEST(test_racer_hit_flash_initialized_to_zero);
     RUN_TEST(test_racer_not_dying_after_init);
