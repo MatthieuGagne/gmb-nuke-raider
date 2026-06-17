@@ -167,6 +167,18 @@ void test_bullet_hit_decrements_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(PATROL_HP - 1u, patrol_get_hp(0u));
 }
 
+void test_bullet_hit_sets_hit_flash(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_mode_for_test(0u, PATROL_MODE_PATROL);
+    patrol_set_hp_for_test(0u, 3u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    patrol_update(0, 0);
+    TEST_ASSERT_EQUAL_UINT8(1u, patrol_is_active(0u));
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, patrol_get_hit_flash_for_test(0u));
+}
+
 void test_fatal_hit_destroys_and_deactivates(void) {
     static uint8_t wtx[1] = {11u};
     static uint8_t wty[1] = {4u};
@@ -194,6 +206,7 @@ int main(void) {
     RUN_TEST(test_ram_contact_damages_player);
     RUN_TEST(test_destroyed_patrol_deals_no_contact_damage);
     RUN_TEST(test_bullet_hit_decrements_hp);
+    RUN_TEST(test_bullet_hit_sets_hit_flash);
     RUN_TEST(test_fatal_hit_destroys_and_deactivates);
     return UNITY_END();
 }

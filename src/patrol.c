@@ -23,6 +23,7 @@ static int8_t  patrol_vy[MAX_PATROLS];
 static uint8_t patrol_dir[MAX_PATROLS];
 static uint8_t patrol_mode[MAX_PATROLS];
 static uint8_t patrol_hp[MAX_PATROLS];
+static uint8_t patrol_hit_flash[MAX_PATROLS];   /* hit-blink countdown (#417) */
 static uint8_t patrol_active[MAX_PATROLS];
 static uint8_t patrol_timer[MAX_PATROLS];   /* fire-cadence countdown */
 static uint8_t patrol_wp_idx[MAX_PATROLS];
@@ -84,6 +85,7 @@ void patrol_init(uint8_t tile_base) BANKED {
     for (i = 0u; i < MAX_PATROLS; i++) {
         patrol_active[i] = 0u;
         patrol_wp_count[i] = 0u;
+        patrol_hit_flash[i] = 0u;
         patrol_oam[i * 4u + 0u] = get_sprite();
         patrol_oam[i * 4u + 1u] = get_sprite();
         patrol_oam[i * 4u + 2u] = get_sprite();
@@ -129,6 +131,7 @@ void patrol_init_empty(void) BANKED {
     for (i = 0u; i < MAX_PATROLS; i++) {
         patrol_active[i] = 0u;
         patrol_wp_count[i] = 0u;
+        patrol_hit_flash[i] = 0u;
     }
 }
 
@@ -172,6 +175,11 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         TileType tt;
 
         if (!patrol_active[i]) continue;
+
+        /* Hit-flash timer tick (#417) */
+        if (patrol_hit_flash[i] > 0u) {
+            patrol_hit_flash[i] = (uint8_t)(patrol_hit_flash[i] - 1u);
+        }
 
         /* --- FSM: choose mode from player delta (Manhattan hysteresis) --- */
         dx16 = px - patrol_px[i];
@@ -279,6 +287,7 @@ void patrol_update(int16_t px, int16_t py) BANKED {
                             patrol_destroy(i);
                             continue;
                         }
+                        patrol_hit_flash[i] = (uint8_t)PATROL_HIT_FLASH_FRAMES; /* non-lethal blink (#417) */
                     }
                 }
                 /* Fire: CHASE + within fire radius + cadence */
@@ -341,6 +350,15 @@ void patrol_render(void) BANKED {
         hw_y = (uint8_t)scr_y;
         d    = patrol_dir[i];
 
+        /* Hit flash — hide sprite on odd 2-frame intervals (#417, mirrors racer) */
+        if (patrol_hit_flash[i] & 2u) {
+            move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+            continue;
+        }
+
         set_sprite_tile(patrol_oam[i * 4u + 0u], s_tile_base + PATROL_TILE_TL[d]);
         set_sprite_tile(patrol_oam[i * 4u + 1u], s_tile_base + PATROL_TILE_BL[d]);
         set_sprite_tile(patrol_oam[i * 4u + 2u], s_tile_base + PATROL_TILE_TR[d]);
@@ -372,6 +390,7 @@ void patrol_render(void) BANKED {
 #ifndef __SDCC
 uint8_t patrol_get_state(uint8_t i)  { return patrol_mode[i]; }
 uint8_t patrol_get_hp(uint8_t i)     { return patrol_hp[i]; }
+uint8_t patrol_get_hit_flash_for_test(uint8_t i) { return patrol_hit_flash[i]; }
 int16_t patrol_get_px(uint8_t i)     { return patrol_px[i]; }
 int16_t patrol_get_py(uint8_t i)     { return patrol_py[i]; }
 uint8_t patrol_get_wp_idx(uint8_t i) { return patrol_wp_idx[i]; }

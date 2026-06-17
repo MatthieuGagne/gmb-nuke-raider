@@ -109,6 +109,7 @@
 #define PATROL_FIRE_RADIUS   64u  /* Manhattan dist within which a chasing patrol fires */
 #define PATROL_WP_THRESHOLD  12u  /* Manhattan advance threshold for route waypoints */
 #define PATROL_FIRE_INTERVAL 45u  /* frames between shots (== TURRET_FIRE_INTERVAL) */
+#define PATROL_HIT_FLASH_FRAMES  RACER_HIT_FLASH_FRAMES /* frames of hit-blink per hit (#417) */
 
 /* FSM modes — uint8_t #defines, NOT a C enum (SDCC widens enums to 16-bit). */
 #define PATROL_MODE_PATROL   0u

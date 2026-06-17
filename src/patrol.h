@@ -35,6 +35,7 @@ uint8_t patrol_fsm_next(uint8_t mode, int16_t dx, int16_t dy) BANKED;
 #ifndef __SDCC
 uint8_t patrol_get_state(uint8_t i);
 uint8_t patrol_get_hp(uint8_t i);
+uint8_t patrol_get_hit_flash_for_test(uint8_t i);
 int16_t patrol_get_px(uint8_t i);
 int16_t patrol_get_py(uint8_t i);
 uint8_t patrol_get_wp_idx(uint8_t i);
