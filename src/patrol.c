@@ -149,6 +149,16 @@ uint8_t patrol_count_active(void) BANKED {
     return c;
 }
 
+/* Destroy a patrol: deactivate and park its 4 OAM slots off-screen. Shared by
+ * the bullet-hit and ram-hit (#417) lethal paths. Caller should `continue`. */
+static void patrol_destroy(uint8_t i) {
+    patrol_active[i] = 0u;
+    move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+}
+
 void patrol_update(int16_t px, int16_t py) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_PATROLS; i++) {
@@ -266,11 +276,7 @@ void patrol_update(int16_t px, int16_t py) BANKED {
                                                    (uint8_t)PATROL_HIT_RADIUS)) {
                         patrol_hp[i]--;
                         if (patrol_hp[i] == 0u) {
-                            patrol_active[i] = 0u;
-                            move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+                            patrol_destroy(i);
                             continue;
                         }
                     }
