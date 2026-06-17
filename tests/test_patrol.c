@@ -137,6 +137,53 @@ void test_ram_contact_damages_player(void) {
     TEST_ASSERT_TRUE(damage_get_hp() < PLAYER_MAX_HP);
 }
 
+void test_ram_decrements_patrol_hp(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, (uint8_t)PATROL_HP);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ENEMY_RAM_COOLDOWN, patrol_get_ram_cooldown_for_test(0u));
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, patrol_get_hit_flash_for_test(0u));
+}
+
+void test_ram_debounced_by_cooldown(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, (uint8_t)PATROL_HP);
+    patrol_update(40, 32);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+    patrol_set_ram_cooldown_for_test(0u, 0u);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - 2u * ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
+void test_ram_to_zero_hp_destroys_patrol(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, (uint8_t)ENEMY_RAM_DAMAGE);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8(0u, patrol_is_active(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, patrol_count_active());
+}
+
+void test_ram_still_damages_player_mutually(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, (uint8_t)PATROL_HP);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PLAYER_MAX_HP - RACER_RAM_DAMAGE), damage_get_hp());
+}
+
 void test_destroyed_patrol_deals_no_contact_damage(void) {
     /* A destroyed patrol (active=0) is skipped by patrol_update's pool guard,
      * so it must not ram the player even when their boxes overlap (#412). */
@@ -204,6 +251,10 @@ int main(void) {
     RUN_TEST(test_no_fire_when_off_screen);
     RUN_TEST(test_fires_when_on_screen_chasing_in_range);
     RUN_TEST(test_ram_contact_damages_player);
+    RUN_TEST(test_ram_decrements_patrol_hp);
+    RUN_TEST(test_ram_debounced_by_cooldown);
+    RUN_TEST(test_ram_to_zero_hp_destroys_patrol);
+    RUN_TEST(test_ram_still_damages_player_mutually);
     RUN_TEST(test_destroyed_patrol_deals_no_contact_damage);
     RUN_TEST(test_bullet_hit_decrements_hp);
     RUN_TEST(test_bullet_hit_sets_hit_flash);

@@ -24,6 +24,7 @@ static uint8_t patrol_dir[MAX_PATROLS];
 static uint8_t patrol_mode[MAX_PATROLS];
 static uint8_t patrol_hp[MAX_PATROLS];
 static uint8_t patrol_hit_flash[MAX_PATROLS];   /* hit-blink countdown (#417) */
+static uint8_t patrol_ram_cooldown[MAX_PATROLS]; /* per-patrol ram-damage debounce (#417) */
 static uint8_t patrol_active[MAX_PATROLS];
 static uint8_t patrol_timer[MAX_PATROLS];   /* fire-cadence countdown */
 static uint8_t patrol_wp_idx[MAX_PATROLS];
@@ -86,6 +87,7 @@ void patrol_init(uint8_t tile_base) BANKED {
         patrol_active[i] = 0u;
         patrol_wp_count[i] = 0u;
         patrol_hit_flash[i] = 0u;
+        patrol_ram_cooldown[i] = 0u;
         patrol_oam[i * 4u + 0u] = get_sprite();
         patrol_oam[i * 4u + 1u] = get_sprite();
         patrol_oam[i * 4u + 2u] = get_sprite();
@@ -132,6 +134,7 @@ void patrol_init_empty(void) BANKED {
         patrol_active[i] = 0u;
         patrol_wp_count[i] = 0u;
         patrol_hit_flash[i] = 0u;
+        patrol_ram_cooldown[i] = 0u;
     }
 }
 
@@ -179,6 +182,11 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         /* Hit-flash timer tick (#417) */
         if (patrol_hit_flash[i] > 0u) {
             patrol_hit_flash[i] = (uint8_t)(patrol_hit_flash[i] - 1u);
+        }
+
+        /* Ram cooldown tick (#417) */
+        if (patrol_ram_cooldown[i] > 0u) {
+            patrol_ram_cooldown[i] = (uint8_t)(patrol_ram_cooldown[i] - 1u);
         }
 
         /* --- FSM: choose mode from player delta (Manhattan hysteresis) --- */
@@ -258,13 +266,25 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             }
         }
 
-        /* --- Ram contact: car-vs-car 16x16 overlap deals contact damage.
-         * damage.c i-frames (DAMAGE_INVINCIBILITY_FRAMES) rate-limit it. --- */
+        /* --- Ram contact: car-vs-car 16x16 overlap. Player side is i-frame
+         * debounced in damage.c (#412); enemy side uses a per-patrol ram
+         * cooldown and routes 0 HP through the shared death path (#417). --- */
         {
             int16_t rdx = px - patrol_px[i];
             int16_t rdy = py - patrol_py[i];
             if (rdx > -16 && rdx < 16 && rdy > -16 && rdy < 16) {
-                damage_apply(RACER_RAM_DAMAGE);
+                damage_apply(RACER_RAM_DAMAGE);          /* player side (#412) */
+                if (patrol_ram_cooldown[i] == 0u) {      /* enemy side (#417) */
+                    patrol_ram_cooldown[i] = (uint8_t)ENEMY_RAM_COOLDOWN;
+                    patrol_hit_flash[i]    = (uint8_t)PATROL_HIT_FLASH_FRAMES;
+                    if (patrol_hp[i] <= (uint8_t)ENEMY_RAM_DAMAGE) {
+                        patrol_hp[i] = 0u;
+                        patrol_destroy(i);
+                        continue;                        /* destroyed — skip rest of this patrol */
+                    } else {
+                        patrol_hp[i] = (uint8_t)(patrol_hp[i] - ENEMY_RAM_DAMAGE);
+                    }
+                }
             }
         }
 
@@ -401,6 +421,8 @@ void patrol_set_pos_for_test(uint8_t i, int16_t px, int16_t py) {
 }
 void patrol_set_mode_for_test(uint8_t i, uint8_t mode) { patrol_mode[i] = mode; }
 void patrol_set_hp_for_test(uint8_t i, uint8_t hp)     { patrol_hp[i] = hp; }
+uint8_t patrol_get_ram_cooldown_for_test(uint8_t i)        { return patrol_ram_cooldown[i]; }
+void    patrol_set_ram_cooldown_for_test(uint8_t i, uint8_t v) { patrol_ram_cooldown[i] = v; }
 void patrol_set_fire_timer_for_test(uint8_t i, uint8_t t) { patrol_timer[i] = t; }
 
 void patrol_spawn_for_test(int16_t px, int16_t py,
