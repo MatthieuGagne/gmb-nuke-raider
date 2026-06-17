@@ -137,6 +137,21 @@ void test_ram_contact_damages_player(void) {
     TEST_ASSERT_TRUE(damage_get_hp() < PLAYER_MAX_HP);
 }
 
+void test_destroyed_patrol_deals_no_contact_damage(void) {
+    /* A destroyed patrol (active=0) is skipped by patrol_update's pool guard,
+     * so it must not ram the player even when their boxes overlap (#412). */
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    patrol_update(0, 0);                 /* lethal bullet, player far → no ram during kill */
+    TEST_ASSERT_EQUAL_UINT8(0u, patrol_is_active(0u));
+    damage_init();                       /* reset player HP after the kill frame */
+    patrol_update(40, 32);               /* player overlaps the wreck's last position */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)PLAYER_MAX_HP, damage_get_hp());
+}
+
 /* ---- hit → hp-- → destroy + free (R6 / AC3) ---- */
 
 void test_bullet_hit_decrements_hp(void) {
@@ -177,6 +192,7 @@ int main(void) {
     RUN_TEST(test_no_fire_when_off_screen);
     RUN_TEST(test_fires_when_on_screen_chasing_in_range);
     RUN_TEST(test_ram_contact_damages_player);
+    RUN_TEST(test_destroyed_patrol_deals_no_contact_damage);
     RUN_TEST(test_bullet_hit_decrements_hp);
     RUN_TEST(test_fatal_hit_destroys_and_deactivates);
     return UNITY_END();
