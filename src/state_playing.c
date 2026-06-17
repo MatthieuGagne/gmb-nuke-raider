@@ -191,9 +191,10 @@ static void update(void) {
             state_replace(&state_game_over, BANK(state_game_over));
             return;
         }
-        /* Racer drove into stationary player — damage if currently overlapping. */
-        if (racer_overlaps_player(px, py)) {
-            damage_apply(RACER_RAM_DAMAGE);
+        /* Racer drove into stationary player — damage if currently overlapping.
+         * Helper applies RACER_RAM_DAMAGE; SFX stays here so racer.c needn't
+         * depend on sfx (#412). */
+        if (racer_apply_contact_damage(px, py)) {
             sfx_play(SFX_HIT);
         }
         hud_set_position(race_state_rank_player());

@@ -14,6 +14,7 @@
 #include "enemy_common.h"  /* enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
 #include "vehicle_physics.h"  /* shared terrain physics + slide collision */
 #include "explosion.h"        /* car-blast spawn on death (#411) */
+#include "damage.h"           /* damage_apply on racer->player contact (#412) */
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -577,6 +578,17 @@ uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
             py < racer_py[i] + 16 && py + 16 > racer_py[i]) {
             return 1u;
         }
+    }
+    return 0u;
+}
+
+/* Reuses racer_overlaps_player so it inherits the active/dying exclusion
+ * (dying racers are active=0). On overlap, applies the shared i-frame-debounced
+ * RACER_RAM_DAMAGE; returns 1 so state_playing plays SFX_HIT (#412). */
+uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED {
+    if (racer_overlaps_player(px, py)) {
+        damage_apply(RACER_RAM_DAMAGE);
+        return 1u;   /* hit — caller plays SFX */
     }
     return 0u;
 }
