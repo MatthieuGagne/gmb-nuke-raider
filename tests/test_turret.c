@@ -191,6 +191,18 @@ void test_turret_death_spawns_explosion(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, explosion_active_count());
 }
 
+void test_turret_takes_no_contact_damage(void) {
+    /* AC8: a turret overlapping the player takes no collision damage. With cam=0
+     * the turret at tile (10,10) is on-screen (oam_x=88, vis_y=96); a player
+     * overlapping its 16x16 box must not destroy it (turrets are excluded). */
+    cam_x = 0u;
+    cam_y = 0u;
+    turret_spawn(10u, 10u);                      /* world pixel ~ (80,80) */
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_count_active());
+    turret_update(80, 80);                        /* player overlapping the turret */
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_count_active()); /* still alive — no ram damage */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_npc_type_constants_defined);
@@ -223,5 +235,6 @@ int main(void) {
     RUN_TEST(test_turret_dir_enum_has_16_values);
     RUN_TEST(test_turret_constants_values);
     RUN_TEST(test_turret_death_spawns_explosion);
+    RUN_TEST(test_turret_takes_no_contact_damage);
     return UNITY_END();
 }
