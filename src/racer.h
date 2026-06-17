@@ -41,6 +41,8 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear);
 uint8_t racer_get_hp_for_test(uint8_t slot);
 void    racer_set_hp_for_test(uint8_t slot, uint8_t hp);
 uint8_t racer_get_hit_flash_for_test(uint8_t slot);
+uint8_t racer_get_ram_cooldown_for_test(uint8_t slot);
+void    racer_set_ram_cooldown_for_test(uint8_t slot, uint8_t v);
 void    racer_set_dir_for_test(uint8_t slot, uint8_t dir);
 uint8_t racer_is_dying_for_test(uint8_t slot);
 uint8_t racer_get_death_timer_for_test(uint8_t slot);

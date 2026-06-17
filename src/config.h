@@ -32,6 +32,8 @@
 #define PLAYER_MAX_HP              100u  /* max HP pool; 0 = dead */
 #define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
 #define ENEMY_BULLET_DAMAGE        10u  /* HP damage dealt by an enemy bullet projectile */
+#define ENEMY_RAM_DAMAGE           1u   /* HP an enemy vehicle loses per ram event (#417) */
+#define ENEMY_RAM_COOLDOWN         DAMAGE_INVINCIBILITY_FRAMES /* per-enemy ram debounce window (= player i-frame) (#417) */
 
 /* Powerup system */
 #define MAX_POWERUPS               4u   /* powerup pool ceiling — max per track */

@@ -32,6 +32,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+static uint8_t  racer_ram_cooldown[MAX_RACERS]; /* per-racer ram-damage debounce (#417) */
 static uint8_t  racer_dying[MAX_RACERS];       /* 1 = playing death blast, frozen */
 static uint8_t  racer_death_timer[MAX_RACERS]; /* counts down RACER_DEATH_TICKS while dying */
 static uint8_t  racer_finish_armed[MAX_RACERS];
@@ -172,6 +173,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_ram_cooldown[i] = 0u;
         racer_dying[i]        = 0u;
         racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
@@ -232,6 +234,7 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_ram_cooldown[i] = 0u;
         racer_dying[i]        = 0u;
         racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
@@ -426,6 +429,11 @@ uint8_t racer_update(void) BANKED {
             racer_hit_flash[i] = (uint8_t)(racer_hit_flash[i] - 1u);
         }
 
+        /* ---- Ram cooldown tick (#417) ---- */
+        if (racer_ram_cooldown[i] > 0u) {
+            racer_ram_cooldown[i] = (uint8_t)(racer_ram_cooldown[i] - 1u);
+        }
+
         /* ---- Bullet hit detection (screen-space, skipped if off-screen) ---- */
         {
             int16_t scr_cx = racer_px[i] + 16;
@@ -586,15 +594,34 @@ uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
     return 0u;
 }
 
-/* Reuses racer_overlaps_player so it inherits the active/dying exclusion
- * (dying racers are active=0). On overlap, applies the shared i-frame-debounced
- * RACER_RAM_DAMAGE; returns 1 so state_playing plays SFX_HIT (#412). */
+/* Mutual contact damage (#412 player side + #417 enemy side). Loops the pool
+ * directly so it knows WHICH racer was rammed. Player side is i-frame-debounced
+ * inside damage_apply; enemy side uses a per-racer ram cooldown so sustained
+ * overlap deals at most one enemy hit per ENEMY_RAM_COOLDOWN window. Dying
+ * racers are active=0 and thus skipped (#411). Returns 1 on any overlap so
+ * state_playing plays SFX_HIT. */
 uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED {
-    if (racer_overlaps_player(px, py)) {
-        damage_apply(RACER_RAM_DAMAGE);
-        return 1u;   /* hit — caller plays SFX */
+    uint8_t i;
+    uint8_t hit = 0u;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        if (!racer_active[i]) continue;
+        if (px < racer_px[i] + 16 && px + 16 > racer_px[i] &&
+            py < racer_py[i] + 16 && py + 16 > racer_py[i]) {
+            damage_apply(RACER_RAM_DAMAGE);
+            if (racer_ram_cooldown[i] == 0u) {
+                racer_ram_cooldown[i] = (uint8_t)ENEMY_RAM_COOLDOWN;
+                racer_hit_flash[i]    = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                if (racer_hp[i] <= (uint8_t)ENEMY_RAM_DAMAGE) {
+                    racer_hp[i] = 0u;
+                    racer_kill(i);
+                } else {
+                    racer_hp[i] = (uint8_t)(racer_hp[i] - ENEMY_RAM_DAMAGE);
+                }
+            }
+            hit = 1u;
+        }
     }
-    return 0u;
+    return hit;
 }
 
 #ifndef __SDCC
@@ -669,6 +696,8 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
 uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
 void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
 uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
+uint8_t racer_get_ram_cooldown_for_test(uint8_t slot)        { return racer_ram_cooldown[slot]; }
+void    racer_set_ram_cooldown_for_test(uint8_t slot, uint8_t v) { racer_ram_cooldown[slot] = v; }
 uint8_t racer_is_dying_for_test(uint8_t slot)        { return racer_dying[slot]; }
 uint8_t racer_get_death_timer_for_test(uint8_t slot) { return racer_death_timer[slot]; }
 void    racer_set_oam_for_test(uint8_t slot, uint8_t h0, uint8_t h1, uint8_t h2, uint8_t h3) {

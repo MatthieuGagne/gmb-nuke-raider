@@ -446,6 +446,74 @@ void test_racer_dying_deals_no_contact_damage(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)PLAYER_MAX_HP, damage_get_hp()); /* HP untouched */
 }
 
+void test_racer_ram_decrements_enemy_hp(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RACER_HP, racer_get_hp_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(40, 40));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - ENEMY_RAM_DAMAGE), racer_get_hp_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)ENEMY_RAM_COOLDOWN, racer_get_ram_cooldown_for_test(1u));
+    TEST_ASSERT_GREATER_THAN_UINT8(0u, racer_get_hit_flash_for_test(1u));
+}
+
+void test_racer_ram_debounced_by_cooldown(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_apply_contact_damage(40, 40);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - ENEMY_RAM_DAMAGE), racer_get_hp_for_test(1u));
+    racer_set_ram_cooldown_for_test(1u, 0u);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - 2u * ENEMY_RAM_DAMAGE), racer_get_hp_for_test(1u));
+}
+
+void test_racer_ram_cooldown_decrements_in_update(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_apply_contact_damage(40, 40);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(ENEMY_RAM_COOLDOWN - 1u), racer_get_ram_cooldown_for_test(1u));
+}
+
+void test_racer_ram_to_zero_hp_kills(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, (uint8_t)ENEMY_RAM_DAMAGE);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hp_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_is_dying_for_test(1u));
+}
+
+void test_racer_ram_still_damages_player_mutually(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PLAYER_MAX_HP - RACER_RAM_DAMAGE), damage_get_hp());
+}
+
+void test_racer_dying_takes_no_ram_damage(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, 1u);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_is_dying_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_apply_contact_damage(40, 40));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hp_for_test(1u));
+}
+
 void test_racer_hp_initialized_to_racer_hp(void) {
     /* racer_init_empty() called in setUp; HP must equal RACER_HP (check enemy slot 1) */
     TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
@@ -843,6 +911,12 @@ int main(void) {
     RUN_TEST(test_racer_overlaps_player_when_inactive);
     RUN_TEST(test_racer_contact_damage_drains_player_hp);
     RUN_TEST(test_racer_dying_deals_no_contact_damage);
+    RUN_TEST(test_racer_ram_decrements_enemy_hp);
+    RUN_TEST(test_racer_ram_debounced_by_cooldown);
+    RUN_TEST(test_racer_ram_cooldown_decrements_in_update);
+    RUN_TEST(test_racer_ram_to_zero_hp_kills);
+    RUN_TEST(test_racer_ram_still_damages_player_mutually);
+    RUN_TEST(test_racer_dying_takes_no_ram_damage);
     RUN_TEST(test_racer_hp_initialized_to_racer_hp);
     RUN_TEST(test_racer_hit_flash_initialized_to_zero);
     RUN_TEST(test_racer_not_dying_after_init);
