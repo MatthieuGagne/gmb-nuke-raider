@@ -128,6 +128,8 @@
 #define RACER_GEAR3_ACCEL         1u
 #define RACER_GEAR_DOWNSHIFT_FRAMES  8u
 #define RACER_RAM_DAMAGE      5u    /* HP damage on player/racer collision */
+#define ENEMY_RAM_DAMAGE      1u    /* HP an enemy loses per ram event (5 rams kill, parity with bullet) */
+#define ENEMY_RAM_COOLDOWN    DAMAGE_INVINCIBILITY_FRAMES  /* per-enemy ram i-frames (30 frames) */
 #define RACER_HP               5u   /* bullet hits to destroy racer */
 #define RACER_HIT_RADIUS       8u   /* screen-space px radius for bullet hit check */
 #define RACER_HIT_FLASH_FRAMES 8u   /* frames of hit-blink per bullet hit */
