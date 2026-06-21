@@ -609,6 +609,9 @@ uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED {
             if (racer_ram_cd[i] == 0u) {
                 racer_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
                 racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
+                 * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
+                 * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
                 racer_hp[i]        = (uint8_t)(racer_hp[i] - ENEMY_RAM_DAMAGE);
                 if (racer_hp[i] == 0u) {
                     racer_kill(i);
