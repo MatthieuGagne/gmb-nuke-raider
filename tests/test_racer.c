@@ -645,6 +645,105 @@ void test_racer_miss_does_not_reduce_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
 }
 
+/* ---- racer enemy-side ram damage (#417) ---- */
+
+void test_racer_ram_reduces_enemy_hp(void) {
+    /* Active racer at (32,32), player overlapping at (40,40). The ram chips
+     * ENEMY_RAM_DAMAGE off the racer and still reports a hit (SFX). */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(40, 40));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - ENEMY_RAM_DAMAGE),
+                            racer_get_hp_for_test(1u));
+}
+
+void test_racer_ram_debounced_by_cooldown(void) {
+    /* Two rams in the same window (no racer_update tick between) deal only one
+     * enemy hit — the per-racer cooldown blocks the second. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    racer_apply_contact_damage(40, 40);   /* hit: hp-1, cd = ENEMY_RAM_COOLDOWN */
+    racer_apply_contact_damage(40, 40);   /* cd > 0 -> no further enemy damage */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - ENEMY_RAM_DAMAGE),
+                            racer_get_hp_for_test(1u));
+}
+
+void test_racer_ram_cooldown_expiry_allows_second_hit(void) {
+    /* After the cooldown drains to 0, the next ram chips HP again. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    racer_apply_contact_damage(40, 40);            /* hp-1, cd set */
+    racer_set_ram_cd_for_test(1u, 0u);             /* simulate cooldown expiry */
+    racer_apply_contact_damage(40, 40);            /* hp-1 again */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - 2u * ENEMY_RAM_DAMAGE),
+                            racer_get_hp_for_test(1u));
+}
+
+void test_racer_ram_nonlethal_sets_hit_flash(void) {
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8(RACER_HIT_FLASH_FRAMES, racer_get_hit_flash_for_test(1u));
+}
+
+void test_racer_ram_to_kill_enters_dying(void) {
+    /* A racer at ENEMY_RAM_DAMAGE HP that gets rammed routes through the #411
+     * death path: dying, active=0, death timer armed, 4 car blasts spawned. */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    explosion_init(20u, 23u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, ENEMY_RAM_DAMAGE);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(40, 40));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_active[1]);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_is_dying_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(RACER_DEATH_TICKS, racer_get_death_timer_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(4u, explosion_active_count());
+}
+
+void test_racer_ram_also_damages_player(void) {
+    /* AC4: the same contact still drains player HP by RACER_RAM_DAMAGE (mutual). */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    racer_apply_contact_damage(40, 40);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PLAYER_MAX_HP - RACER_RAM_DAMAGE), damage_get_hp());
+}
+
+void test_racer_ram_flush_from_any_side(void) {
+    /* A player solid-blocked flush against the racer (no AABB interpenetration)
+     * still rams it from EVERY side, via the shared ENEMY_RAM_REACH margin (#417).
+     * Racer AABB = [32,48) x [32,48); each call places the player flush (gap 0). */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(32, 16));  /* above */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(32, 48));  /* below (from behind) */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(16, 32));  /* left */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(48, 32));  /* right */
+}
+
 void test_racer_get_cp_next_initial_zero(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
@@ -855,6 +954,13 @@ int main(void) {
     RUN_TEST(test_racer_dying_blast_renders_on_own_slots);
     RUN_TEST(test_racer_dead_does_not_trigger_game_over);
     RUN_TEST(test_racer_miss_does_not_reduce_hp);
+    RUN_TEST(test_racer_ram_reduces_enemy_hp);
+    RUN_TEST(test_racer_ram_debounced_by_cooldown);
+    RUN_TEST(test_racer_ram_cooldown_expiry_allows_second_hit);
+    RUN_TEST(test_racer_ram_nonlethal_sets_hit_flash);
+    RUN_TEST(test_racer_ram_to_kill_enters_dying);
+    RUN_TEST(test_racer_ram_also_damages_player);
+    RUN_TEST(test_racer_ram_flush_from_any_side);
     RUN_TEST(test_racer_get_cp_next_initial_zero);
     RUN_TEST(test_racer_spawn_resets_cp_next);
     RUN_TEST(test_racer_get_px_returns_spawn_value);

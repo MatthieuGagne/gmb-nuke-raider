@@ -23,6 +23,8 @@ static int8_t  patrol_vy[MAX_PATROLS];
 static uint8_t patrol_dir[MAX_PATROLS];
 static uint8_t patrol_mode[MAX_PATROLS];
 static uint8_t patrol_hp[MAX_PATROLS];
+static uint8_t patrol_ram_cd[MAX_PATROLS];     /* per-patrol ram-damage cooldown (#417) */
+static uint8_t patrol_hit_flash[MAX_PATROLS];  /* hit-blink frames, bullet + ram (#417) */
 static uint8_t patrol_active[MAX_PATROLS];
 static uint8_t patrol_timer[MAX_PATROLS];   /* fire-cadence countdown */
 static uint8_t patrol_wp_idx[MAX_PATROLS];
@@ -68,6 +70,8 @@ static void _spawn(uint8_t i, int16_t px, int16_t py) {
     patrol_dir[i]   = DIR_B;
     patrol_mode[i]  = PATROL_MODE_PATROL;
     patrol_hp[i]    = (uint8_t)PATROL_HP;
+    patrol_ram_cd[i]   = 0u;
+    patrol_hit_flash[i]= 0u;
     patrol_active[i]= 1u;
     patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
     patrol_wp_idx[i]= 0u;
@@ -149,6 +153,16 @@ uint8_t patrol_count_active(void) BANKED {
     return c;
 }
 
+/* Destroy a patrol: deactivate and hide its 4 OAM slots. Shared by the
+ * bullet-hit and ram-hit paths (#417). */
+static void patrol_kill(uint8_t i) {
+    patrol_active[i] = 0u;
+    move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
+    move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+}
+
 void patrol_update(int16_t px, int16_t py) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_PATROLS; i++) {
@@ -162,6 +176,10 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         TileType tt;
 
         if (!patrol_active[i]) continue;
+
+        /* --- Per-frame timers: ram cooldown + hit-flash (#417) --- */
+        if (patrol_ram_cd[i] > 0u)    patrol_ram_cd[i]--;
+        if (patrol_hit_flash[i] > 0u) patrol_hit_flash[i]--;
 
         /* --- FSM: choose mode from player delta (Manhattan hysteresis) --- */
         dx16 = px - patrol_px[i];
@@ -240,13 +258,26 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             }
         }
 
-        /* --- Ram contact: car-vs-car 16x16 overlap deals contact damage.
-         * damage.c i-frames (DAMAGE_INVINCIBILITY_FRAMES) rate-limit it. --- */
+        /* --- Ram contact: car-vs-car overlap via the SHARED enemy_ram_overlap
+         * test (identical logic to racer.c, ENEMY_RAM_REACH margin so a flush
+         * contact rams from any side). The player takes damage on every overlap
+         * (damage.c i-frames debounce). The patrol takes ENEMY_RAM_DAMAGE behind
+         * its own 30-frame cooldown; a 0-HP result destroys it (#417). --- */
         {
-            int16_t rdx = px - patrol_px[i];
-            int16_t rdy = py - patrol_py[i];
-            if (rdx > -16 && rdx < 16 && rdy > -16 && rdy < 16) {
+            if (enemy_ram_overlap(px, py, patrol_px[i], patrol_py[i])) {
                 damage_apply(RACER_RAM_DAMAGE);
+                if (patrol_ram_cd[i] == 0u) {
+                    patrol_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
+                    patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                    /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
+                     * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
+                     * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
+                    patrol_hp[i]        = (uint8_t)(patrol_hp[i] - ENEMY_RAM_DAMAGE);
+                    if (patrol_hp[i] == 0u) {
+                        patrol_kill(i);
+                        continue;
+                    }
+                }
             }
         }
 
@@ -265,12 +296,9 @@ void patrol_update(int16_t px, int16_t py) BANKED {
                     if (projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy,
                                                    (uint8_t)PATROL_HIT_RADIUS)) {
                         patrol_hp[i]--;
+                        patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
                         if (patrol_hp[i] == 0u) {
-                            patrol_active[i] = 0u;
-                            move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
-                            move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+                            patrol_kill(i);
                             continue;
                         }
                     }
@@ -313,6 +341,15 @@ void patrol_render(void) BANKED {
         uint8_t hw_x, hw_y, d, flags;
 
         if (!patrol_active[i]) {
+            move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
+            move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
+            continue;
+        }
+
+        /* Hit flash — hide sprite on odd 2-frame intervals (#417). */
+        if (patrol_hit_flash[i] & 2u) {
             move_sprite(patrol_oam[i * 4u + 0u], 0u, 0u);
             move_sprite(patrol_oam[i * 4u + 1u], 0u, 0u);
             move_sprite(patrol_oam[i * 4u + 2u], 0u, 0u);
@@ -377,6 +414,9 @@ void patrol_set_pos_for_test(uint8_t i, int16_t px, int16_t py) {
 void patrol_set_mode_for_test(uint8_t i, uint8_t mode) { patrol_mode[i] = mode; }
 void patrol_set_hp_for_test(uint8_t i, uint8_t hp)     { patrol_hp[i] = hp; }
 void patrol_set_fire_timer_for_test(uint8_t i, uint8_t t) { patrol_timer[i] = t; }
+uint8_t patrol_get_ram_cd(uint8_t i)                   { return patrol_ram_cd[i]; }
+void patrol_set_ram_cd_for_test(uint8_t i, uint8_t c)  { patrol_ram_cd[i] = c; }
+uint8_t patrol_get_hit_flash(uint8_t i)                { return patrol_hit_flash[i]; }
 
 void patrol_spawn_for_test(int16_t px, int16_t py,
                            uint8_t *wp_tx, uint8_t *wp_ty, uint8_t wp_count) {

@@ -134,6 +134,35 @@ void test_wp_advance_mid_route(void) {
     TEST_ASSERT_EQUAL_UINT8(2u, enemy_wp_advance(1u, 4u, 1u));
 }
 
+/* ---- enemy_ram_overlap: ram box with ENEMY_RAM_REACH margin, any side (#417) ----
+ * Enemy AABB is [32,48) x [32,48) throughout. */
+
+void test_ram_overlap_when_interpenetrating(void) {
+    /* Player box overlapping the enemy interior -> ram. */
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_ram_overlap(40, 40, 32, 32));
+}
+
+void test_ram_overlap_flush_above(void) {
+    /* Player flush above: player [16,32) touches enemy top edge (gap 0). The
+     * strict AABB would miss; the ENEMY_RAM_REACH margin makes it ram. */
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_ram_overlap(32, 16, 32, 32));
+}
+void test_ram_overlap_flush_below(void) {
+    /* Player flush below (the "from behind" case when the enemy heads up). */
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_ram_overlap(32, 48, 32, 32));
+}
+void test_ram_overlap_flush_left(void) {
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_ram_overlap(16, 32, 32, 32));
+}
+void test_ram_overlap_flush_right(void) {
+    TEST_ASSERT_EQUAL_UINT8(1u, enemy_ram_overlap(48, 32, 32, 32));
+}
+
+void test_ram_overlap_misses_beyond_reach(void) {
+    /* A clear gap of ENEMY_RAM_REACH px below the enemy -> no ram. */
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_ram_overlap(32, (int16_t)(48 + ENEMY_RAM_REACH), 32, 32));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_aim_right);
@@ -167,5 +196,11 @@ int main(void) {
     RUN_TEST(test_wp_advance_reached_wraps_at_last);
     RUN_TEST(test_wp_advance_single_waypoint_wraps_to_self);
     RUN_TEST(test_wp_advance_mid_route);
+    RUN_TEST(test_ram_overlap_when_interpenetrating);
+    RUN_TEST(test_ram_overlap_flush_above);
+    RUN_TEST(test_ram_overlap_flush_below);
+    RUN_TEST(test_ram_overlap_flush_left);
+    RUN_TEST(test_ram_overlap_flush_right);
+    RUN_TEST(test_ram_overlap_misses_beyond_reach);
     return UNITY_END();
 }

@@ -43,6 +43,9 @@ void    patrol_set_pos_for_test(uint8_t i, int16_t px, int16_t py);
 void    patrol_set_mode_for_test(uint8_t i, uint8_t mode);
 void    patrol_set_hp_for_test(uint8_t i, uint8_t hp);
 void    patrol_set_fire_timer_for_test(uint8_t i, uint8_t t);
+uint8_t patrol_get_ram_cd(uint8_t i);
+void    patrol_set_ram_cd_for_test(uint8_t i, uint8_t c);
+uint8_t patrol_get_hit_flash(uint8_t i);
 void    patrol_spawn_for_test(int16_t px, int16_t py,
                               uint8_t *wp_tx, uint8_t *wp_ty, uint8_t wp_count);
 #endif

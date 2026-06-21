@@ -32,6 +32,7 @@ static uint8_t  racer_gear[MAX_RACERS];
 static uint8_t  racer_downshift_timer[MAX_RACERS];
 static uint8_t  racer_hp[MAX_RACERS];
 static uint8_t  racer_hit_flash[MAX_RACERS];
+static uint8_t  racer_ram_cd[MAX_RACERS];      /* per-racer ram-damage cooldown (#417) */
 static uint8_t  racer_dying[MAX_RACERS];       /* 1 = playing death blast, frozen */
 static uint8_t  racer_death_timer[MAX_RACERS]; /* counts down RACER_DEATH_TICKS while dying */
 static uint8_t  racer_finish_armed[MAX_RACERS];
@@ -157,6 +158,21 @@ static uint8_t racer_dir_matches_finish(uint8_t dir, uint8_t finish_dir) {
     return 0u;
 }
 
+/* Lethal hit: stop racing/colliding and play the 4-quadrant car blast on this
+ * racer's own OAM slots (#411). Shared by the bullet-hit and ram-hit paths. */
+static void racer_kill(uint8_t i) {
+    uint8_t base = explosion_car_base();
+    racer_active[i]       = 0u;
+    racer_dying[i]        = 1u;
+    racer_death_timer[i]  = (uint8_t)RACER_DEATH_TICKS;
+    racer_vx[i]           = (int8_t)0;
+    racer_vy[i]           = (int8_t)0;
+    explosion_spawn(racer_oam[i * 4u + 0u], base, 0u,                          EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(racer_oam[i * 4u + 1u], base, S_FLIPY,                      EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(racer_oam[i * 4u + 2u], base, S_FLIPX,                      EXPLOSION_KIND_RACER, 0u, 0u);
+    explosion_spawn(racer_oam[i * 4u + 3u], base, (uint8_t)(S_FLIPX | S_FLIPY), EXPLOSION_KIND_RACER, 0u, 0u);
+}
+
 void racer_init(uint8_t tile_base) BANKED {
     uint8_t i;
     uint8_t spawn_tx;
@@ -172,6 +188,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_ram_cd[i]       = 0u;
         racer_dying[i]        = 0u;
         racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
@@ -232,6 +249,7 @@ void racer_init_empty(void) BANKED {
         racer_downshift_timer[i] = 0u;
         racer_hp[i]           = (uint8_t)RACER_HP;
         racer_hit_flash[i]    = 0u;
+        racer_ram_cd[i]       = 0u;
         racer_dying[i]        = 0u;
         racer_death_timer[i]  = 0u;
         racer_finish_armed[i] = 1u;
@@ -409,6 +427,11 @@ uint8_t racer_update(void) BANKED {
             racer_hit_flash[i] = (uint8_t)(racer_hit_flash[i] - 1u);
         }
 
+        /* ---- Ram cooldown tick (#417) ---- */
+        if (racer_ram_cd[i] > 0u) {
+            racer_ram_cd[i] = (uint8_t)(racer_ram_cd[i] - 1u);
+        }
+
         /* ---- Bullet hit detection (screen-space, skipped if off-screen) ---- */
         {
             int16_t scr_cx = racer_px[i] + 16;
@@ -418,20 +441,7 @@ uint8_t racer_update(void) BANKED {
                     racer_hp[i] = (uint8_t)(racer_hp[i] - 1u);
                     racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
                     if (racer_hp[i] == 0u) {
-                        /* Stop racing/colliding immediately; play the car blast
-                         * on this racer's own 4 OAM slots (#411). Quadrant flip
-                         * + slot order mirror player_kill() and racer_render():
-                         * slot0=TL, slot1=BL, slot2=TR, slot3=BR. */
-                        uint8_t base = explosion_car_base();
-                        racer_active[i]       = 0u;
-                        racer_dying[i]        = 1u;
-                        racer_death_timer[i]  = (uint8_t)RACER_DEATH_TICKS;
-                        racer_vx[i]           = (int8_t)0;
-                        racer_vy[i]           = (int8_t)0;
-                        explosion_spawn(racer_oam[i * 4u + 0u], base, 0u,                          EXPLOSION_KIND_RACER, 0u, 0u);
-                        explosion_spawn(racer_oam[i * 4u + 1u], base, S_FLIPY,                      EXPLOSION_KIND_RACER, 0u, 0u);
-                        explosion_spawn(racer_oam[i * 4u + 2u], base, S_FLIPX,                      EXPLOSION_KIND_RACER, 0u, 0u);
-                        explosion_spawn(racer_oam[i * 4u + 3u], base, (uint8_t)(S_FLIPX | S_FLIPY), EXPLOSION_KIND_RACER, 0u, 0u);
+                        racer_kill(i);
                     }
                 }
             }
@@ -582,15 +592,37 @@ uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
     return 0u;
 }
 
-/* Reuses racer_overlaps_player so it inherits the active/dying exclusion
- * (dying racers are active=0). On overlap, applies the shared i-frame-debounced
- * RACER_RAM_DAMAGE; returns 1 so state_playing plays SFX_HIT (#412). */
+/* Mutual contact damage (#412 + #417). For every active racer overlapping the
+ * player via the SHARED enemy_ram_overlap test (identical logic to patrol.c, with
+ * the ENEMY_RAM_REACH margin so a flush contact rams from any side): chip
+ * ENEMY_RAM_DAMAGE off it behind a per-racer 30-frame cooldown (blink + route to
+ * the #411 death path on a lethal result). The player side always takes
+ * RACER_RAM_DAMAGE on any overlap (damage.c i-frames debounce it). Dying racers
+ * (active=0) are excluded. Returns 1 on any overlap so state_playing plays SFX_HIT. */
 uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED {
-    if (racer_overlaps_player(px, py)) {
-        damage_apply(RACER_RAM_DAMAGE);
-        return 1u;   /* hit — caller plays SFX */
+    uint8_t i;
+    uint8_t hit = 0u;
+    for (i = 0u; i < MAX_RACERS; i++) {
+        if (!racer_active[i]) continue;
+        if (enemy_ram_overlap(px, py, racer_px[i], racer_py[i])) {
+            hit = 1u;
+            if (racer_ram_cd[i] == 0u) {
+                racer_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
+                racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
+                 * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
+                 * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
+                racer_hp[i]        = (uint8_t)(racer_hp[i] - ENEMY_RAM_DAMAGE);
+                if (racer_hp[i] == 0u) {
+                    racer_kill(i);
+                }
+            }
+        }
     }
-    return 0u;
+    if (hit) {
+        damage_apply(RACER_RAM_DAMAGE);
+    }
+    return hit;
 }
 
 #ifndef __SDCC
@@ -621,6 +653,7 @@ void racer_spawn_for_test(int16_t px, int16_t py,
     racer_downshift_timer[1] = 0u;
     racer_hp[1]        = (uint8_t)RACER_HP;
     racer_hit_flash[1] = 0u;
+    racer_ram_cd[1]    = 0u;
     racer_dying[1]       = 0u;
     racer_death_timer[1] = 0u;
     race_state_init(lap_total);
@@ -664,6 +697,8 @@ void    racer_set_gear_for_test(uint8_t slot, uint8_t gear) {
 
 uint8_t racer_get_hp_for_test(uint8_t slot)            { return racer_hp[slot]; }
 void    racer_set_hp_for_test(uint8_t slot, uint8_t h) { racer_hp[slot] = h; }
+uint8_t racer_get_ram_cd_for_test(uint8_t slot)            { return racer_ram_cd[slot]; }
+void    racer_set_ram_cd_for_test(uint8_t slot, uint8_t c) { racer_ram_cd[slot] = c; }
 uint8_t racer_get_hit_flash_for_test(uint8_t slot)     { return racer_hit_flash[slot]; }
 uint8_t racer_is_dying_for_test(uint8_t slot)        { return racer_dying[slot]; }
 uint8_t racer_get_death_timer_for_test(uint8_t slot) { return racer_death_timer[slot]; }

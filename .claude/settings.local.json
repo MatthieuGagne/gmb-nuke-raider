@@ -137,7 +137,13 @@
       "PowerShell(git fetch *)",
       "PowerShell(gh pr list --state open --json number,title,headRefName)",
       "PowerShell(gh issue list --state open --limit 40 --json number,title,labels | ConvertFrom-Json | Sort-Object number | ForEach-Object { \"#$\\($_.number\\) [$\\($_.labels.name -join ','\\)] $\\($_.title\\)\" })",
-      "PowerShell(gh pr list --state open --limit 20 --json number,title,headRefName | ConvertFrom-Json | ForEach-Object { \"#$\\($_.number\\) $\\($_.title\\) \\($\\($_.headRefName\\)\\)\" })"
+      "PowerShell(gh pr list --state open --limit 20 --json number,title,headRefName | ConvertFrom-Json | ForEach-Object { \"#$\\($_.number\\) $\\($_.title\\) \\($\\($_.headRefName\\)\\)\" })",
+      "PowerShell(make test *)",
+      "PowerShell(make memory-check *)",
+      "PowerShell(Start-Process -FilePath \"java\" -ArgumentList \"-jar\", \"C:\\\\Tools\\\\Emulicious\\\\Emulicious.jar\", \"build\\\\nuke-raider.gb\" -WorkingDirectory \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-enemy-collision-damage-417\" -PassThru | Select-Object Id, ProcessName)",
+      "PowerShell(git push *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)"
     ]
   },
   "hooks": {

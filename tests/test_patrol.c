@@ -179,6 +179,87 @@ void test_fatal_hit_destroys_and_deactivates(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, patrol_count_active());
 }
 
+/* ---- patrol enemy-side ram damage + hit-flash (#417) ---- */
+
+void test_patrol_ram_reduces_hp(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(40, 32);   /* player 8px right -> 16x16 overlap -> ram */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
+void test_patrol_ram_from_above_reduces_hp(void) {
+    /* Same shared overlap logic as the racer: contact from a different side
+     * (player 8px above) also rams. Mirrors test_patrol_ram_reduces_hp (#417). */
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(32, 24);   /* player 8px above -> overlap -> ram */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
+void test_patrol_ram_debounced_by_cooldown(void) {
+    /* Two consecutive overlapping updates deal only one enemy hit (cooldown). */
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(40, 32);   /* hp-1, cd = ENEMY_RAM_COOLDOWN */
+    patrol_update(40, 32);   /* cd still > 0 after top-of-frame decrement -> no damage */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
+void test_patrol_ram_cooldown_expiry_allows_second_hit(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(40, 32);                  /* hp-1, cd set */
+    patrol_set_ram_cd_for_test(0u, 1u);     /* next frame's top decrement -> 0 -> ram applies */
+    patrol_update(40, 32);                  /* hp-1 again */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - 2u * ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
+void test_patrol_ram_nonlethal_sets_hit_flash(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8(RACER_HIT_FLASH_FRAMES, patrol_get_hit_flash(0u));
+}
+
+void test_patrol_ram_to_kill_destroys(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, ENEMY_RAM_DAMAGE);
+    patrol_update(40, 32);
+    TEST_ASSERT_EQUAL_UINT8(0u, patrol_is_active(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, patrol_count_active());
+}
+
+void test_patrol_bullet_hit_sets_hit_flash(void) {
+    /* New: bullet hits now blink too (fixes the pre-existing no-blink gap). */
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_mode_for_test(0u, PATROL_MODE_PATROL);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    patrol_update(0, 0);     /* player far -> bullet hit, no ram */
+    TEST_ASSERT_EQUAL_UINT8(RACER_HIT_FLASH_FRAMES, patrol_get_hit_flash(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_fsm_enters_chase_when_inside_detect);
@@ -195,5 +276,12 @@ int main(void) {
     RUN_TEST(test_destroyed_patrol_deals_no_contact_damage);
     RUN_TEST(test_bullet_hit_decrements_hp);
     RUN_TEST(test_fatal_hit_destroys_and_deactivates);
+    RUN_TEST(test_patrol_ram_reduces_hp);
+    RUN_TEST(test_patrol_ram_from_above_reduces_hp);
+    RUN_TEST(test_patrol_ram_debounced_by_cooldown);
+    RUN_TEST(test_patrol_ram_cooldown_expiry_allows_second_hit);
+    RUN_TEST(test_patrol_ram_nonlethal_sets_hit_flash);
+    RUN_TEST(test_patrol_ram_to_kill_destroys);
+    RUN_TEST(test_patrol_bullet_hit_sets_hit_flash);
     return UNITY_END();
 }

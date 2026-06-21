@@ -26,4 +26,11 @@ uint8_t enemy_wp_reached(int8_t dx, int8_t dy, uint8_t threshold) BANKED;
  * cur_idx unchanged. */
 uint8_t enemy_wp_advance(uint8_t cur_idx, uint8_t wp_count, uint8_t reached) BANKED;
 
+/* Ram-collision test: 1 if the player 16x16 AABB at (px,py) overlaps the enemy
+ * 16x16 AABB at (ex,ey), with the enemy box inflated by ENEMY_RAM_REACH on every
+ * side. The margin lets a car solid-blocked flush against an enemy still ram it
+ * from any direction. Shared by racer.c and patrol.c so both use identical
+ * collision logic (#417). */
+uint8_t enemy_ram_overlap(int16_t px, int16_t py, int16_t ex, int16_t ey) BANKED;
+
 #endif /* ENEMY_COMMON_H */
