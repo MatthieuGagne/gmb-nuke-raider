@@ -725,6 +725,25 @@ void test_racer_ram_also_damages_player(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(PLAYER_MAX_HP - RACER_RAM_DAMAGE), damage_get_hp());
 }
 
+void test_racer_ram_flush_from_any_side(void) {
+    /* A player solid-blocked flush against the racer (no AABB interpenetration)
+     * still rams it from EVERY side, via the shared ENEMY_RAM_REACH margin (#417).
+     * Racer AABB = [32,48) x [32,48); each call places the player flush (gap 0). */
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    damage_init();
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(32, 16));  /* above */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(32, 48));  /* below (from behind) */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(16, 32));  /* left */
+    racer_set_hp_for_test(1u, RACER_HP); racer_set_ram_cd_for_test(1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_apply_contact_damage(48, 32));  /* right */
+}
+
 void test_racer_get_cp_next_initial_zero(void) {
     uint8_t wp_tx[1] = { 10u };
     uint8_t wp_ty[1] = { 10u };
@@ -941,6 +960,7 @@ int main(void) {
     RUN_TEST(test_racer_ram_nonlethal_sets_hit_flash);
     RUN_TEST(test_racer_ram_to_kill_enters_dying);
     RUN_TEST(test_racer_ram_also_damages_player);
+    RUN_TEST(test_racer_ram_flush_from_any_side);
     RUN_TEST(test_racer_get_cp_next_initial_zero);
     RUN_TEST(test_racer_spawn_resets_cp_next);
     RUN_TEST(test_racer_get_px_returns_spawn_value);

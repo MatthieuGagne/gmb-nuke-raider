@@ -593,18 +593,18 @@ uint8_t racer_overlaps_player(int16_t px, int16_t py) BANKED {
 }
 
 /* Mutual contact damage (#412 + #417). For every active racer overlapping the
- * player AABB: chip ENEMY_RAM_DAMAGE off it behind a per-racer 30-frame cooldown
- * (blink + route to the #411 death path on a lethal result). The player side
- * always takes RACER_RAM_DAMAGE on any overlap (damage.c i-frames debounce it).
- * Dying racers (active=0) are excluded. Returns 1 on any overlap so state_playing
- * plays SFX_HIT. */
+ * player via the SHARED enemy_ram_overlap test (identical logic to patrol.c, with
+ * the ENEMY_RAM_REACH margin so a flush contact rams from any side): chip
+ * ENEMY_RAM_DAMAGE off it behind a per-racer 30-frame cooldown (blink + route to
+ * the #411 death path on a lethal result). The player side always takes
+ * RACER_RAM_DAMAGE on any overlap (damage.c i-frames debounce it). Dying racers
+ * (active=0) are excluded. Returns 1 on any overlap so state_playing plays SFX_HIT. */
 uint8_t racer_apply_contact_damage(int16_t px, int16_t py) BANKED {
     uint8_t i;
     uint8_t hit = 0u;
     for (i = 0u; i < MAX_RACERS; i++) {
         if (!racer_active[i]) continue;
-        if (px < racer_px[i] + 16 && px + 16 > racer_px[i] &&
-            py < racer_py[i] + 16 && py + 16 > racer_py[i]) {
+        if (enemy_ram_overlap(px, py, racer_px[i], racer_py[i])) {
             hit = 1u;
             if (racer_ram_cd[i] == 0u) {
                 racer_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;

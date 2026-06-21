@@ -1,6 +1,7 @@
 #pragma bank 255
 
 #include "enemy_common.h"
+#include "config.h"      /* ENEMY_RAM_REACH */
 
 /* enemy_aim_dir — verbatim body of the former turret_dir_to_pixel(). */
 player_dir_t enemy_aim_dir(uint8_t tx, uint8_t ty,
@@ -58,4 +59,13 @@ uint8_t enemy_wp_advance(uint8_t cur_idx, uint8_t wp_count, uint8_t reached) BAN
         return (next >= wp_count) ? 0u : next;
     }
     return cur_idx;
+}
+
+/* enemy_ram_overlap — player 16x16 AABB vs enemy 16x16 AABB inflated by
+ * ENEMY_RAM_REACH on every side. `reach` is taken signed so the box math stays
+ * correct even if a coordinate is negative (off-screen). */
+uint8_t enemy_ram_overlap(int16_t px, int16_t py, int16_t ex, int16_t ey) BANKED {
+    int16_t reach = (int16_t)ENEMY_RAM_REACH;
+    return (px < ex + 16 + reach && px + 16 > ex - reach &&
+            py < ey + 16 + reach && py + 16 > ey - reach) ? 1u : 0u;
 }

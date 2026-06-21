@@ -191,6 +191,18 @@ void test_patrol_ram_reduces_hp(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
 }
 
+void test_patrol_ram_from_above_reduces_hp(void) {
+    /* Same shared overlap logic as the racer: contact from a different side
+     * (player 8px above) also rams. Mirrors test_patrol_ram_reduces_hp (#417). */
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {4u};
+    damage_init();
+    patrol_spawn_for_test(32, 32, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    patrol_update(32, 24);   /* player 8px above -> overlap -> ram */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - ENEMY_RAM_DAMAGE), patrol_get_hp(0u));
+}
+
 void test_patrol_ram_debounced_by_cooldown(void) {
     /* Two consecutive overlapping updates deal only one enemy hit (cooldown). */
     static uint8_t wtx[1] = {11u};
@@ -265,6 +277,7 @@ int main(void) {
     RUN_TEST(test_bullet_hit_decrements_hp);
     RUN_TEST(test_fatal_hit_destroys_and_deactivates);
     RUN_TEST(test_patrol_ram_reduces_hp);
+    RUN_TEST(test_patrol_ram_from_above_reduces_hp);
     RUN_TEST(test_patrol_ram_debounced_by_cooldown);
     RUN_TEST(test_patrol_ram_cooldown_expiry_allows_second_hit);
     RUN_TEST(test_patrol_ram_nonlethal_sets_hit_flash);

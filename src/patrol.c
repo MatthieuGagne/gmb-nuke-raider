@@ -258,14 +258,13 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             }
         }
 
-        /* --- Ram contact: car-vs-car 16x16 overlap. The player takes damage on
-         * every overlap (damage.c i-frames debounce). The patrol takes
-         * ENEMY_RAM_DAMAGE behind its own 30-frame cooldown; a 0-HP result
-         * destroys it via the shared kill path (#417). --- */
+        /* --- Ram contact: car-vs-car overlap via the SHARED enemy_ram_overlap
+         * test (identical logic to racer.c, ENEMY_RAM_REACH margin so a flush
+         * contact rams from any side). The player takes damage on every overlap
+         * (damage.c i-frames debounce). The patrol takes ENEMY_RAM_DAMAGE behind
+         * its own 30-frame cooldown; a 0-HP result destroys it (#417). --- */
         {
-            int16_t rdx = px - patrol_px[i];
-            int16_t rdy = py - patrol_py[i];
-            if (rdx > -16 && rdx < 16 && rdy > -16 && rdy < 16) {
+            if (enemy_ram_overlap(px, py, patrol_px[i], patrol_py[i])) {
                 damage_apply(RACER_RAM_DAMAGE);
                 if (patrol_ram_cd[i] == 0u) {
                     patrol_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
