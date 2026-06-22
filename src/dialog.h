@@ -8,6 +8,9 @@
 /* Sentinel: used in DialogNode.next[] to mark end of conversation. */
 #define DIALOG_END 0xFFu
 
+/* Sentinel: a choice's next[] value meaning "open this NPC's vendor shop". */
+#define DIALOG_SHOP 0xFEu
+
 /* ROM-side node: text, optional choices, and destination indices. */
 typedef struct {
     const char *text;           /* displayed line                           */
