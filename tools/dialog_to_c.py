@@ -22,6 +22,14 @@ MAX_CHOICES   = 3
 MAX_NPCS      = 6
 DIALOG_END    = "DIALOG_END"
 
+# Maps a JSON vendor_field string to its loadout-field C macro (see config.h).
+VENDOR_FIELD_MACRO = {
+    "CAR":     "LOADOUT_FIELD_CAR",
+    "ARMOR":   "LOADOUT_FIELD_ARMOR",
+    "WEAPON1": "LOADOUT_FIELD_WEAPON1",
+    "WEAPON2": "LOADOUT_FIELD_WEAPON2",
+}
+
 CONFIG_H_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'config.h')
 
 
@@ -91,7 +99,7 @@ def validate(data, max_npcs=None):
                         f"NPC {npc_id} node {idx}: narration node must have exactly 1 next, "
                         f"got {len(nexts)}")
             for n in nexts:
-                if n == "END":
+                if n in ("END", "SHOP"):
                     continue
                 if not isinstance(n, int) or n < 0 or n >= num_nodes:
                     raise ValueError(
@@ -100,7 +108,11 @@ def validate(data, max_npcs=None):
 
 
 def _next_val(n):
-    return DIALOG_END if n == "END" else str(n)
+    if n == "END":
+        return DIALOG_END
+    if n == "SHOP":
+        return "DIALOG_SHOP"
+    return str(n)
 
 
 def _pad3(val, width=11):
@@ -199,6 +211,23 @@ def generate_c(data, max_npcs=None):
         lines.append(
             f"    {{ {slug}_nodes, {num_nodes}, npc_name_{slug} }}, /* NPC {npc_id}: {name} */"
         )
+    lines.append("};")
+    lines.append("")
+
+    # npc_vendor_field table (indexed by npc_id; 0xFF = not a vendor)
+    lines.append("/* --- Vendor loadout field per npc_id (0xFF = not a vendor) --- */")
+    lines.append("const uint8_t npc_vendor_field[] = {")
+    for npc in data["npcs"]:
+        vf = npc.get("vendor_field")
+        if vf is None:
+            val = "0xFFu"
+        elif vf in VENDOR_FIELD_MACRO:
+            val = VENDOR_FIELD_MACRO[vf]
+        else:
+            raise ValueError(
+                f"NPC {npc['id']} has unknown vendor_field {vf!r} "
+                f"(expected one of {sorted(VENDOR_FIELD_MACRO)})")
+        lines.append(f"    {val}, /* NPC {npc['id']}: {npc['name']} */")
     lines.append("};")
     lines.append("")
     return "\n".join(lines)
