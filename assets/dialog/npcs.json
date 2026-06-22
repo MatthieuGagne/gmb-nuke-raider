@@ -3,6 +3,7 @@
     {
       "id": 0,
       "name": "STEEVE",
+      "vendor_field": "ARMOR",
       "nodes": [
         {
           "idx": 0,
@@ -40,10 +41,14 @@
         },
         {
           "idx": 3,
-          "text": "I've got parts if you've got caps.",
-          "choices": [],
+          "text": "Plate up. Caps first.",
+          "choices": [
+            "Browse",
+            "Later"
+          ],
           "next": [
-            6
+            "SHOP",
+            "END"
           ]
         },
         {
@@ -75,6 +80,7 @@
     {
       "id": 1,
       "name": "TRADER",
+      "vendor_field": "WEAPON1",
       "nodes": [
         {
           "idx": 0,
@@ -84,7 +90,7 @@
             "Leave"
           ],
           "next": [
-            1,
+            "SHOP",
             "END"
           ]
         },
@@ -101,13 +107,18 @@
     {
       "id": 2,
       "name": "DRIFTER",
+      "vendor_field": "WEAPON2",
       "nodes": [
         {
           "idx": 0,
-          "text": "Just passing through.",
-          "choices": [],
+          "text": "Got a little something. Caps talk.",
+          "choices": [
+            "Browse",
+            "Nah"
+          ],
           "next": [
-            1
+            "SHOP",
+            "END"
           ]
         },
         {

@@ -9,4 +9,7 @@
 extern const NpcDialog npc_dialogs[];
 BANKREF_EXTERN(npc_dialogs)
 
+/* Vendor loadout field per npc_id; 0xFF = not a vendor. Generated in dialog_data.c. */
+extern const uint8_t npc_vendor_field[];
+
 #endif /* DIALOG_DATA_H */
