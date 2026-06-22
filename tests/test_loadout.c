@@ -66,14 +66,52 @@ void test_loadout_cycling_wraps_left(void) {
 
 void test_loadout_cycling_normal(void) {
     loadout_init();
-    loadout_cycle_car(1);   /* 0 -> 1 */
+    loadout_cycle_car(1);   /* 0 -> 1 (CAR never gated) */
     TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_car());
+    loadout_unlock_option(LOADOUT_FIELD_ARMOR);
     loadout_cycle_armor(1);
     TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_armor());
+    loadout_unlock_option(LOADOUT_FIELD_WEAPON1);
     loadout_cycle_weapon1(1);
     TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_weapon1());
+    loadout_unlock_option(LOADOUT_FIELD_WEAPON2);
     loadout_cycle_weapon2(1);
     TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_weapon2());
+}
+
+void test_loadout_init_locks_tier1_except_car(void) {
+    loadout_init();
+    TEST_ASSERT_EQUAL_UINT8(1u, loadout_is_option_unlocked(LOADOUT_FIELD_ARMOR, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, loadout_is_option_unlocked(LOADOUT_FIELD_ARMOR, 1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, loadout_is_option_unlocked(LOADOUT_FIELD_WEAPON1, 1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, loadout_is_option_unlocked(LOADOUT_FIELD_WEAPON2, 1u));
+    TEST_ASSERT_EQUAL_UINT8(1u, loadout_is_option_unlocked(LOADOUT_FIELD_CAR, 1u));
+}
+
+void test_loadout_unlock_option_sets_bit(void) {
+    loadout_init();
+    loadout_unlock_option(LOADOUT_FIELD_ARMOR);
+    TEST_ASSERT_EQUAL_UINT8(1u, loadout_is_option_unlocked(LOADOUT_FIELD_ARMOR, 1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, loadout_is_option_unlocked(LOADOUT_FIELD_WEAPON1, 1u));
+}
+
+void test_loadout_cycle_skips_locked(void) {
+    loadout_init();
+    loadout_cycle_armor(1);
+    TEST_ASSERT_EQUAL_UINT8(0u, loadout_get_armor());
+}
+
+void test_loadout_cycle_reaches_unlocked(void) {
+    loadout_init();
+    loadout_unlock_option(LOADOUT_FIELD_ARMOR);
+    loadout_cycle_armor(1);
+    TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_armor());
+}
+
+void test_loadout_car_cycles_without_unlock(void) {
+    loadout_init();
+    loadout_cycle_car(1);
+    TEST_ASSERT_EQUAL_UINT8(1u, loadout_get_car());
 }
 
 int main(void) {
@@ -87,5 +125,10 @@ int main(void) {
     RUN_TEST(test_loadout_cycling_wraps_right);
     RUN_TEST(test_loadout_cycling_wraps_left);
     RUN_TEST(test_loadout_cycling_normal);
+    RUN_TEST(test_loadout_init_locks_tier1_except_car);
+    RUN_TEST(test_loadout_unlock_option_sets_bit);
+    RUN_TEST(test_loadout_cycle_skips_locked);
+    RUN_TEST(test_loadout_cycle_reaches_unlocked);
+    RUN_TEST(test_loadout_car_cycles_without_unlock);
     return UNITY_END();
 }

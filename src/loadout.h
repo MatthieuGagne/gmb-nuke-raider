@@ -22,4 +22,8 @@ void loadout_cycle_armor(int8_t dir) BANKED;
 void loadout_cycle_weapon1(int8_t dir) BANKED;
 void loadout_cycle_weapon2(int8_t dir) BANKED;
 
+/* Unlock state for tier-1 options (tier 0 is always unlocked; CAR is never gated). */
+void    loadout_unlock_option(uint8_t field) BANKED;           /* unlock field's tier-1 */
+uint8_t loadout_is_option_unlocked(uint8_t field, uint8_t option) BANKED;
+
 #endif /* LOADOUT_H */
