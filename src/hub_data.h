@@ -15,4 +15,8 @@ typedef struct {
 extern const HubDef * const hub_table[];
 extern const uint8_t         hub_table_count;
 
+/* Vendor loadout field per npc_id; 0xFF = not a vendor. Generated in hub_data.c
+ * (bank 0) so bank-0 state_hub.c can read it without a bank switch. */
+extern const uint8_t npc_vendor_field[];
+
 #endif /* HUB_DATA_H */

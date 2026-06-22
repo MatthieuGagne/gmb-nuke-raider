@@ -353,26 +353,34 @@ class TestShopAndVendor(unittest.TestCase):
         out = self._emit(data)
         self.assertIn("DIALOG_SHOP", out)
 
+    # vendor_field table lives in bank-0 hub_data.c (generate_hub_c), NOT
+    # bank-255 dialog_data.c — see generate_hub_c emission.
+    def _hub_npcs(self, npcs):
+        hubs = {"hubs": [{"id": 0, "name": "HUB", "npc_ids": [n["id"] for n in npcs["npcs"]]}]}
+        return hubs, npcs
+
     # 43 — vendor_field "ARMOR" maps to LOADOUT_FIELD_ARMOR in the table
     def test_vendor_field_armor_emitted(self):
-        data = {"npcs": [{"id": 0, "name": "STEEVE", "vendor_field": "ARMOR",
+        npcs = {"npcs": [{"id": 0, "name": "STEEVE", "vendor_field": "ARMOR",
                           "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
-        out = self._emit(data)
+        out = conv.generate_hub_c(*self._hub_npcs(npcs))
         self.assertIn("npc_vendor_field[]", out)
         self.assertIn("LOADOUT_FIELD_ARMOR", out)
 
     # 44 — absent vendor_field emits 0xFFu
     def test_vendor_field_absent_is_0xff(self):
-        out = self._emit(_one_npc())
+        npcs = {"npcs": [{"id": 0, "name": "X",
+                          "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
+        out = conv.generate_hub_c(*self._hub_npcs(npcs))
         self.assertIn("npc_vendor_field[]", out)
         self.assertIn("0xFFu", out)
 
     # 45 — unknown vendor_field raises
     def test_vendor_field_invalid_raises(self):
-        data = {"npcs": [{"id": 0, "name": "X", "vendor_field": "BOGUS",
+        npcs = {"npcs": [{"id": 0, "name": "X", "vendor_field": "BOGUS",
                           "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
         with self.assertRaises(ValueError) as cm:
-            conv.generate_c(data)
+            conv.generate_hub_c(*self._hub_npcs(npcs))
         self.assertIn("BOGUS", str(cm.exception))
 
 

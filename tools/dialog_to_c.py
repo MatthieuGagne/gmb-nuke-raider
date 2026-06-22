@@ -213,23 +213,6 @@ def generate_c(data, max_npcs=None):
         )
     lines.append("};")
     lines.append("")
-
-    # npc_vendor_field table (indexed by npc_id; 0xFF = not a vendor)
-    lines.append("/* --- Vendor loadout field per npc_id (0xFF = not a vendor) --- */")
-    lines.append("const uint8_t npc_vendor_field[] = {")
-    for npc in data["npcs"]:
-        vf = npc.get("vendor_field")
-        if vf is None:
-            val = "0xFFu"
-        elif vf in VENDOR_FIELD_MACRO:
-            val = VENDOR_FIELD_MACRO[vf]
-        else:
-            raise ValueError(
-                f"NPC {npc['id']} has unknown vendor_field {vf!r} "
-                f"(expected one of {sorted(VENDOR_FIELD_MACRO)})")
-        lines.append(f"    {val}, /* NPC {npc['id']}: {npc['name']} */")
-    lines.append("};")
-    lines.append("")
     return "\n".join(lines)
 
 
@@ -293,6 +276,26 @@ def generate_hub_c(hubs_data, npcs_data):
     table_entries = ", ".join(f"&{v}" for v in hub_var_names)
     lines.append(f"const HubDef * const hub_table[] = {{ {table_entries} }};")
     lines.append(f"const uint8_t         hub_table_count = {len(hub_var_names)}u;")
+    lines.append("")
+
+    # npc_vendor_field table (indexed by npc_id; 0xFF = not a vendor). Emitted
+    # into bank-0 hub_data.c so bank-0 state_hub.c can read it directly without
+    # a bank switch (dialog_data.c is bank 255 — switchable — so the table must
+    # NOT live there).
+    lines.append("/* --- Vendor loadout field per npc_id (0xFF = not a vendor) --- */")
+    lines.append("const uint8_t npc_vendor_field[] = {")
+    for npc in npcs_data["npcs"]:
+        vf = npc.get("vendor_field")
+        if vf is None:
+            val = "0xFFu"
+        elif vf in VENDOR_FIELD_MACRO:
+            val = VENDOR_FIELD_MACRO[vf]
+        else:
+            raise ValueError(
+                f"NPC {npc['id']} has unknown vendor_field {vf!r} "
+                f"(expected one of {sorted(VENDOR_FIELD_MACRO)})")
+        lines.append(f"    {val}, /* NPC {npc['id']}: {npc['name']} */")
+    lines.append("};")
     lines.append("")
     return "\n".join(lines)
 
