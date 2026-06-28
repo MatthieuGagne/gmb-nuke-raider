@@ -13,11 +13,14 @@
 #include "config.h"
 #include "music.h"
 #include "sfx.h"
+#include "economy.h"
+#include "loadout.h"
 
 BANKREF(state_hub)
 
 #define HUB_SUB_MENU   0u
 #define HUB_SUB_DIALOG 1u
+#define HUB_SUB_SHOP   2u
 #define DIALOG_INNER_W 12u  /* inner text cols inside dialog box (cols 7-18) */
 
 /* Clear only the 18 visible BG rows (0-17). cls() clears all 32 rows and
@@ -35,6 +38,13 @@ static void clear_visible_rows(void) {
 uint8_t overmap_hub_entered = 0u;
 
 static uint8_t           sub_state;
+static uint8_t           s_shop_field;   /* loadout field of the active vendor */
+
+/* Price per loadout field (CAR slot unused). */
+static const uint8_t SHOP_PRICE[LOADOUT_NUM_FIELDS] = {
+    0u, UPGRADE_COST_ARMOR, UPGRADE_COST_WEAPON1, UPGRADE_COST_WEAPON2
+};
+
 static uint8_t           cursor;
 static uint8_t           active_npc;
 static uint8_t           dialog_cursor;
@@ -97,6 +107,24 @@ static void hub_render_menu(void) {
     printf("Leave");
     gotoxy(1u, (uint8_t)(2u + cursor));
     printf(">");
+}
+
+static void hub_render_shop(void) {
+    uint8_t owned = loadout_is_option_unlocked(s_shop_field, 1u);
+    clear_visible_rows();
+    gotoxy(1u, 0u);  printf(hub->name);
+    gotoxy(1u, 2u);  printf("CAPS: %u", economy_get_scrap());
+    gotoxy(1u, 4u);  printf(LOADOUT_OPTION_NAMES[s_shop_field][1u]);
+    gotoxy(12u, 4u); printf("%u", SHOP_PRICE[s_shop_field]);
+    gotoxy(1u, 6u);  printf(owned ? "[OWNED]" : "A:BUY  B:BACK");
+}
+
+static void hub_enter_shop(uint8_t field) {
+    s_shop_field = field;
+    sub_state    = HUB_SUB_SHOP;
+    vbl_display_off();
+    hub_render_shop();
+    DISPLAY_ON;
 }
 
 /* Renders word-wrapped text starting at (start_col, start_row).
@@ -310,6 +338,17 @@ static void update_dialog(void) {
             hub_render_dialog();
             DISPLAY_ON;
         } else {
+            /* last page — vendor-shop hook before advancing */
+            if (dialog_num_choices_cache > 0u &&
+                dialog_next_cache[dialog_cursor] == DIALOG_SHOP) {
+                uint8_t npc_id = hub->npc_dialog_ids[active_npc];
+                hub_enter_shop(npc_vendor_field[npc_id]);
+                dialog_cursor      = 0u;
+                dialog_prev_cursor = 0u;
+                dialog_page_start  = 0u;
+                dialog_next_offset = 0u;
+                return;
+            }
             /* last page — advance dialog node */
             more = dialog_advance(dialog_cursor);
             dialog_cursor      = 0u;
@@ -329,6 +368,27 @@ static void update_dialog(void) {
                 DISPLAY_ON;
             }
         }
+    }
+}
+
+static void update_shop(void) {
+    if (KEY_TICKED(J_A)) {
+        if (!loadout_is_option_unlocked(s_shop_field, 1u) &&
+            economy_get_scrap() >= SHOP_PRICE[s_shop_field]) {
+            (void)economy_spend_scrap(SHOP_PRICE[s_shop_field]);
+            loadout_unlock_option(s_shop_field);
+            sfx_play(SFX_UI);
+            vbl_display_off();
+            hub_render_shop();
+            DISPLAY_ON;
+        }
+        /* insufficient funds or already owned -> no-op */
+    } else if (KEY_TICKED(J_B)) {
+        sub_state = HUB_SUB_MENU;
+        cursor    = 0u;
+        vbl_display_off();
+        hub_render_menu();
+        DISPLAY_ON;
     }
 }
 
@@ -360,8 +420,9 @@ static void enter(void) {
 }
 
 static void update(void) {
-    if (sub_state == HUB_SUB_MENU) { update_menu(); }
-    else                            { update_dialog(); }
+    if (sub_state == HUB_SUB_MENU)      { update_menu(); }
+    else if (sub_state == HUB_SUB_SHOP) { update_shop(); }
+    else                                { update_dialog(); }
 }
 
 static void hub_exit(void) {

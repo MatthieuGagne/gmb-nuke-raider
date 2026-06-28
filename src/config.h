@@ -211,4 +211,9 @@ static const char * const * const LOADOUT_OPTION_NAMES[LOADOUT_NUM_FIELDS] = {
 };
 #endif
 
+/* Upgrade shop: tier-1 unlock prices, indexed by loadout field (CAR unused). */
+#define UPGRADE_COST_ARMOR    75u
+#define UPGRADE_COST_WEAPON1  60u
+#define UPGRADE_COST_WEAPON2  50u
+
 #endif /* CONFIG_H */

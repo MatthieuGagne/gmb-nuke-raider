@@ -145,7 +145,10 @@
       "PowerShell(git status *)",
       "PowerShell(git diff *)",
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; Write-Output \"=== diff vs master \\(should be CLAUDE.md only\\) ===\"; git diff origin/master...HEAD --stat; Write-Output \"=== commits ahead of master ===\"; git log origin/master..HEAD --oneline)",
-      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; git diff .claude/settings.local.json | Select-String -Pattern '^\\\\+' | Select-Object -Last 6)"
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; git diff .claude/settings.local.json | Select-String -Pattern '^\\\\+' | Select-Object -Last 6)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; git status -sb | Select-Object -First 3; Write-Output \"=== recent ===\"; git log --oneline -5)",
+      "Bash(./build/test_loadout)",
+      "PowerShell(make bank-post-build *)"
     ]
   },
   "hooks": {

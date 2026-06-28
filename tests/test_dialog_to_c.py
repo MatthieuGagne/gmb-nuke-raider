@@ -331,5 +331,58 @@ class TestConfigHelpers(unittest.TestCase):
         self.assertIn("NONEXISTENT", str(cm.exception))
 
 
+# ── Shop sentinel + vendor field ─────────────────────────────────────────────
+
+class TestShopAndVendor(unittest.TestCase):
+
+    def _emit(self, data):
+        return conv.generate_c(data)
+
+    # 41 — a choice next of "SHOP" validates OK
+    def test_shop_next_validates(self):
+        data = _one_npc(nodes=[
+            {"idx": 0, "text": "Hi", "choices": ["Browse", "Leave"], "next": ["SHOP", "END"]},
+        ])
+        conv.validate(data)  # must not raise
+
+    # 42 — "SHOP" emits the DIALOG_SHOP sentinel
+    def test_shop_sentinel_emitted(self):
+        data = _one_npc(nodes=[
+            {"idx": 0, "text": "Hi", "choices": ["Browse", "Leave"], "next": ["SHOP", "END"]},
+        ])
+        out = self._emit(data)
+        self.assertIn("DIALOG_SHOP", out)
+
+    # vendor_field table lives in bank-0 hub_data.c (generate_hub_c), NOT
+    # bank-255 dialog_data.c — see generate_hub_c emission.
+    def _hub_npcs(self, npcs):
+        hubs = {"hubs": [{"id": 0, "name": "HUB", "npc_ids": [n["id"] for n in npcs["npcs"]]}]}
+        return hubs, npcs
+
+    # 43 — vendor_field "ARMOR" maps to LOADOUT_FIELD_ARMOR in the table
+    def test_vendor_field_armor_emitted(self):
+        npcs = {"npcs": [{"id": 0, "name": "STEEVE", "vendor_field": "ARMOR",
+                          "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
+        out = conv.generate_hub_c(*self._hub_npcs(npcs))
+        self.assertIn("npc_vendor_field[]", out)
+        self.assertIn("LOADOUT_FIELD_ARMOR", out)
+
+    # 44 — absent vendor_field emits 0xFFu
+    def test_vendor_field_absent_is_0xff(self):
+        npcs = {"npcs": [{"id": 0, "name": "X",
+                          "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
+        out = conv.generate_hub_c(*self._hub_npcs(npcs))
+        self.assertIn("npc_vendor_field[]", out)
+        self.assertIn("0xFFu", out)
+
+    # 45 — unknown vendor_field raises
+    def test_vendor_field_invalid_raises(self):
+        npcs = {"npcs": [{"id": 0, "name": "X", "vendor_field": "BOGUS",
+                          "nodes": [{"idx": 0, "text": "Hi", "choices": [], "next": ["END"]}]}]}
+        with self.assertRaises(ValueError) as cm:
+            conv.generate_hub_c(*self._hub_npcs(npcs))
+        self.assertIn("BOGUS", str(cm.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

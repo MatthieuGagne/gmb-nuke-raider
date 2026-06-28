@@ -41,3 +41,15 @@ static const HubDef hub2 = {
 
 const HubDef * const hub_table[] = { &hub0, &hub1, &hub2 };
 const uint8_t         hub_table_count = 3u;
+
+/* --- Vendor loadout field per npc_id (0xFF = not a vendor) --- */
+const uint8_t npc_vendor_field[] = {
+    LOADOUT_FIELD_ARMOR, /* NPC 0: STEEVE */
+    LOADOUT_FIELD_WEAPON1, /* NPC 1: TRADER */
+    LOADOUT_FIELD_WEAPON2, /* NPC 2: DRIFTER */
+    0xFFu, /* NPC 3: PLACEHOLDER3 */
+    0xFFu, /* NPC 4: PLACEHOLDER4 */
+    0xFFu, /* NPC 5: PLACEHOLDER5 */
+    0xFFu, /* NPC 6: PLACEHOLDER6 */
+    0xFFu, /* NPC 7: PLACEHOLDER7 */
+};
