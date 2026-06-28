@@ -31,6 +31,7 @@
 /* Damage system */
 #define PLAYER_MAX_HP              100u  /* max HP pool; 0 = dead */
 #define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
+#define ARMOR_HEAVY_REDUCTION       2u   /* flat HP subtracted per hit when ARMOR tier 1 (HEAVY); damage floors at 1 */
 #define ENEMY_BULLET_DAMAGE        10u  /* HP damage dealt by an enemy bullet projectile */
 
 /* Powerup system */

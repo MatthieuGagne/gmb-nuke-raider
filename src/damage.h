@@ -8,6 +8,12 @@
  * Call from state_playing enter(), before DISPLAY_ON. */
 void    damage_init(void) BANKED;
 
+/* Cache the player's ARMOR loadout tier for the race (0 = LIGHT, 1 = HEAVY).
+ * Call once after damage_init() in state_playing enter(). HEAVY subtracts
+ * ARMOR_HEAVY_REDUCTION from every incoming damage value (floored at 1).
+ * damage_init() resets the cached tier to 0 (LIGHT). */
+void    damage_set_armor_tier(uint8_t tier) BANKED;
+
 /* Decrement invincibility cooldown by 1 (no-op if already 0).
  * Call once per frame in state_playing update(). */
 void    damage_tick(void) BANKED;
