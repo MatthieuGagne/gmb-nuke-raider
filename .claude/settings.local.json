@@ -148,7 +148,10 @@
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; git diff .claude/settings.local.json | Select-String -Pattern '^\\\\+' | Select-Object -Last 6)",
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; git status -sb | Select-Object -First 3; Write-Output \"=== recent ===\"; git log --oneline -5)",
       "Bash(./build/test_loadout)",
-      "PowerShell(make bank-post-build *)"
+      "PowerShell(make bank-post-build *)",
+      "PowerShell(Set-Location \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-upgrade-shop-139\"; $env:PYTHONPATH = \".\"; python -m unittest tests.test_dialog_to_c.TestShopAndVendor 2>&1 | Select-Object -Last 20)",
+      "PowerShell(gh issue list --state open --limit 30 --json number,title,labels --jq '.[] | \"#\\\\\\(.number\\) \\\\\\(.title\\)\"')",
+      "PowerShell(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | \"#\\\\\\(.number\\) [\\\\\\(.headRefName\\)] draft=\\\\\\(.isDraft\\) \\\\\\(.title\\)\"')"
     ]
   },
   "hooks": {
