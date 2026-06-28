@@ -12,6 +12,7 @@ BANKREF_EXTERN(state_playing)
 #include "hud.h"
 #include "loader.h"
 #include "damage.h"
+#include "loadout.h"
 #include "state_game_over.h"
 #include "state_results.h"
 #include "economy.h"
@@ -90,6 +91,7 @@ static void enter(void) {
     }
     player_reset_vel();
     damage_init();
+    damage_set_armor_tier(loadout_get_armor());  /* HEAVY armor reduces incoming damage for this race (#423) */
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
     race_state_init(track_get_lap_count());
