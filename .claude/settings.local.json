@@ -151,7 +151,8 @@
       "PowerShell(make bank-post-build *)",
       "PowerShell(Set-Location \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\feat-upgrade-shop-139\"; $env:PYTHONPATH = \".\"; python -m unittest tests.test_dialog_to_c.TestShopAndVendor 2>&1 | Select-Object -Last 20)",
       "PowerShell(gh issue list --state open --limit 30 --json number,title,labels --jq '.[] | \"#\\\\\\(.number\\) \\\\\\(.title\\)\"')",
-      "PowerShell(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | \"#\\\\\\(.number\\) [\\\\\\(.headRefName\\)] draft=\\\\\\(.isDraft\\) \\\\\\(.title\\)\"')"
+      "PowerShell(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | \"#\\\\\\(.number\\) [\\\\\\(.headRefName\\)] draft=\\\\\\(.isDraft\\) \\\\\\(.title\\)\"')",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; & ./build/test_damage 2>&1 | Select-Object -Last 3)"
     ]
   },
   "hooks": {

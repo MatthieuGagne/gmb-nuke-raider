@@ -4,10 +4,16 @@
 
 uint8_t hp;
 static uint8_t invincibility_cooldown;
+static uint8_t armor_tier;  /* 0 = LIGHT (no reduction), 1 = HEAVY (ARMOR_HEAVY_REDUCTION per hit) */
 
 void damage_init(void) BANKED {
     hp                     = PLAYER_MAX_HP;
     invincibility_cooldown = 0u;
+    armor_tier             = 0u;
+}
+
+void damage_set_armor_tier(uint8_t tier) BANKED {
+    armor_tier = tier;
 }
 
 void damage_tick(void) BANKED {
@@ -19,6 +25,13 @@ void damage_tick(void) BANKED {
 void damage_apply(uint8_t amount) BANKED {
     if (invincibility_cooldown > 0u) return;
     if (hp == 0u)                    return;
+    /* HEAVY armor: subtract a flat amount, but never below 1 (walls still chip HP).
+     * Guard on amount > 0 so a 0-damage call stays a true no-op (not floored up to 1). */
+    if (amount > 0u && armor_tier == 1u) {
+        amount = (amount > ARMOR_HEAVY_REDUCTION)
+               ? (uint8_t)(amount - ARMOR_HEAVY_REDUCTION)
+               : 1u;
+    }
     if (amount >= hp) {
         hp = 0u;
     } else {
