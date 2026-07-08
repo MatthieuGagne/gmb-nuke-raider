@@ -198,6 +198,39 @@ void test_projectile_render_uses_tile_base(void) {
     TEST_ASSERT_EQUAL_UINT8(17u, mock_sprite_tile[0]);
 }
 
+/* ── per-weapon damage (#424) ─────────────────────────────────────────── */
+
+/* check_hit_enemy returns the cached CANNON damage (default = 1) */
+void test_check_hit_enemy_default_cannon_damage(void) {
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(WEAPON1_CANNON_DAMAGE,
+                            projectile_check_hit_enemy(80u, 80u, 8u));
+}
+
+/* After set to LASER, check_hit_enemy returns the LASER damage */
+void test_check_hit_enemy_laser_damage(void) {
+    projectile_set_weapon1_damage(WEAPON1_LASER_DAMAGE);
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(WEAPON1_LASER_DAMAGE,
+                            projectile_check_hit_enemy(80u, 80u, 8u));
+}
+
+/* A miss returns 0 regardless of the cached damage */
+void test_check_hit_enemy_miss_returns_zero(void) {
+    projectile_set_weapon1_damage(WEAPON1_LASER_DAMAGE);
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(0u, projectile_check_hit_enemy(20u, 20u, 4u));
+}
+
+/* projectile_init() resets the cache back to CANNON */
+void test_projectile_init_resets_weapon_damage(void) {
+    projectile_set_weapon1_damage(WEAPON1_LASER_DAMAGE);
+    projectile_init(17u);   /* must reset cache to CANNON */
+    projectile_fire(80u, 80u, DIR_B, PROJ_OWNER_PLAYER);
+    TEST_ASSERT_EQUAL_UINT8(WEAPON1_CANNON_DAMAGE,
+                            projectile_check_hit_enemy(80u, 80u, 8u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_projectile_init_no_active_slots);
@@ -221,5 +254,9 @@ int main(void) {
     RUN_TEST(test_projectile_player_cooldown_unaffected_by_enemy_shot);
     RUN_TEST(test_projectile_player_cooldown_still_applies);
     RUN_TEST(test_projectile_render_uses_tile_base);
+    RUN_TEST(test_check_hit_enemy_default_cannon_damage);
+    RUN_TEST(test_check_hit_enemy_laser_damage);
+    RUN_TEST(test_check_hit_enemy_miss_returns_zero);
+    RUN_TEST(test_projectile_init_resets_weapon_damage);
     return UNITY_END();
 }
