@@ -293,9 +293,10 @@ void patrol_update(int16_t px, int16_t py) BANKED {
             if (on_screen) {
                 /* Take player bullet hits */
                 if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
-                    if (projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy,
-                                                   (uint8_t)PATROL_HIT_RADIUS)) {
-                        patrol_hp[i]--;
+                    uint8_t dmg = projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy,
+                                                             (uint8_t)PATROL_HIT_RADIUS);
+                    if (dmg) {
+                        patrol_hp[i] = enemy_apply_damage(patrol_hp[i], dmg);
                         patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
                         if (patrol_hp[i] == 0u) {
                             patrol_kill(i);
