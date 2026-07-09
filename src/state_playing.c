@@ -93,6 +93,7 @@ static void enter(void) {
     damage_init();
     damage_set_armor_tier(loadout_get_armor());  /* HEAVY armor reduces incoming damage for this race (#423) */
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
+    projectile_set_weapon1_damage(WEAPON1_DAMAGE_TABLE[loadout_get_weapon1()]);  /* LASER deals more per hit (#424) */
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
     race_state_init(track_get_lap_count());
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
