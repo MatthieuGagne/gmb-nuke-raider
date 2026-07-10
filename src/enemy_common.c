@@ -69,3 +69,8 @@ uint8_t enemy_ram_overlap(int16_t px, int16_t py, int16_t ex, int16_t ey) BANKED
     return (px < ex + 16 + reach && px + 16 > ex - reach &&
             py < ey + 16 + reach && py + 16 > ey - reach) ? 1u : 0u;
 }
+
+/* enemy_apply_damage — subtract dmg from hp, floored at 0 (underflow-safe). */
+uint8_t enemy_apply_damage(uint8_t hp, uint8_t dmg) BANKED {
+    return (dmg >= hp) ? 0u : (uint8_t)(hp - dmg);
+}

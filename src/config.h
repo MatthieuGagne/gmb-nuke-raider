@@ -33,6 +33,8 @@
 #define DAMAGE_INVINCIBILITY_FRAMES 30u /* frames of i-frames after a hit */
 #define ARMOR_HEAVY_REDUCTION       2u   /* flat HP subtracted per hit when ARMOR tier 1 (HEAVY); damage floors at 1 */
 #define ENEMY_BULLET_DAMAGE        10u  /* HP damage dealt by an enemy bullet projectile */
+#define WEAPON1_CANNON_DAMAGE      1u   /* player CANNON (tier 0): HP removed per bullet hit */
+#define WEAPON1_LASER_DAMAGE       2u   /* player LASER  (tier 1): kills RACER_HP=5 in 3 hits (#424) */
 
 /* Powerup system */
 #define MAX_POWERUPS               4u   /* powerup pool ceiling — max per track */
@@ -209,6 +211,16 @@ static const char * const LOADOUT_FIELD_LABELS[]  = {"CAR", "ARMOR", "WEAPON1", 
 static const char * const * const LOADOUT_OPTION_NAMES[LOADOUT_NUM_FIELDS] = {
     LOADOUT_CAR_NAMES, LOADOUT_ARMOR_NAMES,
     LOADOUT_WEAPON1_NAMES, LOADOUT_WEAPON2_NAMES
+};
+#endif
+
+/* Per-weapon bullet damage, indexed by loadout WEAPON1 option (0=CANNON, 1=LASER).
+ * Consumed by state_playing.c to seed the projectile damage cache at race start.
+ * Guarded like LOADOUT_STRINGS so a TU can opt out with a pre-#define. */
+#ifndef WEAPON1_DAMAGE_TABLE_DEFINED
+#define WEAPON1_DAMAGE_TABLE_DEFINED
+static const uint8_t WEAPON1_DAMAGE_TABLE[LOADOUT_OPTIONS_PER_FIELD] = {
+    WEAPON1_CANNON_DAMAGE, WEAPON1_LASER_DAMAGE
 };
 #endif
 

@@ -113,20 +113,23 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
         scr_y = (uint8_t)vis_y;
 
         /* Check if a player bullet hit this turret */
-        if (projectile_check_hit_enemy(scr_x, scr_y, TURRET_HIT_RADIUS)) {
-            turret_hp[i]--;
-            if (turret_hp[i] == 0u) {
-                turret_active[i] = 0u;
-                if (turret_oam[i] != SPRITE_POOL_INVALID) {
-                    /* Hand the OAM slot to the explosion pool.
-                     * Do NOT clear_sprite here — explosion now owns this slot
-                     * and will call clear_sprite when the animation finishes. */
-                    explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u,
-                                    turret_oam_x[i],        /* world pixel x = tx*8+8 */
-                                    turret_ty[i]);           /* world tile y */
-                    turret_oam[i] = SPRITE_POOL_INVALID;
+        {
+            uint8_t dmg = projectile_check_hit_enemy(scr_x, scr_y, TURRET_HIT_RADIUS);
+            if (dmg) {
+                turret_hp[i] = enemy_apply_damage(turret_hp[i], dmg);
+                if (turret_hp[i] == 0u) {
+                    turret_active[i] = 0u;
+                    if (turret_oam[i] != SPRITE_POOL_INVALID) {
+                        /* Hand the OAM slot to the explosion pool.
+                         * Do NOT clear_sprite here — explosion now owns this slot
+                         * and will call clear_sprite when the animation finishes. */
+                        explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u,
+                                        turret_oam_x[i],        /* world pixel x = tx*8+8 */
+                                        turret_ty[i]);           /* world tile y */
+                        turret_oam[i] = SPRITE_POOL_INVALID;
+                    }
+                    continue;
                 }
-                continue;
             }
         }
 

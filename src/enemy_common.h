@@ -5,7 +5,7 @@
 #include "player.h"    /* player_dir_t */
 #include "banking.h"   /* BANKED */
 
-/* Shared enemy-AI math used by turret.c, racer.c, and (PR4) patrol.c.
+/* Shared enemy AI and combat math used by turret.c, racer.c, and patrol.c.
  * All functions are pure (no side effects, no static state). */
 
 /* 16-way aim direction from a source tile toward a player pixel position.
@@ -32,5 +32,11 @@ uint8_t enemy_wp_advance(uint8_t cur_idx, uint8_t wp_count, uint8_t reached) BAN
  * from any direction. Shared by racer.c and patrol.c so both use identical
  * collision logic (#417). */
 uint8_t enemy_ram_overlap(int16_t px, int16_t py, int16_t ex, int16_t ey) BANKED;
+
+/* Subtract dmg from an enemy HP pool, flooring at 0 (no uint8_t underflow).
+ * Returns the new HP; dmg >= hp yields 0 (dead), never wraps to 255. Shared by
+ * racer.c, turret.c, and patrol.c so per-hit damage above 1 (e.g. LASER = 2 vs
+ * TURRET_HP = 1) can't wrap a low-HP enemy to 255 (#424). */
+uint8_t enemy_apply_damage(uint8_t hp, uint8_t dmg) BANKED;
 
 #endif /* ENEMY_COMMON_H */

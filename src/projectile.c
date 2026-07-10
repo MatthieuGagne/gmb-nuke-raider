@@ -63,6 +63,7 @@ static uint8_t proj_oam[MAX_PROJECTILES];  /* OAM slot assigned to each bullet *
 
 static uint8_t proj_cooldown_tick = 0u;    /* frames until next fire is allowed */
 static uint8_t s_proj_tile_base   = 0u;    /* VRAM sprite tile slot, set by projectile_init() */
+static uint8_t s_weapon1_damage   = WEAPON1_CANNON_DAMAGE;  /* HP a player bullet removes per hit; re-seeded at race start (#424) */
 
 /* ── init ──────────────────────────────────────────────────────────────── */
 
@@ -76,6 +77,11 @@ void projectile_init(uint8_t tile_base) BANKED {
         proj_active[i] = 0u;
     }
     proj_cooldown_tick = 0u;
+    s_weapon1_damage = WEAPON1_CANNON_DAMAGE;  /* reset to CANNON; state_playing re-seeds from loadout */
+}
+
+void projectile_set_weapon1_damage(uint8_t dmg) BANKED {
+    s_weapon1_damage = dmg;
 }
 
 /* ── fire ──────────────────────────────────────────────────────────────── */
@@ -198,7 +204,7 @@ uint8_t projectile_check_hit_enemy(uint8_t cx, uint8_t cy, uint8_t r) BANKED {
         if ((uint8_t)dx <= r && (uint8_t)dy <= r) {
             proj_active[i] = 0u;
             clear_sprite(proj_oam[i]);
-            return 1u;
+            return s_weapon1_damage;
         }
     }
     return 0u;

@@ -479,6 +479,47 @@ void test_racer_bullet_hit_reduces_hp(void) {
     TEST_ASSERT_EQUAL_UINT8(RACER_HP - 1u, racer_get_hp_for_test(1u));
 }
 
+void test_racer_laser_kills_in_three_hits(void) {
+    /* cam_y=0 (setUp). Racer at world (32,32); OAM center = (48,56).
+     * With WEAPON1_LASER_DAMAGE=2, RACER_HP=5 dies in ceil(5/2)=3 hits. */
+    static const uint8_t flat_map[8u * 8u] = {
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+        1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+    };
+    uint8_t wp_tx[1] = { 4u };
+    uint8_t wp_ty[1] = { 0u };
+    uint8_t k;
+    track_test_set_map(flat_map, 8u, 8u);
+    racer_spawn_for_test(32, 32, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    projectile_set_weapon1_damage(WEAPON1_LASER_DAMAGE);
+    racer_set_hp_for_test(1u, RACER_HP);
+
+    /* The racer accelerates toward its ty=0 waypoint (north) each racer_update,
+     * so re-anchor it at the spawn position before every shot to keep the fixed
+     * (48,56) bullet inside RACER_HIT_RADIUS — this isolates the per-hit damage. */
+
+    /* Hit 1: 5 -> 3 */
+    racer_set_pos_for_test(1u, 32, 32);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RACER_HP - WEAPON1_LASER_DAMAGE),
+                            racer_get_hp_for_test(1u));  /* 5 - 2 = 3 */
+
+    /* Hit 2: 3 -> 1 (drain fire cooldown first, then re-fire) */
+    for (k = 0u; k < PROJ_FIRE_COOLDOWN; k++) projectile_update();
+    racer_set_pos_for_test(1u, 32, 32);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_get_hp_for_test(1u));
+
+    /* Hit 3: 1 -> 0, floored (underflow-safe), racer destroyed */
+    for (k = 0u; k < PROJ_FIRE_COOLDOWN; k++) projectile_update();
+    racer_set_pos_for_test(1u, 32, 32);
+    projectile_fire(48u, 56u, DIR_T, PROJ_OWNER_PLAYER);
+    racer_update();
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_hp_for_test(1u));
+}
+
 void test_racer_destroyed_when_hp_reaches_zero(void) {
     /* Racer at HP=1. One bullet hit deactivates it. */
     static const uint8_t flat_map[8u * 8u] = {
@@ -946,6 +987,7 @@ int main(void) {
     RUN_TEST(test_racer_hit_flash_initialized_to_zero);
     RUN_TEST(test_racer_not_dying_after_init);
     RUN_TEST(test_racer_bullet_hit_reduces_hp);
+    RUN_TEST(test_racer_laser_kills_in_three_hits);
     RUN_TEST(test_racer_destroyed_when_hp_reaches_zero);
     RUN_TEST(test_racer_death_enters_dying_state);
     RUN_TEST(test_racer_death_spawns_four_car_blasts);

@@ -163,6 +163,25 @@ void test_ram_overlap_misses_beyond_reach(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, enemy_ram_overlap(32, (int16_t)(48 + ENEMY_RAM_REACH), 32, 32));
 }
 
+/* ---- enemy_apply_damage: underflow-safe HP subtraction (#424) ---- */
+
+void test_apply_damage_basic(void) {
+    /* 5 HP minus 2 -> 3 */
+    TEST_ASSERT_EQUAL_UINT8(3u, enemy_apply_damage(5u, 2u));
+}
+void test_apply_damage_cannon_single(void) {
+    /* 1 damage decrements by 1 (CANNON parity) */
+    TEST_ASSERT_EQUAL_UINT8(4u, enemy_apply_damage(5u, 1u));
+}
+void test_apply_damage_exact_kill(void) {
+    /* dmg == hp -> 0 */
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_apply_damage(2u, 2u));
+}
+void test_apply_damage_turret_underflow(void) {
+    /* TURRET_HP=1 hit for LASER (2) must floor at 0, NOT wrap to 255 */
+    TEST_ASSERT_EQUAL_UINT8(0u, enemy_apply_damage(1u, 2u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_aim_right);
@@ -202,5 +221,9 @@ int main(void) {
     RUN_TEST(test_ram_overlap_flush_left);
     RUN_TEST(test_ram_overlap_flush_right);
     RUN_TEST(test_ram_overlap_misses_beyond_reach);
+    RUN_TEST(test_apply_damage_basic);
+    RUN_TEST(test_apply_damage_cannon_single);
+    RUN_TEST(test_apply_damage_exact_kill);
+    RUN_TEST(test_apply_damage_turret_underflow);
     return UNITY_END();
 }
