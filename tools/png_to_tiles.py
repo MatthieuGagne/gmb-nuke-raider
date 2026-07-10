@@ -448,11 +448,11 @@ def png_to_c(png_path, out_path, array_name, bank,
         "",
     ]
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write('\n'.join(lines))
 
     if id_map_out is not None and id_map is not None:
-        with open(id_map_out, "w") as f:
+        with open(id_map_out, "w", newline="\n") as f:
             json.dump(id_map, f, indent=2)
 
     if meta_header_out is not None and tsx_path is not None and id_map is not None:
@@ -521,7 +521,7 @@ def png_to_c(png_path, out_path, array_name, bank,
             "};",
             "#endif /* TRACK_TILESET_META_H */",
         ]
-        with open(meta_header_out, "w") as f:
+        with open(meta_header_out, "w", newline="\n") as f:
             f.write("\n".join(header_lines) + "\n")
 
 

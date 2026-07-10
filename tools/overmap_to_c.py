@@ -149,7 +149,7 @@ def convert(tmx_path, out_path):
         id_map[ty * width + tx] = hub_id
 
     # ── Emit C source ────────────────────────────────────────────────────────
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write(f"/* GENERATED — do not edit. Source: {tmx_path} */\n")
         f.write(f"/* Regenerate: python3 tools/overmap_to_c.py {tmx_path} {out_path} */\n")
         f.write("#pragma bank 255\n")
