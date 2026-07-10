@@ -483,7 +483,7 @@ def tmx_to_c(tmx_path, out_path, prefix='track', emit_powerup_header=None, id_ma
     pw_ty   = [p[1] for p in powerups] + [0] * (MAX_POWERUPS - powerup_count)
     pw_type = [p[2] for p in powerups] + [0] * (MAX_POWERUPS - powerup_count)
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write(f"/* GENERATED — do not edit by hand."
                 f" Source: {tmx_path} */\n")
         f.write(f"/* Regenerate: python3 tools/tmx_to_c.py"
@@ -599,7 +599,7 @@ def emit_npc_header(out_path, tmx_paths):
 
     lines += ['#endif /* TRACK_NPC_EXTERNS_H */']
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write('\n'.join(lines) + '\n')
 
 
@@ -641,7 +641,7 @@ def emit_powerup_header(out_path, tmx_paths):
 
     lines += ['#endif /* TRACK_POWERUP_EXTERNS_H */']
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write('\n'.join(lines) + '\n')
 
 
@@ -699,7 +699,7 @@ def emit_racer_header(out_path, tmx_paths):
                 '',
             ]
     lines += ['#endif /* TRACK_RACER_EXTERNS_H */']
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write('\n'.join(lines) + '\n')
 
 
@@ -728,7 +728,7 @@ if __name__ == '__main__':
         parser.add_argument('tmx', nargs='+', help='TMX input file(s)')
         args = parser.parse_args()
         manifest = collect_rotation_manifest(args.tmx)
-        with open(args.emit_rotation_manifest, 'w') as f:
+        with open(args.emit_rotation_manifest, 'w', newline='\n') as f:
             json.dump({"rotations": manifest}, f, indent=2)
     elif '--emit-header' in sys.argv:
         parser = argparse.ArgumentParser()

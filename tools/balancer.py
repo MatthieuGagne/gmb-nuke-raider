@@ -168,7 +168,7 @@ def main():
                             if v != saved_values.get(n)}
                 new_text = apply_changes(original_text, changes)
                 try:
-                    with open(CONFIG_H, 'w') as f:
+                    with open(CONFIG_H, 'w', newline='\n') as f:
                         f.write(new_text)
                     original_text = new_text
                     saved_values  = dict(values)

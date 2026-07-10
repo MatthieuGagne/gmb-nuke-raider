@@ -78,7 +78,7 @@ def load_json(path):
 
 
 def save_json(data, path):
-    with open(path, 'w') as f:
+    with open(path, 'w', newline='\n') as f:
         json.dump(data, f, indent=2)
         f.write('\n')
 
@@ -625,7 +625,7 @@ class DialogEditor:
                         cfg = f.read()
                     import dialog_to_c as _conv
                     new_cfg = _conv.patch_config_define(cfg, "MAX_NPCS", new_max)
-                    with open(CONFIG_H, 'w') as f:
+                    with open(CONFIG_H, 'w', newline='\n') as f:
                         f.write(new_cfg)
                     self.max_npcs = new_max
                     self.status = f"MAX_NPCS updated to {new_max} in src/config.h"
@@ -654,7 +654,7 @@ class DialogEditor:
         return {"hubs": []}
 
     def _save_hubs(self):
-        with open(self.hubs_path, 'w') as f:
+        with open(self.hubs_path, 'w', newline='\n') as f:
             json.dump(self.hubs_data, f, indent=2)
             f.write('\n')
 

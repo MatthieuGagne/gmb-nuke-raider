@@ -43,7 +43,7 @@ def convert(tmx_path, out_path, array_name, header):
     if len(tile_ids) != width * height:
         raise ValueError(f"Expected {width * height} tiles, got {len(tile_ids)}")
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', newline='\n') as f:
         f.write(f"/* GENERATED — do not edit. Source: {tmx_path} */\n")
         f.write(f"/* Regenerate: python3 tools/tmx_to_array_c.py"
                 f" {tmx_path} {out_path} {array_name} {header} */\n")

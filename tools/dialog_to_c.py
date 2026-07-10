@@ -330,7 +330,7 @@ def main():
 
     # Generate dialog_data.c
     out = generate_c(npcs_data, max_npcs=max_npcs)
-    with open(args.dialog_out, "w") as f:
+    with open(args.dialog_out, "w", newline="\n") as f:
         f.write(out)
     print(f"Written: {args.dialog_out}")
 
@@ -339,7 +339,7 @@ def main():
         with open(args.hubs_json) as f:
             hubs_data = json.load(f)
         hub_out = generate_hub_c(hubs_data, npcs_data)
-        with open(args.hub_out, "w") as f:
+        with open(args.hub_out, "w", newline="\n") as f:
             f.write(hub_out)
         print(f"Written: {args.hub_out}")
 
@@ -350,7 +350,7 @@ def main():
             current = int(m.group(1)) if m else 0
             if needed != current:
                 new_text = patch_config_define(config_text, "MAX_HUB_NPCS", f"{needed}u")
-                with open(args.config_h, "w") as f:
+                with open(args.config_h, "w", newline="\n") as f:
                     f.write(new_text)
                 print(f"Patched MAX_HUB_NPCS={needed}u in {args.config_h}")
 
