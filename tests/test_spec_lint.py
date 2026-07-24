@@ -76,7 +76,7 @@ class TestMinimumEntries(unittest.TestCase):
     _NO_FILE_ENTRY = (
         "## Goal\ng\n\n## Requirements\n- R1: x\n\n"
         "## Acceptance Criteria\n- [ ] AC1: x\n\n## Out of Scope\n- none\n\n"
-        "## Files Impacted\n\n"
+        "## Files Impacted\nTBD — will list files later\n"
     )
 
     def test_requires_at_least_one_R_line(self):
@@ -90,10 +90,11 @@ class TestMinimumEntries(unittest.TestCase):
         self.assertTrue(any('checkbox' in e.lower() for e in result['errors']))
 
     def test_requires_at_least_one_impacted_entry(self):
-        # Files Impacted heading present but body empty -> caught as empty section.
+        # Non-empty body with no '- ' bullet -> exercises the R2 'no entries' branch
+        # (not the empty-section check).
         result = spec_lint.lint(self._NO_FILE_ENTRY)
         self.assertFalse(result['valid'])
-        self.assertTrue(any('Files Impacted' in e for e in result['errors']))
+        self.assertTrue(any('no entries' in e.lower() for e in result['errors']))
 
     def test_valid_fixture_still_passes(self):
         self.assertTrue(spec_lint.lint(_fixture('spec_valid.md'))['valid'])
