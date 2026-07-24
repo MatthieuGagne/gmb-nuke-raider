@@ -77,6 +77,24 @@ def lint(body):
         else:
             present[name] = True
 
+    # R2: Requirements must have at least one '- R' requirement line.
+    if present.get("Requirements"):
+        req_body = _strip_comments(sections["Requirements"])
+        if not re.search(r"(?m)^\s*-\s*R\d*\b", req_body):
+            errors.append("Requirements section has no '- R' requirement lines")
+
+    # R2: Acceptance Criteria must have at least one '- [ ]' checkbox.
+    if present.get("Acceptance Criteria"):
+        ac_body = _strip_comments(sections["Acceptance Criteria"])
+        if not re.search(r"(?m)^\s*-\s*\[[ xX]\]", ac_body):
+            errors.append("Acceptance Criteria section has no '- [ ]' checkboxes")
+
+    # R2: Files Impacted must have at least one bullet entry.
+    if present.get("Files Impacted"):
+        fi_body = _strip_comments(sections["Files Impacted"])
+        if not any(re.match(r"^\s*-\s+\S", ln) for ln in fi_body.splitlines()):
+            errors.append("Files Impacted section has no entries")
+
     return {
         "valid": not errors,
         "doc_only": False,
