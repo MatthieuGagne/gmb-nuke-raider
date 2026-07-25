@@ -100,5 +100,39 @@ class TestMinimumEntries(unittest.TestCase):
         self.assertTrue(spec_lint.lint(_fixture('spec_valid.md'))['valid'])
 
 
+class TestDocOnly(unittest.TestCase):
+    def test_code_spec_not_doc_only(self):
+        result = spec_lint.lint(_fixture('spec_valid.md'))
+        self.assertFalse(result['doc_only'])
+
+    def test_doc_spec_is_doc_only(self):
+        result = spec_lint.lint(_fixture('spec_doc_only.md'))
+        self.assertTrue(result['valid'])
+        self.assertTrue(result['doc_only'])
+
+    def test_impacted_files_parsed_from_backticks(self):
+        result = spec_lint.lint(_fixture('spec_valid.md'))
+        self.assertEqual(result['impacted_files'], ['src/laser.c', 'src/laser.h'])
+
+    def test_non_backtick_entry_yields_no_path(self):
+        body = (
+            "## Goal\ng\n\n## Requirements\n- R1: x\n\n"
+            "## Acceptance Criteria\n- [ ] AC1: x\n\n## Out of Scope\n- none\n\n"
+            "## Files Impacted\n- None directly — tracked by children\n"
+        )
+        result = spec_lint.lint(body)
+        self.assertEqual(result['impacted_files'], [])
+        self.assertFalse(result['doc_only'])   # no parseable files -> not doc-only
+        self.assertTrue(result['valid'])        # a bullet entry still satisfies R2
+
+    def test_bank_manifest_is_not_doc_only(self):
+        body = (
+            "## Goal\ng\n\n## Requirements\n- R1: x\n\n"
+            "## Acceptance Criteria\n- [ ] AC1: x\n\n## Out of Scope\n- none\n\n"
+            "## Files Impacted\n- `bank-manifest.json` — bank assignment\n"
+        )
+        self.assertFalse(spec_lint.lint(body)['doc_only'])
+
+
 if __name__ == '__main__':
     unittest.main()
