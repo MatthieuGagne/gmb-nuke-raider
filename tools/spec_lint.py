@@ -19,7 +19,13 @@ Usage:
     python3 tools/spec_lint.py --issue 433 --json   # machine-readable output
     or imported:  spec_lint.lint(body_text) -> dict
 """
+import argparse
+import json
 import re
+import subprocess
+import sys
+
+REPO = "MatthieuGagne/gmb-nuke-raider"
 
 # Required sections in canonical order (## Notes is optional — not listed).
 REQUIRED_SECTIONS = [
@@ -137,3 +143,61 @@ def lint(body):
         "sections": present,
         "impacted_files": impacted_files,
     }
+
+
+def _fetch_issue_body(issue_number):
+    """Fetch a GitHub issue body via gh. Raise RuntimeError on failure."""
+    result = subprocess.run(
+        ["gh", "issue", "view", str(issue_number),
+         "--repo", REPO, "--json", "body"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"gh failed: {result.stderr.strip()}")
+    return json.loads(result.stdout)["body"]
+
+
+def _render(result):
+    """Human-readable verdict."""
+    if result["valid"]:
+        kind = "doc-only" if result["doc_only"] else "code"
+        return f"PASS - spec is valid ({kind} workflow)"
+    lines = ["FAIL - spec is not valid:"]
+    lines += [f"  - {e}" for e in result["errors"]]
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Lint a PRD spec issue/file.")
+    src = parser.add_mutually_exclusive_group(required=True)
+    src.add_argument("--issue", type=int, help="GitHub issue number (via gh)")
+    src.add_argument("--file", help="path to a local spec file")
+    src.add_argument("--stdin", action="store_true", help="read spec from stdin")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="emit machine-readable JSON")
+    args = parser.parse_args(argv)
+
+    try:
+        if args.issue is not None:
+            body = _fetch_issue_body(args.issue)
+        elif args.file:
+            with open(args.file, encoding="utf-8") as fh:
+                body = fh.read()
+        else:
+            body = sys.stdin.read()
+    except (RuntimeError, OSError) as exc:
+        print(f"spec_lint: {exc}", file=sys.stderr)
+        return 2
+
+    result = lint(body)
+    if args.as_json:
+        print(json.dumps(result, indent=2))
+    elif result["valid"]:
+        print(_render(result))
+    else:
+        print(_render(result), file=sys.stderr)
+    return 0 if result["valid"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

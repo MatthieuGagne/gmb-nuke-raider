@@ -134,5 +134,59 @@ class TestDocOnly(unittest.TestCase):
         self.assertFalse(spec_lint.lint(body)['doc_only'])
 
 
+class TestCliAndInput(unittest.TestCase):
+    def _run(self, args, stdin=None):
+        return subprocess.run(
+            [sys.executable, SCRIPT, *args],
+            capture_output=True, text=True, input=stdin,
+        )
+
+    def test_file_valid_exit_zero(self):
+        r = self._run(['--file', os.path.join(FIXTURES, 'spec_valid.md')])
+        self.assertEqual(r.returncode, 0)
+
+    def test_file_invalid_exit_one_names_section(self):
+        r = self._run(['--file', os.path.join(FIXTURES, 'spec_missing_section.md')])
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('Out of Scope', r.stderr)
+
+    def test_stdin_valid(self):
+        r = self._run(['--stdin'], stdin=_fixture('spec_valid.md'))
+        self.assertEqual(r.returncode, 0)
+
+    def test_json_mode_shape(self):
+        r = self._run(['--file', os.path.join(FIXTURES, 'spec_valid.md'), '--json'])
+        self.assertEqual(r.returncode, 0)
+        payload = json.loads(r.stdout)
+        self.assertEqual(
+            set(payload),
+            {'valid', 'doc_only', 'errors', 'sections', 'impacted_files'},
+        )
+        self.assertTrue(payload['valid'])
+        self.assertFalse(payload['doc_only'])
+
+    def test_json_mode_invalid_still_exit_one(self):
+        r = self._run(['--file', os.path.join(FIXTURES, 'spec_empty_criteria.md'), '--json'])
+        self.assertEqual(r.returncode, 1)
+        self.assertFalse(json.loads(r.stdout)['valid'])
+
+    def test_bad_file_is_operational_error(self):
+        r = self._run(['--file', os.path.join(FIXTURES, 'does_not_exist.md')])
+        self.assertEqual(r.returncode, 2)
+
+    def test_gh_path_parses_body_via_mock(self):
+        fake = types.SimpleNamespace(
+            returncode=0, stdout=json.dumps({'body': _fixture('spec_valid.md')}),
+            stderr='',
+        )
+        orig = spec_lint.subprocess.run
+        spec_lint.subprocess.run = lambda *a, **k: fake
+        try:
+            body = spec_lint._fetch_issue_body(999)
+        finally:
+            spec_lint.subprocess.run = orig
+        self.assertIn('## Goal', body)
+
+
 if __name__ == '__main__':
     unittest.main()
