@@ -108,14 +108,8 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
-          {
-            "type": "command",
-            "command": "python tools/precommit_build_hook.py",
-            "timeout": 300,
-            "statusMessage": "Pre-commit build gate: clean build..."
-          },
           {
             "type": "command",
             "command": "python tools/emulicious_window_hook.py",
@@ -127,7 +121,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",

@@ -19,6 +19,40 @@ jobs:
       - name: Run tests
         run: make test
 
+  # ── Tool suite (Python) — both platforms ─────────────────────────────
+  # A separate job from Unit Tests so a unit-suite failure cannot mask a
+  # tool-suite failure, and matrixed so the Windows-only import class (#441,
+  # dialog_editor's curses) is caught by machine. No paths: filter — a filtered
+  # required check never reports and deadlocks the PR.
+  test-tools:
+    name: Tool Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # The Makefile pins SHELL := bash and shells out to coreutils; Git for
+      # Windows ships both, but its bin dirs are not on the runner's PATH.
+      - name: Put Git's bash and coreutils on PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "C:\Program Files\Git\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Install make (Windows)
+        if: runner.os == 'Windows'
+        run: choco install make --no-progress -y
+
+      - name: Run tool suite
+        run: make test-tools
+
   # ── ROM build (requires GBDK) ────────────────────────────────────────
   build:
     name: ROM Build

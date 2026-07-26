@@ -115,6 +115,37 @@ def check_hygiene(settings):
     return errors
 
 
+def _matchers(settings):
+    """Yield (event, matcher) for every hook group that declares a matcher."""
+    for event, groups in (settings.get('hooks') or {}).items():
+        for group in groups or []:
+            matcher = group.get('matcher')
+            if matcher is not None:
+                yield event, matcher
+
+
+def check_hook_shells(settings):
+    """Return errors for hook matchers naming one shell tool but not the other.
+
+    Matchers are regex-matched against the tool *name*, so "Bash" never matches
+    "PowerShell". Three gates in this repository were registered Bash-only and
+    therefore never fired at all on a PowerShell-configured machine (#441). A
+    mechanism whose failure mode is total silence is checked, not documented.
+    """
+    tools = sorted(SHELL_FORMS)
+    errors = []
+    for event, matcher in _matchers(settings):
+        named = [t for t in tools if re.search(r'\b%s\b' % t, matcher)]
+        if not named or len(named) == len(tools):
+            continue
+        missing = [t for t in tools if t not in named][0]
+        errors.append(
+            '%s hook matcher "%s": names %s but not %s — matchers match the '
+            'tool name, so this hook never fires on a %s-configured machine'
+            % (event, matcher, named[0], missing, missing))
+    return errors
+
+
 def load_inventory(path):
     """Return [(tool, command)] from the inventory, skipping comments/blanks."""
     out = []
@@ -163,6 +194,7 @@ def main(argv=None):
 
     if args.hygiene or run_all:
         errors += check_hygiene(settings)
+        errors += check_hook_shells(settings)
     if args.coverage or run_all:
         errors += check_coverage(settings, load_inventory(args.inventory))
         print('note: coverage is necessary but not sufficient — the supervised '

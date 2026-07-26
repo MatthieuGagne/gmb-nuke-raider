@@ -2,12 +2,17 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import bank_post_build
+
+SOURCE_PATH = os.path.join(os.path.dirname(__file__), '..', 'tools',
+                           'bank_post_build.py')
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -306,6 +311,49 @@ class TestOverallStatus(unittest.TestCase):
                       src_files={'npc_mechanic_portrait.c': SRC_PORTRAIT})
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
+
+
+class RunRomusageTests(unittest.TestCase):
+    """_run_romusage was never exercised, so a hardcoded Linux path stayed
+    green for months while `make bank-post-build` could not run at all (#441).
+    These tests are the reason that cannot recur."""
+
+    def test_resolves_the_binary_from_path(self):
+        seen = {}
+
+        def fake_run(argv, **kwargs):
+            seen['argv'] = argv
+            return subprocess.CompletedProcess(argv, 0, stdout='out', stderr='')
+
+        with mock.patch('shutil.which', return_value='/somewhere/bin/romusage') as which, \
+             mock.patch.object(bank_post_build.subprocess, 'run', fake_run):
+            out = bank_post_build._run_romusage('build/nuke-raider.gb')
+
+        which.assert_called_once_with('romusage')
+        self.assertEqual(seen['argv'], ['/somewhere/bin/romusage',
+                                        'build/nuke-raider.gb', '-a'])
+        self.assertEqual(out, 'out')
+
+    def test_missing_binary_raises_an_actionable_error(self):
+        with mock.patch('shutil.which', return_value=None):
+            with self.assertRaises(FileNotFoundError) as cm:
+                bank_post_build._run_romusage('build/nuke-raider.gb')
+        self.assertIn('PATH', str(cm.exception))
+
+    def test_source_holds_no_absolute_binary_path(self):
+        with open(SOURCE_PATH, encoding='utf-8') as fh:
+            src = fh.read()
+        self.assertNotRegex(src, r"['\"][A-Za-z]:[\\/]|['\"]/(home|opt|usr)/")
+
+    def test_check_invokes_romusage_when_no_output_is_injected(self):
+        # The gap this closes: check()'s romusage_output override was the only
+        # path any test ever took.
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d)
+            with mock.patch.object(bank_post_build, '_run_romusage',
+                                   return_value=ROMUSAGE_HEALTHY) as run:
+                bank_post_build.check(d)
+            run.assert_called_once()
 
 
 if __name__ == '__main__':

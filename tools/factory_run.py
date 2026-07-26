@@ -31,6 +31,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import install_hooks
+
 SCHEMA_VERSION = 1
 
 # Canonical stage order. Every renderer sorts gates by this, never by dict
@@ -84,10 +87,16 @@ def repo_root(cwd=None):
     main tree and an absolute one inside a linked worktree, so it is joined
     with *cwd* before use. ``--show-toplevel`` is the trap: inside a worktree
     it returns the worktree root, which is not where the registry lives.
+
+    The environment is scrubbed with ``install_hooks.clean_env``: git exports
+    ``GIT_DIR`` and friends into every hook's environment and they override
+    *cwd*, so an unscrubbed call made from a hook resolves to whichever
+    repository invoked the hook rather than to *cwd* (#441).
     """
     cwd = os.path.abspath(cwd or os.getcwd())
     proc = subprocess.run(["git", "rev-parse", "--git-common-dir"],
-                          cwd=cwd, capture_output=True, text=True)
+                          cwd=cwd, capture_output=True, text=True,
+                          env=install_hooks.clean_env())
     if proc.returncode != 0:
         raise RuntimeError("not a git repository: %s" % cwd)
     common = os.path.abspath(os.path.join(cwd, proc.stdout.strip()))

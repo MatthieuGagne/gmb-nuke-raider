@@ -17,6 +17,11 @@ GBDK_HOME=~/gbdk make
 
 Output: `build/nuke-raider.gb`
 
+The first build also points git at this repo's tracked hooks (`git config core.hooksPath
+.githooks`), so a `pre-commit` tool-suite gate and a `pre-push` clean-build gate apply from then
+on — no setup step. Later builds change nothing. Undo with `git config --unset core.hooksPath`;
+bypass a single run with `--no-verify`. See `docs/dev-workflow.md` §4.
+
 ### Clean
 
 ```sh
@@ -28,7 +33,8 @@ make clean
 Unit tests compile with `gcc` — no hardware or emulator needed:
 
 ```sh
-make test
+make test        # unit suite — C game logic
+make test-tools  # tool suite — the Python tooling in tools/, ~6 s
 ```
 
 ### Headless smoketest

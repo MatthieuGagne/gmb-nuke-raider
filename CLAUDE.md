@@ -63,7 +63,11 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 
 **Settings tiers:** three layers, and only one of them is committed.
 - **Machine** (`~/.claude/settings.json`, outside the repo): `env` values and any allow rule containing an absolute path. Template: `.claude/settings.user.example.json`.
-- **Repo** (`.claude/settings.json`, tracked): the curated allowlist, the deny list, and all hook wiring. No absolute paths, no `env`. Validated by `python tools/allowlist_lint.py`, enforced by `make test-tools`.
+- **Repo** (`.claude/settings.json`, tracked): the curated allowlist, the deny list, and all
+  **agent** hook wiring — **repository** hook wiring lives in tracked `.githooks/` (see
+  `docs/adr/0002-local-gates-are-repository-hooks.md`). No absolute paths, no `env`. Validated by
+  `python tools/allowlist_lint.py`, enforced by `make test-tools`. Any matcher naming one shell
+  tool must name both (`Bash|PowerShell`) — the hygiene check fails otherwise.
 - **Scratch** (`.claude/settings.local.json`, gitignored): transient session approvals. Never commit it.
 
 **Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: `docs/adr/0001-settings-tier-contract.md`.
@@ -145,7 +149,10 @@ Exception: the grill-with-docs paper trail is versioned in-repo — glossary/con
 3. `make memory-check` fires automatically via PostToolUse hook after step 2 — check the hook output; if any budget is FAIL or ERROR, stop and fix before continuing.
 4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background from the worktree directory (NEVER from the main repo's `build/` — it may be stale): `java -jar C:\Tools\Emulicious\Emulicious.jar build/nuke-raider.gb`
 5. Ask them to confirm it looks correct before proceeding.
-6. Only after the user confirms: update `README.md` if the feature adds or changes any user-visible behavior, then push the branch and create the PR.
+6. Only after the user confirms: update `README.md` if the feature adds or changes any
+   user-visible behavior, then push the branch and create the PR. The `pre-push` repository hook
+   runs `make clean && make` and blocks the push if it fails — steps 2–3 are still yours to run,
+   the hook only guarantees the tree you publish builds.
 
 **GB skill gates:**
 - Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` agent:

@@ -94,9 +94,86 @@ Write → verify → commit. No bank gates required.
 ### Test runner
 
 ```bash
-make test                # C unit tests (gcc + Unity, no GBDK needed)
-make test-tools          # Python tool tests (png_to_tiles, tmx_to_c)
+make test                # unit suite — C game logic (gcc + Unity, no GBDK needed), ~170 s
+make test-tools          # tool suite — this repo's own Python tooling, ~6 s
 ```
+
+The tool suite **discovers** every `tests/test_*.py`: adding a test module gates it, with no
+`Makefile` edit. Nothing is opted in by name, because a hardcoded list is how two modules went
+ungated for four months (#441).
+
+**POSIX-only imports must be guarded.** `curses`, `termios` and `tty` do not exist on Windows.
+Import them in a `try/except ImportError` that binds the name to `None`, and check for `None` at
+the TUI entry point — see `tools/balancer.py` and `tools/dialog_editor.py`. An unguarded import
+takes the whole module out of the suite: the module errors at import, and on a green-looking run
+that reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exist to catch this.
+
+### Gates that run without you
+
+Local gates are **repository hooks**, not agent hooks, so they see every actor — any shell, any
+tool, any agent, or a human in a plain terminal. They are split by cost. Rationale:
+[`docs/adr/0002-local-gates-are-repository-hooks.md`](adr/0002-local-gates-are-repository-hooks.md).
+
+| Hook | Runs | Cost | Blocks |
+|------|------|------|--------|
+| `.githooks/pre-commit` | tool suite (unittest discovery, direct — not via `make`) | ~6 s | the commit |
+| `.githooks/pre-push` | `tools/prepush_build.py` → `make clean && make` | ~29 s | the push |
+
+`.githooks/` is tracked. `make` (and `make test-tools`) depends on a `hooks` target that runs
+`python tools/install_hooks.py`, which sets `core.hooksPath` idempotently — so a fresh clone is
+gated after one build, with no setup step and no rewrite on later builds. Undo with
+`git config --unset core.hooksPath`.
+
+`pre-commit` deliberately does not call `make`: the `Makefile` pins `SHELL := bash` and expects
+`GBDK_HOME`, so a commit from a bare `cmd.exe` would die on `make: bash: command not found` for a
+reason unrelated to the tests. `tests/test_repo_hooks.py` asserts the hook's command and the
+`Makefile` recipe stay byte-identical, since bypassing `make` is exactly what lets them drift.
+
+**Anything that shells out to git must scrub `GIT_DIR` and friends first** — git exports them
+into every hook's environment and they override `cwd`, so an unscrubbed call silently operates on
+the invoking repository instead of the one you named. Both hooks `unset` them before running
+anything, and `install_hooks.clean_env()` is the one definition for Python callers; use it in
+tools *and* in tests.
+
+This is not theoretical. The tool suite runs inside `pre-commit`, and `tests/test_factory_run.py`
+builds a scratch repo with `git init` / `git add` / `git commit`. Unscrubbed, those calls ran
+against the real repository using the very index being committed — producing a merge commit
+titled `init` containing a test fixture file, resetting `core.hooksPath` so the gate stopped
+firing, and rewriting `user.email`. `tests/test_repo_hooks.py` now parses every test module with
+`ast` and fails any `subprocess.run(['git', …], cwd=…)` that passes no `env=`.
+
+`--no-verify` bypasses both. That is acceptable: CI is the authority, so a bypassed local hook
+costs a round-trip, not correctness.
+
+### Agent hooks: name both shell tools
+
+Hook matchers in `.claude/settings.json` are regex-matched against the **tool name**, so `"Bash"`
+never matches `"PowerShell"`. Any matcher naming one shell tool must name both — write
+`"Bash|PowerShell"`. Three hooks were registered `Bash`-only and had never fired on a machine
+configured to use the PowerShell tool (#441); a gate whose failure mode is total silence is not
+left to review. `python tools/allowlist_lint.py --hygiene` fails on a single-shell matcher, and
+`make test-tools` runs it.
+
+### CI-enforced gates
+
+CI is the authority. `master` has branch protection with these checks required, **including for
+administrators** — the names must match exactly, and a matrix job contributes one check per leg:
+
+| Required check | Job in `.github/workflows/build.yml` |
+|----------------|--------------------------------------|
+| `Unit Tests` | `test` — `make test` |
+| `ROM Build` | `build` — `make` |
+| `Tool Tests (ubuntu-latest)` | `test-tools` matrix leg |
+| `Tool Tests (windows-latest)` | `test-tools` matrix leg |
+
+Branch protection lives outside the repository, so this table is its only trace. Inspect it with:
+
+```sh
+gh api repos/:owner/:repo/branches/master/protection --jq '.required_status_checks.contexts'
+```
+
+Never add a `paths:` filter to these jobs — a filtered required check never reports, and the PR
+deadlocks waiting for it.
 
 ### ROM build
 
@@ -282,6 +359,7 @@ For Aseprite CLI details (flags, batch mode, layer/tag filtering), invoke the `a
 Before pushing and creating a PR, verify all of the following:
 
 - [ ] `make test` passes (zero failures)
+- [ ] `make test-tools` passes (tool suite — also enforced by the `pre-commit` repository hook)
 - [ ] `bank-post-build` skill passes (no FAIL banks)
 - [ ] `make memory-check` passes (no FAIL/ERROR budgets)
 - [ ] Smoketest in Emulicious confirmed by user
@@ -341,6 +419,9 @@ deliberately out of scope — the warnings are expected and are not a to-do list
 the PR body has no `Closes`/`Fixes`/`Resolves #N` reference. It is advisory: the check is not
 in branch protection, so it does not block merge. Its regex is a bash mirror of `CLOSES_RE` in
 `tools/trace.py` — change both together.
+
+The gate-enforcing workflows are separate: `.github/workflows/build.yml` provides the four
+required status checks listed in §4, "CI-enforced gates". Those *do* block merge.
 
 ---
 

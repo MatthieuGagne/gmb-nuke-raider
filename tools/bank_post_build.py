@@ -18,15 +18,25 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
 
 def _run_romusage(rom_path):
-    """Run romusage -a and return stdout. Raises on missing binary."""
+    """Run romusage -a and return stdout.
+
+    The binary is resolved from PATH: ADR 0001 forbids absolute machine paths
+    in tracked files, and this function held one for long enough to make
+    `make bank-post-build` unrunnable on the machine that ships it (#441).
+    """
+    exe = shutil.which('romusage')
+    if exe is None:
+        raise FileNotFoundError(
+            'romusage not found on PATH — add your GBDK bin/ directory to '
+            'PATH (GBDK ships bin/romusage).')
     result = subprocess.run(
-        ['/home/mathdaman/gbdk/bin/romusage', rom_path, '-a'],
-        capture_output=True, text=True, check=False,
+        [exe, rom_path, '-a'], capture_output=True, text=True, check=False,
     )
     return result.stdout
 
