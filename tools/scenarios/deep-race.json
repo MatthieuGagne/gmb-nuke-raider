@@ -1,0 +1,38 @@
+{
+  "name": "deep-race",
+  "blocking": false,
+  "watch": ["_hp", "_px", "_py", "_active_lap_count", "_racer_active"],
+  "steps": [
+    {"action": "advance", "frames": 240},
+    {"action": "press", "buttons": ["start"], "delay": 10},
+    {"action": "advance", "frames": 120},
+    {"action": "nav", "to": "track", "id": 2, "settle": 8},
+    {"action": "advance", "frames": 60},
+    {"action": "press", "buttons": ["down"], "delay": 8},
+    {"action": "press", "buttons": ["down"], "delay": 8},
+    {"action": "press", "buttons": ["down"], "delay": 8},
+    {"action": "press", "buttons": ["down"], "delay": 8},
+    {"action": "press", "buttons": ["a"], "delay": 8},
+    {"action": "wait_memory", "address": "_hp", "value": 0, "op": "gt", "max_frames": 900},
+    {"action": "advance", "frames": 180},
+
+    {"action": "press", "buttons": ["down"], "delay": 300},
+    {"action": "press", "buttons": ["down"], "delay": 300},
+    {"action": "assert_memory", "address": "_py", "value": 700, "op": "ge"},
+
+    {"action": "press", "buttons": ["left"], "delay": 180},
+    {"action": "assert_memory", "address": "_px", "value": 40, "op": "le"},
+
+    {"action": "press", "buttons": ["up"], "delay": 300},
+    {"action": "press", "buttons": ["up"], "delay": 300},
+    {"action": "assert_memory", "address": "_py", "value": 20, "op": "le"},
+
+    {"action": "press", "buttons": ["right"], "delay": 180},
+    {"action": "assert_memory", "address": "_px", "value": 100, "op": "ge"},
+
+    {"action": "press", "buttons": ["down"], "delay": 240},
+    {"action": "assert_memory", "address": "_py", "value": 300, "op": "ge"},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "screenshot", "out": "build/smoketest/deep-race/lap-complete.png"}
+  ]
+}
