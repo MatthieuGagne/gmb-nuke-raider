@@ -35,7 +35,13 @@ Keys:
     g       — save JSON + run generator
     q       — quit (prompts if unsaved changes)
 """
-import curses
+# The curses TUI is POSIX-only — CPython ships _curses on POSIX only. Import it
+# lazily so the pure helpers stay importable, and unit-testable, on Windows.
+# Same guard as tools/balancer.py's termios/tty guard.
+try:
+    import curses
+except ImportError:  # pragma: no cover - platform dependent
+    curses = None
 import json
 import os
 import subprocess
@@ -777,6 +783,11 @@ class DialogEditor:
 
 
 def main():
+    if curses is None:
+        print("Error: the dialog editor's TUI needs curses, which CPython "
+              "ships on POSIX only. Run it under WSL or on Linux/macOS.",
+              file=sys.stderr)
+        sys.exit(1)
     path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_JSON
     if not os.path.exists(path):
         print(f"Error: {path} not found", file=sys.stderr)

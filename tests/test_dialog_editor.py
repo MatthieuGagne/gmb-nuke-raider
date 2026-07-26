@@ -3,9 +3,38 @@
 
 Run: PYTHONPATH=. python3 -m pytest tests/test_dialog_editor.py -v
 """
+import contextlib
+import io
 import sys, os, unittest
+from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import dialog_editor as ed
+
+
+class TestPosixOnlyImport(unittest.TestCase):
+    """The TUI is POSIX-only; the pure helpers must import anywhere.
+
+    Same guard as tools/balancer.py's termios/tty guard (PR #439). Without it
+    the whole module — and therefore this whole test file — errors at import
+    on Windows, which is how tests/test_dialog_editor.py stayed out of the
+    tool suite (#441).
+    """
+
+    def test_module_exposes_a_curses_guard(self):
+        self.assertTrue(hasattr(ed, 'curses'))
+
+    def test_main_exits_with_a_clear_message_when_curses_is_missing(self):
+        buf = io.StringIO()
+        # A path that exists, so the failure under test is the curses guard
+        # and not the "file not found" branch further down main().
+        argv = ['dialog_editor.py', __file__]
+        with mock.patch.object(ed, 'curses', None), \
+             mock.patch.object(sys, 'argv', argv), \
+             contextlib.redirect_stderr(buf):
+            with self.assertRaises(SystemExit) as cm:
+                ed.main()
+        self.assertEqual(cm.exception.code, 1)
+        self.assertIn('curses', buf.getvalue())
 
 
 class TestUnassignedNpcs(unittest.TestCase):
