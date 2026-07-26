@@ -124,7 +124,8 @@ gmb-nuke-raider/
 ├── tools/
 │   ├── tmx_to_c.py       # Tiled → C array converter
 │   ├── png_to_tiles.py   # PNG → GB 2bpp C array converter
-│   └── spec_lint.py      # PRD spec gate (gh issue/file/stdin → pass/fail)
+│   ├── spec_lint.py      # PRD spec gate (gh issue/file/stdin → pass/fail)
+│   └── skill_overlay_hook.py # Skill overlay injection hook (project deltas → baseline skills)
 ├── tests/                # Unity unit tests (gcc, no hardware needed)
 ├── docs/
 │   ├── asset-pipeline.md # Full asset authoring and conversion workflow
