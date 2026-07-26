@@ -221,7 +221,7 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook tests.test_trace tests.test_hook_common tests.test_deny_gate_hook tests.test_allowlist_lint tests.test_precommit_build_hook tests.test_emulicious_window_hook tests.test_pyboy_scenario tests.test_factory_run tests.test_factory_report tests.test_factory_status -v
+	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook tests.test_trace tests.test_hook_common tests.test_deny_gate_hook tests.test_allowlist_lint tests.test_precommit_build_hook tests.test_emulicious_window_hook tests.test_pyboy_scenario tests.test_factory_run tests.test_factory_report tests.test_factory_status tests.test_factory_permission_hook -v
 
 # Headless ROM liveness gate — runs every scenario in tools/scenarios/.
 # Blocking scenarios fail the target; evidence scenarios only WARN.
