@@ -1,0 +1,20 @@
+#!/bin/sh
+# Repository hook — clean ROM build gate (#441, ADR 0002).
+#
+# git passes <remote> <url> as arguments and the refs on stdin; neither is
+# needed. The gate is unconditional on the working tree about to be published,
+# which is exactly what CLAUDE.md's smoketest gate already demands by hand.
+#
+# Bypass with `git push --no-verify`; CI remains the authority.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if command -v python >/dev/null 2>&1; then
+    PY=python
+elif command -v python3 >/dev/null 2>&1; then
+    PY=python3
+else
+    echo "pre-push: no python on PATH — clean-build gate skipped" >&2
+    exit 0
+fi
+
+exec "$PY" tools/prepush_build.py

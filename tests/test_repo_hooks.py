@@ -7,6 +7,7 @@ and needs GBDK_HOME; a commit from a bare cmd.exe would die on
 make is also exactly what lets the hook and the Makefile drift, so the
 agreement is asserted here.
 """
+import json
 import os
 import re
 import unittest
@@ -15,6 +16,8 @@ ROOT = os.path.join(os.path.dirname(__file__), '..')
 HOOKS_DIR = os.path.join(ROOT, '.githooks')
 MAKEFILE = os.path.join(ROOT, 'Makefile')
 PRE_COMMIT = os.path.join(HOOKS_DIR, 'pre-commit')
+PRE_PUSH = os.path.join(HOOKS_DIR, 'pre-push')
+SETTINGS = os.path.join(ROOT, '.claude', 'settings.json')
 
 DISCOVERY = "-m unittest discover -s tests -p 'test_*.py'"
 
@@ -65,6 +68,26 @@ class MakefileWiringTests(unittest.TestCase):
     def test_hooks_is_phony(self):
         phony = re.search(r'(?m)^\.PHONY:(.*)$', read(MAKEFILE)).group(1)
         self.assertIn('hooks', phony.split())
+
+
+class PrePushTests(unittest.TestCase):
+    def test_pre_push_has_a_posix_shebang(self):
+        self.assertTrue(read(PRE_PUSH).startswith('#!/bin/sh'))
+
+    def test_pre_push_runs_the_build_gate(self):
+        self.assertIn('tools/prepush_build.py', read(PRE_PUSH))
+
+
+class AgentHookMigrationTests(unittest.TestCase):
+    """R5: the clean build now gates the action it is actually about. The old
+    agent hook must be gone, not merely superseded — a registration pointing at
+    a deleted script fails on every tool call."""
+
+    def test_settings_no_longer_register_the_precommit_build_hook(self):
+        self.assertNotIn('precommit_build_hook', read(SETTINGS))
+
+    def test_settings_json_is_valid(self):
+        json.loads(read(SETTINGS))
 
 
 if __name__ == '__main__':
