@@ -1,0 +1,16 @@
+{
+  "_comment": "Machine tier template. Copy to ~/.claude/settings.json and replace the paths with this machine's. Tracked here as the authoritative record of what belongs at the machine tier; never read by the tooling.",
+  "env": {
+    "GBDK_HOME": "C:/gbdk",
+    "PYTHONUTF8": "1",
+    "EMULICIOUS_INI": "C:/Tools/Emulicious/Emulicious.ini",
+    "MAKE_PATH_PREPEND": "C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\usr\\bin"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(C:\\gbdk\\bin\\romusage:*)",
+      "Bash(java -jar C:\\Tools\\Emulicious\\Emulicious.jar:*)",
+      "Read(//c/Users/mathd/.claude/**)"
+    ]
+  }
+}

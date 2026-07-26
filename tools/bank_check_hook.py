@@ -4,17 +4,19 @@
 Reads tool-use JSON from stdin. Exits 1 (blocking) if bank_check fails.
 Exits 0 silently for files outside src/, non-C/H files, or parse errors.
 """
-import json
 import os
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hook_common
+
 
 def main():
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError, ValueError):
+    data = hook_common.read_payload()
+    if data is None:
         sys.exit(0)  # Can't parse stdin — don't block
+    hook_common.reroot(data)
 
     tool_input = data.get('tool_input', {})
     file_path = tool_input.get('file_path', '')
