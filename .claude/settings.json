@@ -13,6 +13,31 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py C:/Code/nuke-raider/tools/skill_overlay_hook.py",
+            "timeout": 15,
+            "statusMessage": "skill overlay lookup..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py C:/Code/nuke-raider/tools/skill_overlay_hook.py",
+            "timeout": 15,
+            "statusMessage": "skill overlay lookup..."
+          }
+        ]
+      }
     ]
   }
 }
