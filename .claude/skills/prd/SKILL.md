@@ -5,7 +5,7 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
-Always invoke the `grill-me` skill — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once grill-me is satisfied, proceed to drafting.
+Always invoke the `grill-with-docs` skill — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once the grilling is satisfied, proceed to drafting.
 
 ---
 
