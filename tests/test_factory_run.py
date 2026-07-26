@@ -136,5 +136,143 @@ class TestRunIssue(unittest.TestCase):
         self.assertTrue(bool(env['NUKE_FACTORY_RUN']))
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factory_fixtures
+
+
+class JournalTestCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.reg = os.path.join(self.tmp, 'registry')
+        self.reset = factory_fixtures.pinned_clock()
+
+    def tearDown(self):
+        self.reset()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def append(self, kind, issue=436, **fields):
+        return factory_run.append_event(issue, kind, registry=self.reg,
+                                        render=False, **fields)
+
+
+class TestAppendAndRebuild(JournalTestCase):
+    def test_event_is_one_json_line_with_ts_issue_attempt_kind(self):
+        self.append('start', slug='s', branch='b', worktree='/w', stage='GATE')
+        with open(factory_run.journal_path(436, self.reg), encoding='utf-8') as fh:
+            lines = fh.read().splitlines()
+        self.assertEqual(len(lines), 1)
+        ev = json.loads(lines[0])
+        self.assertEqual(ev['issue'], 436)
+        self.assertEqual(ev['attempt'], 1)
+        self.assertEqual(ev['kind'], 'start')
+        self.assertEqual(ev['ts'], '2026-07-26T12:00:00+00:00')
+
+    def test_unknown_event_kind_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.append('nonsense')
+
+    def test_rebuild_reproduces_the_incrementally_saved_state(self):
+        """AC3: replay must equal the projection written event by event."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    plan='p.md', stage='GATE')
+        self.append('gate', stage='GATE', gate='spec lint', result='pass')
+        self.append('decision', text='journal wins')
+        self.append('stage', stage='BUILD')
+        self.append('gate', stage='BUILD', gate='make test', result='fail')
+        self.append('failure', message='boom')
+        self.append('retry', attempt=2, stage='BUILD')
+        self.append('gate', stage='BUILD', gate='make test', result='pass')
+        self.append('scenario', scenario='reach-race', result='pass')
+        self.append('permission', tool='Bash', outcome='denied', command='rm')
+        self.append('finish', result='shipped')
+
+        incremental = factory_run.load_state(436, self.reg)
+        replayed = factory_run.rebuild_state(
+            436, factory_run.read_journal(436, self.reg))
+        self.assertEqual(incremental, replayed)
+        self.assertEqual(incremental['event_count'], 11)
+        self.assertEqual(incremental['attempt'], 2)
+        self.assertEqual(incremental['stage'], 'BUILD')
+
+    def test_retry_clears_this_attempts_results_but_keeps_decisions(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('decision', text='keep me')
+        self.append('gate', stage='BUILD', gate='make test', result='fail')
+        self.append('failure', message='boom')
+        self.append('retry', attempt=2, stage='BUILD')
+        state = factory_run.load_state(436, self.reg)
+        self.assertEqual(state['gates'], [])
+        self.assertIsNone(state['failure'])
+        self.assertEqual([d['text'] for d in state['decisions']], ['keep me'])
+        self.assertEqual(state['worktree'], '/w')
+
+    def test_truncated_final_line_still_rebuilds(self):
+        """AC3: append-only files fail at the tail, the recoverable place."""
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('gate', stage='GATE', gate='spec lint', result='pass')
+        path = factory_run.journal_path(436, self.reg)
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(text + '{"ts": "2026-07-26T12:0')
+
+        events = factory_run.read_journal(436, self.reg)
+        self.assertEqual(len(events), 2)
+        rebuilt = factory_run.rebuild_state(436, events)
+        self.assertEqual(len(rebuilt['gates']), 1)
+
+    def test_missing_state_is_rebuilt_from_the_journal(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('stage', stage='BUILD')
+        os.remove(factory_run.state_path(436, self.reg))
+        self.assertEqual(factory_run.load_state(436, self.reg)['stage'], 'BUILD')
+
+    def test_torn_state_file_is_rebuilt_not_fatal(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        with open(factory_run.state_path(436, self.reg), 'w') as fh:
+            fh.write('{"schema_ver')
+        self.assertEqual(factory_run.load_state(436, self.reg)['slug'], 'obs')
+
+    def test_state_lagging_the_journal_is_rebuilt(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        stale = factory_run.load_state(436, self.reg)
+        self.append('stage', stage='SHIP')
+        factory_run.save_state(stale, self.reg)          # simulate a lagging write
+        self.assertEqual(factory_run.load_state(436, self.reg)['stage'], 'SHIP')
+
+    def test_load_state_never_writes(self):
+        """AC/R3: readers must not touch the registry."""
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        path = factory_run.state_path(436, self.reg)
+        os.remove(path)
+        factory_run.load_state(436, self.reg)
+        self.assertFalse(os.path.exists(path))
+
+    def test_unknown_run_is_none(self):
+        self.assertIsNone(factory_run.load_state(12345, self.reg))
+
+
+class TestOrderedGates(JournalTestCase):
+    def test_gates_render_in_canonical_stage_order(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('gate', stage='SHIP', gate='pr created', result='pass')
+        self.append('gate', stage='GATE', gate='spec lint', result='pass')
+        self.append('gate', stage='BUILD', gate='make', result='pass')
+        self.append('gate', stage='BUILD', gate='make test', result='pass')
+        state = factory_run.load_state(436, self.reg)
+        self.assertEqual(
+            [(g['stage'], g['gate']) for g in factory_run.ordered_gates(state)],
+            [('GATE', 'spec lint'), ('BUILD', 'make'),
+             ('BUILD', 'make test'), ('SHIP', 'pr created')])
+
+    def test_unknown_stage_sorts_last_in_journal_order(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('gate', stage='WEIRD', gate='z', result='pass')
+        self.append('gate', stage='GATE', gate='a', result='pass')
+        state = factory_run.load_state(436, self.reg)
+        self.assertEqual([g['gate'] for g in factory_run.ordered_gates(state)],
+                         ['a', 'z'])
+
+
 if __name__ == '__main__':
     unittest.main()

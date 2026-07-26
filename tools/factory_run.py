@@ -169,3 +169,187 @@ def save_state(state, registry=None):
         fh.flush()
         os.fsync(fh.fileno())
     os.replace(tmp, final)
+
+
+def apply_event(state, event):
+    """Fold one event into *state*. Mutates and returns it.
+
+    This is the whole projection. ``rebuild_state`` and ``append_event`` share
+    it, which is what makes replay and incremental writing agree by
+    construction rather than by discipline.
+    """
+    kind = event.get("kind")
+    ts = event.get("ts")
+    if event.get("attempt") is not None:
+        state["attempt"] = event["attempt"]
+
+    if kind == "start":
+        for field in ("slug", "branch", "worktree", "plan"):
+            if event.get(field) is not None:
+                state[field] = event[field]
+        if event.get("stage"):
+            state["stage"] = event["stage"]
+    elif kind == "stage":
+        state["stage"] = event.get("stage")
+    elif kind == "gate":
+        state["gates"].append({"stage": event.get("stage"),
+                               "gate": event.get("gate"),
+                               "result": event.get("result"), "ts": ts})
+    elif kind == "decision":
+        state["decisions"].append({"text": event.get("text"), "ts": ts})
+    elif kind == "scenario":
+        state["scenarios"].append({"scenario": event.get("scenario"),
+                                   "result": event.get("result"), "ts": ts})
+    elif kind == "permission":
+        state["permissions"].append({"tool": event.get("tool"),
+                                     "command": event.get("command"),
+                                     "outcome": event.get("outcome"),
+                                     "reason": event.get("reason"), "ts": ts})
+    elif kind == "retry":
+        # A new attempt re-runs the gates and scenarios, so this attempt's
+        # results start empty. Decisions and permissions accumulate across the
+        # whole run: both are evidence about the run, not about one pass.
+        state["gates"] = []
+        state["scenarios"] = []
+        state["failure"] = None
+        state["finished"] = None
+        state["stage"] = event.get("stage") or state["stage"]
+    elif kind == "failure":
+        state["failure"] = {"message": event.get("message"), "ts": ts}
+    elif kind == "finish":
+        state["finished"] = {"result": event.get("result"), "ts": ts}
+
+    state["updated"] = ts
+    state["event_count"] += 1
+    return state
+
+
+def rebuild_state(issue, events):
+    """Replay *events* into a fresh projection."""
+    state = new_state(issue)
+    for event in events:
+        apply_event(state, event)
+    return state
+
+
+def read_journal(issue, registry=None):
+    """Parsed events, oldest first. Unparseable lines are skipped, not fatal.
+
+    A truncated final line is the expected corruption for an append-only file
+    written by a process that was killed; a corrupt middle line is rarer but
+    equally survivable, and a forensic tool that refuses to open the file is
+    useless at exactly the moment it is needed.
+    """
+    try:
+        with open(journal_path(issue, registry), encoding="utf-8") as fh:
+            raw = fh.read()
+    except OSError:
+        return []
+    events = []
+    for line in raw.split("\n"):
+        if not line.strip():
+            continue
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue
+    return events
+
+
+def _load_state_raw(issue, registry=None):
+    """state.json as written, or None when it is unusable."""
+    try:
+        with open(state_path(issue, registry), encoding="utf-8") as fh:
+            state = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(state, dict) or \
+            state.get("schema_version") != SCHEMA_VERSION:
+        return None
+    return state
+
+
+def load_state(issue, registry=None):
+    """Current state, self-healing. Never writes.
+
+    Rebuilds from the journal when state.json is missing, unparseable, of a
+    foreign schema version, or behind the journal. Returns None when the run
+    has no registry entry at all.
+    """
+    events = read_journal(issue, registry)
+    state = _load_state_raw(issue, registry)
+    if state is not None and state.get("event_count") == len(events):
+        return state
+    if not events:
+        return state
+    return rebuild_state(issue, events)
+
+
+def ordered_gates(state):
+    """Gates in canonical stage order, journal order within a stage.
+
+    Stages the schema does not know sort last rather than being dropped — an
+    unrecognised stage is a reporting problem, not a reason to hide evidence.
+    """
+    rank = {stage: i for i, stage in enumerate(STAGES)}
+    gates = state.get("gates") or []
+    return [gate for _, gate in sorted(
+        enumerate(gates),
+        key=lambda pair: (rank.get(pair[1].get("stage"), len(rank)), pair[0]))]
+
+
+def _render_page(registry):
+    """Regenerate .factory/status.html. Fail-open: never raises.
+
+    Imported lazily because factory_status imports this module: the writer
+    re-rendering the page is what makes the meta-refresh honest without a
+    watcher process, and a rendering bug must never kill a run.
+    """
+    try:
+        tools_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, tools_dir)
+        try:
+            import factory_status
+        finally:
+            if tools_dir in sys.path:
+                sys.path.remove(tools_dir)
+        factory_status.write_html(registry=registry)
+    except Exception:
+        pass
+
+
+def append_event(issue, kind, registry=None, render=True, **fields):
+    """Append one event, then re-save the projection. Returns the event.
+
+    Journal first, state second — see ADR 0003. Fields whose value is None are
+    dropped so the journal stays readable.
+    """
+    if kind not in EVENT_KINDS:
+        raise ValueError("unknown event kind: %r (expected one of %s)"
+                         % (kind, ", ".join(EVENT_KINDS)))
+    registry = registry or registry_root()
+    directory = run_dir(issue, registry)
+    os.makedirs(directory, exist_ok=True)
+
+    state = _load_state_raw(issue, registry)
+    journal = read_journal(issue, registry)
+    if state is None or state.get("event_count") != len(journal):
+        state = rebuild_state(issue, journal)
+
+    attempt = fields.pop("attempt", None)
+    event = {"ts": timestamp(), "issue": int(issue), "kind": kind,
+             "attempt": int(attempt) if attempt is not None
+                        else state["attempt"]}
+    event.update({k: v for k, v in fields.items() if v is not None})
+
+    with open(os.path.join(directory, JOURNAL_FILE), "a",
+              encoding="utf-8") as fh:
+        fh.write(json.dumps(event, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+    apply_event(state, event)
+    save_state(state, registry)
+    if render:
+        _render_page(registry)
+    return event
