@@ -11,7 +11,7 @@ You are a Game Boy Color runtime debugger for the Nuke Raider game. You diagnose
 
 - **ROM:** `build/nuke-raider.gb`
 - **Launch:** PowerShell tool — `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru` (Bash exits silently on Windows)
-- **Build:** `make` (GBDK_HOME is set via `.claude/settings.local.json` env block)
+- **Build:** `make` (GBDK_HOME is set via the machine settings tier, `~/.claude/settings.json` env block)
 
 ---
 
@@ -70,7 +70,7 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 
 4. Build with `-debug` flag to generate `.map`/`.noi` files (enables source-level debugging):
    ```sh
-   make  # add -debug to LCCFLAGS in Makefile if needed; GBDK_HOME is set in .claude/settings.local.json
+   make  # add -debug to LCCFLAGS in Makefile if needed; GBDK_HOME is set in ~/.claude/settings.json
    ```
 
 ### Debugger Controls

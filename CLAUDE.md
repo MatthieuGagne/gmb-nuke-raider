@@ -61,7 +61,12 @@ To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` fo
 
 Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git` if push fails due to missing credentials.
 
-**Settings files:** `.claude/settings.local.json` is checked into git and must always be committed. When any new tool permission is approved during a session, commit `.claude/settings.local.json` along with the feature work so permissions are not lost.
+**Settings tiers:** three layers, and only one of them is committed.
+- **Machine** (`~/.claude/settings.json`, outside the repo): `env` values and any allow rule containing an absolute path. Template: `.claude/settings.user.example.json`.
+- **Repo** (`.claude/settings.json`, tracked): the curated allowlist, the deny list, and all hook wiring. No absolute paths, no `env`. Validated by `python tools/allowlist_lint.py`, enforced by `make test-tools`.
+- **Scratch** (`.claude/settings.local.json`, gitignored): transient session approvals. Never commit it.
+
+**Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: `docs/adr/0001-settings-tier-contract.md`.
 
 **Always create a PR after pushing a branch** — no need to ask. Include `Closes #N` in the PR body to auto-close the related GitHub issue on merge. When a PR is merged, verify that the linked issue is closed; if not, close it manually with `gh issue close N`.
 

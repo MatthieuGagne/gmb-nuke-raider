@@ -52,7 +52,7 @@ Never use `mgba-qt` (wrong emulator) or reference `wasteland-racer.gb` (wrong RO
 
 - **Any user-visible behavior changed** (new feature, changed controls, new screen, new module) → update the **Game Modules table** in `README.md`.
 - **Any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed** → update `docs/dev-workflow.md` in the same PR. The two are co-authoritative and must agree.
-- **Any new tool permission approved this session** → commit `.claude/settings.local.json` alongside the feature work, so permissions are not lost.
+- **Any new tool permission approved this session** → promote it into the tracked `.claude/settings.json` as a generalized rule in its tool's canonical form (`Bash(prefix:*)`, `PowerShell(prefix *)`), or discard it. Never commit `.claude/settings.local.json` — it is gitignored scratch. Validate with `python tools/allowlist_lint.py`. See `docs/adr/0001-settings-tier-contract.md`.
 
 ### PR conventions
 

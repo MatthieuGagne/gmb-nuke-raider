@@ -1,0 +1,59 @@
+# Coverage inventory — every command this project's automated stages and the
+# CLAUDE.md gate sequence issue. Validated against .claude/settings.json by
+# tools/allowlist_lint.py --coverage.
+#
+# Format:  <Tool>: <command>
+# Blank lines and lines beginning with # are ignored.
+#
+# EXTENSION POINT: the five factory stages (#437) and the headless driver
+# (#438) append their commands here as they become real. Today this file
+# covers the CLAUDE.md gate sequence only.
+#
+# NOT CHECKED — machine tier. These are covered by ~/.claude/settings.json
+# (template: .claude/settings.user.example.json), which this check does not
+# read because its paths are placeholders:
+#   Bash: java -jar <EMULICIOUS_JAR> build/nuke-raider.gb
+#   Bash: <GBDK_HOME>/bin/romusage build/nuke-raider.gb
+
+# --- worktree setup and sync ---
+Bash: git fetch origin
+Bash: git merge origin/master
+Bash: git worktree list
+Bash: git rev-parse --show-toplevel
+Bash: git branch --show-current
+
+# --- build and verification gates ---
+Bash: make clean
+Bash: make
+Bash: make test
+Bash: make test-tools
+Bash: make memory-check
+Bash: make bank-post-build
+Bash: python tools/bank_check.py .
+Bash: python tools/memory_check.py .
+Bash: python tools/allowlist_lint.py
+
+# --- inspection ---
+Bash: git status
+Bash: git diff origin/master...HEAD --stat
+Bash: git log --oneline -5
+Bash: git ls-files .claude
+Bash: grep -n settings.local.json CLAUDE.md
+Bash: ls tools
+
+# --- issue and PR traffic ---
+Bash: gh auth setup-git
+Bash: gh issue view 443 --json title,body,state
+Bash: gh pr create --title Title --body-file body.md
+Bash: gh pr list --state open
+Bash: gh run list --limit 5
+
+# --- commits and push (routed through PowerShell per #437 R8) ---
+PowerShell: git add -A
+PowerShell: git commit -m message
+PowerShell: git push -u origin feature-branch
+PowerShell: make clean
+PowerShell: make
+PowerShell: make test-tools
+PowerShell: gh pr create --title Title --body-file body.md
+PowerShell: Start-Process -FilePath java -ArgumentList -jar

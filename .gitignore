@@ -55,6 +55,10 @@ docs/plans/
 # Personal / machine-specific Claude instructions
 CLAUDE.local.md
 
+# Claude scratch settings tier — transient session approvals, never committed
+# (see docs/adr/0001-settings-tier-contract.md)
+.claude/settings.local.json
+
 
 # Superpowers SDD workspace (transient ledger written by baseline subagent-driven-development)
 .superpowers/

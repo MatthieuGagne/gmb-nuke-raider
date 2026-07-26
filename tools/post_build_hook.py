@@ -4,10 +4,13 @@
 Reads Bash tool-use JSON from stdin. Always exits 0 (non-blocking).
 Skips: make clean, make test, make bank-post-build, make memory-check.
 """
-import json
+import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hook_common
 
 
 _SKIP_PATTERN = re.compile(
@@ -16,10 +19,10 @@ _SKIP_PATTERN = re.compile(
 
 
 def main():
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError, ValueError):
+    data = hook_common.read_payload()
+    if data is None:
         sys.exit(0)
+    hook_common.reroot(data)
 
     command = data.get('tool_input', {}).get('command', '')
 
