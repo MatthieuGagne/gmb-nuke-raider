@@ -310,5 +310,126 @@ class TestTraceAndFreeze(unittest.TestCase):
         self.assertEqual(ctx.frame, 200)
 
 
+class ChangingEmu(FakeEmu):
+    """_px increments every tick; everything else is static."""
+
+    def tick(self, n=1, render=False):
+        super().tick(n, render)
+        val = self.ticks & 0xFFFF
+        self.memory[0xC246] = val & 0xFF
+        self.memory[0xC247] = (val >> 8) & 0xFF
+
+
+class TestAssertMemory(unittest.TestCase):
+
+    def test_passes_on_equal(self):
+        emu = FakeEmu(memory={0xC199: 1})
+        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        ps.run(emu, [{"action": "assert_memory", "address": "_racer_active", "value": 1}], ctx)
+
+    def test_fails_on_mismatch_with_step_index(self):
+        emu = FakeEmu(memory={0xC199: 0})
+        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        with self.assertRaises(ps.StepFailure) as cm:
+            ps.run(emu, [{"action": "advance", "frames": 1},
+                         {"action": "assert_memory", "address": "_racer_active", "value": 1}], ctx)
+        self.assertEqual(cm.exception.step, 1)
+        self.assertEqual(cm.exception.kind, 'assert')
+
+    def test_gt_operator(self):
+        emu = FakeEmu(memory={0xC4F2: 9})
+        ctx = ps.RunContext(symbols={'_hp': 0xC4F2})
+        ps.run(emu, [{"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"}], ctx)
+
+    def test_gt_operator_fails_at_zero(self):
+        emu = FakeEmu(memory={0xC4F2: 0})
+        ctx = ps.RunContext(symbols={'_hp': 0xC4F2})
+        with self.assertRaises(ps.StepFailure):
+            ps.run(emu, [{"action": "assert_memory", "address": "_hp",
+                          "value": 0, "op": "gt"}], ctx)
+
+    def test_word_width_read(self):
+        emu = FakeEmu(memory={0xC246: 0x00, 0xC247: 0x01})   # 256
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        ps.run(emu, [{"action": "assert_memory", "address": "_px",
+                      "value": 256, "width": 2}], ctx)
+
+    def test_px_defaults_to_word_width_without_explicit_field(self):
+        emu = FakeEmu(memory={0xC246: 0x00, 0xC247: 0x01})
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        ps.run(emu, [{"action": "assert_memory", "address": "_px", "value": 256}], ctx)
+
+
+class TestAssertLive(unittest.TestCase):
+
+    def test_passes_when_symbol_and_screen_change(self):
+        emu = ChangingEmu(memory={0xC246: 0, 0xC247: 0},
+                          frames=[[i % 251] for i in range(400)])
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
+                      "screen": True, "frames": 30}], ctx)
+
+    def test_fails_when_symbol_is_frozen(self):
+        emu = FakeEmu(memory={0xC246: 7, 0xC247: 0},
+                      frames=[[i % 251] for i in range(400)])
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        with self.assertRaises(ps.StepFailure) as cm:
+            ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
+                          "screen": True, "frames": 20}], ctx)
+        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertIn('_px', cm.exception.message)
+
+    def test_fails_when_screen_is_frozen(self):
+        emu = ChangingEmu(memory={0xC246: 0, 0xC247: 0})   # constant screen bytes
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        with self.assertRaises(ps.StepFailure) as cm:
+            ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
+                          "screen": True, "frames": 20}], ctx)
+        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertIn('screen', cm.exception.message)
+
+    def test_screen_check_can_be_disabled(self):
+        emu = ChangingEmu(memory={0xC246: 0, 0xC247: 0})
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
+                      "screen": False, "frames": 20}], ctx)
+
+
+class TestNav(unittest.TestCase):
+
+    MANIFEST = {
+        "navigation": {
+            "travel_frames_per_tile": 4,
+            "overmap_to_track": {"1": ["left", "left"], "2": ["right"]},
+            "overmap_to_hub":   {"1": ["up", "up"]},
+        }
+    }
+
+    def test_nav_to_track_expands_manifest_path(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, manifest=self.MANIFEST)
+        ps.run(emu, [{"action": "nav", "to": "track", "id": 1}], ctx)
+        self.assertEqual([p[0] for p in emu.presses], ["left", "left"])
+        self.assertEqual(emu.presses[0][1], 4)      # travel_frames_per_tile
+
+    def test_nav_to_hub_expands_manifest_path(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, manifest=self.MANIFEST)
+        ps.run(emu, [{"action": "nav", "to": "hub", "id": 1}], ctx)
+        self.assertEqual([p[0] for p in emu.presses], ["up", "up"])
+
+    def test_nav_without_manifest_raises_scenario_error(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, manifest={})
+        with self.assertRaises(ps.ScenarioError):
+            ps.run(emu, [{"action": "nav", "to": "track", "id": 1}], ctx)
+
+    def test_nav_unknown_destination_raises_scenario_error(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, manifest=self.MANIFEST)
+        with self.assertRaises(ps.ScenarioError):
+            ps.run(emu, [{"action": "nav", "to": "track", "id": 99}], ctx)
+
+
 if __name__ == '__main__':
     unittest.main()

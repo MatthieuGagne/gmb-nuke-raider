@@ -369,5 +369,57 @@ def _dispatch(emu, step, ctx, i):
     elif act == "screenshot":
         ctx.capture(emu, step.get("out", ctx.default_out))
 
+    elif act == "assert_memory":
+        addr, width = _addr_and_width(ctx, step)
+        target = int(step["value"])
+        actual = read_value(emu, addr, width)
+        if not _cmp(step, actual, target):
+            raise StepFailure(
+                i, "assert",
+                f"{step['address']} is {actual}, expected "
+                f"{step.get('op', 'eq')} {target}", act)
+
+    elif act == "assert_live":
+        frames = int(step.get("frames", 60))
+        names = list(step.get("symbols", []))
+        want_screen = bool(step.get("screen", True))
+        addrs = {n: (resolve(n, ctx.symbols), ctx.width_of(n)) for n in names}
+        start = {n: read_value(emu, a, w) for n, (a, w) in addrs.items()}
+        changed, hashes = set(), set()
+        for _ in range(frames):
+            ctx.tick(emu, 1, render_all=True)
+            hashes.add(ctx.screen_hash(emu))
+            for n, (a, w) in addrs.items():
+                if read_value(emu, a, w) != start[n]:
+                    changed.add(n)
+        stale = [n for n in names if n not in changed]
+        if stale:
+            raise StepFailure(
+                i, "liveness",
+                f"{', '.join(stale)} unchanged over {frames} frames", act)
+        if want_screen and len(hashes) < 2:
+            raise StepFailure(
+                i, "liveness",
+                f"screen hash unchanged over {frames} frames", act)
+
+    elif act == "nav":
+        nav = ctx.manifest.get("navigation")
+        if not nav:
+            raise ScenarioError(
+                "nav step requires build/game-manifest.json "
+                "(run 'make' to generate it)")
+        key = {"track": "overmap_to_track", "hub": "overmap_to_hub"}.get(step["to"])
+        if key is None:
+            raise ScenarioError(f"nav 'to' must be 'track' or 'hub', got {step['to']!r}")
+        table = nav.get(key, {})
+        dirs = table.get(str(step["id"]))
+        if dirs is None:
+            raise ScenarioError(f"No manifest path for {step['to']} {step['id']!r}")
+        per_tile = int(nav.get("travel_frames_per_tile", 4))
+        settle = int(step.get("settle", per_tile))
+        for direction in dirs:
+            press(emu, ctx, [direction], per_tile)
+            ctx.tick(emu, settle)
+
     else:
         raise ScenarioError(f"Step {i}: unhandled action {act!r}")
