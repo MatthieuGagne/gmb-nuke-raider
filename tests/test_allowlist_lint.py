@@ -1,7 +1,59 @@
 """Tests for tools/allowlist_lint.py — hygiene rules."""
+import os
 import unittest
 
-from tools.allowlist_lint import (check_hygiene, parse_rule, rule_matches)
+from tools.allowlist_lint import (check_hook_shells, check_hygiene,
+                                  load_settings, parse_rule, rule_matches)
+
+REPO_SETTINGS = os.path.join(os.path.dirname(__file__), '..', '.claude',
+                             'settings.json')
+
+
+def hooks(matcher, event='PreToolUse'):
+    return {'hooks': {event: [{'matcher': matcher, 'hooks': []}]}}
+
+
+class HookShellDualityTests(unittest.TestCase):
+    """Matchers are regex-matched against the tool *name*, so "Bash" never
+    matches "PowerShell". Three gates were registered Bash-only and had never
+    fired on a PowerShell-configured machine (#441). Documenting that rule is
+    what let it last four months, so it is checked instead."""
+
+    def test_bash_only_matcher_is_an_error(self):
+        errors = check_hook_shells(hooks('Bash'))
+        self.assertEqual(len(errors), 1)
+        self.assertIn('PowerShell', errors[0])
+
+    def test_powershell_only_matcher_is_an_error(self):
+        errors = check_hook_shells(hooks('PowerShell'))
+        self.assertEqual(len(errors), 1)
+        self.assertIn('Bash', errors[0])
+
+    def test_both_shells_is_clean(self):
+        self.assertEqual(check_hook_shells(hooks('Bash|PowerShell')), [])
+
+    def test_non_shell_matcher_is_ignored(self):
+        self.assertEqual(check_hook_shells(hooks('Write|Edit')), [])
+
+    def test_matcherless_group_is_ignored(self):
+        settings = {'hooks': {'UserPromptSubmit': [{'hooks': []}]}}
+        self.assertEqual(check_hook_shells(settings), [])
+
+    def test_no_hooks_key_is_ignored(self):
+        self.assertEqual(check_hook_shells({}), [])
+
+    def test_error_names_the_event(self):
+        errors = check_hook_shells(hooks('Bash', event='PostToolUse'))
+        self.assertIn('PostToolUse', errors[0])
+
+    def test_every_hook_in_the_repo_settings_covers_both_shells(self):
+        self.assertEqual(check_hook_shells(load_settings(REPO_SETTINGS)), [])
+
+    def test_hygiene_run_reports_hook_errors(self):
+        # The check must reach the tool suite, not just exist (AC8).
+        from tools import allowlist_lint
+        self.assertEqual(allowlist_lint.main(['--hygiene',
+                                              '--settings', REPO_SETTINGS]), 0)
 
 
 def settings(allow, deny=None):
