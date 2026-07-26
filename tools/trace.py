@@ -4,16 +4,24 @@ trace.py — traceability chain for a spec issue: issue -> plan -> branch -> PR 
 
 Chain mode renders the full chain for one issue number, resolving the plan from
 the working tree first and from git history second (plans are sometimes deleted
-after a feature merges).
+after a feature merges). Check mode applies the same invariants repo-wide:
+every plan carries an "**Issue:** #N" header and an issue number in its
+filename; every PR body references an issue with Closes/Fixes/Resolves #N.
+Violations on artifacts dated on/after ADOPTION_DATE are errors; older
+artifacts produce warnings only.
 
 Exit codes:
-    0  chain rendered
+    0  chain rendered, or check passed (warnings allowed)
+    1  check found violations (errors)
     2  operational error (gh/git failed, unreadable input)
 
 Usage:
-    python3 tools/trace.py 435              # render the chain for issue #435
-    python3 tools/trace.py 435 --json       # machine-readable output
-    or imported:  trace.trace(435) -> dict
+    python3 tools/trace.py 435                    # render the chain for issue #435
+    python3 tools/trace.py 435 --json
+    python3 tools/trace.py --check                # repo-wide invariants
+    python3 tools/trace.py --check --plans-only   # offline: plans only, no gh
+    python3 tools/trace.py --check --json
+    or imported:  trace.trace(435) / trace.check(plans, prs) -> dict
 """
 import argparse
 import json
@@ -28,6 +36,10 @@ PLAN_DIR = "docs/plans"
 # Plans created on or after this date must carry the issue header and the
 # issue number in their filename (convention adopted by #435).
 ADOPTION_DATE = "2026-07-26"
+
+# gh pr list page size for check mode. The adoption-date filter keeps the
+# result set small; this is a safety cap, not a paging loop.
+PR_PAGE_LIMIT = 200
 
 PLAN_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-issue(\d+)-[a-z0-9][a-z0-9-]*\.md$")
 PLAN_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
@@ -108,22 +120,30 @@ def _history_plans(root="."):
             yield commit, line
 
 
+def collect_plans(root="."):
+    """Read every plan under docs/plans/ into check()'s input shape."""
+    plan_dir = os.path.join(root, *PLAN_DIR.split("/"))
+    plans = []
+    if not os.path.isdir(plan_dir):
+        return plans
+    for name in sorted(os.listdir(plan_dir)):
+        if not name.endswith(".md"):
+            continue
+        with open(os.path.join(plan_dir, name), encoding="utf-8") as fh:
+            plans.append({"path": f"{PLAN_DIR}/{name}", "name": name,
+                          "text": fh.read()})
+    return plans
+
+
 def find_plan(number, root="."):
     """Locate the plan for an issue: working tree first, then git history.
 
     Returns {"path", "removed", "commit"} or None.
     """
-    plan_dir = os.path.join(root, *PLAN_DIR.split("/"))
-    if os.path.isdir(plan_dir):
-        for name in sorted(os.listdir(plan_dir)):
-            if not name.endswith(".md"):
-                continue
-            _, name_issue = parse_plan_name(name)
-            with open(os.path.join(plan_dir, name), encoding="utf-8") as fh:
-                text = fh.read()
-            if name_issue == number or plan_header_issue(text) == number:
-                return {"path": f"{PLAN_DIR}/{name}", "removed": False,
-                        "commit": None}
+    for plan in collect_plans(root):
+        _, name_issue = parse_plan_name(plan["name"])
+        if name_issue == number or plan_header_issue(plan["text"]) == number:
+            return {"path": plan["path"], "removed": False, "commit": None}
     try:
         history = list(_history_plans(root))
     except RuntimeError:
@@ -196,23 +216,115 @@ def render_chain(chain):
     return "\n".join(lines)
 
 
+def check(plans, prs, adoption_date=ADOPTION_DATE):
+    """Validate traceability invariants over already-collected artifacts.
+
+    plans: [{"path", "name", "text"}]
+    prs:   [{"number", "created_at", "body"}]
+
+    Artifacts dated on/after adoption_date produce errors; older ones produce
+    warnings. Returns {"ok", "errors", "warnings"}.
+    """
+    errors, warnings = [], []
+
+    for plan in plans:
+        date, name_issue = parse_plan_name(plan["name"])
+        header_issue = plan_header_issue(plan["text"])
+        legacy = date is None or date < adoption_date
+
+        if date is None:
+            errors.append(f"{plan['path']}: filename has no YYYY-MM-DD prefix")
+        if header_issue is None:
+            bucket = warnings if legacy else errors
+            bucket.append(f"{plan['path']}: missing '**Issue:** #N' header")
+        if name_issue is None and date is not None:
+            bucket = warnings if legacy else errors
+            bucket.append(f"{plan['path']}: filename does not follow "
+                          f"YYYY-MM-DD-issue<N>-<slug>.md")
+        if (name_issue is not None and header_issue is not None
+                and name_issue != header_issue):
+            errors.append(f"{plan['path']}: filename says #{name_issue} but "
+                          f"header says #{header_issue}")
+
+    for pr in prs:
+        if closes_refs(pr.get("body")):
+            continue
+        created = (pr.get("created_at") or "")[:10]
+        bucket = warnings if created < adoption_date else errors
+        bucket.append(f"PR #{pr['number']}: body has no "
+                      f"Closes/Fixes/Resolves #N reference")
+
+    return {"ok": not errors, "errors": errors, "warnings": warnings}
+
+
+def collect_prs(adoption_date=ADOPTION_DATE):
+    """PRs subject to the Closes-#N invariant.
+
+    Everything created on/after the adoption date (error-eligible), plus every
+    still-open PR from before it (warning-eligible). Closed PRs older than the
+    adoption date are out of scope and never fetched.
+    """
+    seen, prs = set(), []
+    queries = [
+        ["--state", "all", "--search", f"created:>={adoption_date}"],
+        ["--state", "open"],
+    ]
+    for extra in queries:
+        for pr in _gh_json(["pr", "list", "--repo", REPO, "--limit",
+                            str(PR_PAGE_LIMIT), "--json",
+                            "number,createdAt,body,url", *extra]):
+            if pr["number"] in seen:
+                continue
+            seen.add(pr["number"])
+            prs.append({"number": pr["number"], "created_at": pr["createdAt"],
+                        "body": pr.get("body") or ""})
+    return prs
+
+
+def render_check(result):
+    """Human-readable check verdict."""
+    lines = [f"WARN  {w}" for w in result["warnings"]]
+    lines += [f"ERROR {e}" for e in result["errors"]]
+    lines.append("PASS - traceability invariants hold" if result["ok"]
+                 else f"FAIL - {len(result['errors'])} traceability violation(s)")
+    return "\n".join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Trace a spec issue through plan, branch, PR and merge.")
-    parser.add_argument("issue", type=int, help="issue number to trace")
+    parser.add_argument("issue", nargs="?", type=int,
+                        help="issue number to trace")
+    parser.add_argument("--check", action="store_true",
+                        help="validate repo-wide traceability invariants")
+    parser.add_argument("--plans-only", action="store_true",
+                        help="with --check: skip the PR invariant (no gh calls)")
     parser.add_argument("--root", default=".", help="repo root (default: .)")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="emit machine-readable JSON")
     args = parser.parse_args(argv)
 
+    if args.check == (args.issue is not None):
+        parser.error("give an issue number or --check, not both")
+
     try:
-        result = trace(args.issue, args.root)
+        if args.check:
+            prs = [] if args.plans_only else collect_prs()
+            result = check(collect_plans(args.root), prs)
+        else:
+            result = trace(args.issue, args.root)
     except (RuntimeError, OSError, KeyError, ValueError) as exc:
         print(f"trace: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps(result, indent=2) if args.as_json else render_chain(result))
-    return 0
+    if args.as_json:
+        print(json.dumps(result, indent=2))
+    elif args.check:
+        print(render_check(result),
+              file=sys.stdout if result["ok"] else sys.stderr)
+    else:
+        print(render_chain(result))
+    return 0 if (not args.check or result["ok"]) else 1
 
 
 if __name__ == "__main__":

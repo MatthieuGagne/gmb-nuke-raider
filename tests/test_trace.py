@@ -137,5 +137,126 @@ class TestCli(unittest.TestCase):
         self.assertEqual(self._run([]).returncode, 2)
 
 
+def _plan(name, text):
+    return {'path': f'docs/plans/{name}', 'name': name, 'text': text}
+
+
+COMPLIANT = _plan('2026-07-26-issue435-traceability.md',
+                  '# Traceability\n\n**Issue:** #435\n')
+LEGACY = _plan('2026-04-04-turret-fire-and-disappear.md', '# Turret\n')
+POST_NO_HEADER = _plan('2026-08-01-issue500-thing.md', '# Thing\n')
+MISMATCH = _plan('2026-08-01-issue500-thing.md',
+                 '# Thing\n\n**Issue:** #501\n')
+UNDATED = _plan('scratch.md', '# Scratch\n')
+
+
+class TestCheck(unittest.TestCase):
+    def test_compliant_plan_is_clean(self):
+        result = trace_tool.check([COMPLIANT], [])
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['warnings'], [])
+
+    def test_legacy_plan_warns_but_passes(self):
+        result = trace_tool.check([LEGACY], [])
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['errors'], [])
+        self.assertTrue(any('missing' in w for w in result['warnings']))
+
+    def test_post_adoption_plan_without_header_errors(self):
+        result = trace_tool.check([POST_NO_HEADER], [])
+        self.assertFalse(result['ok'])
+        self.assertTrue(any('missing' in e for e in result['errors']))
+
+    def test_header_filename_mismatch_errors(self):
+        result = trace_tool.check([MISMATCH], [])
+        self.assertFalse(result['ok'])
+        self.assertTrue(any('#500' in e and '#501' in e
+                            for e in result['errors']))
+
+    def test_undated_filename_errors(self):
+        result = trace_tool.check([UNDATED], [])
+        self.assertFalse(result['ok'])
+        self.assertTrue(any('YYYY-MM-DD' in e for e in result['errors']))
+
+    def test_pr_with_closes_is_clean(self):
+        prs = [{'number': 444, 'created_at': '2026-07-26T15:33:09Z',
+                'body': 'body\n\nCloses #442\n'}]
+        result = trace_tool.check([], prs)
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['warnings'], [])
+
+    def test_post_adoption_pr_without_closes_errors(self):
+        prs = [{'number': 445, 'created_at': '2026-07-27T00:00:00Z',
+                'body': 'no link here'}]
+        result = trace_tool.check([], prs)
+        self.assertFalse(result['ok'])
+        self.assertTrue(any('#445' in e for e in result['errors']))
+
+    def test_legacy_pr_without_closes_warns(self):
+        prs = [{'number': 400, 'created_at': '2026-05-01T00:00:00Z',
+                'body': 'no link here'}]
+        result = trace_tool.check([], prs)
+        self.assertTrue(result['ok'])
+        self.assertTrue(any('#400' in w for w in result['warnings']))
+
+    def test_adoption_date_is_injectable(self):
+        result = trace_tool.check([LEGACY], [], adoption_date='2026-01-01')
+        self.assertFalse(result['ok'])
+
+
+class TestCollectPlans(unittest.TestCase):
+    def test_reads_markdown_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plans = os.path.join(tmp, 'docs', 'plans')
+            os.makedirs(plans)
+            with open(os.path.join(plans, '2026-07-26-issue1-a.md'),
+                      'w', encoding='utf-8') as fh:
+                fh.write('**Issue:** #1\n')
+            with open(os.path.join(plans, 'notes.txt'),
+                      'w', encoding='utf-8') as fh:
+                fh.write('ignore me\n')
+            collected = trace_tool.collect_plans(tmp)
+            self.assertEqual([p['name'] for p in collected],
+                             ['2026-07-26-issue1-a.md'])
+
+
+class TestCheckCli(unittest.TestCase):
+    def _run(self, args):
+        return subprocess.run([sys.executable, SCRIPT, *args],
+                              capture_output=True, text=True)
+
+    def _repo(self, tmp, plan_name, plan_text):
+        plans = os.path.join(tmp, 'docs', 'plans')
+        os.makedirs(plans)
+        with open(os.path.join(plans, plan_name), 'w', encoding='utf-8') as fh:
+            fh.write(plan_text)
+
+    def test_plans_only_clean_exits_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._repo(tmp, '2026-07-26-issue435-trace.md', '**Issue:** #435\n')
+            r = self._run(['--check', '--plans-only', '--root', tmp])
+            self.assertEqual(r.returncode, 0)
+            self.assertIn('PASS', r.stdout)
+
+    def test_plans_only_violation_exits_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._repo(tmp, '2026-08-01-issue500-thing.md', '# no header\n')
+            r = self._run(['--check', '--plans-only', '--root', tmp])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn('ERROR', r.stderr)
+
+    def test_json_check_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._repo(tmp, '2026-07-26-issue435-trace.md', '**Issue:** #435\n')
+            r = self._run(['--check', '--plans-only', '--root', tmp, '--json'])
+            self.assertEqual(r.returncode, 0)
+            payload = json.loads(r.stdout)
+            self.assertEqual(set(payload), {'ok', 'errors', 'warnings'})
+
+    def test_issue_and_check_together_is_usage_error(self):
+        self.assertEqual(self._run(['435', '--check']).returncode, 2)
+
+
 if __name__ == '__main__':
     unittest.main()
