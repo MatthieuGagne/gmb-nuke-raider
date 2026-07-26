@@ -154,6 +154,18 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/factory_permission_hook.py",
+            "timeout": 15,
+            "statusMessage": "recording permission prompt..."
+          }
+        ]
+      }
     ]
   }
 }

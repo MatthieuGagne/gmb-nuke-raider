@@ -414,3 +414,133 @@ in branch protection, so it does not block merge. Its regex is a bash mirror of 
 
 The gate-enforcing workflows are separate: `.github/workflows/build.yml` provides the four
 required status checks listed in §4, "CI-enforced gates". Those *do* block merge.
+
+---
+
+## 9. Factory run registry
+
+Every walk-away factory run records itself under the **main** repo root, outside every
+worktree, so a run stays explainable after its worktree is deleted.
+
+```
+.factory/
+  status.html                       # dashboard, regenerated on every event
+  runs/issue-<N>/
+    journal.jsonl                   # append-only; the source of truth
+    state.json                      # cached projection of the journal
+    autopsy/attempt-<k>/            # evidence copied out of a failed attempt
+```
+
+`.factory/` is gitignored. Resolution is `dirname(abspath(git rev-parse --git-common-dir))` —
+**not** `--show-toplevel`, which returns the *worktree* root from inside a worktree.
+`NUKE_FACTORY_REGISTRY` overrides the location for tests and scratch runs.
+
+### Who writes what
+
+| Tool | Role |
+|------|------|
+| `tools/factory_run.py` | Schema owner and **sole writer** of the registry. Library, not a CLI. |
+| `tools/factory_status.py` | Read-only dashboard, terminal + HTML. Writes only the rendered page. |
+| `tools/factory_report.py` | Deterministic PR body from state + journal. Writes nothing in the registry. |
+| `tools/factory_permission_hook.py` | `Notification` hook: records a run blocked on a permission prompt. |
+| `tools/deny_gate_hook.py` | Appends a `permission` event at the moment it refuses. |
+
+### Journal and state
+
+The journal is the truth; `state.json` is a cache. `append_event()` writes the journal line
+first, then re-saves state atomically (temp file + `os.replace`), so state can lag the journal
+by one event and can never lead it. `load_state()` replays the journal whenever state is
+missing, unparseable, of a foreign schema version, or behind the journal — a torn write
+self-heals instead of being fatal. An unparseable JSONL line is discarded on read, never an
+error. Full rationale: [`docs/adr/0003-factory-run-journal-as-source-of-truth.md`](adr/0003-factory-run-journal-as-source-of-truth.md).
+
+Event kinds: `start`, `stage`, `gate`, `decision`, `retry`, `scenario`, `permission`,
+`failure`, `finish`. Every event carries `ts`, `issue`, `attempt`, `kind`.
+
+Only `start`, `stage`, and `retry` move `state["stage"]`. A `gate` event carries a `stage`
+field recording where that gate ran, but it does not advance the run — a run can show gate
+results for BUILD while its stage is still GATE.
+
+A **retry** clears this attempt's gates, scenarios, failure, and finish marker. Decisions and
+permission events accumulate across the whole run: both are evidence about the run, not about
+one pass.
+
+### Run conditions
+
+| Condition | Meaning |
+|-----------|---------|
+| `failed` | A terminal failure was recorded. |
+| `complete` | The run finished. |
+| `stale` | The recorded worktree no longer exists on disk. |
+| `idle` | Worktree intact, nothing emitted for 15 minutes. |
+| `active` | Emitting normally. |
+
+Terminal conditions outrank `stale`: a finished run legitimately outlives its worktree.
+`stale` and `idle` are never collapsed — they call for different actions.
+
+### Determinism contract
+
+All timestamps are UTC ISO-8601 with an explicit offset, produced through the single
+`factory_run.clock()` seam that tests inject and both CLIs expose as `--now`. Gates render in
+canonical stage order (`GATE → PLAN → BUILD → VERIFY → SHIP`), decisions in journal order,
+never dict order. Golden comparison of the PR body is byte-exact, so trailing whitespace and
+the final newline are part of the contract.
+
+Because `condition` and `elapsed` are measured against *now*, a dashboard rendered without
+`--now` reports live values: a run that a pinned-clock fixture calls `active` reads `idle`
+once real time has moved on. That is the seam working, not drift.
+
+### Autopsy bundles
+
+On a terminal failure the evidence is **copied** — never referenced — into
+`autopsy/attempt-<k>/`: state, journal, the scenario JSON as executed, smoketest screenshots
+and `trace*.jsonl` / `results.json`, and sha256 sums of the ROM under test and the reference
+ROM. Stage logs are excluded because they are written straight into the registry (#450) and
+already survive.
+
+Assembly is best-effort and **never raises**: `manifest.json` lists every expected artifact as
+present or absent-with-reason. An autopsy that dies during a failure destroys the evidence it
+exists to preserve.
+
+### Commands
+
+```sh
+python tools/factory_status.py                          # terminal dashboard
+python tools/factory_status.py --json                   # machine-readable
+python tools/factory_status.py --html                   # write .factory/status.html
+python tools/factory_report.py --issue 436              # PR body to stdout
+python tools/factory_report.py --issue 436 --out body.md
+```
+
+Both exit `0` whenever they render and `2` on operational failure. Neither ever exits `1` from
+run content — an unhealthy run is a thing to report, not a tool error.
+
+The HTML page is self-contained: inline CSS, screenshots embedded as base64 data URIs, so it
+opens from disk with no server and survives worktree deletion. Freshness comes from the
+writer: `append_event()` re-renders the page (fail-open) on every event, which is what makes
+its 30-second meta-refresh honest without a watcher process. Embedding is capped at three
+checkpoints plus every failure frame per run, and the page states what it dropped.
+
+### Permission events
+
+A permission prompt during an unattended run is an allowlist bug (#432 R6). Two mechanisms
+record it: the `Notification` hook captures a run blocked on a prompt, and `deny_gate_hook.py`
+appends at the moment it refuses. Correlation is by `NUKE_FACTORY_RUN` carrying the **issue
+number** (`NUKE_FACTORY_RUN=436`) — not by `cwd`, which matches every run equally and does not
+exist yet at GATE stage. A non-numeric value stays truthy, so the deny gate's factory-only
+rules still fire while the run is treated as unattributable and nothing is journalled; that is
+how the deny-gate tests exercise the rules without writing to the real registry. It is set by
+the session or driver process, never by a settings file: the repo tier forbids `env` (see
+[`docs/adr/0001-settings-tier-contract.md`](adr/0001-settings-tier-contract.md)).
+
+Note that the deny gate matches on raw command text, so a diagnostic that merely *quotes* a
+forbidden command is itself refused. Assemble such strings piecewise in tooling that reports
+on denied commands.
+
+This is the one agent-specific surface here. Under any other agent no permission events are
+recorded, and a run with none renders as normal, not broken.
+
+### Retention
+
+None. `.factory/` grows without bound from screenshots and traces until deleted by hand.
+Accepted cost for a solo project.
