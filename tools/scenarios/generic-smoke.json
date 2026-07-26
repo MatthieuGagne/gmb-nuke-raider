@@ -1,0 +1,17 @@
+{
+  "name": "generic-smoke",
+  "blocking": true,
+  "watch": ["_hp", "_px", "_py", "_racer_active"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "advance", "frames": 180},
+    {"action": "screenshot", "out": "build/smoketest/generic-smoke/race-start.png"},
+    {"action": "press", "buttons": ["down"], "delay": 240},
+    {"action": "assert_live", "symbols": ["_py"], "screen": true, "frames": 60},
+    {"action": "screenshot", "out": "build/smoketest/generic-smoke/gameplay.png"},
+    {"action": "press", "buttons": ["down"], "delay": 240},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "screenshot", "out": "build/smoketest/generic-smoke/finish.png"}
+  ]
+}
