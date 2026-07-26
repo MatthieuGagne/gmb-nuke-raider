@@ -21,7 +21,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
+.PHONY: all clean test test-tools smoketest export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
 
 all: $(TARGET) sync-docs
 
@@ -221,7 +221,12 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 $(TARGET): src/overmap_car_sprite.c
 
 test-tools:
-	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook tests.test_trace tests.test_hook_common tests.test_deny_gate_hook tests.test_allowlist_lint tests.test_precommit_build_hook tests.test_emulicious_window_hook -v
+	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook tests.test_trace tests.test_hook_common tests.test_deny_gate_hook tests.test_allowlist_lint tests.test_precommit_build_hook tests.test_emulicious_window_hook tests.test_pyboy_scenario -v
+
+# Headless ROM liveness gate — runs every scenario in tools/scenarios/.
+# Blocking scenarios fail the target; evidence scenarios only WARN.
+smoketest:
+	python tools/smoketest_headless.py --all
 
 # Validate #pragma bank in src/*.c against bank-manifest.json — fails build on mismatch
 bank-check:

@@ -31,6 +31,20 @@ Unit tests compile with `gcc` — no hardware or emulator needed:
 make test
 ```
 
+### Headless smoketest
+
+`make smoketest` boots the built ROM under PyBoy and drives it through the scenarios in
+`tools/scenarios/`, checking the game reaches gameplay and stays alive — no emulator window,
+no interaction:
+
+```sh
+make smoketest
+```
+
+Exit codes: `0` pass, `1` run failure, `2` tool/usage error. Each run writes
+`build/smoketest/<scenario>/` with `results.json`, a WRAM `trace.jsonl`, and screenshots.
+See [`docs/dev-workflow.md`](docs/dev-workflow.md) for the scenario format and differential mode.
+
 ## Running
 
 ```sh
