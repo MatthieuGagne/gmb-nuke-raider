@@ -454,5 +454,48 @@ class TestScreenshotCliSurface(unittest.TestCase):
         self.assertEqual(args.steps, '[]')
 
 
+class TestSmoketestResults(unittest.TestCase):
+
+    def _mod(self):
+        import importlib
+        return importlib.import_module('smoketest_headless')
+
+    def test_trace_is_written_as_jsonl(self):
+        st = self._mod()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'trace.jsonl')
+            st.write_trace([{"frame": 10, "values": {"_hp": 8}},
+                            {"frame": 20, "values": {"_hp": 7}}], path)
+            lines = [json.loads(l) for l in open(path) if l.strip()]
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(lines[1]['values']['_hp'], 7)
+
+    def test_passing_result_has_pass_verdict(self):
+        st = self._mod()
+        ctx = ps.RunContext(symbols={})
+        ctx.frame = 100
+        res = st.build_result('generic-smoke', ctx)
+        self.assertEqual(res['verdict'], 'pass')
+        self.assertEqual(res['scenario'], 'generic-smoke')
+        self.assertEqual(res['frames'], 100)
+        self.assertIsNone(res['failure'])
+
+    def test_failing_result_records_step_and_kind(self):
+        st = self._mod()
+        ctx = ps.RunContext(symbols={})
+        fail = ps.StepFailure(19, 'liveness', '_px unchanged over 60 frames', 'assert_live')
+        res = st.build_result('generic-smoke', ctx, failure=fail)
+        self.assertEqual(res['verdict'], 'fail')
+        self.assertEqual(res['failure']['step'], 19)
+        self.assertEqual(res['failure']['kind'], 'liveness')
+        self.assertEqual(res['failure']['action'], 'assert_live')
+
+    def test_exit_codes_are_zero_one_two(self):
+        st = self._mod()
+        self.assertEqual(st.EXIT_PASS, 0)
+        self.assertEqual(st.EXIT_FAIL, 1)
+        self.assertEqual(st.EXIT_USAGE, 2)
+
+
 if __name__ == '__main__':
     unittest.main()
