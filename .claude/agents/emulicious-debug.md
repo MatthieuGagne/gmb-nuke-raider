@@ -145,9 +145,14 @@ romusage build/nuke-raider.cdb -a
 
 ## GBC-Specific Diagnostic Hints
 
-**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. For `static` WRAM variables, disassemble the getter function from the ROM binary (`.noi` from `make build-debug`) to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
+**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. Two ways to reach a `static` WRAM variable:
+
+- *Preferred when you can rebuild:* export a non-`static` debug global alongside it (e.g. `uint8_t dbg_foo;`), rebuild, then `grep "dbg_foo" build/nuke-raider.map` to get its address and read it via `pyboy.memory[addr]`. See the `screenshot` skill's "Headless WRAM Read" pattern for the full workflow.
+- *When you only have a getter and cannot add a debug global:* disassemble the getter function from the ROM binary (`.noi` from `make build-debug`) to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
 
 **"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, open the Memory Editor and read `SCY`/`SCX` (0xFF42/0xFF43) — non-zero values mean the tilemap is rendering off-screen.
+
+**`finish_eval()` direction-velocity race:** Any `BANKED` physics blocker (e.g. `racer_blocks_pixel()`) can zero `vy` on the same frame the player reaches a finish/checkpoint tile. If `finish_eval()` gates on `pvy > 0`, that check silently fails even though the player crossed correctly. Prefer `player_get_dir()` facing-direction over instantaneous velocity. Confirm headlessly: export `dbg_pvy` and read it via PyBoy at the crossing frame — if `pvy=0` despite correct facing direction, this is the cause (tracked in issue #382).
 
 ---
 
