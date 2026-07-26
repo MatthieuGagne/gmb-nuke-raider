@@ -66,7 +66,8 @@ class InstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self._repo(d)
             subprocess.run(['git', 'config', '--local', 'core.hooksPath',
-                            '.git/hooks'], cwd=d, check=True)
+                            '.git/hooks'], cwd=d, check=True,
+                           env=install_hooks.clean_env())
             self.assertTrue(install_hooks.install(d))
             self.assertEqual(install_hooks.current_hooks_path(d), '.githooks')
 
@@ -91,7 +92,8 @@ class InstallTests(unittest.TestCase):
 
     def test_main_refuses_when_the_hooks_directory_is_missing(self):
         with tempfile.TemporaryDirectory() as d:
-            subprocess.run(['git', 'init', '-q', d], check=True)
+            subprocess.run(['git', 'init', '-q', d], check=True,
+                           env=install_hooks.clean_env())
             argv = [sys.executable,
                     os.path.join(os.path.dirname(__file__), '..', 'tools',
                                  'install_hooks.py'), d]

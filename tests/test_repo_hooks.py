@@ -7,10 +7,15 @@ and needs GBDK_HOME; a commit from a bare cmd.exe would die on
 make is also exactly what lets the hook and the Makefile drift, so the
 agreement is asserted here.
 """
+import ast
 import json
 import os
 import re
+import sys
 import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
+import install_hooks
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 HOOKS_DIR = os.path.join(ROOT, '.githooks')
@@ -68,6 +73,100 @@ class MakefileWiringTests(unittest.TestCase):
     def test_hooks_is_phony(self):
         phony = re.search(r'(?m)^\.PHONY:(.*)$', read(MAKEFILE)).group(1)
         self.assertIn('hooks', phony.split())
+
+
+class GitEnvScrubTests(unittest.TestCase):
+    """git exports GIT_DIR and friends into every hook's environment, and they
+    override cwd. The tool suite runs inside pre-commit and contains tests that
+    shell out to git (tests/test_factory_run.py builds a scratch repo), so
+    without this scrub those tests commit to the real repository using the very
+    index being committed. That happened — a merge commit came out titled
+    "init" with a test fixture file in it (#441)."""
+
+    def _unset_names(self, path):
+        m = re.search(r'(?ms)^unset ((?:[A-Z_ ]+\\\n\s*)*[A-Z_ ]+)$', read(path))
+        return set(m.group(1).replace('\\\n', ' ').split()) if m else set()
+
+    def test_pre_commit_scrubs_the_git_environment(self):
+        self.assertIn('GIT_DIR', self._unset_names(PRE_COMMIT))
+
+    def test_pre_push_scrubs_the_git_environment(self):
+        self.assertIn('GIT_DIR', self._unset_names(PRE_PUSH))
+
+    def test_hooks_scrub_exactly_the_documented_variables(self):
+        # One definition, two consumers: drift here is how the scrub silently
+        # stops covering a variable git later starts exporting.
+        expected = set(install_hooks.GIT_ENV_OVERRIDES)
+        self.assertEqual(self._unset_names(PRE_COMMIT), expected)
+        self.assertEqual(self._unset_names(PRE_PUSH), expected)
+
+
+class GitInTestsTests(unittest.TestCase):
+    """Any test that shells out to git must scrub too — cwd alone is not enough
+    once the suite runs inside a hook."""
+
+    # AST, not a regex: a regex cannot span a multi-line call, and it matches
+    # its own specimen strings inside this very file. Both mistakes were made
+    # before this comment existed — the first version missed
+    # `subprocess.run(['git', 'config', ...], cwd=d)`, which is the exact call
+    # that reset this repository's core.hooksPath mid-commit.
+    def _offending_calls(self, src):
+        out = []
+        for node in ast.walk(ast.parse(src)):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            if not (isinstance(fn, ast.Attribute) and fn.attr == 'run'
+                    and isinstance(fn.value, ast.Name)
+                    and fn.value.id == 'subprocess' and node.args):
+                continue
+            argv = node.args[0]
+            if isinstance(argv, ast.BinOp):      # ('git',) + args
+                argv = argv.left
+            first = argv
+            if isinstance(argv, (ast.List, ast.Tuple)):
+                first = argv.elts[0] if argv.elts else None
+            if not (isinstance(first, ast.Constant) and first.value == 'git'):
+                continue
+            kwargs = {k.arg for k in node.keywords}
+            if 'cwd' in kwargs and 'env' not in kwargs:
+                out.append(node.lineno)
+        return out
+
+    def test_the_detector_catches_the_list_form(self):
+        bad = "subprocess.run(['git', 'config', '--local', 'x'], cwd=d)"
+        self.assertEqual(len(self._offending_calls(bad)), 1)
+
+    def test_the_detector_catches_the_tuple_form(self):
+        bad = "subprocess.run(('git',) + args, cwd=self.main, check=True)"
+        self.assertEqual(len(self._offending_calls(bad)), 1)
+
+    def test_the_detector_spans_a_multiline_call(self):
+        bad = ("subprocess.run(['git', 'init', '-q', d],\n"
+               "               check=True,\n"
+               "               cwd=d)")
+        self.assertEqual(len(self._offending_calls(bad)), 1)
+
+    def test_the_detector_accepts_a_scrubbed_call(self):
+        good = ("subprocess.run(['git', 'init', d], cwd=d, "
+                "env=install_hooks.clean_env())")
+        self.assertEqual(self._offending_calls(good), [])
+
+    def test_the_detector_ignores_non_git_calls(self):
+        self.assertEqual(
+            self._offending_calls("subprocess.run(['make'], cwd=d)"), [])
+
+    def test_no_test_runs_git_with_cwd_but_no_env(self):
+        offenders = []
+        tests_dir = os.path.dirname(__file__)
+        for name in sorted(os.listdir(tests_dir)):
+            if not (name.startswith('test_') and name.endswith('.py')):
+                continue
+            if self._offending_calls(read(os.path.join(tests_dir, name))):
+                offenders.append(name)
+        self.assertEqual(offenders, [],
+                         'git subprocess with cwd= but no env= — see '
+                         'install_hooks.clean_env')
 
 
 class PrePushTests(unittest.TestCase):

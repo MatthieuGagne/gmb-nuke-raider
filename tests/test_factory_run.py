@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_run
+import install_hooks
 
 
 class TestClockSeam(unittest.TestCase):
@@ -61,8 +62,13 @@ class TestRegistryRoot(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _git(self, *args):
+        # clean_env, not just cwd: git exports GIT_DIR/GIT_INDEX_FILE into
+        # every hook's environment and they override cwd, so under the
+        # pre-commit hook these calls would build their scratch repo out of
+        # the real repository's index (#441).
         subprocess.run(('git',) + args, cwd=self.main, check=True,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True,
+                       env=install_hooks.clean_env())
 
     def test_repo_root_from_main_tree(self):
         self.assertEqual(os.path.realpath(factory_run.repo_root(self.main)),

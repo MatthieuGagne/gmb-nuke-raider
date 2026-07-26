@@ -129,10 +129,18 @@ gated after one build, with no setup step and no rewrite on later builds. Undo w
 reason unrelated to the tests. `tests/test_repo_hooks.py` asserts the hook's command and the
 `Makefile` recipe stay byte-identical, since bypassing `make` is exactly what lets them drift.
 
-Anything that shells out to git from inside a hook must scrub `GIT_DIR` and friends first
-(`install_hooks.clean_env`) — git exports them into every hook's environment and they override
-`cwd`, so an unscrubbed call silently operates on the invoking repository instead of the one you
-named.
+**Anything that shells out to git must scrub `GIT_DIR` and friends first** — git exports them
+into every hook's environment and they override `cwd`, so an unscrubbed call silently operates on
+the invoking repository instead of the one you named. Both hooks `unset` them before running
+anything, and `install_hooks.clean_env()` is the one definition for Python callers; use it in
+tools *and* in tests.
+
+This is not theoretical. The tool suite runs inside `pre-commit`, and `tests/test_factory_run.py`
+builds a scratch repo with `git init` / `git add` / `git commit`. Unscrubbed, those calls ran
+against the real repository using the very index being committed — producing a merge commit
+titled `init` containing a test fixture file, resetting `core.hooksPath` so the gate stopped
+firing, and rewriting `user.email`. `tests/test_repo_hooks.py` now parses every test module with
+`ast` and fails any `subprocess.run(['git', …], cwd=…)` that passes no `env=`.
 
 `--no-verify` bypasses both. That is acceptable: CI is the authority, so a bypassed local hook
 costs a round-trip, not correctness.

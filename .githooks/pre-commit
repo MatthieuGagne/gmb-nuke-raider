@@ -11,6 +11,16 @@
 # Bypass with `git commit --no-verify`; CI remains the authority.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+# Scrub the git variables git exports into every hook's environment. They
+# override cwd, so any test that shells out to git — tests/test_factory_run.py
+# builds a scratch repo with `git init` / `git add` / `git commit` — would
+# otherwise operate on THIS repository, using this very commit's index. That is
+# not hypothetical: it hijacked a merge commit before this line existed (#441).
+# Keep this list identical to GIT_ENV_OVERRIDES in tools/install_hooks.py;
+# tests/test_repo_hooks.py enforces that.
+unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE \
+      GIT_OBJECT_DIRECTORY GIT_PREFIX
+
 if command -v python >/dev/null 2>&1; then
     PY=python
 elif command -v python3 >/dev/null 2>&1; then

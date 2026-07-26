@@ -8,6 +8,11 @@
 # Bypass with `git push --no-verify`; CI remains the authority.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+# See .githooks/pre-commit for why: git exports these into every hook's
+# environment and they override cwd (#441).
+unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE \
+      GIT_OBJECT_DIRECTORY GIT_PREFIX
+
 if command -v python >/dev/null 2>&1; then
     PY=python
 elif command -v python3 >/dev/null 2>&1; then
