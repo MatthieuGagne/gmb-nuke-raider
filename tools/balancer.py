@@ -14,8 +14,16 @@ import os
 import re
 import subprocess
 import sys
-import termios
-import tty
+
+# The interactive TUI is POSIX-only (termios/tty + /dev/tty). Import them
+# lazily so the pure helpers (parse_config, apply_changes) stay importable —
+# and unit-testable — on Windows, where these modules do not exist.
+try:
+    import termios
+    import tty
+except ImportError:  # pragma: no cover - platform dependent
+    termios = None
+    tty = None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT   = os.path.dirname(SCRIPT_DIR)
@@ -134,6 +142,13 @@ def _draw(variables, values, cursor, status):
 # ---------------------------------------------------------------------------
 
 def main():
+    if termios is None:
+        sys.stderr.write(
+            'balancer: the interactive TUI requires a POSIX terminal '
+            '(termios/tty); it does not run on Windows.\n'
+        )
+        sys.exit(2)
+
     with open(CONFIG_H) as f:
         original_text = f.read()
 
