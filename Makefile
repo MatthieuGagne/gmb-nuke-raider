@@ -220,8 +220,13 @@ src/overmap_car_sprite.c: assets/sprites/overmap_car.png tools/png_to_tiles.py
 
 $(TARGET): src/overmap_car_sprite.c
 
+# Tool suite — discovers every tests/test_*.py, so a new test module is gated
+# with no Makefile edit (#441). Keep this command byte-identical to the one in
+# .githooks/pre-commit; tests/test_repo_hooks.py enforces that.
+# No -t . (discovery breaks: tests/ is not a package), no PYTHONPATH=. (the
+# test modules put tools/ on sys.path themselves), no -v (noise at 450 tests).
 test-tools:
-	PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook tests.test_trace tests.test_hook_common tests.test_deny_gate_hook tests.test_allowlist_lint tests.test_precommit_build_hook tests.test_emulicious_window_hook tests.test_pyboy_scenario -v
+	python -m unittest discover -s tests -p 'test_*.py'
 
 # Headless ROM liveness gate — runs every scenario in tools/scenarios/.
 # Blocking scenarios fail the target; evidence scenarios only WARN.
