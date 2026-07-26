@@ -15,7 +15,7 @@ _Avoid_: user settings, global settings, local settings
 
 **Repo tier**:
 The tracked settings layer inside the repository, holding the curated
-allowlist, the deny list, and all hook wiring.
+allowlist, the deny list, and all agent hook wiring.
 _Avoid_: project settings, shared settings
 
 **Scratch tier**:
@@ -61,6 +61,31 @@ A hook script that locates the repository root from its own invocation context
 rather than trusting the working directory it inherits.
 _Avoid_: relative hook, portable hook
 
+### Gates & suites
+
+**Gate**:
+A check that blocks the action it guards. A check that only reports its result
+is not a gate.
+_Avoid_: check, guard, validation
+
+**Agent hook**:
+A check the coding agent runs around its own tool use. It sees only work done
+through the agent.
+_Avoid_: hook, settings hook
+
+**Repository hook**:
+A check git runs on a repository event. It sees every actor, agent or human.
+_Avoid_: git hook, local hook
+
+**Unit suite**:
+The C tests exercising game logic on the host, run by `make test`.
+_Avoid_: the tests, unit tests
+
+**Tool suite**:
+The Python tests exercising this repository's own tooling, run by
+`make test-tools`.
+_Avoid_: tool tests, the Python tests, unit tests
+
 ### Factory runs
 
 **Run**:
@@ -89,9 +114,8 @@ if the two disagree, the journal is right.
 _Avoid_: the state file, run status, run record
 
 **Gate result**:
-The recorded outcome of one blocking check within a stage.
-_Avoid_: gate — bare "gate" already means the deny gate, and separately the
-build and smoketest gates
+The recorded outcome of one **Gate** within a stage.
+_Avoid_: gate — that names the check itself, not the record of how it came out
 
 **Autopsy bundle**:
 The evidence copied out of a failing attempt so the failure stays explainable
