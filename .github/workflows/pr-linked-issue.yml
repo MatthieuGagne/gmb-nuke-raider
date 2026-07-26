@@ -1,0 +1,37 @@
+name: PR Linked Issue
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches: ["master"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  linked-issue:
+    name: PR references an issue
+    runs-on: ubuntu-latest
+    steps:
+      # The PR body is untrusted input — pass it through env, never interpolate
+      # ${{ }} directly into the shell.
+      - name: Check PR body for an issue reference
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Keep this pattern in sync with CLOSES_RE in tools/trace.py.
+          PATTERN='(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+'
+          if printf '%s' "$PR_BODY" | grep -qiE "$PATTERN"; then
+            REF=$(printf '%s' "$PR_BODY" | grep -oiE "$PATTERN" | head -1)
+            echo "PR references an issue: $REF" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error::PR body has no 'Closes #N' reference — link the spec issue."
+          {
+            echo "### Missing issue link"
+            echo ""
+            echo "Add \`Closes #N\` to the PR body so the spec issue auto-closes on merge."
+            echo "See \`docs/dev-workflow.md\` §8 Traceability."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -60,7 +60,7 @@ directories under `.claude/skills/`.
 ```
 brainstorming skill
   → /prd skill (creates GitHub issue with PRD)
-  → [new session] writing-plans skill (creates docs/plans/YYYY-MM-DD-<feature>.md)
+  → [new session] writing-plans skill (creates docs/plans/YYYY-MM-DD-issue<N>-<slug>.md)
   → subagent-driven-development skill (executes plan, task-by-task)
   → finishing-a-development-branch skill (tests → gates → smoketest → PR)
 ```
@@ -253,7 +253,54 @@ Before pushing and creating a PR, verify all of the following:
 - [ ] **If user-visible behavior changed:** README module table updated
 - [ ] **If any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed:** this file (`docs/dev-workflow.md`) updated
 - [ ] PR body includes `Closes #N` for the related issue
+- [ ] `python tools/trace.py --check` passes (no ERROR lines; legacy warnings are expected)
 - [ ] `.claude/settings.local.json` committed if any new tool permissions were approved
 
 Use `gh pr create` with a `## Summary` + `## Test Plan` body. After merge, verify the linked
 issue is auto-closed; if not, run `gh issue close N`.
+
+---
+
+## 8. Traceability
+
+Every change is traceable end to end: **issue → plan → branch → PR → merge**.
+
+### Conventions
+
+| Link | Convention | Enforced by |
+|------|-----------|-------------|
+| issue → plan | Plan filename `docs/plans/YYYY-MM-DD-issue<N>-<slug>.md` **and** an `**Issue:** #N` line in the plan header | `.claude/skill-overlays/writing-plans.md` (self-review check #6), `tools/trace.py --check` |
+| plan → branch | Worktree branch name ends in `-<N>` (e.g. `worktree-plan-laser-weapon-damage-424`) | convention; `trace.py` uses it only when no PR exists yet |
+| branch → PR | PR body contains `Closes #N` | `finishing-a-development-branch` skill, `.github/workflows/pr-linked-issue.yml` |
+| PR → merge | GitHub auto-closes the issue on merge | GitHub |
+
+### Tracing one issue
+
+```sh
+python tools/trace.py 424           # human-readable chain
+python tools/trace.py 424 --json    # machine-readable
+```
+
+Renders issue title/state, the plan file (searching the working tree first, then git history
+for plans deleted after merge), branch, PR and merge commit. Any link that cannot be resolved
+prints `(not found)` rather than failing.
+
+### Checking the whole repo
+
+```sh
+python tools/trace.py --check                # plans + PRs (needs gh)
+python tools/trace.py --check --plans-only   # plans only, offline
+```
+
+Exit `0` = pass (warnings allowed), `1` = violations, `2` = operational error.
+
+`ADOPTION_DATE` in `tools/trace.py` is the single knob governing severity: plans and PRs dated
+on or after it are **errors**; older ones are **warnings**. Back-filling historical plans is
+deliberately out of scope — the warnings are expected and are not a to-do list.
+
+### CI
+
+`.github/workflows/pr-linked-issue.yml` runs on every PR open/edit/reopen/sync and fails when
+the PR body has no `Closes`/`Fixes`/`Resolves #N` reference. It is advisory: the check is not
+in branch protection, so it does not block merge. Its regex is a bash mirror of `CLOSES_RE` in
+`tools/trace.py` — change both together.
