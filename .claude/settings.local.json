@@ -154,7 +154,14 @@
       "PowerShell(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | \"#\\\\\\(.number\\) [\\\\\\(.headRefName\\)] draft=\\\\\\(.isDraft\\) \\\\\\(.title\\)\"')",
       "PowerShell($env:PATH = \"C:\\\\Program Files\\\\Git\\\\bin;C:\\\\Program Files\\\\Git\\\\usr\\\\bin;$env:PATH\"; & ./build/test_damage 2>&1 | Select-Object -Last 3)",
       "Bash(gh issue *)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "PowerShell(git worktree list; \"---\"; git branch --show-current; \"---\"; \\(Get-Location\\).Path)",
+      "PowerShell(Get-ChildItem \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\plan-factory-spec-gate-433\\\\docs\\\\plans\" -ErrorAction SilentlyContinue | Select-Object Name; \"--- other wt ---\"; Get-ChildItem \"C:\\\\Code\\\\nuke-raider\\\\.claude\\\\worktrees\\\\plan-spec-gate-433\\\\docs\\\\plans\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "Read(//c/Users/mathd/.claude/plugins/cache/claude-plugins-official/superpowers/**)",
+      "Read(//c/Users/mathd/.claude/plugins/cache/claude-plugins-official/superpowers/6.2.0/**)",
+      "Read(//c/Users/mathd/.claude/skills/**)",
+      "Read(//c/Users/mathd/.claude/plugins/**)",
+      "WebFetch(domain:www.aihero.dev)"
     ]
   },
   "hooks": {
