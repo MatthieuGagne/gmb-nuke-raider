@@ -7,7 +7,10 @@ Project (Nuke Raider) additions and overrides for the baseline writing-plans ski
 
 ## Overrides (do NOT follow the baseline here)
 
-- **Save plans to `docs/plans/YYYY-MM-DD-<feature-name>.md`** — NOT `docs/superpowers/plans/` or any other baseline location.
+- **Save plans to `docs/plans/YYYY-MM-DD-issue<N>-<slug>.md`** — NOT `docs/superpowers/plans/`
+  or any other baseline location, and NOT the issue-less `YYYY-MM-DD-<feature-name>.md` form.
+  `<N>` is the GitHub issue number the plan implements; `<slug>` is lowercase, hyphen-separated
+  (e.g. `docs/plans/2026-07-26-issue435-traceability.md`).
 
 ## Project additions
 
@@ -104,6 +107,8 @@ Every plan MUST start with this header:
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Issue:** #N
+
 **Goal:** [One sentence describing what this builds]
 
 **Architecture:** [2-3 sentences about approach]
@@ -114,6 +119,11 @@ Every plan MUST start with this header:
 
 - [Question 1 — or delete this line if none]
 ```
+
+The `**Issue:** #N` line is mandatory and must sit on its own line, exactly in this form —
+`tools/trace.py` parses it to link the plan back to its spec issue, and the issue number must
+match the one in the filename. If a plan has no originating issue, create one first (`/prd`);
+a plan with no issue cannot be traced.
 
 ### Task templates
 
@@ -130,9 +140,11 @@ Run this before offering the execution handoff. Fix any failures first.
 | 3 | **Parallel annotations justified** | Every task has `**Depends on:**` and `**Parallelizable with:**` filled in. Any `**Parallelizable with:** none` MUST be followed by a one-sentence justification (e.g. "writes same file as Task M"). An unjustified `none` is a plan defect. |
 | 4 | **Parallel Execution Groups tables present** | Every batch that precedes a Smoketest Checkpoint has a `#### Parallel Execution Groups` table |
 | 5 | **No implementation details leaked from brainstorming** | Plan contains file paths and task steps, not design narrative or requirement rationale (those belong in the GitHub issue) |
+| 6 | **Issue header + filename** | The plan has an `**Issue:** #N` line matching the `issue<N>` in its filename. Verify with `python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` lines mentioning this plan |
 
 **Failure handling:**
 - Checks #1, #2, #4, #5 fail → fix the plan now and re-run the checklist from the top.
+- Check #6 fails → fix the header and/or rename the file now, then re-run `python tools/trace.py --check --plans-only`.
 - Check #3 fails (unjustified `none`) → do NOT silently fix. Present the plan WITH the Incomplete Warning block below, immediately after the plan header. The user decides whether to proceed or fix first.
 
 ```markdown
