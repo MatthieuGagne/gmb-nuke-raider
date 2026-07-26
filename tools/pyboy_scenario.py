@@ -423,3 +423,36 @@ def _dispatch(emu, step, ctx, i):
 
     else:
         raise ScenarioError(f"Step {i}: unhandled action {act!r}")
+
+
+def _group_by_step(trace):
+    grouped = {}
+    for rec in trace:
+        grouped.setdefault(rec["step"], []).append(rec)
+    return grouped
+
+
+def diff_traces(main, ref):
+    """Step-anchored comparison of two WRAM traces.
+
+    Both runs execute the same flat step list, so step indices always
+    correspond even when timing shifts inside a step. Returns the first
+    divergence, or None when the traces agree.
+    """
+    ga, gb = _group_by_step(main), _group_by_step(ref)
+    for step in sorted(set(ga) | set(gb)):
+        ra, rb = ga.get(step, []), gb.get(step, [])
+        for i in range(min(len(ra), len(rb))):
+            shared = sorted(set(ra[i]["values"]) & set(rb[i]["values"]))
+            for sym in shared:
+                if ra[i]["values"][sym] != rb[i]["values"][sym]:
+                    return {"step": step, "action": ra[i]["action"],
+                            "frame": ra[i]["frame"], "symbol": sym,
+                            "main": ra[i]["values"][sym],
+                            "ref":  rb[i]["values"][sym]}
+        if len(ra) != len(rb):
+            anchor = (ra or rb)[-1]
+            return {"step": step, "action": anchor["action"],
+                    "frame": anchor["frame"], "symbol": "__sample_count__",
+                    "main": len(ra), "ref": len(rb)}
+    return None

@@ -184,7 +184,20 @@ def main() -> int:
     for scenario in scenarios:
         out_dir = os.path.join(args.out_dir, scenario["name"])
         ctx, failure = run_one(args.rom, scenario, args, symbols, manifest, out_dir)
+        divergence, verdict = None, None
+
+        if args.ref_rom:
+            if not os.path.exists(args.ref_rom):
+                print(f"Reference ROM not found: {args.ref_rom}", file=sys.stderr)
+                return EXIT_USAGE
+            ref_ctx, ref_failure = run_one(args.ref_rom, scenario, args, symbols,
+                                           manifest, out_dir, tag="-ref")
+            divergence = ps.diff_traces(ctx.trace, ref_ctx.trace)
+            if failure is not None and ref_failure is not None:
+                verdict = "scenario-invalid"
+
         result = build_result(scenario["name"], ctx, failure=failure,
+                              divergence=divergence, verdict=verdict,
                               blocking=scenario["blocking"])
         results.append(result)
         _report(result, args.as_json)

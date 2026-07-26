@@ -497,5 +497,45 @@ class TestSmoketestResults(unittest.TestCase):
         self.assertEqual(st.EXIT_USAGE, 2)
 
 
+def rec(frame, step, values, action='advance'):
+    return {"frame": frame, "step": step, "action": action,
+            "values": values, "screen_hash": "x"}
+
+
+class TestDiffTraces(unittest.TestCase):
+
+    def test_identical_traces_have_no_divergence(self):
+        a = [rec(10, 0, {"_hp": 8}), rec(20, 1, {"_hp": 8})]
+        self.assertIsNone(ps.diff_traces(a, list(a)))
+
+    def test_reports_first_diverging_symbol_with_both_values(self):
+        a = [rec(10, 0, {"_hp": 8}), rec(20, 1, {"_hp": 0})]
+        b = [rec(10, 0, {"_hp": 8}), rec(20, 1, {"_hp": 8})]
+        d = ps.diff_traces(a, b)
+        self.assertEqual(d['step'], 1)
+        self.assertEqual(d['symbol'], '_hp')
+        self.assertEqual(d['main'], 0)
+        self.assertEqual(d['ref'], 8)
+        self.assertEqual(d['frame'], 20)
+
+    def test_timing_shift_within_a_step_does_not_desynchronise(self):
+        # Same step, ref sampled one extra time; values agree where compared.
+        a = [rec(10, 0, {"_hp": 8}), rec(20, 0, {"_hp": 8})]
+        b = [rec(10, 0, {"_hp": 8}), rec(20, 0, {"_hp": 8}), rec(30, 0, {"_hp": 8})]
+        d = ps.diff_traces(a, b)
+        self.assertEqual(d['symbol'], '__sample_count__')
+        self.assertEqual(d['step'], 0)
+
+    def test_earlier_step_divergence_wins_over_later(self):
+        a = [rec(10, 0, {"_hp": 1}), rec(20, 5, {"_hp": 9})]
+        b = [rec(10, 0, {"_hp": 2}), rec(20, 5, {"_hp": 3})]
+        self.assertEqual(ps.diff_traces(a, b)['step'], 0)
+
+    def test_only_shared_symbols_are_compared(self):
+        a = [rec(10, 0, {"_hp": 8, "_px": 5})]
+        b = [rec(10, 0, {"_hp": 8})]
+        self.assertIsNone(ps.diff_traces(a, b))
+
+
 if __name__ == '__main__':
     unittest.main()
