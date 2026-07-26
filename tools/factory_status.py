@@ -168,6 +168,258 @@ def render_table(rows, registry):
     return "\n".join(out) + "\n"
 
 
+# ── HTML ─────────────────────────────────────────────────────────────────────
+
+MAX_SCREENSHOTS = 3
+MAX_IMAGE_BYTES = 512 * 1024
+REFRESH_SECONDS = 30
+
+_CSS = """\
+body{font-family:ui-monospace,Consolas,monospace;background:#14171a;
+color:#dfe4e8;margin:0;padding:24px;line-height:1.5}
+h1{font-size:18px;margin:0 0 4px}
+.meta{color:#7d8891;font-size:12px;margin-bottom:20px}
+.run{border:1px solid #2b3238;border-radius:6px;padding:16px;margin-bottom:18px;
+background:#1b1f23}
+.run h2{font-size:15px;margin:0 0 6px;font-weight:normal}
+.sub{color:#7d8891;font-size:11px;margin-bottom:10px}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;margin-left:8px}
+.b-active{background:#1f6feb;color:#fff}
+.b-idle{background:#7d5b00;color:#fff}
+.b-stale{background:#4b4b4b;color:#fff}
+.b-failed{background:#8b1d1d;color:#fff}
+.b-complete{background:#1a7f37;color:#fff}
+.strip{display:flex;gap:6px;margin:10px 0}
+.stg{flex:1;text-align:center;font-size:11px;padding:6px 0;border-radius:4px;
+background:#23292e;color:#7d8891}
+.stg.done{background:#173d24;color:#7fd18f}
+.stg.current{background:#1f6feb;color:#fff}
+.stg.failed{background:#5b1717;color:#ffb3b3}
+h3{font-size:12px;color:#7d8891;font-weight:normal;margin:14px 0 4px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border:1px solid #2b3238;padding:4px 8px;text-align:left}
+th{color:#7d8891;font-weight:normal}
+.pass{color:#7fd18f}
+.fail{color:#ff8080}
+ul{margin:4px 0;padding-left:20px;font-size:12px}
+.shots{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.shots figure{margin:0}
+.shots img{image-rendering:pixelated;width:320px;border:1px solid #2b3238;
+display:block}
+.shots figcaption{font-size:11px;color:#7d8891;margin-top:3px}
+.note{font-size:11px;color:#c9a227;margin:6px 0 0}
+.empty{color:#7d8891;font-size:12px}
+"""
+
+
+def _latest_autopsy(registry, issue):
+    """Newest ``autopsy/attempt-<k>/smoketest`` directory, by attempt number."""
+    base = os.path.join(factory_run.run_dir(issue, registry), "autopsy")
+    if not os.path.isdir(base):
+        return None
+    attempts = []
+    for name in os.listdir(base):
+        if name.startswith("attempt-"):
+            try:
+                attempts.append((int(name[len("attempt-"):]), name))
+            except ValueError:
+                continue
+    for _, name in sorted(attempts, reverse=True):
+        smoke = os.path.join(base, name, "smoketest")
+        if os.path.isdir(smoke):
+            return smoke
+    return None
+
+
+def screenshot_paths(row, registry):
+    """(paths, source) for one run.
+
+    A live run's PNGs are read straight from its worktree; once the worktree is
+    gone the autopsy bundle is the fallback, which is what lets a stale run's
+    page still show what it looked like when it died.
+    """
+    worktree = row.get("worktree")
+    base, source = None, "none"
+    if worktree:
+        candidate = os.path.join(worktree, "build", "smoketest")
+        if os.path.isdir(candidate):
+            base, source = candidate, "worktree"
+    if base is None:
+        base = _latest_autopsy(registry, row["issue"])
+        source = "autopsy" if base else "none"
+    if base is None:
+        return [], "none"
+    paths = []
+    for dirpath, _dirs, files in os.walk(base):
+        for name in files:
+            if name.lower().endswith(".png"):
+                paths.append(os.path.join(dirpath, name))
+    paths.sort()
+    return paths, source
+
+
+def select_screenshots(paths, limit=MAX_SCREENSHOTS):
+    """(kept, dropped). Failure frames are never dropped.
+
+    Ordering is by filename, not mtime: the page is part of a determinism
+    contract and mtime is not reproducible across machines or checkouts.
+    """
+    failures = [p for p in paths if os.path.basename(p).startswith("failure")]
+    rest = [p for p in paths if p not in failures]
+    kept = failures + (rest[-limit:] if limit >= 0 else rest)
+    return kept, len(paths) - len(kept)
+
+
+def _embed(path):
+    """(data-uri, None) or (None, reason)."""
+    try:
+        size = os.path.getsize(path)
+        if size > MAX_IMAGE_BYTES:
+            return None, "too large (%d bytes)" % size
+        with open(path, "rb") as fh:
+            return ("data:image/png;base64,"
+                    + base64.b64encode(fh.read()).decode("ascii")), None
+    except OSError as exc:
+        return None, str(exc)
+
+
+def _stage_strip(row):
+    stages = list(factory_run.STAGES)
+    current = row["stage"] if row["stage"] in stages else None
+    index = stages.index(current) if current else -1
+    out = ['<div class="strip">']
+    for i, stage in enumerate(stages):
+        if index >= 0 and i < index:
+            css = "stg done"
+        elif index >= 0 and i == index:
+            css = "stg failed" if row["condition"] == "failed" else "stg current"
+        elif row["condition"] == "complete":
+            css = "stg done"
+        else:
+            css = "stg"
+        out.append('<div class="%s">%s</div>' % (css, escape(stage)))
+    out.append("</div>")
+    return "".join(out)
+
+
+def _run_html(row, registry, limit):
+    out = ['<section class="run">']
+    out.append('<h2>#%d %s<span class="badge b-%s">%s</span></h2>'
+               % (row["issue"], escape(row["slug"]), row["condition"],
+                  row["condition"]))
+    out.append('<div class="sub">branch %s &middot; attempt %d &middot; '
+               'last event %s ago%s</div>'
+               % (escape(row["branch"]), row["attempt"],
+                  escape(row["elapsed_text"]),
+                  " &middot; worktree missing" if not row["worktree_exists"]
+                  and row["worktree"] else ""))
+    out.append(_stage_strip(row))
+
+    if row["failure"]:
+        out.append('<h3>Failure</h3><p class="fail">%s</p>'
+                   % escape(str(row["failure"].get("message") or "")))
+
+    out.append("<h3>Gate results</h3>")
+    if row["gates"]:
+        out.append("<table><tr><th>Stage</th><th>Gate</th><th>Result</th></tr>")
+        for gate in row["gates"]:
+            result = gate.get("result") or "-"
+            css = "pass" if result == "pass" else (
+                "fail" if result == "fail" else "")
+            out.append('<tr><td>%s</td><td>%s</td><td class="%s">%s</td></tr>'
+                       % (escape(str(gate.get("stage") or "-")),
+                          escape(str(gate.get("gate") or "-")), css,
+                          escape(result)))
+        out.append("</table>")
+    else:
+        out.append('<p class="empty">No gates recorded.</p>')
+
+    out.append("<h3>Decisions</h3>")
+    if row["decisions"]:
+        out.append("<ul>" + "".join(
+            "<li>%s</li>" % escape(str(d.get("text") or ""))
+            for d in row["decisions"]) + "</ul>")
+    else:
+        out.append('<p class="empty">None recorded.</p>')
+
+    if row["permissions"]:
+        out.append("<h3>Permission events</h3>")
+        out.append("<table><tr><th>Tool</th><th>Outcome</th><th>Command</th></tr>")
+        for perm in row["permissions"]:
+            out.append("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+                       % (escape(str(perm.get("tool") or "-")),
+                          escape(str(perm.get("outcome") or "-")),
+                          escape(str(perm.get("command") or "-"))))
+        out.append("</table>")
+
+    out.append("<h3>Screenshots</h3>")
+    paths, source = screenshot_paths(row, registry)
+    kept, dropped = select_screenshots(paths, limit)
+    figures, failed = [], []
+    for path in kept:
+        uri, reason = _embed(path)
+        if uri is None:
+            failed.append("%s (%s)" % (os.path.basename(path), reason))
+            continue
+        figures.append('<figure><img src="%s" alt="%s"><figcaption>%s</figcaption>'
+                       '</figure>' % (uri, escape(os.path.basename(path)),
+                                      escape(os.path.basename(path))))
+    if figures:
+        out.append('<div class="shots">' + "".join(figures) + "</div>")
+    else:
+        out.append('<p class="empty">No screenshots available for this run.</p>')
+    if dropped:
+        out.append('<p class="note">Showing %d of %d screenshots (capped at %d '
+                   'plus every failure frame), read from the %s.</p>'
+                   % (len(kept), len(paths), limit, source))
+    if failed:
+        out.append('<p class="note">Not embedded: %s</p>'
+                   % escape(", ".join(failed)))
+
+    out.append("</section>")
+    return "".join(out)
+
+
+def render_html(rows, registry, now, limit=MAX_SCREENSHOTS):
+    """The whole dashboard as one self-contained document.
+
+    Everything is inline — CSS and images alike — so the page opens from disk
+    with no server and keeps working after the worktrees it describes are gone.
+    """
+    body = ("".join(_run_html(r, registry, limit) for r in rows)
+            if rows else
+            '<p class="empty">No factory runs recorded in %s</p>'
+            % escape(str(registry)))
+    return (
+        "<!doctype html>\n"
+        '<html lang="en"><head><meta charset="utf-8">\n'
+        '<meta http-equiv="refresh" content="%d">\n'
+        "<title>Factory runs</title>\n"
+        "<style>%s</style></head><body>\n"
+        "<h1>Factory runs</h1>\n"
+        '<div class="meta">%s &middot; rendered %s &middot; refreshes every %ds'
+        "</div>\n"
+        "%s\n</body></html>\n"
+        % (REFRESH_SECONDS, _CSS, escape(str(registry)),
+           escape(now.astimezone().isoformat(timespec="seconds")),
+           REFRESH_SECONDS, body))
+
+
+def write_html(registry=None, out=None, now=None, limit=MAX_SCREENSHOTS):
+    """Render and atomically replace the page. Returns its path."""
+    registry = registry or factory_run.registry_root()
+    out = out or os.path.join(registry, "status.html")
+    now = now or factory_run.clock()
+    page = render_html(collect(registry, now=now), registry, now, limit)
+    directory = os.path.dirname(os.path.abspath(out))
+    os.makedirs(directory, exist_ok=True)
+    tmp = out + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(page)
+    os.replace(tmp, out)
+    return out
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description=__doc__,
