@@ -205,6 +205,43 @@ Invoke the `screenshot` skill before running the script to get the full step API
 
 After capturing, use the `Read` tool on the output path to view the image inline in conversation.
 
+### Headless smoketest
+
+`make smoketest` boots the built ROM under PyBoy and runs every scenario in
+`tools/scenarios/`, asserting the game reaches gameplay and stays alive. It is the
+blocking VERIFY gate for the agent factory.
+
+- `tools/pyboy_scenario.py` is the shared step engine. `tools/screenshot.py` uses it too, so
+  both tools accept the same step vocabulary.
+- Scenarios are JSON. A scenario may reuse another by name:
+  `{"action": "include", "name": "reach-race"}` — includes are inlined at load time.
+- Navigation is derived from `build/game-manifest.json` rather than hardcoded:
+  `{"action": "nav", "to": "track", "id": 1}` expands the BFS path the build already computes
+  from `assets/maps/overmap.tmx`, so scenarios survive map edits.
+- `"blocking": false` marks an evidence scenario — it runs and reports, but never fails the gate.
+- Symbols resolve from `build/game-manifest.json` first, then `build/nuke-raider.noi`
+  (full names), then `build/nuke-raider.map` (names truncated to 9 characters — last resort).
+  `static` variables appear in none of the three and cannot be watched or asserted.
+- Every run writes `build/smoketest/<scenario>/`: `results.json` (with a `verdict` field),
+  `trace.jsonl` (WRAM sentinels sampled every 30 frames), and checkpoint screenshots.
+- Differential debugging: `--ref-rom PATH` re-runs the same scenario against a reference ROM and
+  reports the first WRAM divergence by step. If the scenario fails on both ROMs it is reported
+  `scenario-invalid` rather than blamed on the game.
+
+Exit codes: `0` pass, `1` run failure, `2` tool or usage error.
+
+Two facts about the game that scenarios must respect:
+
+- **The D-pad is the accelerator**, not `A` (`player.c`: `gas` is gated on
+  `J_UP|J_DOWN|J_LEFT|J_RIGHT`); `A` fires. A scenario that "holds A to drive" sits still.
+- **"Race is live" is `_hp > 0`**, not `_racer_active`. `hp` is written only by `damage_init()`
+  in `state_playing`, so it is 0 through boot and menus. `_racer_active` is `racer_active[0]`,
+  the AI-racer pool flag — Track 1 spawns no AI racers, so it stays 0 for a whole valid race.
+
+`make test-tools` covers the engine itself host-side (no ROM, no PyBoy emulation — though it does
+import PyBoy via `screenshot.py`). The two gates are deliberately separate: unit tests verify the
+engine, `make smoketest` verifies the ROM.
+
 ---
 
 ## 6. Asset Pipeline
