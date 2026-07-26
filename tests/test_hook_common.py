@@ -84,5 +84,24 @@ class ReadPayloadTests(unittest.TestCase):
         self.assertIsNone(read_payload())
 
 
+class ExistingHooksUseRerootTests(unittest.TestCase):
+    """Both pre-existing hooks must re-root rather than trust inherited cwd."""
+
+    def _source(self, name):
+        path = os.path.join(os.path.dirname(__file__), '..', 'tools', name)
+        with open(path, encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_bank_check_hook_reroots(self):
+        src = self._source('bank_check_hook.py')
+        self.assertIn('hook_common', src)
+        self.assertIn('reroot(', src)
+
+    def test_post_build_hook_reroots(self):
+        src = self._source('post_build_hook.py')
+        self.assertIn('hook_common', src)
+        self.assertIn('reroot(', src)
+
+
 if __name__ == '__main__':
     unittest.main()
