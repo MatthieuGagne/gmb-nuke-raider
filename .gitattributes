@@ -1,5 +1,15 @@
 * text=auto
 *.sh text eol=lf
+
+# Repository hooks are #!/bin/sh scripts with no extension, so *.sh misses them.
+# Checked out with CRLF, sh dies on the shebang's trailing \r (#441).
+.githooks/* text eol=lf
+
+# Golden fixtures are compared byte-for-byte with newline='' — a CRLF checkout
+# makes them mismatch on Windows only, which is how tests/test_factory_report.py
+# passed locally and failed the Tool Tests (windows-latest) CI leg (#441).
+tests/fixtures/** text eol=lf
+
 Makefile text eol=lf
 *.py text eol=lf
 *.c text eol=lf

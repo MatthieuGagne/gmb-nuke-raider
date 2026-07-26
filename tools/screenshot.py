@@ -41,10 +41,14 @@ def _exit(msg: str) -> None:
     sys.exit(1)
 
 
+# Bind to None rather than exiting: exiting at import time makes the whole
+# module unimportable, which takes build_parser() — and the tests that check
+# the CLI surface — out of reach wherever PyBoy is absent, such as CI. Same
+# guard as tools/dialog_editor.py's curses import; see docs/dev-workflow.md §4.
 try:
     from pyboy import PyBoy
-except ImportError:
-    _exit("PyBoy not found. Run: pip install -r requirements.txt")
+except ImportError:  # pragma: no cover - optional dependency
+    PyBoy = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -65,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    if PyBoy is None:
+        _exit("PyBoy not found. Run: pip install -r requirements.txt")
+
     args = build_parser().parse_args()
 
     if not os.path.exists(args.rom):
