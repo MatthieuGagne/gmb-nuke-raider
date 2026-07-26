@@ -837,6 +837,38 @@ TMX_WITH_RACER_WAYPOINTS = """\
 </map>
 """
 
+TMX_WITH_INDEXED_RACER_WAYPOINTS = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="10" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <objectgroup id="5" name="racer_waypoints_0">
+  <object id="10" x="8" y="8"><point/></object>
+  <object id="11" x="16" y="16"><point/></object>
+ </objectgroup>
+ <objectgroup id="6" name="racer_waypoints_1">
+  <object id="12" x="24" y="8"><point/></object>
+ </objectgroup>
+</map>
+"""
+
+TMX_WITH_BAD_SUFFIX_RACER_WAYPOINTS = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="orthogonal"
+     width="3" height="10" tilewidth="8" tileheight="8">
+ <properties>
+  <property name="lap_count" type="int" value="1"/>
+ </properties>
+ <tileset firstgid="1" source="track.tsx"/>
+ <objectgroup id="5" name="racer_waypoints_alt">
+  <object id="10" x="8" y="8"><point/></object>
+ </objectgroup>
+</map>
+"""
+
 TMX_WITH_NON_POINT_WAYPOINTS = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal"
@@ -889,21 +921,34 @@ class TestParseRacerWaypoints(unittest.TestCase):
         root = ET.fromstring(tmx_text)
         return conv.parse_racer_waypoints(root)
 
+    # parse_racer_waypoints returns a dict keyed by layer index:
+    #   None -> the unindexed 'racer_waypoints' layer
+    #   N    -> the 'racer_waypoints_N' layer
+    # Both fixtures below use the unindexed layer, so they land under None.
+
     def test_no_racer_waypoints_layer_returns_empty(self):
         result = self._parse(MINIMAL_TMX)
-        self.assertEqual(result, [])
+        self.assertEqual(result, {})
 
     def test_non_point_objects_skipped(self):
         result = self._parse(TMX_WITH_NON_POINT_WAYPOINTS)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0], (2, 2))
+        self.assertEqual(list(result), [None])
+        self.assertEqual(result[None], [(2, 2)])
 
     def test_point_objects_parsed_in_order(self):
         result = self._parse(TMX_WITH_RACER_WAYPOINTS)
-        self.assertEqual(len(result), 3)
-        self.assertEqual(result[0], (1, 1))
-        self.assertEqual(result[1], (2, 2))
-        self.assertEqual(result[2], (3, 1))
+        self.assertEqual(list(result), [None])
+        self.assertEqual(result[None], [(1, 1), (2, 2), (3, 1)])
+
+    def test_indexed_layers_keyed_by_number(self):
+        result = self._parse(TMX_WITH_INDEXED_RACER_WAYPOINTS)
+        self.assertEqual(sorted(k for k in result), [0, 1])
+        self.assertEqual(result[0], [(1, 1), (2, 2)])
+        self.assertEqual(result[1], [(3, 1)])
+
+    def test_non_numeric_suffix_layer_ignored(self):
+        result = self._parse(TMX_WITH_BAD_SUFFIX_RACER_WAYPOINTS)
+        self.assertEqual(result, {})
 
     def test_waypoints_emitted_in_generated_c(self):
         import tempfile, os

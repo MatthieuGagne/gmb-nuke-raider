@@ -86,19 +86,23 @@ class TestRomusageBudget(unittest.TestCase):
         statuses = {r[0]: r[2] for r in result['bank_results']}
         self.assertEqual(statuses[1], 'WARN')
 
-    def test_bank1_fail_at_100(self):
+    # A bank that rounds to 100% but still links is WARN, not FAIL (43491d8):
+    # romusage runs after the linker, so a genuine overflow has already failed
+    # the build. WARN keeps the signal without blocking the post-build gate.
+
+    def test_bank1_warn_at_100(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FULL)
         statuses = {r[0]: r[2] for r in result['bank_results']}
-        self.assertEqual(statuses[1], 'FAIL')
+        self.assertEqual(statuses[1], 'WARN')
 
-    def test_bank1_fail_above_100(self):
+    def test_bank1_warn_above_100(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FAIL)
         statuses = {r[0]: r[2] for r in result['bank_results']}
-        self.assertEqual(statuses[1], 'FAIL')
+        self.assertEqual(statuses[1], 'WARN')
 
     def test_other_bank_warn_above_80(self):
         with tempfile.TemporaryDirectory() as d:
@@ -274,17 +278,21 @@ class TestOverallStatus(unittest.TestCase):
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_WARN)
         self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
-    def test_bank1_full_overall_fail(self):
+    # Bank pressure alone never escalates to FAIL (43491d8) — see the
+    # TestRomusageBudget notes. Only state-symbol, __bank_ and -Wm-ya
+    # problems produce an overall FAIL.
+
+    def test_bank1_full_overall_warn(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d, noi=NOI_STATES_OK)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FULL)
-        self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
+        self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
-    def test_bank1_overflow_overall_fail(self):
+    def test_bank1_overflow_overall_warn(self):
         with tempfile.TemporaryDirectory() as d:
             make_repo(d, noi=NOI_STATES_OK)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_BANK1_FAIL)
-        self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
+        self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
     def test_state_overflow_overall_fail(self):
         with tempfile.TemporaryDirectory() as d:
