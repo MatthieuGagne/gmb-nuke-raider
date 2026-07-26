@@ -431,5 +431,28 @@ class TestNav(unittest.TestCase):
             ps.run(emu, [{"action": "nav", "to": "track", "id": 99}], ctx)
 
 
+class TestScreenshotCliSurface(unittest.TestCase):
+    """AC2: screenshot.py's flags and step schema must not regress."""
+
+    def _parser(self):
+        import importlib
+        mod = importlib.import_module('screenshot')
+        return mod.build_parser()
+
+    def test_legacy_flags_still_present(self):
+        opts = {a.dest for a in self._parser()._actions}
+        for flag in ('rom', 'map', 'out', 'steps', 'steps_file'):
+            self.assertIn(flag, opts)
+
+    def test_new_optional_flags_present(self):
+        opts = {a.dest for a in self._parser()._actions}
+        for flag in ('noi', 'manifest', 'library'):
+            self.assertIn(flag, opts)
+
+    def test_default_steps_is_empty_json_array(self):
+        args = self._parser().parse_args([])
+        self.assertEqual(args.steps, '[]')
+
+
 if __name__ == '__main__':
     unittest.main()
