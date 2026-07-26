@@ -163,7 +163,10 @@
       "Read(//c/Users/mathd/.claude/plugins/**)",
       "WebFetch(domain:www.aihero.dev)",
       "PowerShell(gh issue view 434 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 434: $\\($_.title\\)\"; $_.body }; gh issue view 435 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 435: $\\($_.title\\)\"; $_.body }; gh issue view 436 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 436: $\\($_.title\\)\"; $_.body }; gh issue view 438 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 438: $\\($_.title\\)\"; $_.body })",
-      "PowerShell($s = \"C:/Users/mathd/AppData/Local/Temp/claude/C--Code-nuke-raider/73960216-88fc-4768-82fe-17b65b63b955/scratchpad\"; gh issue edit 437 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-437-body.md\" && gh issue edit 435 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-435-body.md\" && gh issue edit 441 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-441-body.md\" && gh issue edit 442 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-skill-overlays.md\")"
+      "PowerShell($s = \"C:/Users/mathd/AppData/Local/Temp/claude/C--Code-nuke-raider/73960216-88fc-4768-82fe-17b65b63b955/scratchpad\"; gh issue edit 437 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-437-body.md\" && gh issue edit 435 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-435-body.md\" && gh issue edit 441 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-441-body.md\" && gh issue edit 442 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-skill-overlays.md\")",
+      "Bash(PYTHONPATH=. python -m unittest tests.test_png_to_tiles tests.test_tmx_to_c tests.test_bank_check tests.test_bank_post_build tests.test_dialog_to_c tests.test_balancer tests.test_emit_manifest tests.test_memory_check tests.test_sync_scene_data tests.test_spec_lint tests.test_skill_overlay_hook)",
+      "Bash(gh --version)",
+      "Bash(PYTHONPATH=. python -m unittest tests.test_trace)"
     ]
   },
   "hooks": {
