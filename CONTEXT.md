@@ -85,3 +85,48 @@ _Avoid_: the tests, unit tests
 The Python tests exercising this repository's own tooling, run by
 `make test-tools`.
 _Avoid_: tool tests, the Python tests, unit tests
+
+### Factory runs
+
+**Run**:
+Everything the factory does on behalf of one spec issue, spanning every pass it
+makes at that issue.
+_Avoid_: job, session, build
+
+**Attempt**:
+A single pass through the stages within a run. A run that failed and was
+restarted has one run and several attempts.
+_Avoid_: retry, pass, re-run
+
+**Run registry**:
+The durable record of every run, kept where the disappearance of a worktree
+cannot take it away.
+_Avoid_: run directory, state dir, run store
+
+**Journal**:
+The append-only record of everything that happened during a run, and the
+authority on what happened.
+_Avoid_: event log, audit log, history
+
+**Run state**:
+The current standing of a run, derived from the journal. Never the authority —
+if the two disagree, the journal is right.
+_Avoid_: the state file, run status, run record
+
+**Gate result**:
+The recorded outcome of one **Gate** within a stage.
+_Avoid_: gate — that names the check itself, not the record of how it came out
+
+**Autopsy bundle**:
+The evidence copied out of a failing attempt so the failure stays explainable
+once its worktree is gone.
+_Avoid_: crash dump, failure report, postmortem
+
+**Stale run**:
+A run whose recorded worktree no longer exists on disk.
+_Avoid_: dead run, orphaned run, abandoned run
+
+**Idle run**:
+A run that has emitted nothing recently and is, as far as anything can tell,
+still alive.
+_Avoid_: hung run, stalled run, stale run
