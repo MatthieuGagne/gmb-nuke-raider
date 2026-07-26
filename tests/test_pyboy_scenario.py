@@ -129,5 +129,81 @@ class TestReadValue(unittest.TestCase):
         self.assertEqual(ps.DEFAULT_WIDTHS['_py'], 2)
 
 
+class TestLoadScenario(unittest.TestCase):
+
+    def _lib(self, d, name, obj):
+        path = os.path.join(d, name + '.json')
+        write(path, json.dumps(obj))
+        return path
+
+    def test_bare_list_is_accepted_and_defaults_applied(self):
+        sc = ps.load_scenario([{"action": "advance", "frames": 3}])
+        self.assertEqual(sc['steps'], [{"action": "advance", "frames": 3}])
+        self.assertTrue(sc['blocking'])
+        self.assertEqual(sc['watch'], [])
+
+    def test_dict_form_preserves_metadata(self):
+        sc = ps.load_scenario({
+            "name": "x", "blocking": False, "watch": ["_hp"],
+            "steps": [{"action": "advance", "frames": 1}],
+        })
+        self.assertEqual(sc['name'], 'x')
+        self.assertFalse(sc['blocking'])
+        self.assertEqual(sc['watch'], ['_hp'])
+
+    def test_include_is_inlined_by_concatenation(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._lib(d, 'snippet', {"steps": [
+                {"action": "advance", "frames": 1},
+                {"action": "advance", "frames": 2},
+            ]})
+            sc = ps.load_scenario({"steps": [
+                {"action": "include", "name": "snippet"},
+                {"action": "advance", "frames": 3},
+            ]}, library_dir=d)
+            self.assertEqual([s['frames'] for s in sc['steps']], [1, 2, 3])
+            self.assertNotIn('include', [s['action'] for s in sc['steps']])
+
+    def test_nested_includes_are_inlined(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._lib(d, 'inner', {"steps": [{"action": "advance", "frames": 1}]})
+            self._lib(d, 'outer', {"steps": [
+                {"action": "include", "name": "inner"},
+                {"action": "advance", "frames": 2},
+            ]})
+            sc = ps.load_scenario({"steps": [{"action": "include", "name": "outer"}]},
+                                  library_dir=d)
+            self.assertEqual([s['frames'] for s in sc['steps']], [1, 2])
+
+    def test_include_cycle_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._lib(d, 'a', {"steps": [{"action": "include", "name": "b"}]})
+            self._lib(d, 'b', {"steps": [{"action": "include", "name": "a"}]})
+            with self.assertRaises(ps.ScenarioError):
+                ps.load_scenario({"steps": [{"action": "include", "name": "a"}]},
+                                 library_dir=d)
+
+    def test_dangling_include_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ps.ScenarioError):
+                ps.load_scenario({"steps": [{"action": "include", "name": "ghost"}]},
+                                 library_dir=d)
+
+    def test_unknown_action_raises(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{"action": "teleport"}])
+
+    def test_missing_required_field_raises(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{"action": "assert_memory", "address": "_hp"}])
+
+    def test_scenario_loaded_from_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._lib(d, 'file', {"steps": [{"action": "advance", "frames": 9}]})
+            sc = ps.load_scenario(p, library_dir=d)
+            self.assertEqual(sc['steps'][0]['frames'], 9)
+            self.assertEqual(sc['name'], 'file')
+
+
 if __name__ == '__main__':
     unittest.main()
