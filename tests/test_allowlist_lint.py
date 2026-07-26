@@ -91,5 +91,57 @@ class TrackedSettingsTests(unittest.TestCase):
         self.assertEqual(check_hygiene(load_settings('.claude/settings.json')), [])
 
 
+class InventoryTests(unittest.TestCase):
+    def test_inventory_parses(self):
+        from tools.allowlist_lint import load_inventory
+        inv = load_inventory('tests/fixtures/factory_commands.txt')
+        self.assertGreater(len(inv), 10)
+        for tool, command in inv:
+            self.assertIn(tool, ('Bash', 'PowerShell'))
+            self.assertTrue(command)
+
+    def test_comments_and_blanks_ignored(self):
+        import tempfile
+        from tools.allowlist_lint import load_inventory
+        with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False,
+                                         encoding='utf-8') as fh:
+            fh.write('# a comment\n\nBash: make clean\n')
+            path = fh.name
+        self.assertEqual(load_inventory(path), [('Bash', 'make clean')])
+
+
+class CoverageTests(unittest.TestCase):
+    INV = [('Bash', 'make clean'), ('Bash', 'git fetch origin')]
+
+    def test_covered_inventory_passes(self):
+        from tools.allowlist_lint import check_coverage
+        s = settings(['Bash(git:*)', 'Bash(make:*)'])
+        self.assertEqual(check_coverage(s, self.INV), [])
+
+    def test_missing_rule_fails(self):
+        """AC3: removing a rule a fixture command depends on turns this red."""
+        from tools.allowlist_lint import check_coverage
+        s = settings(['Bash(git:*)'])          # Bash(make:*) removed
+        errs = check_coverage(s, self.INV)
+        self.assertTrue(any('make clean' in e for e in errs))
+
+    def test_deny_rule_fails_coverage(self):
+        from tools.allowlist_lint import check_coverage
+        s = settings(['Bash(git:*)'], ['Bash(git fetch:*)'])
+        errs = check_coverage(s, [('Bash', 'git fetch origin')])
+        self.assertTrue(any('deny rule' in e for e in errs))
+
+
+class TrackedCoverageTests(unittest.TestCase):
+    """The real pairing must pass. Turns green in Task 9."""
+
+    def test_tracked_settings_cover_inventory(self):
+        from tools.allowlist_lint import (check_coverage, load_inventory,
+                                          load_settings)
+        errs = check_coverage(load_settings('.claude/settings.json'),
+                              load_inventory('tests/fixtures/factory_commands.txt'))
+        self.assertEqual(errs, [])
+
+
 if __name__ == '__main__':
     unittest.main()
