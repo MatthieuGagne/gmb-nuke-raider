@@ -353,3 +353,117 @@ def append_event(issue, kind, registry=None, render=True, **fields):
     if render:
         _render_page(registry)
     return event
+
+
+# ── Autopsy ──────────────────────────────────────────────────────────────────
+
+def sha256_file(path):
+    """Hex sha256 of *path*, read in chunks."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_autopsy(issue, registry=None, worktree=None, scenario=None,
+                  rom=None, ref_rom=None):
+    """Copy this attempt's evidence into ``autopsy/attempt-<k>/``.
+
+    Everything worktree-resident is copied in, never referenced, so the bundle
+    outlives the worktree. Stage logs are excluded on purpose: they are written
+    straight into the registry (#450) and already survive.
+
+    Best-effort by contract. Every expected artifact is listed in
+    ``manifest.json`` as present or absent-with-reason, a missing artifact is
+    never an error, and this function never raises — an autopsy that dies
+    during a failure destroys the evidence it exists to preserve. Returns the
+    bundle directory, or None when the registry itself is unusable.
+    """
+    registry = registry or registry_root()
+    try:
+        state = load_state(issue, registry) or new_state(issue)
+        attempt = int(state.get("attempt") or 1)
+        dest = os.path.join(run_dir(issue, registry), "autopsy",
+                            "attempt-%d" % attempt)
+        os.makedirs(dest, exist_ok=True)
+    except Exception:
+        return None
+
+    entries = []
+
+    def record(name, src, rel=None):
+        if not src or not os.path.isfile(src):
+            entries.append({"name": name, "present": False,
+                            "reason": "not found: %s" % (src or "<unset>")})
+            return
+        rel = rel or os.path.basename(src)
+        try:
+            target = os.path.join(dest, rel)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(src, target)
+            entries.append({"name": name, "present": True, "source": src,
+                            "dest": rel.replace(os.sep, "/")})
+        except OSError as exc:
+            entries.append({"name": name, "present": False,
+                            "reason": "copy failed: %s" % exc})
+
+    try:
+        record("state", os.path.join(run_dir(issue, registry), STATE_FILE))
+        record("journal", os.path.join(run_dir(issue, registry), JOURNAL_FILE))
+        record("scenario", scenario)
+
+        smoke = os.path.join(worktree, "build", "smoketest") if worktree else None
+        if not smoke or not os.path.isdir(smoke):
+            entries.append({"name": "smoketest", "present": False,
+                            "reason": "no smoketest directory: %s"
+                                      % (smoke or "<no worktree>")})
+        else:
+            copied = 0
+            for name in sorted(os.listdir(smoke)):
+                sub = os.path.join(smoke, name)
+                if not os.path.isdir(sub):
+                    continue
+                for fname in sorted(os.listdir(sub)):
+                    if fname.endswith((".png", ".jsonl")) or \
+                            fname == "results.json":
+                        record("smoketest/%s/%s" % (name, fname),
+                               os.path.join(sub, fname),
+                               os.path.join("smoketest", name, fname))
+                        copied += 1
+            entries.append({"name": "smoketest", "present": copied > 0,
+                            "reason": None if copied else
+                                      "no artifacts under %s" % smoke,
+                            "count": copied})
+
+        checks = {}
+        for label, path in (("rom", rom), ("ref_rom", ref_rom)):
+            if path and os.path.isfile(path):
+                try:
+                    checks[label] = {"path": path, "sha256": sha256_file(path)}
+                    continue
+                except OSError as exc:
+                    reason = "hash failed: %s" % exc
+            else:
+                reason = "not found: %s" % (path or "<unset>")
+            checks[label] = {"path": path, "sha256": None, "reason": reason}
+            entries.append({"name": "checksum:%s" % label, "present": False,
+                            "reason": reason})
+        with open(os.path.join(dest, "checksums.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(checks, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+    except Exception as exc:
+        entries.append({"name": "assembly", "present": False,
+                        "reason": "aborted: %s" % exc})
+
+    try:
+        with open(os.path.join(dest, "manifest.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump({"schema_version": SCHEMA_VERSION, "issue": int(issue),
+                       "attempt": attempt, "created": timestamp(),
+                       "artifacts": entries}, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+    except Exception:
+        pass
+    return dest

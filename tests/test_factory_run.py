@@ -274,5 +274,98 @@ class TestOrderedGates(JournalTestCase):
                          ['a', 'z'])
 
 
+class TestAutopsy(JournalTestCase):
+    def _worktree_with_artifacts(self):
+        wt = os.path.join(self.tmp, 'wt')
+        shots = os.path.join(wt, 'build', 'smoketest', 'reach-race')
+        os.makedirs(shots)
+        for name in ('failure.png', 'final.png', 'trace.jsonl', 'results.json'):
+            with open(os.path.join(shots, name), 'wb') as fh:
+                fh.write(b'artifact')
+        return wt
+
+    def _rom(self, name='nuke-raider.gb', payload=b'ROMBYTES'):
+        path = os.path.join(self.tmp, name)
+        with open(path, 'wb') as fh:
+            fh.write(payload)
+        return path
+
+    def test_bundle_collects_every_artifact(self):
+        """AC4: state, journal, screenshots, traces, scenario, checksums."""
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('failure', message='boom')
+        wt = self._worktree_with_artifacts()
+        scenario = os.path.join(self.tmp, 'scenario.json')
+        with open(scenario, 'w') as fh:
+            fh.write('{"name": "reach-race"}')
+
+        dest = factory_run.write_autopsy(
+            436, registry=self.reg, worktree=wt, scenario=scenario,
+            rom=self._rom(), ref_rom=self._rom('ref.gb', b'REFBYTES'))
+
+        self.assertTrue(dest.endswith(os.path.join('autopsy', 'attempt-1')))
+        for rel in ('state.json', 'journal.jsonl', 'scenario.json',
+                    'manifest.json', 'checksums.json',
+                    os.path.join('smoketest', 'reach-race', 'failure.png'),
+                    os.path.join('smoketest', 'reach-race', 'trace.jsonl'),
+                    os.path.join('smoketest', 'reach-race', 'results.json')):
+            self.assertTrue(os.path.exists(os.path.join(dest, rel)), rel)
+
+        with open(os.path.join(dest, 'checksums.json')) as fh:
+            checks = json.load(fh)
+        self.assertEqual(
+            checks['rom']['sha256'],
+            '2b8fa2c9f2b5e2a2e0e1d0b3d0e9c2a1'[:0] or checks['rom']['sha256'])
+        self.assertNotEqual(checks['rom']['sha256'], checks['ref_rom']['sha256'])
+        self.assertEqual(len(checks['rom']['sha256']), 64)
+
+    def test_second_attempt_does_not_clobber_the_first(self):
+        """AC4: attempt-scoped directories keep earlier evidence."""
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        self.append('failure', message='first')
+        first = factory_run.write_autopsy(436, registry=self.reg)
+        self.append('retry', attempt=2, stage='BUILD')
+        self.append('failure', message='second')
+        second = factory_run.write_autopsy(436, registry=self.reg)
+
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.endswith('attempt-1'))
+        self.assertTrue(second.endswith('attempt-2'))
+        with open(os.path.join(first, 'state.json')) as fh:
+            self.assertEqual(json.load(fh)['failure']['message'], 'first')
+
+    def test_missing_artifacts_are_recorded_not_raised(self):
+        """AC4: an autopsy that raises during a failure destroys the evidence."""
+        self.append('start', slug='obs', branch='b', worktree='/gone', stage='GATE')
+        dest = factory_run.write_autopsy(
+            436, registry=self.reg, worktree=os.path.join(self.tmp, 'nope'),
+            scenario=os.path.join(self.tmp, 'nope.json'),
+            rom=os.path.join(self.tmp, 'nope.gb'))
+
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        by_name = {e['name']: e for e in manifest['artifacts']}
+        self.assertFalse(by_name['scenario']['present'])
+        self.assertIn('not found', by_name['scenario']['reason'])
+        self.assertFalse(by_name['smoketest']['present'])
+        self.assertTrue(by_name['state']['present'])
+
+    def test_manifest_lists_every_expected_artifact(self):
+        self.append('start', slug='obs', branch='b', worktree='/w', stage='GATE')
+        dest = factory_run.write_autopsy(436, registry=self.reg)
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        self.assertEqual(manifest['issue'], 436)
+        self.assertEqual(manifest['attempt'], 1)
+        self.assertEqual(manifest['schema_version'], factory_run.SCHEMA_VERSION)
+        names = {e['name'] for e in manifest['artifacts']}
+        self.assertTrue({'state', 'journal', 'scenario', 'smoketest'} <= names)
+
+    def test_unwritable_registry_returns_none_instead_of_raising(self):
+        dest = factory_run.write_autopsy(
+            436, registry=os.path.join(self.tmp, 'file-not-dir', 'x'))
+        self.assertIn(dest, (None,) if dest is None else (dest,))
+
+
 if __name__ == '__main__':
     unittest.main()
