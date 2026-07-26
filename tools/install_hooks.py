@@ -21,13 +21,31 @@ import sys
 
 HOOKS_DIR = '.githooks'
 
+# git exports these into every hook's environment, and they override cwd — so
+# a call made from inside a hook would silently act on the repository that
+# invoked the hook rather than on repo_root. Scrubbing them is what makes the
+# repo_root argument mean what it says (#441).
+GIT_ENV_OVERRIDES = (
+    'GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX',
+)
+
+
+def clean_env(environ=None):
+    """Return *environ* without the git variables that override cwd."""
+    src = os.environ if environ is None else environ
+    return {k: v for k, v in src.items() if k not in GIT_ENV_OVERRIDES}
+
+
+def _git(args, repo_root):
+    """Run git in *repo_root*, immune to an inherited hook environment."""
+    return subprocess.run(['git'] + args, cwd=repo_root, env=clean_env(),
+                          capture_output=True, text=True, check=False)
+
 
 def current_hooks_path(repo_root='.'):
     """Return the repo's configured core.hooksPath, or None when unset."""
-    result = subprocess.run(
-        ['git', 'config', '--local', '--get', 'core.hooksPath'],
-        cwd=repo_root, capture_output=True, text=True, check=False,
-    )
+    result = _git(['config', '--local', '--get', 'core.hooksPath'], repo_root)
     return result.stdout.strip() or None
 
 
@@ -43,8 +61,10 @@ def install(repo_root='.', wanted=HOOKS_DIR):
     """
     if not needs_install(current_hooks_path(repo_root), wanted):
         return False
-    subprocess.run(['git', 'config', '--local', 'core.hooksPath', wanted],
-                   cwd=repo_root, check=True)
+    result = _git(['config', '--local', 'core.hooksPath', wanted], repo_root)
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode, 'git config', result.stdout, result.stderr)
     return True
 
 

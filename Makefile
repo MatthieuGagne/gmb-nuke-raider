@@ -21,9 +21,9 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools smoketest export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
+.PHONY: all clean test test-tools hooks smoketest export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
 
-all: $(TARGET) sync-docs
+all: hooks $(TARGET) sync-docs
 
 # ── Generated sources ─────────────────────────────────────────────────────────
 # ── Tile rotation pipeline ──────────────────────────────────────────────────
@@ -225,8 +225,13 @@ $(TARGET): src/overmap_car_sprite.c
 # .githooks/pre-commit; tests/test_repo_hooks.py enforces that.
 # No -t . (discovery breaks: tests/ is not a package), no PYTHONPATH=. (the
 # test modules put tools/ on sys.path themselves), no -v (noise at 450 tests).
-test-tools:
+test-tools: hooks
 	python -m unittest discover -s tests -p 'test_*.py'
+
+# Repository hooks (ADR 0002). Idempotent: only writes core.hooksPath when it
+# is missing or wrong, so a build that is already gated changes nothing.
+hooks:
+	python tools/install_hooks.py .
 
 # Headless ROM liveness gate — runs every scenario in tools/scenarios/.
 # Blocking scenarios fail the target; evidence scenarios only WARN.

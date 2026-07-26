@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import install_hooks
@@ -21,13 +22,31 @@ class NeedsInstallTests(unittest.TestCase):
         self.assertTrue(install_hooks.needs_install('.git/hooks'))
 
 
+class CleanEnvTests(unittest.TestCase):
+    def test_drops_git_dir(self):
+        self.assertNotIn('GIT_DIR', install_hooks.clean_env(
+            {'GIT_DIR': '/x', 'PATH': '/usr/bin'}))
+
+    def test_keeps_everything_else(self):
+        self.assertEqual(
+            install_hooks.clean_env({'GIT_DIR': '/x', 'PATH': '/usr/bin'}),
+            {'PATH': '/usr/bin'})
+
+    def test_drops_every_documented_override(self):
+        env = dict.fromkeys(install_hooks.GIT_ENV_OVERRIDES, '/x')
+        self.assertEqual(install_hooks.clean_env(env), {})
+
+
 class InstallTests(unittest.TestCase):
     """A gate that requires reading a setup doc is opt-in, which is the
     failure mode #441 exists to remove — so `make` runs this, and it must be
     safe to run on every single build."""
 
     def _repo(self, d):
-        subprocess.run(['git', 'init', '-q', d], check=True)
+        # clean_env matters here too: under the pre-commit hook GIT_DIR is set,
+        # and `git init <dir>` honours it instead of creating a repo at <dir>.
+        subprocess.run(['git', 'init', '-q', d], check=True,
+                       env=install_hooks.clean_env())
         os.makedirs(os.path.join(d, '.githooks'), exist_ok=True)
         return d
 
@@ -55,6 +74,20 @@ class InstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self._repo(d)
             self.assertIsNone(install_hooks.current_hooks_path(d))
+
+    def test_repo_root_wins_over_an_inherited_git_dir(self):
+        """git exports GIT_DIR into every hook's environment, and GIT_DIR
+        overrides cwd — so without scrubbing it, install() silently operates on
+        whatever repository invoked the hook instead of *repo_root*. Found by
+        the pre-commit gate blocking itself the first time it ran (#441)."""
+        with tempfile.TemporaryDirectory() as d:
+            self._repo(d)
+            other = os.path.join(os.path.dirname(__file__), '..', '.git')
+            with mock.patch.dict(os.environ, {'GIT_DIR': os.path.abspath(other)}):
+                self.assertIsNone(install_hooks.current_hooks_path(d))
+                self.assertTrue(install_hooks.install(d))
+                self.assertEqual(install_hooks.current_hooks_path(d),
+                                 '.githooks')
 
     def test_main_refuses_when_the_hooks_directory_is_missing(self):
         with tempfile.TemporaryDirectory() as d:

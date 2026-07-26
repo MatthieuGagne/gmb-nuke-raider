@@ -1,0 +1,28 @@
+#!/bin/sh
+# Repository hook — tool suite gate (#441, ADR 0002).
+#
+# Runs the ~6s Python tool suite before every commit, from any shell, tool or
+# agent. It deliberately does NOT call make: the Makefile pins SHELL := bash
+# and expects GBDK_HOME, so a commit from a bare cmd.exe would die on
+# "make: bash: command not found" for a reason unrelated to the tests, which is
+# worse than no gate. Keep the command below byte-identical to the Makefile's
+# test-tools recipe — tests/test_repo_hooks.py enforces that.
+#
+# Bypass with `git commit --no-verify`; CI remains the authority.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if command -v python >/dev/null 2>&1; then
+    PY=python
+elif command -v python3 >/dev/null 2>&1; then
+    PY=python3
+else
+    echo "pre-commit: no python on PATH — tool suite gate skipped" >&2
+    exit 0
+fi
+
+if ! "$PY" -m unittest discover -s tests -p 'test_*.py'; then
+    echo "" >&2
+    echo "pre-commit: tool suite failed — commit blocked. Fix it, or re-run" >&2
+    echo "            'make test-tools' to reproduce." >&2
+    exit 1
+fi
