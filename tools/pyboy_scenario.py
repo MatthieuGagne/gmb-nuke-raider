@@ -12,6 +12,7 @@ Emulator contract (duck-typed, satisfied by PyBoy and by tests' FakeEmu):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -213,3 +214,160 @@ def load_scenario(src, library_dir=None):
     sc["steps"] = _inline(sc["steps"], library_dir, [sc["name"]], 1)
     _validate(sc["steps"])
     return sc
+
+
+_OPS = {
+    "eq": lambda a, b: a == b,
+    "ne": lambda a, b: a != b,
+    "lt": lambda a, b: a < b,
+    "le": lambda a, b: a <= b,
+    "gt": lambda a, b: a > b,
+    "ge": lambda a, b: a >= b,
+}
+
+
+class RunContext:
+    """Frame counter, trace sampler, and freeze watchdog for one run.
+
+    The trace sampler doubles as the render heartbeat: when trace_every is
+    non-zero the engine renders at every sample point, which is what gives
+    the freeze watchdog a stream of frames to compare.
+    """
+
+    def __init__(self, symbols, manifest=None, watch=None, trace_every=0,
+                 freeze_frames=0, default_out=None, widths=None):
+        self.symbols = symbols
+        self.manifest = manifest or {}
+        self.watch = list(watch or [])
+        self.trace_every = int(trace_every)
+        self.freeze_frames = int(freeze_frames)
+        self.default_out = default_out
+        self.widths = dict(DEFAULT_WIDTHS)
+        self.widths.update(widths or {})
+
+        self.frame = 0
+        self.step = -1
+        self.action = None
+        self.trace = []
+        self.screenshots = []
+        self._last_hash = None
+        self._unchanged = 0
+
+    # --- helpers ---------------------------------------------------------
+    def screen_hash(self, emu):
+        return hashlib.sha1(emu.screen.image.tobytes()).hexdigest()[:16]
+
+    def width_of(self, name):
+        return self.widths.get(name, 1)
+
+    def sample(self, emu):
+        values = {}
+        for name in self.watch:
+            addr = self.symbols.get(name)
+            if addr is None:
+                continue
+            values[name] = read_value(emu, addr, self.width_of(name))
+        digest = self.screen_hash(emu)
+        self.trace.append({
+            "frame": self.frame, "step": self.step, "action": self.action,
+            "values": values, "screen_hash": digest,
+        })
+        if digest == self._last_hash:
+            self._unchanged += self.trace_every
+        else:
+            self._unchanged = 0
+        self._last_hash = digest
+        if self.freeze_frames and self._unchanged >= self.freeze_frames:
+            raise StepFailure(
+                self.step, "freeze",
+                f"screen unchanged for {self._unchanged} frames "
+                f"(threshold {self.freeze_frames})", self.action)
+
+    def tick(self, emu, n, render_all=False, render_last=False):
+        """Advance n frames, rendering at sample points (and sampling there)."""
+        n = int(n)
+        if n <= 0:
+            return
+        sampling = self.trace_every > 0
+        if not sampling and not render_all:
+            # Fast path: no trace, no watchdog (screenshot.py's default).
+            if n > 1:
+                emu.tick(n - 1, render=False)
+            emu.tick(1, render=render_last)
+            self.frame += n
+            return
+        for _ in range(n):
+            self.frame += 1
+            due = sampling and (self.frame % self.trace_every == 0)
+            emu.tick(1, render=bool(due or render_all))
+            if due:
+                self.sample(emu)
+
+    def capture(self, emu, path):
+        emu.tick(1, render=True)
+        self.frame += 1
+        emu.screen.image.save(path)
+        self.screenshots.append(path)
+
+
+def press(emu, ctx, buttons, delay=1):
+    """Canonical press: one rendered frame first (KEY_TICKED), all buttons
+    queued together (simultaneous), then held for `delay` frames."""
+    emu.tick(1, render=True)
+    ctx.frame += 1
+    for btn in buttons:
+        emu.button(str(btn).lower(), int(delay))
+    ctx.tick(emu, int(delay))
+
+
+def _cmp(step, actual, target):
+    op = step.get("op", "eq")
+    if op not in _OPS:
+        raise ScenarioError(f"Unknown operator {op!r}")
+    return _OPS[op](actual, target)
+
+
+def _addr_and_width(ctx, step):
+    name = step["address"]
+    addr = resolve(name, ctx.symbols)
+    width = int(step.get("width", ctx.width_of(name) if isinstance(name, str) else 1))
+    return addr, width
+
+
+def run(emu, steps, ctx):
+    """Execute a flat step list. Raises StepFailure; never calls sys.exit."""
+    for i, step in enumerate(steps):
+        ctx.step = i
+        ctx.action = step.get("action")
+        _dispatch(emu, step, ctx, i)
+    return ctx
+
+
+def _dispatch(emu, step, ctx, i):
+    act = step.get("action")
+
+    if act == "advance":
+        ctx.tick(emu, step["frames"], render_last=True)
+
+    elif act == "press":
+        press(emu, ctx, step["buttons"], step.get("delay", 1))
+
+    elif act == "wait_memory":
+        addr, width = _addr_and_width(ctx, step)
+        target = int(step["value"])
+        max_f = int(step.get("max_frames", 600))
+        for _ in range(max_f):
+            if _cmp(step, read_value(emu, addr, width), target):
+                return
+            ctx.tick(emu, 1)
+        raise StepFailure(
+            i, "timeout",
+            f"wait_memory timed out after {max_f} frames "
+            f"(addr={hex(addr)}, got={read_value(emu, addr, width)}, "
+            f"want {step.get('op', 'eq')} {target})", act)
+
+    elif act == "screenshot":
+        ctx.capture(emu, step.get("out", ctx.default_out))
+
+    else:
+        raise ScenarioError(f"Step {i}: unhandled action {act!r}")

@@ -205,5 +205,110 @@ class TestLoadScenario(unittest.TestCase):
             self.assertEqual(sc['name'], 'file')
 
 
+class TestPressSemantics(unittest.TestCase):
+
+    def test_rendered_tick_precedes_every_press(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{"action": "press", "buttons": ["start"], "delay": 4}], ctx)
+        # The frame immediately before the press must have been rendered.
+        _, _, at = emu.presses[0]
+        self.assertTrue(emu.render_log[at - 1],
+                        "KEY_TICKED requires a rendered frame before button()")
+
+    def test_multi_button_press_is_simultaneous(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{"action": "press", "buttons": ["a", "left"], "delay": 6}], ctx)
+        self.assertEqual([p[0] for p in emu.presses], ["a", "left"])
+        # Both queued at the same tick count => held together.
+        self.assertEqual(emu.presses[0][2], emu.presses[1][2])
+
+    def test_press_holds_for_delay_frames(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{"action": "press", "buttons": ["a"], "delay": 10}], ctx)
+        self.assertEqual(emu.presses[0][1], 10)
+
+
+class TestAdvanceAndWait(unittest.TestCase):
+
+    def test_advance_ticks_requested_frames(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{"action": "advance", "frames": 25}], ctx)
+        self.assertEqual(emu.ticks, 25)
+        self.assertEqual(ctx.frame, 25)
+
+    def test_wait_memory_returns_when_value_matches(self):
+        emu = FakeEmu(memory={0xC199: 1})
+        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        ps.run(emu, [{"action": "wait_memory", "address": "_racer_active",
+                      "value": 1, "max_frames": 50}], ctx)
+        self.assertLess(emu.ticks, 50)
+
+    def test_wait_memory_timeout_raises_step_failure(self):
+        emu = FakeEmu(memory={0xC199: 0})
+        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        with self.assertRaises(ps.StepFailure) as cm:
+            ps.run(emu, [{"action": "wait_memory", "address": "_racer_active",
+                          "value": 1, "max_frames": 8}], ctx)
+        self.assertEqual(cm.exception.kind, 'timeout')
+        self.assertEqual(cm.exception.step, 0)
+
+    def test_wait_memory_supports_operator_and_width(self):
+        emu = FakeEmu(memory={0xC246: 0x00, 0xC247: 0x02})   # _px == 512
+        ctx = ps.RunContext(symbols={'_px': 0xC246})
+        ps.run(emu, [{"action": "wait_memory", "address": "_px", "value": 100,
+                      "op": "gt", "width": 2, "max_frames": 5}], ctx)
+        self.assertLess(emu.ticks, 5)
+
+    def test_screenshot_step_saves_to_named_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = os.path.join(d, 'shot.png')
+            emu = FakeEmu()
+            ctx = ps.RunContext(symbols={}, default_out=os.path.join(d, 'default.png'))
+            ps.run(emu, [{"action": "screenshot", "out": out}], ctx)
+            self.assertIn(out, emu.saved)
+
+
+class TestTraceAndFreeze(unittest.TestCase):
+
+    def test_trace_samples_at_interval_and_tags_step(self):
+        emu = FakeEmu(memory={0xC4F2: 5})
+        ctx = ps.RunContext(symbols={'_hp': 0xC4F2}, watch=['_hp'], trace_every=10)
+        ps.run(emu, [{"action": "advance", "frames": 30}], ctx)
+        self.assertEqual(len(ctx.trace), 3)
+        self.assertEqual(ctx.trace[0]['values']['_hp'], 5)
+        self.assertEqual(ctx.trace[0]['step'], 0)
+        self.assertEqual(ctx.trace[0]['action'], 'advance')
+        self.assertEqual([r['frame'] for r in ctx.trace], [10, 20, 30])
+
+    def test_trace_records_screen_hash(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, trace_every=5)
+        ps.run(emu, [{"action": "advance", "frames": 5}], ctx)
+        self.assertIn('screen_hash', ctx.trace[0])
+
+    def test_freeze_watchdog_fires_on_static_screen(self):
+        emu = FakeEmu()                      # tobytes() constant => hash never changes
+        ctx = ps.RunContext(symbols={}, trace_every=10, freeze_frames=30)
+        with self.assertRaises(ps.StepFailure) as cm:
+            ps.run(emu, [{"action": "advance", "frames": 200}], ctx)
+        self.assertEqual(cm.exception.kind, 'freeze')
+
+    def test_freeze_watchdog_silent_when_screen_changes(self):
+        emu = FakeEmu(frames=[[i % 251] for i in range(300)])
+        ctx = ps.RunContext(symbols={}, trace_every=10, freeze_frames=30)
+        ps.run(emu, [{"action": "advance", "frames": 200}], ctx)   # must not raise
+        self.assertEqual(ctx.frame, 200)
+
+    def test_freeze_watchdog_disabled_when_zero(self):
+        emu = FakeEmu()
+        ctx = ps.RunContext(symbols={}, trace_every=10, freeze_frames=0)
+        ps.run(emu, [{"action": "advance", "frames": 200}], ctx)
+        self.assertEqual(ctx.frame, 200)
+
+
 if __name__ == '__main__':
     unittest.main()
