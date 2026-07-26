@@ -1,26 +1,148 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(aseprite:*)",
+      "Bash(awk:*)",
+      "Bash(cp:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(gcc:*)",
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(kill:*)",
+      "Bash(ls:*)",
+      "Bash(make:*)",
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(py:*)",
+      "Bash(python:*)",
+      "Bash(romusage:*)",
+      "Bash(sed:*)",
+      "Bash(sleep:*)",
+      "Bash(tiled:*)",
+      "Bash(timeout:*)",
+      "Bash(wc:*)",
+      "Bash(xargs:*)",
+      "Glob(*)",
+      "Grep(*)",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Set-Content *)",
+      "PowerShell(Start-Process *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(gh *)",
+      "PowerShell(git *)",
+      "PowerShell(make *)",
+      "PowerShell(py *)",
+      "PowerShell(python *)",
+      "Read(**)",
+      "Skill(bank-post-build)",
+      "Skill(bank-pre-write)",
+      "Skill(build)",
+      "Skill(doc-review)",
+      "Skill(executing-plans)",
+      "Skill(gb-memory-validator)",
+      "Skill(grill-with-docs)",
+      "Skill(test)",
+      "Skill(track-build)",
+      "Skill(update-config)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:doc.mapeditor.org)",
+      "WebFetch(domain:docs.pyboy.dk)",
+      "WebFetch(domain:emulicious.net)",
+      "WebFetch(domain:gbdev.gg8.se)",
+      "WebFetch(domain:gbdev.io)",
+      "WebFetch(domain:gbdk-2020.github.io)",
+      "WebFetch(domain:gbdk.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:superdisk.github.io)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:www.aseprite.org)",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin master:*)",
+      "PowerShell(gh pr merge *)",
+      "PowerShell(git push --force *)",
+      "PowerShell(git push --force-with-lease *)",
+      "PowerShell(git push -f *)",
+      "PowerShell(git push origin main *)",
+      "PowerShell(git push origin master *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/deny_gate_hook.py",
+            "timeout": 15,
+            "statusMessage": "deny gate..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/bank_check_hook.py",
+            "timeout": 60,
+            "statusMessage": "bank-pre-write check..."
+          }
+        ]
+      },
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit*)",
-            "command": "powershell -NoProfile -Command \"$r = git rev-parse --show-toplevel; $env:GBDK_HOME='C:/gbdk'; $env:PATH='C:\\Program Files\\Git\\bin;C:\\Program Files\\Git\\usr\\bin;' + $env:PATH; Set-Location $r; make clean; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; make; exit $LASTEXITCODE\"",
+            "command": "python tools/precommit_build_hook.py",
             "timeout": 300,
             "statusMessage": "Pre-commit build gate: clean build..."
+          },
+          {
+            "type": "command",
+            "command": "python tools/emulicious_window_hook.py",
+            "timeout": 15,
+            "statusMessage": "Resetting Emulicious window position..."
           }
         ]
       }
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/post_build_hook.py",
+            "timeout": 300,
+            "statusMessage": "bank-post-build + memory-check..."
+          }
+        ]
+      },
+      {
         "matcher": "Skill",
         "hooks": [
           {
             "type": "command",
-            "command": "py C:/Code/nuke-raider/tools/skill_overlay_hook.py",
+            "command": "python tools/skill_overlay_hook.py",
             "timeout": 15,
             "statusMessage": "skill overlay lookup..."
           }
@@ -32,7 +154,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py C:/Code/nuke-raider/tools/skill_overlay_hook.py",
+            "command": "python tools/skill_overlay_hook.py",
             "timeout": 15,
             "statusMessage": "skill overlay lookup..."
           }
