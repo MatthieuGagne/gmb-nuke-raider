@@ -5,7 +5,9 @@ under a pinned, auto-advancing clock, so the fixtures exercise the real append
 path instead of hand-written JSON that could drift from the schema.
 """
 import os
+import struct
 import sys
+import zlib
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
@@ -42,9 +44,46 @@ def _worktree(tmpdir, issue, create=True):
     return path
 
 
-def _png(path, payload=b'\x89PNG\r\n\x1a\nFIXTURE'):
+GB_SCREEN = (160, 144)          # a real Game Boy frame, so the demo looks right
+
+
+def _colour(name):
+    """Deterministic colour per file name, bright enough on a dark page.
+
+    Failure frames are red so the one screenshot that matters is obvious in
+    the dashboard at a glance.
+    """
+    if os.path.basename(name).startswith('failure'):
+        return (170, 60, 60)
+    seed = sum(ord(c) * (i + 1) for i, c in enumerate(os.path.basename(name)))
+    return (80 + seed * 37 % 176, 80 + seed * 61 % 176, 80 + seed * 89 % 176)
+
+
+def _png_bytes(width, height, rgb):
+    """A real, minimal RGB PNG. Stdlib only, byte-identical for a given colour.
+
+    These fixtures once wrote a PNG signature followed by filler. Every
+    decoder rejects that, so the dashboard embedded it happily and the browser
+    drew a broken-image icon: a screenshot fixture that cannot be displayed
+    cannot demonstrate the one thing the HTML page exists for.
+    """
+    scanlines = (b'\x00' + bytes(rgb) * width) * height
+
+    def chunk(tag, payload):
+        return (struct.pack('>I', len(payload)) + tag + payload
+                + struct.pack('>I', zlib.crc32(tag + payload) & 0xffffffff))
+
+    ihdr = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+    return (b'\x89PNG\r\n\x1a\n'
+            + chunk(b'IHDR', ihdr)
+            + chunk(b'IDAT', zlib.compress(scanlines, 9))
+            + chunk(b'IEND', b''))
+
+
+def _png(path):
+    """Write a displayable PNG whose colour is derived from its name."""
     with open(path, 'wb') as fh:
-        fh.write(payload)
+        fh.write(_png_bytes(GB_SCREEN[0], GB_SCREEN[1], _colour(path)))
     return path
 
 
