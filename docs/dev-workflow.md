@@ -51,7 +51,7 @@ directories under `.claude/skills/`.
   happen in a worktree. Use `EnterWorktree` or the `using-git-worktrees` skill before any write.
 - **Integrate via PR only.** Never merge feature branches to master locally.
 - Use `gh` for all GitHub operations. Run `gh auth setup-git` if push fails.
-- `.claude/settings.local.json` is checked into git; commit it alongside feature work.
+- **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See `docs/adr/0001-settings-tier-contract.md`.
 
 ---
 
@@ -254,7 +254,7 @@ Before pushing and creating a PR, verify all of the following:
 - [ ] **If any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed:** this file (`docs/dev-workflow.md`) updated
 - [ ] PR body includes `Closes #N` for the related issue
 - [ ] `python tools/trace.py --check` passes (no ERROR lines; legacy warnings are expected)
-- [ ] `.claude/settings.local.json` committed if any new tool permissions were approved
+- [ ] Any new tool permission promoted into `.claude/settings.json` as a generalized rule (never `.claude/settings.local.json`, which is gitignored)
 
 Use `gh pr create` with a `## Summary` + `## Test Plan` body. After merge, verify the linked
 issue is auto-closed; if not, run `gh issue close N`.
