@@ -171,7 +171,10 @@
       "PowerShell($m=\"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.map\"; if \\(Test-Path $m\\) { Select-String -Path $m -Pattern \"_rs_cp_next|_active_lap_count|_racer_active|_hp\\\\b|_px\\\\b|_py\\\\b\" | ForEach-Object { $_.Line.Trim\\(\\) } | Select-Object -First 15 } else { \"no map in main tree\" })",
       "PowerShell($n=\"C:\\\\Code\\\\nuke-raider\\\\build\\\\nuke-raider.noi\"; if \\(Test-Path $n\\) { \"NOI exists\"; Select-String -Path $n -Pattern \"^DEF \\(_rs_cp_next|_active_lap_count|_racer_active|_hp|_px|_py|_depth\\)\\\\b\" | ForEach-Object { $_.Line } } else { \"no .noi\" })",
       "PowerShell(Select-String *)",
-      "PowerShell(Select-String -Path .gitignore -Pattern \"plans|docs\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" }; \"=== settings.local.json diff ===\"; git diff .claude/settings.local.json)"
+      "PowerShell(Select-String -Path .gitignore -Pattern \"plans|docs\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" }; \"=== settings.local.json diff ===\"; git diff .claude/settings.local.json)",
+      "Bash(pip show *)",
+      "Bash(PYTHONPATH=. python -m unittest tests.test_pyboy_scenario -v)",
+      "Bash(PYTHONPATH=. python -m unittest tests.test_pyboy_scenario)"
     ]
   },
   "hooks": {
