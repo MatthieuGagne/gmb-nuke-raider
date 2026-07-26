@@ -55,3 +55,6 @@ docs/plans/
 # Personal / machine-specific Claude instructions
 CLAUDE.local.md
 
+
+# Superpowers SDD workspace (transient ledger written by baseline subagent-driven-development)
+.superpowers/

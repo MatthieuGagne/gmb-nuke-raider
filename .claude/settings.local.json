@@ -74,14 +74,13 @@
       "WebFetch(domain:doc.mapeditor.org)",
       "WebFetch(domain:docs.pyboy.dk)",
       "WebFetch(domain:superdisk.github.io)",
-      "Skill(grill-me)",
+      "Skill(grill-with-docs)",
       "Skill(executing-plans)",
       "Skill(test)",
       "Skill(build)",
       "Skill(bank-post-build)",
       "Skill(gb-memory-validator)",
       "Skill(bank-pre-write)",
-      "Skill(systematic-debugging)",
       "Skill(track-build)",
       "Skill(update-config)",
       "PowerShell(git *)",
@@ -162,7 +161,9 @@
       "Read(//c/Users/mathd/.claude/plugins/cache/claude-plugins-official/superpowers/6.2.0/**)",
       "Read(//c/Users/mathd/.claude/skills/**)",
       "Read(//c/Users/mathd/.claude/plugins/**)",
-      "WebFetch(domain:www.aihero.dev)"
+      "WebFetch(domain:www.aihero.dev)",
+      "PowerShell(gh issue view 434 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 434: $\\($_.title\\)\"; $_.body }; gh issue view 435 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 435: $\\($_.title\\)\"; $_.body }; gh issue view 436 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 436: $\\($_.title\\)\"; $_.body }; gh issue view 438 --json title,body | ConvertFrom-Json | ForEach-Object { \"=== 438: $\\($_.title\\)\"; $_.body })",
+      "PowerShell($s = \"C:/Users/mathd/AppData/Local/Temp/claude/C--Code-nuke-raider/73960216-88fc-4768-82fe-17b65b63b955/scratchpad\"; gh issue edit 437 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-437-body.md\" && gh issue edit 435 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-435-body.md\" && gh issue edit 441 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-441-body.md\" && gh issue edit 442 --repo MatthieuGagne/gmb-nuke-raider --body-file \"$s/prd-skill-overlays.md\")"
     ]
   },
   "hooks": {

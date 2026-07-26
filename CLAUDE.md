@@ -75,9 +75,14 @@ duplicate those descriptions here. `docs/dev-workflow.md` is co-authoritative an
 to its workflow step.
 
 Two things not obvious from frontmatter alone:
-- Several skills are **project-local shadows** of global `superpowers:` skills (brainstorming,
-  writing-plans, executing-plans, systematic-debugging, finishing-a-development-branch,
-  subagent-driven-development, grill-me) — the local copy wins when invoked by name and adds the GB gates.
+- The superpowers workflow skills (brainstorming, writing-plans, executing-plans,
+  subagent-driven-development, finishing-a-development-branch, dispatching-parallel-agents,
+  plus grill-with-docs) run from their auto-updating baselines; project deltas live in
+  `.claude/skill-overlays/<name>.md` and are injected automatically by
+  `tools/skill_overlay_hook.py` (PostToolUse on Skill + UserPromptSubmit hooks in
+  `.claude/settings.json`). On conflict, the overlay wins. Each overlay's `baseline:`
+  frontmatter pins the superpowers version it was written against; the hook warns when
+  the installed version has moved (re-sync the overlay when it fires).
 - `bank-pre-write` / `bank-post-build` / `gb-memory-validator` fire **automatically** via hooks
   (PreToolUse on `src/*` writes, PostToolUse after a non-clean `make`); the skills are fallback references.
 
@@ -124,6 +129,8 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Build verification:** `make` (use `/build` skill)
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
+Exception: the grill-with-docs paper trail is versioned in-repo — glossary/context in
+`CONTEXT.md` (repo root), decisions as ADRs in `docs/adr/NNNN-title.md`, merged via PR.
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 

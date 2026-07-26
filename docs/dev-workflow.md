@@ -18,6 +18,30 @@ Nuke Raider is a Game Boy Color game built with GBDK-2020 and SDCC.
 Claude Code assistance is provided through **skills** (`.claude/skills/`) and **agents**
 (`.claude/agents/`). Skills are invoked with the `Skill` tool; agents with the `Agent` tool.
 
+### Skill overlays
+
+The workflow skills below — brainstorming, writing-plans, executing-plans,
+subagent-driven-development, finishing-a-development-branch, dispatching-parallel-agents, and
+grill-with-docs — are **not** forked into `.claude/skills/`. They run from their auto-updating
+marketplace baselines (superpowers, plus `grill-with-docs` from `mattpocock/skills`), and this
+project's deltas live in `.claude/skill-overlays/<name>.md`.
+
+`tools/skill_overlay_hook.py` injects the matching overlay whenever one of those skills is
+invoked — via `PostToolUse` on the `Skill` tool for model-invoked skills, and via
+`UserPromptSubmit` for user-typed `/commands`, which bypass the Skill tool. Both hooks are
+registered in `.claude/settings.json`. On conflict, **the overlay wins** over the baseline.
+
+Each overlay's `baseline:` frontmatter pins the version it was written against. When the
+installed superpowers version moves past that pin, the hook prepends a drift warning to the
+injected context — re-sync that overlay against the new baseline when it fires. The hook is
+fail-open: a missing overlay, malformed input, or any internal error produces no output and
+exit 0, so it can never block a session. Shared reference material for the overlays lives in
+`.claude/skill-overlays/references/`.
+
+Only skills with **no** upstream baseline (`prd`, `bank-pre-write`, `doc-review`,
+`design-an-interface`, `triage-issue`, the asset-pipeline skills, …) remain as real
+directories under `.claude/skills/`.
+
 ---
 
 ## 2. Branch & Worktree Policy
@@ -145,7 +169,10 @@ wait_vbl_done()
 
 For **compile errors**: check the GBDK constraints above; invoke `gbdk-expert` agent.
 
-For **runtime issues** (crashes, glitches, wrong values): invoke the `systematic-debugging` skill (`/debug`) first — it enforces hypothesis-queue-first debugging and requires a `confirm_when` artifact on every hypothesis before the queue can be approved. Then dispatch `emulicious-debug` for instrumentation.
+For **runtime issues** (crashes, glitches, wrong values): follow CLAUDE.md's Debugging Rules
+(one variable per test; a shifted crash is not the same bug), then dispatch the
+`emulicious-debug` agent for interactive instrumentation or `pyboy-debug` for headless
+diagnosis. Its GBC-specific diagnostic hints live in the agent file itself.
 
 Key tools in Emulicious:
 - **EMU_printf** (`src/debug.h`) — formatted print output visible in the Emulicious console
