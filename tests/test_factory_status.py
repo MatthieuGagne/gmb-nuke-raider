@@ -1,6 +1,8 @@
 """Tests for tools/factory_status.py"""
+import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -261,6 +263,22 @@ class TestRenderHtml(StatusTestCase):
 
     def test_screenshots_are_embedded_as_data_uris(self):
         self.assertIn('data:image/png;base64,', self.page())
+
+    def test_embedded_payload_is_a_decodable_png(self):
+        """A well-formed data URI is not evidence that anything renders.
+
+        The fixtures once wrote a bare PNG signature plus filler: the page
+        embedded it correctly and every browser drew a broken-image icon,
+        which the data-URI assertion above happily passed.
+        """
+        uris = re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)',
+                          self.page())
+        self.assertTrue(uris)
+        for uri in uris:
+            raw = base64.b64decode(uri)
+            self.assertEqual(raw[:8], b'\x89PNG\r\n\x1a\n')
+            self.assertIn(b'IHDR', raw)
+            self.assertIn(b'IEND', raw)
 
     def test_page_states_when_images_were_capped(self):
         """AC7: the page must admit what it dropped."""
