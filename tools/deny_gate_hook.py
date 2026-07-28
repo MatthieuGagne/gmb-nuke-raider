@@ -107,7 +107,7 @@ def main():
         sys.stderr.write(
             'Refused by the deny gate: %s.\n'
             'This operation is forbidden by .claude/settings.json and '
-            'tools/deny_gate_hook.py (see docs/adr/0001-settings-tier-contract.md).\n'
+            'tools/deny_gate_hook.py (see ADR 0001, issue #466).\n'
             % reason)
         sys.exit(2)
 

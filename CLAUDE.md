@@ -65,12 +65,12 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **Machine** (`~/.claude/settings.json`, outside the repo): `env` values and any allow rule containing an absolute path. Template: `.claude/settings.user.example.json`.
 - **Repo** (`.claude/settings.json`, tracked): the curated allowlist, the deny list, and all
   **agent** hook wiring — **repository** hook wiring lives in tracked `.githooks/` (see
-  `docs/adr/0002-local-gates-are-repository-hooks.md`). No absolute paths, no `env`. Validated by
+  ADR 0002 (#467)). No absolute paths, no `env`. Validated by
   `python tools/allowlist_lint.py`, enforced by `make test-tools`. Any matcher naming one shell
   tool must name both (`Bash|PowerShell`) — the hygiene check fails otherwise.
 - **Scratch** (`.claude/settings.local.json`, gitignored): transient session approvals. Never commit it.
 
-**Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: `docs/adr/0001-settings-tier-contract.md`.
+**Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: ADR 0001 (#466).
 
 **Always create a PR after pushing a branch** — no need to ask. Include `Closes #N` in the PR body to auto-close the related GitHub issue on merge. When a PR is merged, verify that the linked issue is closed; if not, close it manually with `gh issue close N`.
 
@@ -138,8 +138,12 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 **Build verification:** `make` (use `/build` skill)
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
-Exception: the grill-with-docs paper trail is versioned in-repo — glossary/context in
-`CONTEXT.md` (repo root), decisions as ADRs in `docs/adr/NNNN-title.md`, merged via PR.
+Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
+in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues**, closed
+on acceptance; allocate the next number with `gh issue list --label adr` + 1 (next is 0006),
+and cite them as `ADR NNNN (#issue)`. Every document issue — PRD, ADR, review, handoff, and
+the `log`-labeled run logs — is added to the "Nuke Raider — Documents" project at creation
+with its Type set (ADR issues → Type = ADR, run logs → Type = Log).
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 

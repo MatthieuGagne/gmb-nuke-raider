@@ -51,7 +51,7 @@ directories under `.claude/skills/`.
   happen in a worktree. Use `EnterWorktree` or the `using-git-worktrees` skill before any write.
 - **Integrate via PR only.** Never merge feature branches to master locally.
 - Use `gh` for all GitHub operations. Run `gh auth setup-git` if push fails.
-- **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See `docs/adr/0001-settings-tier-contract.md`.
+- **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See [ADR 0001 (#466)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
 
 ---
 
@@ -112,7 +112,7 @@ that reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exis
 
 Local gates are **repository hooks**, not agent hooks, so they see every actor — any shell, any
 tool, any agent, or a human in a plain terminal. They are split by cost. Rationale:
-[`docs/adr/0002-local-gates-are-repository-hooks.md`](adr/0002-local-gates-are-repository-hooks.md).
+[ADR 0002 (#467)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467).
 
 | Hook | Runs | Cost | Blocks |
 |------|------|------|--------|
@@ -462,7 +462,7 @@ first, then re-saves state atomically (temp file + `os.replace`), so state can l
 by one event and can never lead it. `load_state()` replays the journal whenever state is
 missing, unparseable, of a foreign schema version, or behind the journal — a torn write
 self-heals instead of being fatal. An unparseable JSONL line is discarded on read, never an
-error. Full rationale: [`docs/adr/0003-factory-run-journal-as-source-of-truth.md`](adr/0003-factory-run-journal-as-source-of-truth.md).
+error. Full rationale: [ADR 0003 (#468)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/468).
 
 Event kinds: `start`, `stage`, `gate`, `decision`, `retry`, `scenario`, `permission`,
 `failure`, `finish`. Every event carries `ts`, `issue`, `attempt`, `kind`.
@@ -579,7 +579,7 @@ exist yet at GATE stage. A non-numeric value stays truthy, so the deny gate's fa
 rules still fire while the run is treated as unattributable and nothing is journalled; that is
 how the deny-gate tests exercise the rules without writing to the real registry. It is set by
 the session or driver process, never by a settings file: the repo tier forbids `env` (see
-[`docs/adr/0001-settings-tier-contract.md`](adr/0001-settings-tier-contract.md)).
+[ADR 0001 (#466)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)).
 
 Note that the deny gate matches on raw command text, so a diagnostic that merely *quotes* a
 forbidden command is itself refused. Assemble such strings piecewise in tooling that reports

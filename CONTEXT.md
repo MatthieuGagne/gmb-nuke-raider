@@ -1,8 +1,8 @@
 # Nuke Raider
 
 Shared vocabulary for this repository. Definitions only — no implementation
-detail, no decisions. Decisions live in `docs/adr/`; requirements live in
-GitHub issues.
+detail, no decisions. Decisions live in `adr`-labeled GitHub issues; requirements
+live in GitHub issues.
 
 ## Language
 
