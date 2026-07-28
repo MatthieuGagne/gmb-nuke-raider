@@ -98,6 +98,11 @@ A single pass through the stages within a run. A run that failed and was
 restarted has one run and several attempts.
 _Avoid_: retry, pass, re-run
 
+**Stage**:
+One of the named phases an attempt passes through in a fixed order: GATE, PLAN,
+BUILD, VERIFY, SHIP.
+_Avoid_: phase, step
+
 **Run registry**:
 The durable record of every run, kept where the disappearance of a worktree
 cannot take it away.
@@ -106,7 +111,14 @@ _Avoid_: run directory, state dir, run store
 **Journal**:
 The append-only record of everything that happened during a run, and the
 authority on what happened.
-_Avoid_: event log, audit log, history
+_Avoid_: event log, audit log, history — and never a **Stage log**, which holds
+raw command output rather than a record of events
+
+**Stage log**:
+The output of the commands run during one stage, kept exactly as those commands
+emitted it.
+_Avoid_: transcript — that names an agent session's output; build log — every
+stage has one, not only BUILD
 
 **Run state**:
 The current standing of a run, derived from the journal. Never the authority —
