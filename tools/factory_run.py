@@ -5,8 +5,7 @@ The registry lives at ``<main repo root>/.factory/runs/issue-<N>/`` — outside
 every worktree, so a run stays explainable after its worktree is gone.
 
 The journal (``journal.jsonl``) is the source of truth and ``state.json`` is a
-cached projection of it; see
-``docs/adr/0003-factory-run-journal-as-source-of-truth.md``. ``append_event()``
+cached projection of it; see ADR 0003 (issue #468). ``append_event()``
 writes the journal line first, then re-saves state atomically, so state can lag
 the journal by one event and can never lead it.
 
