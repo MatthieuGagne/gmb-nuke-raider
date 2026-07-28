@@ -10,9 +10,10 @@ cached projection of it; see
 writes the journal line first, then re-saves state atomically, so state can lag
 the journal by one event and can never lead it.
 
-This module is the only writer of the registry. Every other factory tool reads.
-It is a library, not a CLI: ``factory_status.py`` and ``factory_report.py`` are
-the command-line surfaces.
+This module is the sole writer of run state and the journal; ``factory_log.py``
+is the sole writer of the ``logs/`` subtree (ADR 0005, #450). Every other
+factory tool reads. It is a library, not a CLI: ``factory_status.py`` and
+``factory_report.py`` are the command-line surfaces.
 
 Usage (imported):
     import factory_run
@@ -126,6 +127,11 @@ def state_path(issue, registry=None):
 
 def journal_path(issue, registry=None):
     return os.path.join(run_dir(issue, registry), JOURNAL_FILE)
+
+
+def log_path(issue, stage, registry=None):
+    """``runs/issue-<N>/logs/<STAGE>.log`` — written by factory_log.py (#450)."""
+    return os.path.join(run_dir(issue, registry), "logs", "%s.log" % stage)
 
 
 def run_issue(env=None):

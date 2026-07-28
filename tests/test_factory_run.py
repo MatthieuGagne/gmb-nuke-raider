@@ -373,5 +373,19 @@ class TestAutopsy(JournalTestCase):
         self.assertIn(dest, (None,) if dest is None else (dest,))
 
 
+class TestLogPath(unittest.TestCase):
+    """R7 (#450): the layout is owned here; the writing lives in factory_log."""
+
+    def test_log_path_lives_under_the_run_logs_subtree(self):
+        self.assertEqual(
+            factory_run.log_path(450, 'BUILD', registry='REG'),
+            os.path.join('REG', 'runs', 'issue-450', 'logs', 'BUILD.log'))
+
+    def test_log_path_coerces_issue_like_run_dir_does(self):
+        self.assertEqual(
+            factory_run.log_path('450', 'SHIP', registry='REG'),
+            os.path.join('REG', 'runs', 'issue-450', 'logs', 'SHIP.log'))
+
+
 if __name__ == '__main__':
     unittest.main()
