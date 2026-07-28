@@ -436,6 +436,7 @@ worktree, so a run stays explainable after its worktree is deleted.
   runs/issue-<N>/
     journal.jsonl                   # append-only; the source of truth
     state.json                      # cached projection of the journal
+    logs/<STAGE>.log                # stage logs, appended by factory_log (#450)
     autopsy/attempt-<k>/            # evidence copied out of a failed attempt
 ```
 
@@ -447,7 +448,8 @@ worktree, so a run stays explainable after its worktree is deleted.
 
 | Tool | Role |
 |------|------|
-| `tools/factory_run.py` | Schema owner and **sole writer** of the registry. Library, not a CLI. |
+| `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
+| `tools/factory_log.py` | **Sole writer of the `logs/` subtree** (ADR 0005): tees stage command output into `logs/<STAGE>.log`. |
 | `tools/factory_status.py` | Read-only dashboard, terminal + HTML. Writes only the rendered page. |
 | `tools/factory_report.py` | Deterministic PR body from state + journal. Writes nothing in the registry. |
 | `tools/factory_permission_hook.py` | `Notification` hook: records a run blocked on a permission prompt. |
@@ -510,6 +512,38 @@ Assembly is best-effort and **never raises**: `manifest.json` lists every expect
 present or absent-with-reason. An autopsy that dies during a failure destroys the evidence it
 exists to preserve.
 
+### Stage logs
+
+`tools/factory_log.py` runs a stage command and tees its merged stdout+stderr both to the
+console and to `runs/issue-<N>/logs/<STAGE>.log` — binary end-to-end, byte-identical to what
+the console saw. Logs are append-only within a stage: retries accumulate, each invocation
+wrapped in a single-line header and trailer, so `grep '^===== factory-log'` reconstructs the
+invocation list with no parser:
+
+```
+===== factory-log stage=BUILD attempt=2 started=2026-07-27T12:00:00+00:00 =====
+cwd: C:/Code/nuke-raider/.claude/worktrees/factory-log-450
+cmd: make clean
+----- output -----
+<child bytes, verbatim>
+===== factory-log stage=BUILD exit=0 ended=2026-07-27T12:01:03+00:00 =====
+```
+
+The trailer is the completion signal: its absence means the invocation did not complete —
+otherwise indistinguishable from a command that failed silently.
+
+The child's stdout is a **pipe, not a pty**, so `isatty()` is false and TTY-conditional color
+and progress rendering are suppressed. That is the documented cost of capture; nothing forces
+color back on, which keeps the logs greppable and the log byte-identical to the console.
+
+Logging is **fail-open**: the child's exit code is always returned, and each logging failure
+(unresolvable registry root, no issue number, unwritable destination, mid-stream write error)
+emits exactly one `factory-log: WARNING:` line on stderr. Outside a factory run there is no
+issue number, so the helper degrades to a plain runner — one warning, no log file. That
+warning is what lets downstream log publication (#437 R11) report "no stage log captured"
+instead of silently missing an asset. The child failing to *spawn* is not a logging failure:
+it returns 127 and never reports success.
+
 ### Commands
 
 ```sh
@@ -518,10 +552,16 @@ python tools/factory_status.py --json                   # machine-readable
 python tools/factory_status.py --html                   # write .factory/status.html
 python tools/factory_report.py --issue 436              # PR body to stdout
 python tools/factory_report.py --issue 436 --out body.md
+python tools/factory_log.py --stage BUILD --issue 450 -- make clean
+python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Command "make clean; make"
 ```
 
-Both exit `0` whenever they render and `2` on operational failure. Neither ever exits `1` from
-run content — an unhealthy run is a thing to report, not a tool error.
+`factory_status` and `factory_report` exit `0` whenever they render and `2` on operational
+failure; neither ever exits `1` from run content — an unhealthy run is a thing to report, not
+a tool error. `factory_log` passes the child's exit code through verbatim, returns `127` when
+the command cannot be spawned, and `2` on misuse (unknown `--stage`, bad `--now`, no command
+after `--`). Commands are argv lists — never `shell=True`; a compound command names its shell
+explicitly, as in the `pwsh -NoProfile -Command` example above.
 
 The HTML page is self-contained: inline CSS, screenshots embedded as base64 data URIs, so it
 opens from disk with no server and survives worktree deletion. Freshness comes from the
@@ -550,5 +590,5 @@ recorded, and a run with none renders as normal, not broken.
 
 ### Retention
 
-None. `.factory/` grows without bound from screenshots and traces until deleted by hand.
-Accepted cost for a solo project.
+None. `.factory/` grows without bound from screenshots, traces, and stage logs until deleted
+by hand — a flapping stage grows one log file without limit. Accepted cost for a solo project.
