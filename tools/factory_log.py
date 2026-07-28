@@ -181,3 +181,58 @@ def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
         return exit_code
     finally:
         log.close()
+
+
+def split_command(argv):
+    """Split helper options from the child command at the first ``--``."""
+    if "--" in argv:
+        cut = argv.index("--")
+        return argv[:cut], argv[cut + 1:]
+    return argv, []
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--stage", required=True,
+                        help="stage name, one of: %s"
+                             % ", ".join(factory_run.STAGES))
+    parser.add_argument("--issue", type=int, default=None,
+                        help="issue number (default: NUKE_FACTORY_RUN)")
+    parser.add_argument("--attempt", type=int, default=None,
+                        help="attempt number recorded in the log header")
+    parser.add_argument("--cwd", default=None,
+                        help="working directory for the command")
+    parser.add_argument("--log-path", default=None,
+                        help="write the log here instead of the registry")
+    parser.add_argument("--now", default=None,
+                        help="pin the clock, UTC ISO-8601 (determinism seam)")
+    return parser
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    own, cmd = split_command(argv)
+    args = build_parser().parse_args(own)
+    if args.stage not in factory_run.STAGES:
+        print("factory_log: unknown --stage %r (one of: %s)"
+              % (args.stage, ", ".join(factory_run.STAGES)), file=sys.stderr)
+        return 2
+    if not cmd:
+        print("factory_log: no command after --", file=sys.stderr)
+        return 2
+    if args.now:
+        try:
+            pinned = factory_run.parse_now(args.now)
+        except ValueError as exc:
+            print("factory_log: bad --now: %s" % exc, file=sys.stderr)
+            return 2
+        factory_run.set_clock(lambda: pinned)
+    return run_logged(cmd, stage=args.stage, issue=args.issue,
+                      attempt=args.attempt, cwd=args.cwd,
+                      log_path=args.log_path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

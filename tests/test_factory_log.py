@@ -246,5 +246,61 @@ class TestFailOpen(LogTestCase):
         self.assertIn(b'exit=130', self.log_bytes())
 
 
+class TestCli(unittest.TestCase):
+    """CLI per tools/ convention, exercised as a subprocess like test_factory_report."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.log = os.path.join(self.tmp, 'BUILD.log')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_cli(self, *args):
+        proc = subprocess.run([sys.executable, SCRIPT] + list(args),
+                              capture_output=True)
+        return proc.returncode, proc.stdout, proc.stderr
+
+    def test_happy_path_streams_logs_and_pins_the_clock(self):
+        code, out, err = self.run_cli(
+            '--stage', 'BUILD', '--log-path', self.log, '--attempt', '2',
+            '--now', '2026-07-27T12:00:00+00:00',
+            '--', sys.executable, '-c', "print('hi')")
+        self.assertEqual(code, 0)
+        self.assertIn(b'hi', out)
+        with open(self.log, 'rb') as fh:
+            body = fh.read()
+        self.assertIn(b'attempt=2 started=2026-07-27T12:00:00+00:00', body)
+        self.assertIn(b'exit=0 ended=2026-07-27T12:00:00+00:00', body)
+
+    def test_child_exit_code_passes_through(self):
+        code, out, err = self.run_cli(
+            '--stage', 'BUILD', '--log-path', self.log,
+            '--', sys.executable, '-c', 'import sys; sys.exit(9)')
+        self.assertEqual(code, 9)
+
+    def test_unknown_stage_exits_2_and_runs_nothing(self):
+        """AC6: invalid --stage returns 2 and the command never runs."""
+        marker = os.path.join(self.tmp, 'ran')
+        code, out, err = self.run_cli(
+            '--stage', 'NOPE', '--log-path', self.log,
+            '--', sys.executable, '-c',
+            "import sys; open(sys.argv[1], 'w').close()", marker)
+        self.assertEqual(code, 2)
+        self.assertFalse(os.path.exists(marker))
+        self.assertIn(b'factory_log', err)
+
+    def test_no_command_after_dashes_exits_2(self):
+        code, out, err = self.run_cli('--stage', 'BUILD', '--log-path', self.log)
+        self.assertEqual(code, 2)
+        self.assertIn(b'no command', err)
+
+    def test_bad_now_exits_2(self):
+        code, out, err = self.run_cli(
+            '--stage', 'BUILD', '--log-path', self.log, '--now', 'not-a-time',
+            '--', sys.executable, '-c', 'pass')
+        self.assertEqual(code, 2)
+
+
 if __name__ == '__main__':
     unittest.main()
