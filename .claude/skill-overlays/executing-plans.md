@@ -61,4 +61,4 @@ This is mandatory even when the implementation felt smooth. If the user provides
 
 ### Shipping
 
-Never push or create a PR before the Emulicious smoketest passes with user confirmation. Only after confirmation: update `README.md` if user-visible behavior changed, promote any newly approved tool permission into the tracked `.claude/settings.json` as a generalized rule (never commit `.claude/settings.local.json` — it is gitignored scratch; see `docs/adr/0001-settings-tier-contract.md`), then push and open the PR with `Closes #N` in the body.
+Never push or create a PR before the Emulicious smoketest passes with user confirmation. Only after confirmation: update `README.md` if user-visible behavior changed, promote any newly approved tool permission into the tracked `.claude/settings.json` as a generalized rule (never commit `.claude/settings.local.json` — it is gitignored scratch; see ADR 0001 (#466)), then push and open the PR with `Closes #N` in the body.
