@@ -481,3 +481,45 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
             return body
 
     return _render(ctx)[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER
+
+
+# ── Secret scan ──────────────────────────────────────────────────────────────
+
+SCAN_CHUNK = 1 << 20
+_SCAN_OVERLAP = 512          # longest credential shape, with room to spare
+
+# Refuse, never redact. Everything that is published stays byte-exact (AC5);
+# redaction would make that invariant conditional, and one false positive would
+# silently corrupt a log. A hit blocks exactly one asset and says so in the
+# body — the run's outcome is unchanged (R8).
+SECRET_PATTERNS = (
+    ("gh[pousr]_", re.compile(rb"gh[pousr]_[A-Za-z0-9]{16,}")),
+    ("github_pat_", re.compile(rb"github_pat_[A-Za-z0-9_]{20,}")),
+    ("xox[baprs]-", re.compile(rb"xox[baprs]-[A-Za-z0-9-]{10,}")),
+    ("AKIA", re.compile(rb"AKIA[0-9A-Z]{16}")),
+    ("Bearer", re.compile(rb"[Bb]earer\s+[A-Za-z0-9._~+/=-]{20,}")),
+)
+
+
+def scan_secrets(path):
+    """The shape that matched, or None when the file is clean.
+
+    Reads in chunks with an overlap so a credential straddling a chunk
+    boundary is still caught. A file that cannot be read is reported as unsafe:
+    the scan is the only thing standing between a stage log and a public
+    release asset, and "could not check" is not "clean".
+    """
+    try:
+        with open(path, "rb") as fh:
+            carry = b""
+            while True:
+                chunk = fh.read(SCAN_CHUNK)
+                if not chunk:
+                    return None
+                window = carry + chunk
+                for label, pattern in SECRET_PATTERNS:
+                    if pattern.search(window):
+                        return "credential-shaped string (%s)" % label
+                carry = window[-_SCAN_OVERLAP:]
+    except OSError as exc:
+        return "unreadable, not scanned: %s" % exc

@@ -412,3 +412,48 @@ class TestBodyBudget(PublishTestCase):
             now=factory_fixtures.FIXED_NOW)
         self.assertLessEqual(len(body), factory_publish.BODY_BUDGET)
         self.assertIn('truncated at the', body)
+
+
+class TestSecretScan(PublishTestCase):
+    def scan(self, payload):
+        path = os.path.join(self.tmp, 'BUILD.log')
+        with open(path, 'wb') as fh:
+            fh.write(payload)
+        return factory_publish.scan_secrets(path)
+
+    def test_clean_log_passes(self):
+        self.assertIsNone(self.scan(b'make: nothing to be done\n' * 100))
+
+    def test_github_token_shapes_are_refused(self):
+        """AC6/R8. The repo is public and push protection does not inspect
+        release assets, so this is the only net."""
+        for payload in (b'ghp_' + b'A' * 36, b'gho_' + b'b' * 36,
+                        b'github_pat_' + b'C' * 40):
+            self.assertIsNotNone(self.scan(b'noise\n' + payload + b'\nmore'),
+                                 payload[:12])
+
+    def test_slack_and_aws_shapes_are_refused(self):
+        self.assertIsNotNone(self.scan(b'xoxb-1234567890-abcdefghij'))
+        self.assertIsNotNone(self.scan(b'AKIAIOSFODNN7EXAMPLE'))
+
+    def test_long_bearer_values_are_refused(self):
+        self.assertIsNotNone(
+            self.scan(b'Authorization: Bearer ' + b'x' * 40))
+
+    def test_short_bearer_word_is_not_a_false_positive(self):
+        self.assertIsNone(self.scan(b'the bearer of bad news\n'))
+
+    def test_a_match_split_across_read_chunks_is_still_found(self):
+        """A chunked reader that ignores the boundary has a hole in it."""
+        pad = b'q' * (factory_publish.SCAN_CHUNK - 10)
+        self.assertIsNotNone(self.scan(pad + b'ghp_' + b'D' * 36 + b'\n'))
+
+    def test_unreadable_file_is_treated_as_unsafe(self):
+        reason = factory_publish.scan_secrets(
+            os.path.join(self.tmp, 'does-not-exist.log'))
+        self.assertIsNotNone(reason)
+
+    def test_reason_names_the_shape_not_the_secret(self):
+        reason = self.scan(b'ghp_' + b'A' * 36)
+        self.assertIn('gh[pousr]_', reason)
+        self.assertNotIn('AAAA', reason)
