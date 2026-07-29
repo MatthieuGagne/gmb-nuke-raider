@@ -643,3 +643,120 @@ def ensure_release(warnings, runner=subprocess.run):
     _warn(warnings, "release %r not ensured: %s"
           % (RELEASE_TAG, _tail(proc.stderr)))
     return False
+
+
+_ISSUE_NUMBER = re.compile(r"/issues/(\d+)\s*$")
+
+
+def write_body_file(issue, text, registry=None, name="publish-body.md"):
+    """Stage a body for ``--body-file`` and keep it as the offline copy.
+
+    Never argv: the body carries emoji and a Windows console codepage is not
+    UTF-8. The file lives under the run directory, which this module owns.
+    """
+    directory = os.path.join(factory_run.run_dir(issue, registry),
+                             PUBLISH_DIRNAME)
+    os.makedirs(directory, exist_ok=True)
+    path = os.path.join(directory, name)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+    return path
+
+
+def ensure_run_issue(state, publish, title, body, warnings, registry=None,
+                     runner=subprocess.run):
+    """Create the run issue, or edit the one this run already owns.
+
+    One run issue per **spec** issue, created on the first publish and reused
+    forever after — its number lives in publish.json so it is never recreated
+    (R2). Returns the number, or None when creation failed.
+    """
+    issue = int(state["issue"])
+    path = write_body_file(issue, body, registry)
+    number = publish.get("run_issue")
+    if number:
+        proc = gh(["issue", "edit", str(number), "--title", title,
+                   "--body-file", path], runner=runner)
+        if proc.returncode != 0:
+            _warn(warnings, "run issue #%d not updated: %s"
+                  % (number, _tail(proc.stderr)))
+        return number
+
+    proc = gh(["issue", "create", "--title", title, "--body-file", path,
+               "--label", RUN_LABEL], runner=runner)
+    if proc.returncode != 0:
+        _warn(warnings, "run issue not created: %s" % _tail(proc.stderr))
+        return None
+    match = _ISSUE_NUMBER.search((proc.stdout or "").strip())
+    if not match:
+        _warn(warnings, "run issue number not parseable from: %s"
+              % _tail(proc.stdout))
+        return None
+    publish["run_issue"] = int(match.group(1))
+    publish["run_issue_url"] = (proc.stdout or "").strip().splitlines()[-1]
+    return publish["run_issue"]
+
+
+_STATE_VERB = {True: ("reopen", "reopened"), False: ("close", "closed")}
+
+
+def set_issue_state(number, want_open, warnings, runner=subprocess.run):
+    """Reopen the run issue for a new attempt, close it at terminal (R2)."""
+    verb, past = _STATE_VERB[bool(want_open)]
+    proc = gh(["issue", verb, str(number)], runner=runner)
+    if proc.returncode == 0 or _already(proc, "already open", "already closed"):
+        return True
+    _warn(warnings, "run issue #%d not %s: %s"
+          % (number, past, _tail(proc.stderr)))
+    return False
+
+
+def ensure_project_type_log(publish, issue_url, warnings,
+                            runner=subprocess.run):
+    """Add the run issue to "Nuke Raider — Documents" with Type = Log.
+
+    Once per run, not once per publish: this is four API calls and the Logs
+    view only needs the item to exist. Projects views have no API, so the view
+    itself was built by hand (R13) and this only feeds it.
+    """
+    if publish.get("projected"):
+        return True
+    add = gh(["project", "item-add", str(PROJECT_NUMBER), "--owner",
+              PROJECT_OWNER, "--url", issue_url, "--format", "json"],
+             runner=runner)
+    if add.returncode != 0:
+        _warn(warnings, "run issue not added to the Documents project: %s"
+              % _tail(add.stderr))
+        return False
+    try:
+        item_id = json.loads(add.stdout)["id"]
+    except (ValueError, KeyError, TypeError):
+        _warn(warnings, "project item id not parseable from item-add output")
+        return False
+
+    fields = gh(["project", "field-list", str(PROJECT_NUMBER), "--owner",
+                 PROJECT_OWNER, "--format", "json"], runner=runner)
+    field_id = option_id = None
+    try:
+        for field in json.loads(fields.stdout).get("fields") or []:
+            if field.get("name") != "Type":
+                continue
+            field_id = field.get("id")
+            for option in field.get("options") or []:
+                if option.get("name") == "Log":
+                    option_id = option.get("id")
+    except (ValueError, AttributeError):
+        pass
+    if not field_id or not option_id:
+        _warn(warnings, "project Type=Log not set: no Type field with a Log "
+                        "option in project %d" % PROJECT_NUMBER)
+        return False
+
+    edit = gh(["project", "item-edit", "--id", item_id, "--project-id",
+               PROJECT_ID, "--field-id", field_id,
+               "--single-select-option-id", option_id], runner=runner)
+    if edit.returncode != 0:
+        _warn(warnings, "project Type=Log not set: %s" % _tail(edit.stderr))
+        return False
+    publish["projected"] = True
+    return True

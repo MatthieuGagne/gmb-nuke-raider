@@ -587,3 +587,136 @@ class TestEnsureLabelAndRelease(PublishTestCase):
         argv = fake.argv_for('release create')[0]
         self.assertIn('factory-logs', argv)
         self.assertIn('--latest=false', argv)
+
+
+ISSUE_URL = 'https://github.com/MatthieuGagne/gmb-nuke-raider/issues/481'
+FIELD_LIST = json.dumps({'fields': [
+    {'id': 'F_type', 'name': 'Type',
+     'options': [{'id': 'O_adr', 'name': 'ADR'}, {'id': 'O_log', 'name': 'Log'}]},
+    {'id': 'F_status', 'name': 'Status'}]})
+
+
+class TestRunIssueLifecycle(PublishTestCase):
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_shipped_run(self.tmp)
+        self.state = factory_run.load_state(440, self.reg)
+        self.publish = factory_publish.new_publish_state(440)
+
+    def ensure(self, fake, warnings=None):
+        return factory_publish.ensure_run_issue(
+            self.state, self.publish, 'run 440 · attempt 1 · SHIP · complete',
+            'body text', warnings if warnings is not None else [],
+            registry=self.reg, runner=fake)
+
+    def test_first_publish_creates_a_labelled_issue(self):
+        """AC1."""
+        fake = FakeGh({'issue create': (0, ISSUE_URL + '\n', '')})
+        self.assertEqual(self.ensure(fake), 481)
+        argv = fake.argv_for('issue create')[0]
+        self.assertIn('--label', argv)
+        self.assertIn('log', argv)
+        self.assertEqual(self.publish['run_issue'], 481)
+
+    def test_the_body_goes_through_a_file_never_argv(self):
+        """The body carries emoji; argv encoding on Windows is not utf-8."""
+        fake = FakeGh({'issue create': (0, ISSUE_URL + '\n', '')})
+        self.ensure(fake)
+        argv = fake.argv_for('issue create')[0]
+        self.assertIn('--body-file', argv)
+        path = argv[argv.index('--body-file') + 1]
+        with open(path, encoding='utf-8') as fh:
+            self.assertEqual(fh.read(), 'body text')
+
+    def test_second_publish_edits_the_same_issue(self):
+        """AC1: reused forever after, never recreated."""
+        self.publish['run_issue'] = 481
+        fake = FakeGh()
+        self.assertEqual(self.ensure(fake), 481)
+        self.assertEqual(fake.argv_for('issue create'), [])
+        self.assertIn('481', fake.argv_for('issue edit')[0])
+
+    def test_title_is_re_rendered_on_every_edit(self):
+        """AC2/R3."""
+        self.publish['run_issue'] = 481
+        fake = FakeGh()
+        self.ensure(fake)
+        argv = fake.argv_for('issue edit')[0]
+        self.assertIn('--title', argv)
+        self.assertIn('run 440 · attempt 1 · SHIP · complete', argv)
+
+    def test_create_failure_warns_once_and_returns_none(self):
+        """AC9."""
+        fake = FakeGh({'issue create': (1, '', 'HTTP 502')})
+        warnings = []
+        self.assertIsNone(self.ensure(fake, warnings))
+        self.assertEqual(len(warnings), 1)
+        self.assertIsNone(self.publish['run_issue'])
+
+    def test_edit_failure_warns_once_and_keeps_the_number(self):
+        """AC9: a failed edit never loses the issue we already own."""
+        self.publish['run_issue'] = 481
+        fake = FakeGh({'issue edit': (1, '', 'HTTP 502')})
+        warnings = []
+        self.assertEqual(self.ensure(fake, warnings), 481)
+        self.assertEqual(len(warnings), 1)
+
+    def test_unparseable_create_output_warns(self):
+        fake = FakeGh({'issue create': (0, 'not a url\n', '')})
+        warnings = []
+        self.assertIsNone(self.ensure(fake, warnings))
+        self.assertEqual(len(warnings), 1)
+
+    def test_reopen_and_close_are_idempotent(self):
+        """AC4: a later attempt reopens the same issue."""
+        fake = FakeGh({'issue reopen': (1, '', 'issue is already open')})
+        warnings = []
+        self.assertTrue(factory_publish.set_issue_state(481, True, warnings,
+                                                        runner=fake))
+        self.assertEqual(warnings, [])
+
+
+class TestProjectTypeLog(PublishTestCase):
+    def fake(self, **overrides):
+        results = {'project item-add': (0, json.dumps({'id': 'PVTI_x'}), ''),
+                   'project field-list': (0, FIELD_LIST, ''),
+                   'project item-edit': (0, '', '')}
+        results.update(overrides)
+        return FakeGh(results)
+
+    def test_item_is_added_and_typed_log(self):
+        """AC1."""
+        publish = factory_publish.new_publish_state(440)
+        fake = self.fake()
+        self.assertTrue(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, [], runner=fake))
+        edit = fake.argv_for('project item-edit')[0]
+        self.assertIn('PVTI_x', edit)
+        self.assertIn('F_type', edit)
+        self.assertIn('O_log', edit)
+        self.assertTrue(publish['projected'])
+
+    def test_a_projected_run_is_not_re_added_on_every_publish(self):
+        publish = factory_publish.new_publish_state(440)
+        publish['projected'] = True
+        fake = self.fake()
+        self.assertTrue(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, [], runner=fake))
+        self.assertEqual(fake.calls, [])
+
+    def test_missing_type_option_warns_once(self):
+        """AC9."""
+        fake = self.fake(**{'project field-list': (0, '{"fields": []}', '')})
+        warnings = []
+        publish = factory_publish.new_publish_state(440)
+        self.assertFalse(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, warnings, runner=fake))
+        self.assertEqual(len(warnings), 1)
+
+    def test_item_add_failure_warns_once(self):
+        fake = self.fake(**{'project item-add': (1, '', 'HTTP 403')})
+        warnings = []
+        publish = factory_publish.new_publish_state(440)
+        self.assertFalse(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, warnings, runner=fake))
+        self.assertEqual(len(warnings), 1)
