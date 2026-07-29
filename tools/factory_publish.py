@@ -57,6 +57,7 @@ WARNING_PREFIX = "factory-publish: WARNING: "
 # dashboard exactly when a run is going wrong, so the bound is enforced here
 # rather than discovered from an API error (R5).
 BODY_BUDGET = 60000
+TRUNCATION_MARKER = "\n\n_… truncated at the %d-character budget …_\n" % BODY_BUDGET
 LOG_TAIL_LINES = 100
 LOG_TAIL_BYTES = 64 * 1024
 
@@ -441,11 +442,42 @@ def _render(ctx):
 
 def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
                 budget=BODY_BUDGET):
-    """The whole run issue body. Pure in (state, publish) but for the log tail.
+    """The whole run issue body, bounded at *budget* characters.
 
-    Rendered, measured, then shed until it fits — see ``_shed`` (R5).
+    Render, measure, then shed in a fixed order until it fits, each cut leaving
+    an explicit marker rather than vanishing: the inline log tail, then
+    permission events, then decisions oldest-first. Never shed: the status
+    header, the stage strip, the failure fields, the gate table, the stage-log
+    asset table. A hard truncation is the backstop (R5).
     """
     ctx = {"state": state, "publish": publish, "registry": registry,
            "now": now, "repo": repo, "sections": SECTIONS,
            "shed_tail": False, "shed_permissions": False, "drop_decisions": 0}
-    return _render(ctx)
+
+    def attempt():
+        body = _render(ctx)
+        return body if len(body) <= budget else None
+
+    body = attempt()
+    if body is not None:
+        return body
+
+    ctx["shed_tail"] = True
+    body = attempt()
+    if body is not None:
+        return body
+
+    ctx["shed_permissions"] = True
+    body = attempt()
+    if body is not None:
+        return body
+
+    # Oldest first: the most recent decisions are the ones that explain where
+    # the run is now. Linear because decisions are human-authored and few.
+    for drop in range(1, len(state.get("decisions") or []) + 1):
+        ctx["drop_decisions"] = drop
+        body = attempt()
+        if body is not None:
+            return body
+
+    return _render(ctx)[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER

@@ -330,3 +330,85 @@ class TestWorktreeIsNotLeaked(PublishTestCase):
 
     def test_missing_worktree_renders_a_dash(self):
         self.assertEqual(factory_publish.display_worktree(None, self.tmp), '-')
+
+
+class TestBodyBudget(PublishTestCase):
+    # Few and long, not many and short. append_event() replays the whole
+    # journal and fsyncs twice per call, so an 800-event fixture costs minutes;
+    # what the budget exercises is total body *bulk*, which 50 fat entries
+    # reach just as well as 400 thin ones.
+    FILLER = 3000
+
+    def huge_run(self, decisions=25, permissions=25):
+        reg = os.path.join(self.tmp, 'reg')
+        reset = factory_fixtures.pinned_clock()
+        try:
+            factory_run.append_event(600, 'start', registry=reg, branch='b',
+                                     worktree=self.tmp, stage='BUILD')
+            for i in range(decisions):
+                factory_run.append_event(
+                    600, 'decision', registry=reg,
+                    text='decision %d %s' % (i, 'x' * self.FILLER))
+            for i in range(permissions):
+                factory_run.append_event(
+                    600, 'permission', registry=reg, tool='Bash',
+                    outcome='denied',
+                    command='cmd %d %s' % (i, 'y' * self.FILLER))
+            path = factory_run.log_path(600, 'BUILD', reg)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'wb') as fh:
+                fh.write(b'\n'.join(b'noisy line %d %s' % (i, b'z' * 300)
+                                    for i in range(400)))
+            factory_run.append_event(600, 'failure', registry=reg,
+                                     message='boom')
+        finally:
+            reset()
+        return reg
+
+    def body(self, reg):
+        publish = factory_publish.new_publish_state(600)
+        publish['uploaded'].append('issue-600-attempt-1-BUILD.log')
+        return factory_publish.render_body(
+            factory_run.load_state(600, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def test_body_stays_under_the_budget(self):
+        """AC8."""
+        self.assertLessEqual(len(self.body(self.huge_run())),
+                             factory_publish.BODY_BUDGET)
+
+    def test_never_sheds_the_load_bearing_sections(self):
+        """AC8: header, strip, failure fields, gate table, stage-log table."""
+        body = self.body(self.huge_run())
+        self.assertIn('**Spec** #600', body)
+        self.assertIn('❌ BUILD', body)     # the strip, not shed
+        self.assertIn('### Failure', body)
+        self.assertIn('- **Stage** BUILD', body)
+        self.assertIn('### Gate results', body)
+        self.assertIn('### Stage logs', body)
+        self.assertIn('issue-600-attempt-1-BUILD.log', body)
+
+    def test_sheds_in_the_documented_order_with_markers(self):
+        """AC8: each cut leaves a marker rather than vanishing."""
+        body = self.body(self.huge_run())
+        self.assertIn('tail omitted — full log:', body)
+        self.assertIn('events omitted — see the local registry', body)
+        self.assertIn('earlier decisions omitted', body)
+
+    def test_tail_survives_when_the_body_fits(self):
+        reg = self.huge_run(decisions=1, permissions=1)
+        body = self.body(reg)
+        self.assertIn('<details>', body)
+        self.assertNotIn('tail omitted', body)
+
+    def test_hard_truncation_is_the_backstop(self):
+        """AC8: a body that will not fit even fully shed is cut, and says so."""
+        reg = self.huge_run(decisions=0, permissions=0)
+        publish = factory_publish.new_publish_state(600)
+        for i in range(4000):
+            publish['uploaded'].append('issue-600-attempt-%d-BUILD.log' % i)
+        body = factory_publish.render_body(
+            factory_run.load_state(600, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertLessEqual(len(body), factory_publish.BODY_BUDGET)
+        self.assertIn('truncated at the', body)
