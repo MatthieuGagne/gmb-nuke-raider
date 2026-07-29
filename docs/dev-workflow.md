@@ -451,7 +451,7 @@ worktree, so a run stays explainable after its worktree is deleted.
 |------|------|
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** (ADR 0005): tees stage command output into `logs/<STAGE>.log`. |
-| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** (ADR 0006): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
+| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 0006 (#475)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
 | `tools/factory_status.py` | Read-only terminal dashboard (`--json`). Writes nothing at all. |
 | `tools/factory_report.py` | Deterministic PR body from state + journal. Writes nothing in the registry. |
 | `tools/factory_permission_hook.py` | `Notification` hook: records a run blocked on a permission prompt. |
@@ -570,7 +570,9 @@ explicitly, as in the `pwsh -NoProfile -Command` example above.
 ### Publishing to GitHub
 
 A run's durable, shareable rendering is a **run issue** on GitHub, written only by
-`tools/factory_publish.py`. One run issue per **spec** issue — created on the first publish,
+`tools/factory_publish.py`
+([ADR 0006 (#475)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)).
+One run issue per **spec** issue — created on the first publish,
 reused forever after, reopened when a later attempt starts, closed at terminal. Its number
 lives in `publish.json`, so it is never recreated. It carries the `log` label and sits in the
 "Nuke Raider — Documents" project with **Type = Log**, which is what the

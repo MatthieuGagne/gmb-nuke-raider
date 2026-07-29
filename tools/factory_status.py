@@ -2,7 +2,7 @@
 """Factory run dashboard: one row per run in the registry.
 
 Read-only, and now it writes nothing at all. The durable, shareable rendering
-of a run is its GitHub run issue (ADR 0006, #472); this is the zero-latency
+of a run is its GitHub run issue — ADR 0006 (#475); this is the zero-latency
 offline check beside it — a terminal table and ``--json``, costing no network
 round trip. Two renderings of one state drift, so there is only one.
 

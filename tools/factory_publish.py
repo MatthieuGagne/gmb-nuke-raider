@@ -5,8 +5,8 @@ Sole writer of the GitHub surfaces — the run issue, the release assets, and th
 spec-issue comment. ``factory_run`` stays the sole writer of run state and the
 journal; ``factory_log`` stays the sole writer of ``logs/``. This module's own
 durable memory is ``runs/issue-<N>/publish.json``, which nothing else writes:
-the same narrowing ADR 0005 applied to the log subtree, extended to a third
-owner (ADR 0006, #472).
+the same narrowing ADR 0005 (#470) applied to the log subtree, extended to a
+third owner — ADR 0006 (#475), filed by #472.
 
 Publication is an explicit call, never a side effect of ``append_event()``. A
 GitHub outage must not be able to stall a stage or slow the journal's hot path,
