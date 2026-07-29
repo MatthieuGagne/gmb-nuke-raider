@@ -196,3 +196,172 @@ def render_title(state, now=None):
     return "run %d · attempt %d · %s · %s" % (
         int(state["issue"]), int(state.get("attempt") or 1),
         state.get("stage") or "-", run_condition(state, now))
+
+
+# ── Body ─────────────────────────────────────────────────────────────────────
+
+def _cell(value):
+    """One table cell: None becomes a dash, pipes are escaped."""
+    if value is None or value == "":
+        return "-"
+    return str(value).replace("|", r"\|")
+
+
+def _table(headers, rows):
+    out = ["| %s |" % " | ".join(headers),
+           "|%s|" % "|".join("---" for _ in headers)]
+    out += ["| %s |" % " | ".join(_cell(c) for c in row) for row in rows]
+    return out
+
+
+def stage_strip(state, now=None):
+    """``✅ GATE → 🔵 BUILD → ⬜ SHIP``, generated from factory_run.STAGES.
+
+    Never a hardcoded list of five: PRD-11 (#471) inserts REVIEW between VERIFY
+    and SHIP and it must appear here with no edit to this module (R4).
+    """
+    stages = list(factory_run.STAGES)
+    condition = run_condition(state, now)
+    current = state.get("stage")
+    index = stages.index(current) if current in stages else -1
+    glyphs = []
+    for i, stage in enumerate(stages):
+        if condition == "complete":
+            glyph = GLYPH_DONE
+        elif index < 0 or i > index:
+            glyph = GLYPH_PENDING
+        elif i < index:
+            glyph = GLYPH_DONE
+        else:
+            glyph = GLYPH_FAILED if condition == "failed" else GLYPH_CURRENT
+        glyphs.append("%s %s" % (glyph, stage))
+    return " → ".join(glyphs)
+
+
+def _section_gates(ctx):
+    gates = factory_run.ordered_gates(ctx["state"])
+    if not gates:
+        return ["_No gates recorded._"]
+    return _table(("Stage", "Gate", "Result"),
+                  [(g.get("stage"), g.get("gate"), g.get("result"))
+                   for g in gates])
+
+
+def _section_decisions(ctx):
+    decisions = ctx["state"].get("decisions") or []
+    dropped = ctx["drop_decisions"]
+    kept = decisions[dropped:] if dropped else decisions
+    if not kept and not dropped:
+        return None
+    out = []
+    if dropped:
+        out.append("_%d earlier decisions omitted_" % dropped)
+        out.append("")
+    out += ["- %s" % (d.get("text") or "-") for d in kept]
+    return out
+
+
+def _section_scenarios(ctx):
+    scenarios = ctx["state"].get("scenarios") or []
+    shots = [n for n in ctx["publish"].get("uploaded") or []
+             if n.endswith(".png")]
+    if not scenarios and not shots:
+        return None
+    out = []
+    if scenarios:
+        out += _table(("Scenario", "Blocking", "Result"),
+                      [(s.get("scenario"), s.get("blocking"), s.get("result"))
+                       for s in scenarios])
+    for name in shots:
+        if out:
+            out.append("")
+        out.append("![%s](%s)" % (name, asset_url(name, ctx["repo"])))
+    return out
+
+
+def _section_stage_logs(ctx):
+    rows = []
+    for name in sorted(ctx["publish"].get("uploaded") or []):
+        parsed = _parse_log_asset(name)
+        if parsed is None:
+            continue
+        attempt, stage = parsed
+        rows.append((stage, attempt,
+                     "[%s](%s)" % (name, asset_url(name, ctx["repo"]))))
+    for name, reason in sorted((ctx["publish"].get("withheld") or {}).items()):
+        parsed = _parse_log_asset(name)
+        if parsed is None:
+            continue
+        attempt, stage = parsed
+        rows.append((stage, attempt, "withheld — %s" % reason))
+    if not rows:
+        return ["_No stage logs published yet._"]
+    rows.sort(key=lambda r: (_stage_rank(r[0]), r[1]))
+    return _table(("Stage", "Attempt", "Log"), rows)
+
+
+def _section_permissions(ctx):
+    if ctx["shed_permissions"]:
+        count = len(ctx["state"].get("permissions") or [])
+        return ["_%d events omitted — see the local registry_" % count] \
+            if count else None
+    perms = ctx["state"].get("permissions") or []
+    if not perms:
+        return None
+    return _table(("Tool", "Outcome", "Command"),
+                  [(p.get("tool"), p.get("outcome"), p.get("command"))
+                   for p in perms])
+
+
+# Order is fixed and the list is data, not inlined markup: PRD-11 adds its
+# "Review findings" section by appending one entry here (R4).
+SECTIONS = (
+    ("Gate results", _section_gates),
+    ("Decisions made", _section_decisions),
+    ("Scenario evidence", _section_scenarios),
+    ("Stage logs", _section_stage_logs),
+    ("Permission events", _section_permissions),
+)
+
+_LOG_ASSET = re.compile(r"^issue-\d+-attempt-(\d+)-(.+)\.log$")
+
+
+def _parse_log_asset(name):
+    """(attempt, stage) for a log asset name, or None."""
+    match = _LOG_ASSET.match(name)
+    if not match:
+        return None
+    return int(match.group(1)), match.group(2)
+
+
+def _stage_rank(stage):
+    stages = list(factory_run.STAGES)
+    return stages.index(stage) if stage in stages else len(stages)
+
+
+def _render(ctx):
+    state = ctx["state"]
+    out = ["**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
+           % (int(state["issue"]), state.get("branch") or "-",
+              int(state.get("attempt") or 1), state.get("updated") or "-"),
+           "",
+           stage_strip(state, ctx["now"])]
+    for title, render in ctx["sections"]:
+        lines = render(ctx)
+        if lines is None:
+            continue
+        out += ["", "### %s" % title, ""] + lines
+    out += ["", BODY_MARKER]
+    return "\n".join(out) + "\n"
+
+
+def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
+                budget=BODY_BUDGET):
+    """The whole run issue body. Pure in (state, publish) but for the log tail.
+
+    Rendered, measured, then shed until it fits — see ``_shed`` (R5).
+    """
+    ctx = {"state": state, "publish": publish, "registry": registry,
+           "now": now, "repo": repo, "sections": SECTIONS,
+           "shed_tail": False, "shed_permissions": False, "drop_decisions": 0}
+    return _render(ctx)

@@ -151,3 +151,98 @@ class TestRenderTitle(PublishTestCase):
         self.assertEqual(factory_publish.render_title(state,
                                                       now=factory_fixtures.FIXED_NOW),
                          'run 500 · attempt 1 · - · active')
+
+
+class TestRenderBody(PublishTestCase):
+    def body(self, issue, reg, publish=None):
+        state = factory_run.load_state(issue, reg)
+        publish = publish or factory_publish.new_publish_state(issue)
+        return factory_publish.render_body(state, publish, registry=reg,
+                                           now=factory_fixtures.FIXED_NOW)
+
+    def shipped(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['uploaded'].append('issue-440-attempt-1-BUILD.log')
+        return self.body(440, reg, publish)
+
+    def test_matches_the_golden_byte_for_byte(self):
+        """AC10."""
+        self.assertEqual(self.shipped(), golden('expected_run_issue_body.md'))
+
+    def test_body_is_stable_across_repeated_renders(self):
+        """AC10: pure function of run state.
+
+        The registry is built once on purpose: build_shipped_run() appends its
+        whole event sequence, so calling it twice into one tmpdir would double
+        every gate and decision and test the fixture, not the renderer.
+        """
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['uploaded'].append('issue-440-attempt-1-BUILD.log')
+        self.assertEqual(self.body(440, reg, publish),
+                         self.body(440, reg, publish))
+
+    def test_body_ends_with_exactly_one_newline(self):
+        body = self.shipped()
+        self.assertTrue(body.endswith('\n'))
+        self.assertFalse(body.endswith('\n\n'))
+
+    def test_strip_is_generated_from_factory_run_stages(self):
+        """R4: a sixth stage (PRD-11's REVIEW) appears with no edit here."""
+        original = factory_run.STAGES
+        try:
+            factory_run.STAGES = original[:4] + ('REVIEW',) + original[4:]
+            reg = factory_fixtures.build_shipped_run(self.tmp)
+            self.assertIn('REVIEW', self.body(440, reg))
+        finally:
+            factory_run.STAGES = original
+
+    def test_current_stage_is_marked_and_later_stages_are_pending(self):
+        reg = factory_fixtures.build_registry(self.tmp)
+        strip = self.body(436, reg).splitlines()[2]
+        self.assertEqual(strip, '✅ GATE → ✅ PLAN → ✅ BUILD → 🔵 VERIFY → ⬜ SHIP')
+
+    def test_permission_events_are_rendered(self):
+        reg = factory_fixtures.build_registry(self.tmp)
+        body = self.body(436, reg)
+        self.assertIn('### Permission events', body)
+        self.assertIn('| Bash | denied |', body)
+
+    def test_empty_sections_are_omitted_but_gates_and_logs_are_not(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'start', registry=reg, branch='b',
+                                 stage='GATE')
+        body = self.body(500, reg)
+        self.assertNotIn('### Decisions made', body)
+        self.assertNotIn('### Permission events', body)
+        self.assertIn('### Gate results', body)
+        self.assertIn('### Stage logs', body)
+
+    def test_withheld_asset_is_named_in_the_stage_logs_table(self):
+        """AC6."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['withheld']['issue-440-attempt-1-BUILD.log'] = (
+            'credential-shaped string (gh[pousr]_)')
+        body = self.body(440, reg, publish)
+        self.assertIn('withheld', body)
+        self.assertIn('credential-shaped string', body)
+
+    def test_screenshots_render_inline_from_uploaded_assets(self):
+        """AC7."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['uploaded'].append('issue-440-attempt-1-reach-race-failure.png')
+        body = self.body(440, reg, publish)
+        self.assertIn('![issue-440-attempt-1-reach-race-failure.png](https://',
+                      body)
+
+    def test_body_carries_the_machine_owned_marker(self):
+        self.assertIn(factory_publish.BODY_MARKER, self.shipped())
+
+    def test_pipes_in_run_data_do_not_break_the_tables(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'gate', registry=reg, stage='BUILD',
+                                 gate='make test | tee out', result='pass')
+        self.assertIn(r'make test \| tee out', self.body(500, reg))
