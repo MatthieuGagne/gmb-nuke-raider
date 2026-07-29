@@ -432,10 +432,11 @@ worktree, so a run stays explainable after its worktree is deleted.
 
 ```
 .factory/
-  status.html                       # dashboard, regenerated on every event
   runs/issue-<N>/
     journal.jsonl                   # append-only; the source of truth
     state.json                      # cached projection of the journal
+    publish.json                    # what has been published to GitHub (#472)
+    publish/                        # staged assets under their published names
     logs/<STAGE>.log                # stage logs, appended by factory_log (#450)
     autopsy/attempt-<k>/            # evidence copied out of a failed attempt
 ```
@@ -450,7 +451,8 @@ worktree, so a run stays explainable after its worktree is deleted.
 |------|------|
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** (ADR 0005): tees stage command output into `logs/<STAGE>.log`. |
-| `tools/factory_status.py` | Read-only dashboard, terminal + HTML. Writes only the rendered page. |
+| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** (ADR 0006): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
+| `tools/factory_status.py` | Read-only terminal dashboard (`--json`). Writes nothing at all. |
 | `tools/factory_report.py` | Deterministic PR body from state + journal. Writes nothing in the registry. |
 | `tools/factory_permission_hook.py` | `Notification` hook: records a run blocked on a permission prompt. |
 | `tools/deny_gate_hook.py` | Appends a `permission` event at the moment it refuses. |
@@ -549,11 +551,13 @@ it returns 127 and never reports success.
 ```sh
 python tools/factory_status.py                          # terminal dashboard
 python tools/factory_status.py --json                   # machine-readable
-python tools/factory_status.py --html                   # write .factory/status.html
 python tools/factory_report.py --issue 436              # PR body to stdout
 python tools/factory_report.py --issue 436 --out body.md
 python tools/factory_log.py --stage BUILD --issue 450 -- make clean
 python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Command "make clean; make"
+python tools/factory_publish.py --issue 437 --stage-completed BUILD
+python tools/factory_publish.py --issue 437 --terminal
+python tools/factory_publish.py --issue 437 --dry-run
 ```
 
 `factory_status` and `factory_report` exit `0` whenever they render and `2` on operational
@@ -563,11 +567,59 @@ the command cannot be spawned, and `2` on misuse (unknown `--stage`, bad `--now`
 after `--`). Commands are argv lists — never `shell=True`; a compound command names its shell
 explicitly, as in the `pwsh -NoProfile -Command` example above.
 
-The HTML page is self-contained: inline CSS, screenshots embedded as base64 data URIs, so it
-opens from disk with no server and survives worktree deletion. Freshness comes from the
-writer: `append_event()` re-renders the page (fail-open) on every event, which is what makes
-its 30-second meta-refresh honest without a watcher process. Embedding is capped at three
-checkpoints plus every failure frame per run, and the page states what it dropped.
+### Publishing to GitHub
+
+A run's durable, shareable rendering is a **run issue** on GitHub, written only by
+`tools/factory_publish.py`. One run issue per **spec** issue — created on the first publish,
+reused forever after, reopened when a later attempt starts, closed at terminal. Its number
+lives in `publish.json`, so it is never recreated. It carries the `log` label and sits in the
+"Nuke Raider — Documents" project with **Type = Log**, which is what the
+[Logs view](https://github.com/users/MatthieuGagne/projects/3/views/4) filters on (sorted by
+*Updated*, not *Created*: a run issue is long-lived, so most-recently-active first is what a
+dashboard wants).
+
+The title is the dashboard — in an issue list it is the only column there is:
+
+```
+run 437 · attempt 2 · BUILD · active
+```
+
+`<condition>` is `factory_status.condition()` verbatim; there is one definition of the five
+conditions, not two.
+
+**Cadence.** Publication is an explicit call, never a side effect of `append_event()`. The
+orchestrator calls it at stage transitions, gate results and terminal events — roughly 15-25
+edits per run. `factory_run` performs no network I/O at all: a GitHub outage must never stall a
+stage or slow the journal's hot path, so the published copy is **allowed to lag** and the local
+registry stays the authority.
+
+**Assets.** Stage logs publish as per-attempt assets on a rolling `factory-logs` release, named
+`issue-<N>-attempt-<k>-<stage>.log` and never clobbered. Each is a verbatim whole-file copy of
+`logs/<stage>.log` as it stood at upload time — the publisher copies bytes and never reads log
+content, so #450's no-parsing boundary is untouched. Because local logs are append-only across
+attempts, attempt *k*'s asset is a superset of attempt *k−1*'s; that redundancy buys an
+immutable per-attempt history and is an accepted cost. Screenshots publish uncapped as
+`issue-<N>-attempt-<k>-<scenario>-<frame>.png` and render inline in the body.
+
+**The withheld case.** Before upload every log is matched against a short denylist of credential
+shapes (`gh[pousr]_`, `github_pat_`, `xox[baprs]-`, `AKIA…`, long `Bearer` values). A hit
+**blocks that one asset** and the body's Stage logs row says so, naming the local path.
+Everything published stays byte-exact: redaction would make that invariant conditional and one
+false positive would silently corrupt a log. This is the only net there is — the repo is public
+and GitHub's push protection does not inspect release assets.
+
+**Bounds.** The body is rendered, measured and shed until it fits under 60,000 characters
+(GitHub's cap is ~65k): first the inline log tail, then permission events, then decisions
+oldest-first, each cut leaving an explicit marker. The status header, stage strip, failure
+fields, gate table and stage-log table are never shed. A body edit rejected for length would
+freeze the dashboard exactly when a run is going wrong, so the bound is enforced by the renderer
+rather than discovered from an API error.
+
+**Fail-open, end to end.** No publication failure — issue create/edit, asset upload, label,
+project, comment — changes a run's outcome. Each degradation emits exactly one
+`factory-publish: WARNING:` line on stderr and is reported in the body where the body is still
+writable. The tool exits `1` when it published with degradation; **the orchestrator must not
+treat that as a run failure.**
 
 ### Permission events
 
@@ -590,5 +642,8 @@ recorded, and a run with none renders as normal, not broken.
 
 ### Retention
 
-None. `.factory/` grows without bound from screenshots, traces, and stage logs until deleted
-by hand — a flapping stage grows one log file without limit. Accepted cost for a solo project.
+None. `.factory/` grows without bound from screenshots, traces, stage logs and staged assets
+until deleted by hand, and GitHub release assets grow with it — one flapping spec accumulates
+per-attempt assets indefinitely. Deleting old assets is always safe because the local registry
+is the source of truth (#450 R5), but no automatic policy is specified. Accepted cost for a solo
+project.

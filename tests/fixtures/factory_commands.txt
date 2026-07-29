@@ -48,6 +48,22 @@ Bash: gh pr create --title Title --body-file body.md
 Bash: gh pr list --state open
 Bash: gh run list --limit 5
 
+# --- run publication (#472) ---
+Bash: gh label create log --color 5319E7
+Bash: gh release view factory-logs
+Bash: gh release create factory-logs --title Title --notes Notes
+Bash: gh release upload factory-logs asset.log
+Bash: gh issue create --title Title --body-file body.md --label log
+Bash: gh issue edit 481 --title Title --body-file body.md
+Bash: gh issue reopen 481
+Bash: gh issue close 481
+Bash: gh issue comment 437 --body-file body.md
+Bash: gh project item-add 3 --owner MatthieuGagne --url URL
+Bash: gh project field-list 3 --owner MatthieuGagne --format json
+Bash: gh project item-edit --id ID --project-id ID --field-id ID
+Bash: python tools/factory_publish.py --issue 437 --stage-completed BUILD
+PowerShell: python tools/factory_publish.py --issue 437 --terminal
+
 # --- commits and push (routed through PowerShell per #437 R8) ---
 PowerShell: git add -A
 PowerShell: git commit -m message
