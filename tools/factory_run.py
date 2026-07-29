@@ -158,6 +158,7 @@ def new_state(issue):
         "branch": None,
         "worktree": None,
         "plan": None,
+        "pr": None,
         "attempt": 1,
         "stage": None,
         "gates": [],
@@ -198,7 +199,7 @@ def apply_event(state, event):
         state["attempt"] = event["attempt"]
 
     if kind == "start":
-        for field in ("slug", "branch", "worktree", "plan"):
+        for field in ("slug", "branch", "worktree", "plan", "pr"):
             if event.get(field) is not None:
                 state[field] = event[field]
         if event.get("stage"):
@@ -213,7 +214,8 @@ def apply_event(state, event):
         state["decisions"].append({"text": event.get("text"), "ts": ts})
     elif kind == "scenario":
         state["scenarios"].append({"scenario": event.get("scenario"),
-                                   "result": event.get("result"), "ts": ts})
+                                   "result": event.get("result"),
+                                   "blocking": event.get("blocking"), "ts": ts})
     elif kind == "permission":
         state["permissions"].append({"tool": event.get("tool"),
                                      "command": event.get("command"),
@@ -312,32 +314,19 @@ def ordered_gates(state):
         key=lambda pair: (rank.get(pair[1].get("stage"), len(rank)), pair[0]))]
 
 
-def _render_page(registry):
-    """Regenerate .factory/status.html. Fail-open: never raises.
-
-    Imported lazily because factory_status imports this module: the writer
-    re-rendering the page is what makes the meta-refresh honest without a
-    watcher process, and a rendering bug must never kill a run.
-    """
-    try:
-        tools_dir = os.path.dirname(os.path.abspath(__file__))
-        sys.path.insert(0, tools_dir)
-        try:
-            import factory_status
-        finally:
-            if tools_dir in sys.path:
-                sys.path.remove(tools_dir)
-        factory_status.write_html(registry=registry)
-    except Exception:
-        pass
-
-
-def append_event(issue, kind, registry=None, render=True, **fields):
+def append_event(issue, kind, registry=None, **fields):
     """Append one event, then re-save the projection. Returns the event.
 
     Journal first, state second — see ADR 0003. Fields whose value is None are
-    dropped so the journal stays readable.
+    dropped so the journal stays readable. This function performs no rendering
+    and no network I/O: publication to GitHub is an explicit call into
+    factory_publish, never a side effect of the writer (#472 R6).
     """
+    if "render" in fields:
+        # Explicit, because **fields would otherwise swallow a stale render=
+        # and write it into the journal as if it were run data.
+        raise TypeError("append_event() got an unexpected keyword argument "
+                        "'render' (#472 R14)")
     if kind not in EVENT_KINDS:
         raise ValueError("unknown event kind: %r (expected one of %s)"
                          % (kind, ", ".join(EVENT_KINDS)))
@@ -364,8 +353,6 @@ def append_event(issue, kind, registry=None, render=True, **fields):
 
     apply_event(state, event)
     save_state(state, registry)
-    if render:
-        _render_page(registry)
     return event
 
 

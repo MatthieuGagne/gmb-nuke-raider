@@ -1,8 +1,6 @@
 """Tests for tools/factory_status.py"""
-import base64
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -87,12 +85,12 @@ class TestConditions(StatusTestCase):
     def test_failure_outranks_a_missing_worktree(self):
         """A terminal run legitimately outlives its worktree."""
         factory_run.append_event(999, 'failure', registry=self.reg,
-                                 render=False, message='boom')
+                                 message='boom')
         self.assertEqual(self.rows()[999]['condition'], 'failed')
 
     def test_finish_renders_complete(self):
         factory_run.append_event(436, 'finish', registry=self.reg,
-                                 render=False, result='shipped')
+                                 result='shipped')
         self.assertEqual(self.rows()[436]['condition'], 'complete')
 
 
@@ -159,7 +157,7 @@ class TestCli(StatusTestCase):
     def test_exits_zero_even_when_every_run_is_unhealthy(self):
         """R3: exit 1 must never come from run content."""
         factory_run.append_event(436, 'failure', registry=self.reg,
-                                 render=False, message='boom')
+                                 message='boom')
         code, _, _ = self.run_cli('--registry', self.reg, '--now', NOW.isoformat())
         self.assertEqual(code, 0)
 
@@ -223,130 +221,21 @@ class TestScreenshotSelection(StatusTestCase):
         self.assertEqual((paths, source), ([], 'none'))
 
 
-class TestRenderHtml(StatusTestCase):
-    def page(self, **kw):
-        return factory_status.render_html(
-            factory_status.collect(self.reg, now=NOW), self.reg, NOW, **kw)
+class TestHtmlIsGone(StatusTestCase):
+    def test_no_html_symbols_remain(self):
+        """#472 R14: one state, one rendering."""
+        for name in ('render_html', 'write_html', '_run_html', '_stage_strip',
+                     '_embed', '_CSS', 'MAX_IMAGE_BYTES', 'REFRESH_SECONDS'):
+            self.assertFalse(hasattr(factory_status, name), name)
 
-    def test_page_is_a_complete_standalone_document(self):
-        """AC7: opens locally with no server."""
-        html = self.page()
-        self.assertTrue(html.startswith('<!doctype html>'))
-        self.assertIn('</html>', html)
-        self.assertIn('http-equiv="refresh"', html)
-        self.assertNotIn('<script src=', html)
-        self.assertNotIn('<link rel="stylesheet"', html)
-        self.assertNotIn('http://', html)
+    def test_html_flag_is_rejected(self):
+        proc = subprocess.run([sys.executable, SCRIPT, '--registry', self.reg,
+                               '--html'], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 2)
 
-    def test_stage_strip_marks_done_current_and_pending(self):
-        html = self.page()
-        for stage in factory_run.STAGES:
-            self.assertIn('>%s<' % stage, html)
-        self.assertIn('stg current', html)
-        self.assertIn('stg done', html)
-
-    def test_gate_table_and_decisions_are_present(self):
-        html = self.page()
-        self.assertIn('make test-tools', html)
-        self.assertIn('Journal is the source of truth', html)
-
-    def test_permission_events_appear(self):
-        """AC6, HTML half."""
-        html = self.page()
-        self.assertIn('git push --force origin worktree-obs-436', html)
-        self.assertIn('denied', html)
-
-    def test_condition_badges_are_rendered_per_run(self):
-        html = self.page()
-        for css in ('b-active', 'b-idle', 'b-stale'):
-            self.assertIn(css, html)
-
-    def test_screenshots_are_embedded_as_data_uris(self):
-        self.assertIn('data:image/png;base64,', self.page())
-
-    def test_embedded_payload_is_a_decodable_png(self):
-        """A well-formed data URI is not evidence that anything renders.
-
-        The fixtures once wrote a bare PNG signature plus filler: the page
-        embedded it correctly and every browser drew a broken-image icon,
-        which the data-URI assertion above happily passed.
-        """
-        uris = re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)',
-                          self.page())
-        self.assertTrue(uris)
-        for uri in uris:
-            raw = base64.b64decode(uri)
-            self.assertEqual(raw[:8], b'\x89PNG\r\n\x1a\n')
-            self.assertIn(b'IHDR', raw)
-            self.assertIn(b'IEND', raw)
-
-    def test_page_states_when_images_were_capped(self):
-        """AC7: the page must admit what it dropped."""
-        html = self.page(limit=2)
-        self.assertIn('Showing 3 of 5 screenshots', html)
-
-    def test_no_note_when_nothing_was_dropped(self):
-        html = self.page(limit=10)
-        self.assertNotIn('screenshots (capped', html)
-
-    def test_run_with_no_images_says_so(self):
-        self.assertIn('No screenshots', self.page())
-
-    def test_markup_in_run_data_is_escaped(self):
-        factory_run.append_event(437, 'decision', registry=self.reg,
-                                 render=False, text='<script>alert(1)</script>')
-        self.assertNotIn('<script>alert(1)</script>', self.page())
-        self.assertIn('&lt;script&gt;', self.page())
-
-    def test_empty_registry_renders_a_page_not_a_crash(self):
-        html = factory_status.render_html([], os.path.join(self.tmp, 'none'),
-                                          NOW)
-        self.assertIn('No factory runs', html)
-
-
-class TestWriteHtml(StatusTestCase):
-    def test_writes_to_the_registry_root_by_default(self):
-        path = factory_status.write_html(registry=self.reg, now=NOW)
-        self.assertEqual(path, os.path.join(self.reg, 'status.html'))
-        self.assertTrue(os.path.exists(path))
-        self.assertFalse(os.path.exists(path + '.tmp'))
-
-    def test_writes_no_state_or_journal(self):
-        before = _snapshot(os.path.join(self.reg, 'runs'))
-        factory_status.write_html(registry=self.reg, now=NOW)
-        self.assertEqual(_snapshot(os.path.join(self.reg, 'runs')), before)
-
-    def test_append_event_regenerates_the_page(self):
-        """R8: the writer refreshes the page, so no watcher is needed."""
-        page = os.path.join(self.reg, 'status.html')
-        if os.path.exists(page):
-            os.remove(page)
-        factory_run.set_clock(lambda: NOW)
+    def test_nothing_writes_status_html(self):
         factory_run.append_event(436, 'stage', registry=self.reg, stage='SHIP')
-        self.assertTrue(os.path.exists(page))
-        with open(page, encoding='utf-8') as fh:
-            self.assertIn('SHIP', fh.read())
-
-    def test_a_rendering_error_never_kills_a_run(self):
-        """R8: fail-open. The event must still be journalled."""
-        original = factory_status.render_html
-        factory_status.render_html = lambda *a, **k: 1 / 0
-        try:
-            factory_run.set_clock(lambda: NOW)
-            factory_run.append_event(436, 'stage', registry=self.reg,
-                                     stage='SHIP')
-        finally:
-            factory_status.render_html = original
-        self.assertEqual(factory_run.load_state(436, self.reg)['stage'], 'SHIP')
-
-
-class TestHtmlCli(StatusTestCase):
-    def test_html_mode_writes_and_prints_the_path(self):
-        proc = subprocess.run(
-            [sys.executable, SCRIPT, '--registry', self.reg, '--html',
-             '--now', NOW.isoformat()], capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0)
-        self.assertTrue(os.path.exists(proc.stdout.strip()))
+        self.assertFalse(os.path.exists(os.path.join(self.reg, 'status.html')))
 
 
 def _snapshot(root):
