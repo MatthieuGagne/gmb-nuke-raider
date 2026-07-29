@@ -852,3 +852,171 @@ def publish_screenshots(state, publish, warnings, registry=None,
         if upload_asset(dest, name, publish, warnings, runner=runner):
             published.append(name)
     return published
+
+
+# ── Orchestration ────────────────────────────────────────────────────────────
+
+def _outcome(state):
+    if state.get("failure"):
+        return "failed"
+    if state.get("finished"):
+        return str((state["finished"] or {}).get("result") or "finished")
+    return "ended"
+
+
+def comment_once(state, publish, run_issue, warnings, registry=None,
+                 runner=subprocess.run):
+    """Exactly one spec-issue comment per attempt, at terminal (R10).
+
+    Editing a body notifies nobody, so a comment is the only completion signal;
+    one per attempt is the whole notification budget. The first publish
+    mentioning ``#<N>`` cross-references the spec's timeline for free, so there
+    is no start-of-run comment.
+    """
+    issue = int(state["issue"])
+    attempt = int(state.get("attempt") or 1)
+    if attempt in (publish.get("commented_attempts") or []):
+        return False
+
+    lines = ["Factory attempt %d **%s**." % (attempt, _outcome(state))]
+    if run_issue:
+        lines.append("")
+        lines.append("Run dashboard: #%d" % run_issue)
+    if state.get("pr"):
+        lines.append("Pull request: %s" % state["pr"])
+    if state.get("failure"):
+        lines.append("")
+        lines.append("Failed in %s: %s" % (
+            state.get("stage") or "-",
+            (state["failure"] or {}).get("message") or "-"))
+    body = "\n".join(lines) + "\n"
+
+    path = write_body_file(issue, body, registry, name="publish-comment.md")
+    proc = gh(["issue", "comment", str(issue), "--body-file", path],
+              runner=runner)
+    if proc.returncode != 0:
+        _warn(warnings, "spec issue comment not posted: %s"
+              % _tail(proc.stderr))
+        return False
+    publish.setdefault("commented_attempts", []).append(attempt)
+    return True
+
+
+def publish_run(issue, registry=None, stage_completed=None, terminal=False,
+                runner=subprocess.run, now=None):
+    """Re-render this run's GitHub surfaces. Never raises (R11).
+
+    Called explicitly by the orchestrator at stage transitions, gate results
+    and terminal events — roughly 15-25 edits per run. The local registry stays
+    the authority and the published copy is allowed to lag (R6).
+    """
+    registry = registry or factory_run.registry_root()
+    state = factory_run.load_state(issue, registry)
+    if state is None:
+        raise LookupError("no registry entry for issue #%d under %s"
+                          % (int(issue), registry))
+    publish = load_publish_state(issue, registry)
+    warnings = []
+
+    ensure_label(warnings, runner=runner)
+    ensure_release(warnings, runner=runner)
+
+    if stage_completed:
+        publish_stage_log(state, publish, stage_completed, warnings,
+                          registry=registry, runner=runner)
+    if terminal and state.get("stage"):
+        publish_stage_log(state, publish, state["stage"], warnings,
+                          registry=registry, runner=runner)
+    publish_screenshots(state, publish, warnings, registry=registry,
+                        runner=runner)
+
+    known = publish.get("run_issue")
+    if known and not terminal:
+        set_issue_state(known, True, warnings, runner=runner)
+
+    title = render_title(state, now)
+    body = render_body(state, publish, registry=registry, now=now)
+    number = ensure_run_issue(state, publish, title, body, warnings,
+                              registry=registry, runner=runner)
+
+    if number:
+        url = publish.get("run_issue_url") or \
+            "https://github.com/%s/issues/%d" % (DEFAULT_REPO, number)
+        ensure_project_type_log(publish, url, warnings, runner=runner)
+    if terminal:
+        if number:
+            set_issue_state(number, False, warnings, runner=runner)
+        comment_once(state, publish, number, warnings, registry=registry,
+                     runner=runner)
+
+    try:
+        save_publish_state(publish, registry)
+    except OSError as exc:
+        _warn(warnings, "publish state not saved: %s" % exc)
+    return PublishResult(number, warnings, list(publish.get("uploaded") or []))
+
+
+def exit_code(result):
+    """0 when clean, 1 when degraded. The orchestrator must not treat 1 as a
+    run failure (R11)."""
+    return EXIT_DEGRADED if result.warnings else EXIT_OK
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--issue", type=int, required=True,
+                        help="spec issue number of the run to publish")
+    parser.add_argument("--registry", default=None,
+                        help="registry root (default: <main repo root>/.factory)")
+    parser.add_argument("--stage-completed", default=None,
+                        help="stage whose log just completed, one of: %s"
+                             % ", ".join(factory_run.STAGES))
+    parser.add_argument("--terminal", action="store_true",
+                        help="the run has ended: close the issue and comment")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="render the body to stdout, touch no network")
+    parser.add_argument("--now", default=None,
+                        help="pin the clock, UTC ISO-8601 (determinism seam)")
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    now = None
+    if args.now:
+        try:
+            now = factory_run.parse_now(args.now)
+        except ValueError as exc:
+            print("factory_publish: bad --now: %s" % exc, file=sys.stderr)
+            return EXIT_MISUSE
+        factory_run.set_clock(lambda: now)
+    if args.stage_completed and args.stage_completed not in factory_run.STAGES:
+        print("factory_publish: unknown --stage-completed %r (one of: %s)"
+              % (args.stage_completed, ", ".join(factory_run.STAGES)),
+              file=sys.stderr)
+        return EXIT_MISUSE
+
+    try:
+        registry = args.registry or factory_run.registry_root()
+        if args.dry_run:
+            state = factory_run.load_state(args.issue, registry)
+            if state is None:
+                raise LookupError("no registry entry for issue #%d under %s"
+                                  % (args.issue, registry))
+            body = render_body(state, load_publish_state(args.issue, registry),
+                               registry=registry, now=now)
+            sys.stdout.buffer.write(body.encode("utf-8"))
+            return EXIT_OK
+        result = publish_run(args.issue, registry=registry,
+                             stage_completed=args.stage_completed,
+                             terminal=args.terminal, now=now)
+    except (LookupError, RuntimeError, OSError) as exc:
+        print("factory_publish: %s" % exc, file=sys.stderr)
+        return EXIT_MISUSE
+    return exit_code(result)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

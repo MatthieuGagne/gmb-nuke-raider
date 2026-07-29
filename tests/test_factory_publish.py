@@ -832,3 +832,142 @@ class TestAssetUpload(PublishTestCase):
             self.state, self.publish, [], registry=self.reg, runner=fake)
         self.assertEqual(self.publish['withheld'], {})
         self.assertEqual(len(names), 5)
+
+
+class TestPublishRun(PublishTestCase):
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = factory_run.log_path(440, 'BUILD', self.reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'make: ok\n')
+
+    def fake(self, **overrides):
+        results = {'issue create': (0, ISSUE_URL + '\n', ''),
+                   'project item-add': (0, json.dumps({'id': 'PVTI_x'}), ''),
+                   'project field-list': (0, FIELD_LIST, '')}
+        results.update(overrides)
+        return FakeGh(results)
+
+    def run_publish(self, fake, **kw):
+        kw.setdefault('registry', self.reg)
+        kw.setdefault('now', factory_fixtures.FIXED_NOW)
+        return factory_publish.publish_run(440, runner=fake, **kw)
+
+    def test_first_publish_creates_labels_and_types_the_issue(self):
+        """AC1."""
+        fake = self.fake()
+        result = self.run_publish(fake, stage_completed='BUILD')
+        self.assertEqual(result.run_issue, 481)
+        self.assertEqual(result.warnings, [])
+        self.assertTrue(fake.argv_for('label create'))
+        self.assertTrue(fake.argv_for('issue create'))
+        self.assertTrue(fake.argv_for('project item-edit'))
+
+    def test_stage_transition_posts_no_comment(self):
+        """AC2."""
+        fake = self.fake()
+        self.run_publish(fake, stage_completed='BUILD')
+        self.assertEqual(fake.argv_for('issue comment'), [])
+
+    def test_state_survives_between_publishes(self):
+        """AC1: a second publish edits, never creates."""
+        fake = self.fake()
+        self.run_publish(fake, stage_completed='BUILD')
+        second = self.fake()
+        self.run_publish(second, stage_completed='VERIFY')
+        self.assertEqual(second.argv_for('issue create'), [])
+        self.assertTrue(second.argv_for('issue edit'))
+
+    def test_terminal_closes_the_issue_and_comments_exactly_once(self):
+        """AC3/R10."""
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        self.assertTrue(fake.argv_for('issue close'))
+        self.assertEqual(len(fake.argv_for('issue comment')), 1)
+        self.assertIn('440', fake.argv_for('issue comment')[0])
+
+    def test_a_second_terminal_publish_does_not_comment_again(self):
+        """R10: one comment per attempt is the whole notification budget."""
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        again = self.fake()
+        self.run_publish(again, terminal=True)
+        self.assertEqual(again.argv_for('issue comment'), [])
+
+    def test_a_new_attempt_reopens_and_comments_again(self):
+        """AC4."""
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        factory_run.append_event(440, 'retry', registry=self.reg, attempt=2,
+                                 stage='BUILD')
+        second = self.fake()
+        self.run_publish(second, stage_completed='BUILD')
+        self.assertTrue(second.argv_for('issue reopen'))
+        self.assertIn('attempt 2',
+                      ' '.join(second.argv_for('issue edit')[0]))
+        self.assertTrue(any('attempt-2-BUILD.log' in a
+                            for a in second.argv_for('release upload')[0]))
+
+    def test_every_gh_failure_leaves_the_outcome_unchanged(self):
+        """AC9: one marked warning each, never an exception."""
+        for key in ('issue create', 'issue edit', 'release upload',
+                    'issue comment', 'label create', 'release create'):
+            with self.subTest(key=key):
+                reg = factory_fixtures.build_shipped_run(
+                    tempfile.mkdtemp(dir=self.tmp))
+                fake = self.fake(**{key: (1, '', 'HTTP 502'),
+                                    'release view': (1, '', 'not found')})
+                result = factory_publish.publish_run(
+                    440, registry=reg, terminal=True, runner=fake,
+                    now=factory_fixtures.FIXED_NOW)
+                self.assertGreaterEqual(len(result.warnings), 1)
+
+    def test_the_journal_is_never_written_by_publishing(self):
+        """AC2: append_event makes no network call and publish makes no event."""
+        before = len(factory_run.read_journal(440, self.reg))
+        self.run_publish(self.fake(), stage_completed='BUILD')
+        self.assertEqual(len(factory_run.read_journal(440, self.reg)), before)
+
+
+class TestCli(PublishTestCase):
+    def test_unknown_stage_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        proc = subprocess.run([sys.executable, SCRIPT, '--issue', '440',
+                               '--registry', reg, '--stage-completed',
+                               'DEPLOY'], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, factory_publish.EXIT_MISUSE)
+
+    def test_bad_now_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        proc = subprocess.run([sys.executable, SCRIPT, '--issue', '440',
+                               '--registry', reg, '--now', 'yesterday'],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, factory_publish.EXIT_MISUSE)
+
+    def test_unknown_run_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        proc = subprocess.run([sys.executable, SCRIPT, '--issue', '9999',
+                               '--registry', reg], capture_output=True,
+                              text=True)
+        self.assertEqual(proc.returncode, factory_publish.EXIT_MISUSE)
+
+    def test_dry_run_writes_the_body_and_touches_no_network(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        proc = subprocess.run([sys.executable, SCRIPT, '--issue', '440',
+                               '--registry', reg, '--dry-run', '--now',
+                               '2026-07-26T14:00:00+00:00'],
+                              capture_output=True)
+        self.assertEqual(proc.returncode, factory_publish.EXIT_OK)
+        self.assertIn(b'**Spec** #440', proc.stdout)
+        self.assertIn(factory_publish.BODY_MARKER.encode('utf-8'), proc.stdout)
+
+    def test_degradation_exits_one_not_zero(self):
+        """Exit codes: 1 is reportable, and never a run failure."""
+        result = factory_publish.PublishResult(None, ['boom'], [])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)
+        self.assertEqual(
+            factory_publish.exit_code(factory_publish.PublishResult(1, [], [])),
+            factory_publish.EXIT_OK)
