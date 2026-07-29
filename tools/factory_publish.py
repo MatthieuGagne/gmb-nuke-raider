@@ -523,3 +523,63 @@ def scan_secrets(path):
                 carry = window[-_SCAN_OVERLAP:]
     except OSError as exc:
         return "unreadable, not scanned: %s" % exc
+
+
+# ── Screenshot sourcing ──────────────────────────────────────────────────────
+
+def latest_autopsy(issue, registry=None):
+    """Newest ``autopsy/attempt-<k>/smoketest`` directory, by attempt number."""
+    base = os.path.join(factory_run.run_dir(issue, registry), "autopsy")
+    if not os.path.isdir(base):
+        return None
+    attempts = []
+    for name in os.listdir(base):
+        if name.startswith("attempt-"):
+            try:
+                attempts.append((int(name[len("attempt-"):]), name))
+            except ValueError:
+                continue
+    for _, name in sorted(attempts, reverse=True):
+        smoke = os.path.join(base, name, "smoketest")
+        if os.path.isdir(smoke):
+            return smoke
+    return None
+
+
+def screenshot_paths(state, registry=None):
+    """(paths, source) for one run.
+
+    A live run's PNGs are read straight from its worktree; once the worktree is
+    gone the autopsy bundle is the fallback, which is what lets a dead run's
+    issue still show what it looked like when it died (AC7).
+    """
+    worktree = state.get("worktree")
+    base, source = None, "none"
+    if worktree:
+        candidate = os.path.join(worktree, "build", "smoketest")
+        if os.path.isdir(candidate):
+            base, source = candidate, "worktree"
+    if base is None:
+        base = latest_autopsy(state["issue"], registry)
+        source = "autopsy" if base else "none"
+    if base is None:
+        return [], "none"
+    paths = []
+    for dirpath, _dirs, files in os.walk(base):
+        for name in files:
+            if name.lower().endswith(".png"):
+                paths.append(os.path.join(dirpath, name))
+    paths.sort()
+    return paths, source
+
+
+def select_screenshots(paths):
+    """Every screenshot, failure frames first.
+
+    Uncapped: a run produces four to eight PNGs and GitHub stores them for
+    free, so the HTML page's three-image cap retires with the page (R9).
+    Ordering is by filename, not mtime — the body is under a determinism
+    contract and mtime is not reproducible across machines.
+    """
+    failures = [p for p in paths if os.path.basename(p).startswith("failure")]
+    return failures + [p for p in paths if p not in failures]

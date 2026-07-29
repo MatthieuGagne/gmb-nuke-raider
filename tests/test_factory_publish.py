@@ -457,3 +457,54 @@ class TestSecretScan(PublishTestCase):
         reason = self.scan(b'ghp_' + b'A' * 36)
         self.assertIn('gh[pousr]_', reason)
         self.assertNotIn('AAAA', reason)
+
+
+class TestScreenshotSourcing(PublishTestCase):
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_registry(self.tmp)
+
+    def state(self, issue):
+        return factory_run.load_state(issue, self.reg)
+
+    def test_failure_frame_is_always_first(self):
+        """AC7: failure frames are never dropped."""
+        paths, source = factory_publish.screenshot_paths(self.state(436),
+                                                         self.reg)
+        kept = factory_publish.select_screenshots(paths)
+        self.assertEqual(source, 'worktree')
+        self.assertTrue(os.path.basename(kept[0]).startswith('failure'))
+
+    def test_nothing_is_capped(self):
+        """R9: a run produces 4-8 PNGs and they all publish."""
+        paths, _ = factory_publish.screenshot_paths(self.state(436), self.reg)
+        self.assertEqual(len(factory_publish.select_screenshots(paths)),
+                         len(paths))
+        self.assertEqual(len(paths), 5)
+
+    def test_selection_is_by_filename_not_mtime(self):
+        paths, _ = factory_publish.screenshot_paths(self.state(436), self.reg)
+        kept = factory_publish.select_screenshots(paths)
+        self.assertEqual(kept[1:], sorted(kept[1:]))
+
+    def test_stale_run_falls_back_to_the_latest_autopsy_bundle(self):
+        """AC7: sourced from the worktree while it exists, autopsy once gone."""
+        smoke = os.path.join(factory_run.run_dir(999, self.reg), 'autopsy',
+                             'attempt-2', 'smoketest', 'reach-race')
+        os.makedirs(smoke, exist_ok=True)
+        factory_fixtures._png(os.path.join(smoke, 'failure.png'))
+        paths, source = factory_publish.screenshot_paths(self.state(999),
+                                                         self.reg)
+        self.assertEqual(source, 'autopsy')
+        self.assertEqual(len(paths), 1)
+
+    def test_no_worktree_and_no_autopsy_yields_nothing(self):
+        paths, source = factory_publish.screenshot_paths(self.state(999),
+                                                         self.reg)
+        self.assertEqual((paths, source), ([], 'none'))
+
+    def test_factory_status_no_longer_sources_screenshots(self):
+        """R9: MAX_SCREENSHOTS retires with the HTML page."""
+        for name in ('MAX_SCREENSHOTS', 'screenshot_paths',
+                     'select_screenshots', '_latest_autopsy'):
+            self.assertFalse(hasattr(factory_status, name), name)

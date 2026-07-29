@@ -181,46 +181,6 @@ class TestCli(StatusTestCase):
         self.assertEqual({r['issue'] for r in rows}, {436, 437, 999})
 
 
-class TestScreenshotSelection(StatusTestCase):
-    def test_failure_frame_is_always_kept(self):
-        paths = ['a/checkpoint-1.png', 'a/checkpoint-2.png',
-                 'a/checkpoint-3.png', 'a/checkpoint-4.png', 'a/failure.png']
-        kept, dropped = factory_status.select_screenshots(paths, limit=2)
-        self.assertIn('a/failure.png', kept)
-        self.assertEqual(len(kept), 3)
-        self.assertEqual(dropped, 2)
-
-    def test_selection_is_by_filename_not_mtime(self):
-        """Determinism beats true recency: mtime is not reproducible."""
-        paths = ['a/checkpoint-1.png', 'a/checkpoint-2.png', 'a/checkpoint-3.png']
-        kept, _ = factory_status.select_screenshots(paths, limit=2)
-        self.assertEqual(kept, ['a/checkpoint-2.png', 'a/checkpoint-3.png'])
-
-    def test_nothing_dropped_when_under_the_cap(self):
-        kept, dropped = factory_status.select_screenshots(['a/x.png'], limit=3)
-        self.assertEqual((kept, dropped), (['a/x.png'], 0))
-
-    def test_live_run_reads_from_the_worktree(self):
-        row = self.rows()[436]
-        paths, source = factory_status.screenshot_paths(row, self.reg)
-        self.assertEqual(source, 'worktree')
-        self.assertEqual(len(paths), 5)
-
-    def test_stale_run_falls_back_to_the_latest_autopsy_bundle(self):
-        """R8: the page must survive worktree deletion."""
-        row = self.rows()[436]
-        factory_run.write_autopsy(436, registry=self.reg, worktree=row['worktree'])
-        shutil.rmtree(row['worktree'])
-        row = self.rows()[436]
-        paths, source = factory_status.screenshot_paths(row, self.reg)
-        self.assertEqual(source, 'autopsy')
-        self.assertTrue(paths)
-
-    def test_no_worktree_and_no_autopsy_yields_nothing(self):
-        paths, source = factory_status.screenshot_paths(self.rows()[999], self.reg)
-        self.assertEqual((paths, source), ([], 'none'))
-
-
 class TestHtmlIsGone(StatusTestCase):
     def test_no_html_symbols_remain(self):
         """#472 R14: one state, one rendering."""
