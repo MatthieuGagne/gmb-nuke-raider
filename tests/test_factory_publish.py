@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_publish
 import factory_run
+import factory_status
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import factory_fixtures
@@ -97,3 +98,56 @@ class TestAssetNaming(PublishTestCase):
             factory_publish.asset_url('issue-437-attempt-2-BUILD.log'),
             'https://github.com/MatthieuGagne/gmb-nuke-raider/releases/'
             'download/factory-logs/issue-437-attempt-2-BUILD.log')
+
+
+class TestRenderTitle(PublishTestCase):
+    def test_shipped_run_reads_complete(self):
+        """AC1/R3: the title is the only column an issue list has."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        self.assertEqual(factory_publish.render_title(state,
+                                                      now=factory_fixtures.FIXED_NOW),
+                         'run 440 · attempt 1 · SHIP · complete')
+
+    def test_failed_run_reads_failed(self):
+        """AC3."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        state = factory_run.load_state(441, reg)
+        self.assertEqual(factory_publish.render_title(state,
+                                                      now=factory_fixtures.FIXED_NOW),
+                         'run 441 · attempt 1 · BUILD · failed')
+
+    def test_second_attempt_shows_in_the_title(self):
+        """AC4."""
+        reg = factory_fixtures.build_registry(self.tmp)
+        state = factory_run.load_state(436, reg)
+        self.assertEqual(factory_publish.render_title(state,
+                                                      now=factory_fixtures.FIXED_NOW),
+                         'run 436 · attempt 2 · VERIFY · active')
+
+    def test_missing_worktree_reads_stale(self):
+        reg = factory_fixtures.build_registry(self.tmp)
+        state = factory_run.load_state(999, reg)
+        self.assertEqual(factory_publish.render_title(state,
+                                                      now=factory_fixtures.FIXED_NOW),
+                         'run 999 · attempt 1 · BUILD · stale')
+
+    def test_condition_is_factory_status_verbatim(self):
+        """R3: one definition of the five conditions, not two."""
+        reg = factory_fixtures.build_registry(self.tmp)
+        rows = {r['issue']: r for r in
+                factory_status.collect(reg, now=factory_fixtures.FIXED_NOW)}
+        for issue, row in rows.items():
+            state = factory_run.load_state(issue, reg)
+            self.assertEqual(
+                factory_publish.run_condition(state,
+                                              now=factory_fixtures.FIXED_NOW),
+                row['condition'], issue)
+
+    def test_stageless_run_renders_a_dash(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'decision', registry=reg, text='hi')
+        state = factory_run.load_state(500, reg)
+        self.assertEqual(factory_publish.render_title(state,
+                                                      now=factory_fixtures.FIXED_NOW),
+                         'run 500 · attempt 1 · - · active')

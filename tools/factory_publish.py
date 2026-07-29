@@ -173,3 +173,26 @@ def asset_url(name, repo=DEFAULT_REPO):
     and its goldens must not depend on a network round trip."""
     return "https://github.com/%s/releases/download/%s/%s" % (
         repo, RELEASE_TAG, name)
+
+
+# ── Title ────────────────────────────────────────────────────────────────────
+
+def run_condition(state, now=None):
+    """One of ``factory_status.CONDITIONS`` for a single run.
+
+    Delegates rather than re-deriving: the five conditions and their precedence
+    are specified and tested in factory_status, and a second definition would
+    drift from the first (R3).
+    """
+    now = now or factory_run.clock()
+    worktree = state.get("worktree")
+    exists = bool(worktree) and os.path.isdir(worktree)
+    return factory_status.condition(
+        state, factory_status.elapsed_seconds(state, now), exists)
+
+
+def render_title(state, now=None):
+    """``run <N> · attempt <k> · <STAGE> · <condition>``. Pure."""
+    return "run %d · attempt %d · %s · %s" % (
+        int(state["issue"]), int(state.get("attempt") or 1),
+        state.get("stage") or "-", run_condition(state, now))
