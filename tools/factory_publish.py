@@ -760,3 +760,95 @@ def ensure_project_type_log(publish, issue_url, warnings,
         return False
     publish["projected"] = True
     return True
+
+
+# ── Assets ───────────────────────────────────────────────────────────────────
+
+def stage_dir(issue, registry=None):
+    """Where assets are staged under their published names, publisher-owned.
+
+    ``gh release upload`` names the asset after the file's basename, so the
+    copy is what carries ``issue-<N>-attempt-<k>-<stage>.log``. The copy is
+    also what makes AC5 provable: bytes in, bytes out, no read of the content.
+    """
+    path = os.path.join(factory_run.run_dir(issue, registry), PUBLISH_DIRNAME)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def upload_asset(path, name, publish, warnings, runner=subprocess.run):
+    """Upload one staged asset. Never clobbers an existing one (R7)."""
+    if name in (publish.get("uploaded") or []):
+        return True
+    proc = gh(["release", "upload", RELEASE_TAG, path], runner=runner)
+    if proc.returncode != 0:
+        _warn(warnings, "asset %s not uploaded: %s" % (name, _tail(proc.stderr)))
+        return False
+    publish.setdefault("uploaded", []).append(name)
+    return True
+
+
+def publish_stage_log(state, publish, stage, warnings, registry=None,
+                      runner=subprocess.run):
+    """Publish one stage's log as a per-attempt asset.
+
+    A verbatim whole-file copy of ``logs/<stage>.log`` as it stood at upload
+    time — the publisher copies bytes and never reads log content, so #450's
+    no-parsing boundary is untouched. Local logs are append-only across
+    attempts, so attempt *k*'s asset is a superset of attempt *k-1*'s; that
+    redundancy is the accepted cost of an immutable per-attempt history (R7).
+    """
+    issue = int(state["issue"])
+    attempt = int(state.get("attempt") or 1)
+    name = log_asset_name(issue, attempt, stage)
+    if name in (publish.get("uploaded") or []):
+        return True
+
+    src = factory_run.log_path(issue, stage, registry)
+    if not os.path.isfile(src):
+        _warn(warnings, "no stage log captured for %s (%s)" % (stage, src))
+        return False
+
+    reason = scan_secrets(src)
+    if reason:
+        publish.setdefault("withheld", {})[name] = "%s — local copy: %s" % (
+            reason, os.path.join("logs", "%s.log" % stage))
+        _warn(warnings, "asset withheld for %s: %s (the run is unaffected)"
+              % (stage, reason))
+        return False
+
+    dest = os.path.join(stage_dir(issue, registry), name)
+    try:
+        shutil.copyfile(src, dest)
+    except OSError as exc:
+        _warn(warnings, "asset %s not staged: %s" % (name, exc))
+        return False
+    return upload_asset(dest, name, publish, warnings, runner=runner)
+
+
+def publish_screenshots(state, publish, warnings, registry=None,
+                        runner=subprocess.run):
+    """Publish this attempt's screenshots. Returns the names now published.
+
+    Uncapped and never scanned: a PNG has no credential shape to find, and the
+    scan must not become a reason evidence goes missing. Failure frames first,
+    so the one that matters is uploaded even if a later one fails (R9).
+    """
+    issue = int(state["issue"])
+    attempt = int(state.get("attempt") or 1)
+    paths, _source = screenshot_paths(state, registry)
+    published = []
+    for path in select_screenshots(paths):
+        name = shot_asset_name(issue, attempt, path)
+        if name in (publish.get("uploaded") or []):
+            published.append(name)
+            continue
+        dest = os.path.join(stage_dir(issue, registry), name)
+        try:
+            shutil.copyfile(path, dest)
+        except OSError as exc:
+            _warn(warnings, "screenshot %s not staged: %s" % (name, exc))
+            continue
+        if upload_asset(dest, name, publish, warnings, runner=runner):
+            published.append(name)
+    return published

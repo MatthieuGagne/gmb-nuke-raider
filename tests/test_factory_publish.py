@@ -720,3 +720,115 @@ class TestProjectTypeLog(PublishTestCase):
         self.assertFalse(factory_publish.ensure_project_type_log(
             publish, ISSUE_URL, warnings, runner=fake))
         self.assertEqual(len(warnings), 1)
+
+
+class TestAssetUpload(PublishTestCase):
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_registry(self.tmp)
+        self.state = factory_run.load_state(436, self.reg)
+        self.publish = factory_publish.new_publish_state(436)
+
+    def write_log(self, stage, payload=b'make: ok\n'):
+        path = factory_run.log_path(436, stage, self.reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(payload)
+        return path
+
+    def publish_log(self, stage, fake, warnings=None):
+        return factory_publish.publish_stage_log(
+            self.state, self.publish, stage,
+            warnings if warnings is not None else [], registry=self.reg,
+            runner=fake)
+
+    def test_staged_asset_is_a_byte_exact_copy(self):
+        """AC5: the published asset equals the local log, byte for byte."""
+        src = self.write_log('BUILD', b'\x00\x01binary\xff\n' * 40)
+        fake = FakeGh()
+        self.assertTrue(self.publish_log('BUILD', fake))
+        staged = fake.argv_for('release upload')[0][-1]
+        with open(src, 'rb') as a, open(staged, 'rb') as b:
+            self.assertEqual(a.read(), b.read())
+
+    def test_asset_is_named_by_issue_attempt_and_stage(self):
+        """AC4: attempt 2's asset does not disturb attempt 1's."""
+        self.write_log('BUILD')
+        fake = FakeGh()
+        self.publish_log('BUILD', fake)
+        self.assertIn('issue-436-attempt-2-BUILD.log',
+                      os.path.basename(fake.argv_for('release upload')[0][-1]))
+
+    def test_an_uploaded_asset_is_never_re_uploaded(self):
+        """R7: never clobbered."""
+        self.write_log('BUILD')
+        fake = FakeGh()
+        self.publish_log('BUILD', fake)
+        self.publish_log('BUILD', fake)
+        self.assertEqual(len(fake.argv_for('release upload')), 1)
+        self.assertEqual(self.publish['uploaded'],
+                         ['issue-436-attempt-2-BUILD.log'])
+
+    def test_missing_log_warns_and_is_not_a_failure(self):
+        """AC3: the fail-open case reads 'no stage log captured'."""
+        warnings = []
+        self.assertFalse(self.publish_log('SHIP', FakeGh(), warnings))
+        self.assertEqual(len(warnings), 1)
+
+    def test_credential_shaped_log_is_withheld_and_named(self):
+        """AC6."""
+        self.write_log('BUILD', b'token ghp_' + b'A' * 36 + b'\n')
+        fake = FakeGh()
+        warnings = []
+        self.assertFalse(self.publish_log('BUILD', fake, warnings))
+        self.assertEqual(fake.argv_for('release upload'), [])
+        self.assertEqual(len(warnings), 1)
+        withheld = self.publish['withheld']['issue-436-attempt-2-BUILD.log']
+        self.assertIn('credential-shaped', withheld)
+        self.assertIn('logs', withheld)
+
+    def test_one_withheld_asset_does_not_block_the_others(self):
+        """AC6."""
+        self.write_log('BUILD', b'ghp_' + b'A' * 36)
+        self.write_log('GATE', b'clean\n')
+        fake = FakeGh()
+        self.publish_log('BUILD', fake, [])
+        self.assertTrue(self.publish_log('GATE', fake, []))
+        self.assertEqual(self.publish['uploaded'],
+                         ['issue-436-attempt-2-GATE.log'])
+
+    def test_upload_failure_warns_once_and_is_not_recorded(self):
+        """AC9."""
+        self.write_log('BUILD')
+        fake = FakeGh({'release upload': (1, '', 'HTTP 502')})
+        warnings = []
+        self.assertFalse(self.publish_log('BUILD', fake, warnings))
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(self.publish['uploaded'], [])
+
+    def test_screenshots_upload_uncapped_with_failure_frames(self):
+        """AC7/R9."""
+        fake = FakeGh()
+        names = factory_publish.publish_screenshots(
+            self.state, self.publish, [], registry=self.reg, runner=fake)
+        self.assertEqual(len(names), 5)
+        self.assertTrue(any('failure' in n for n in names))
+        self.assertTrue(all(n.startswith('issue-436-attempt-2-reach-race-')
+                            for n in names))
+
+    def test_screenshots_are_not_re_uploaded(self):
+        fake = FakeGh()
+        factory_publish.publish_screenshots(self.state, self.publish, [],
+                                            registry=self.reg, runner=fake)
+        factory_publish.publish_screenshots(self.state, self.publish, [],
+                                            registry=self.reg, runner=fake)
+        self.assertEqual(len(fake.argv_for('release upload')), 5)
+
+    def test_screenshots_are_not_secret_scanned(self):
+        """R8 is about logs; a PNG has no credential shape to find and the
+        scan must not become a reason evidence goes missing."""
+        fake = FakeGh()
+        names = factory_publish.publish_screenshots(
+            self.state, self.publish, [], registry=self.reg, runner=fake)
+        self.assertEqual(self.publish['withheld'], {})
+        self.assertEqual(len(names), 5)
