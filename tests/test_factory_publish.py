@@ -2,6 +2,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -508,3 +509,81 @@ class TestScreenshotSourcing(PublishTestCase):
         for name in ('MAX_SCREENSHOTS', 'screenshot_paths',
                      'select_screenshots', '_latest_autopsy'):
             self.assertFalse(hasattr(factory_status, name), name)
+
+
+class FakeGh:
+    """Records gh invocations and replays canned results. No network, ever."""
+
+    def __init__(self, results=None, default=(0, '', '')):
+        self.calls = []
+        self.results = dict(results or {})
+        self.default = default
+
+    def key(self, argv):
+        """First two non-flag words, e.g. 'issue create' or 'release upload'."""
+        words = [a for a in argv[1:] if not a.startswith('-')]
+        return ' '.join(words[:2])
+
+    def __call__(self, argv, **kwargs):
+        self.calls.append((list(argv), kwargs))
+        code, out, err = self.results.get(self.key(argv), self.default)
+        return subprocess.CompletedProcess(list(argv), code, out, err)
+
+    def argv_for(self, key):
+        return [argv for argv, _ in self.calls if self.key(argv) == key]
+
+
+class TestGhSeam(PublishTestCase):
+    def test_every_call_is_prefixed_with_gh_and_a_scrubbed_env(self):
+        """Global constraint: GIT_DIR leakage broke factory_run before (#462)."""
+        fake = FakeGh()
+        factory_publish.gh(['issue', 'view', '1'], runner=fake)
+        argv, kwargs = fake.calls[0]
+        self.assertEqual(argv[0], 'gh')
+        self.assertNotIn('GIT_DIR', kwargs['env'])
+        self.assertTrue(kwargs['capture_output'])
+        self.assertEqual(kwargs['encoding'], 'utf-8')
+
+    def test_a_missing_gh_binary_is_not_an_exception(self):
+        def explode(argv, **kwargs):
+            raise OSError('no gh on PATH')
+        proc = factory_publish.gh(['issue', 'view', '1'], runner=explode)
+        self.assertEqual(proc.returncode, 127)
+
+
+class TestEnsureLabelAndRelease(PublishTestCase):
+    def test_label_is_created_once(self):
+        """R13."""
+        fake = FakeGh()
+        warnings = []
+        self.assertTrue(factory_publish.ensure_label(warnings, runner=fake))
+        self.assertEqual(warnings, [])
+        self.assertIn('log', fake.argv_for('label create')[0])
+
+    def test_existing_label_is_not_a_degradation(self):
+        fake = FakeGh({'label create': (1, '', 'label already exists')})
+        warnings = []
+        self.assertTrue(factory_publish.ensure_label(warnings, runner=fake))
+        self.assertEqual(warnings, [])
+
+    def test_label_failure_warns_once_and_does_not_raise(self):
+        """AC9/R11."""
+        fake = FakeGh({'label create': (1, '', 'HTTP 403')})
+        warnings = []
+        self.assertFalse(factory_publish.ensure_label(warnings, runner=fake))
+        self.assertEqual(len(warnings), 1)
+
+    def test_existing_release_is_not_recreated(self):
+        fake = FakeGh({'release view': (0, '{}', '')})
+        warnings = []
+        self.assertTrue(factory_publish.ensure_release(warnings, runner=fake))
+        self.assertEqual(fake.argv_for('release create'), [])
+
+    def test_missing_release_is_created_not_latest(self):
+        """R13: repo tags stay clean."""
+        fake = FakeGh({'release view': (1, '', 'release not found')})
+        warnings = []
+        self.assertTrue(factory_publish.ensure_release(warnings, runner=fake))
+        argv = fake.argv_for('release create')[0]
+        self.assertIn('factory-logs', argv)
+        self.assertIn('--latest=false', argv)

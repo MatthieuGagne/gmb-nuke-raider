@@ -583,3 +583,63 @@ def select_screenshots(paths):
     """
     failures = [p for p in paths if os.path.basename(p).startswith("failure")]
     return failures + [p for p in paths if p not in failures]
+
+
+# ── The gh layer ─────────────────────────────────────────────────────────────
+
+def _tail(text, limit=200):
+    """One line of stderr, short enough for a warning."""
+    text = " ".join((text or "").split())
+    return text[-limit:] if text else "(no stderr)"
+
+
+def gh(argv, runner=subprocess.run):
+    """Run one ``gh`` command. Never raises; the caller decides what a failure
+    means. *runner* is the injected seam that keeps every test off the network
+    (the idiom from prepush_build.py:43).
+
+    The environment is scrubbed with ``install_hooks.clean_env``: git exports
+    ``GIT_DIR`` into every hook's environment and it overrides *cwd*, which hit
+    real factory code before (#462). Output is decoded as UTF-8 with
+    replacement so a Windows console codepage cannot turn a parse into a crash.
+    """
+    command = ["gh"] + list(argv)
+    try:
+        return runner(command, capture_output=True, encoding="utf-8",
+                      errors="replace", env=install_hooks.clean_env())
+    except OSError as exc:
+        return subprocess.CompletedProcess(command, 127, "", str(exc))
+
+
+def _already(proc, *needles):
+    """True when gh refused because the thing already exists."""
+    text = ((proc.stdout or "") + (proc.stderr or "")).lower()
+    return any(n in text for n in needles)
+
+
+def ensure_label(warnings, runner=subprocess.run):
+    """Create the ``log`` label if it is missing. Idempotent, fail-open."""
+    proc = gh(["label", "create", RUN_LABEL, "--color", "5319E7",
+               "--description", "Factory run dashboard issue"], runner=runner)
+    if proc.returncode == 0 or _already(proc, "already exists"):
+        return True
+    _warn(warnings, "label %r not ensured: %s" % (RUN_LABEL, _tail(proc.stderr)))
+    return False
+
+
+def ensure_release(warnings, runner=subprocess.run):
+    """Create the rolling ``factory-logs`` release if it is missing.
+
+    Marked not-latest so the repo's tag list stays about the game (R13). Doing
+    this on demand rather than as a one-time manual step keeps a walk-away run
+    from failing on setup nobody remembered to do.
+    """
+    if gh(["release", "view", RELEASE_TAG], runner=runner).returncode == 0:
+        return True
+    proc = gh(["release", "create", RELEASE_TAG, "--title", RELEASE_TITLE,
+               "--notes", RELEASE_NOTES, "--latest=false"], runner=runner)
+    if proc.returncode == 0 or _already(proc, "already exists"):
+        return True
+    _warn(warnings, "release %r not ensured: %s"
+          % (RELEASE_TAG, _tail(proc.stderr)))
+    return False
