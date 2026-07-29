@@ -40,6 +40,7 @@ import sys
 
 _TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _TOOLS_DIR)
+import factory_report
 import factory_run
 import factory_status
 import install_hooks
@@ -313,9 +314,92 @@ def _section_permissions(ctx):
                    for p in perms])
 
 
+def display_worktree(worktree, registry=None):
+    """The worktree path as it is safe to publish (Q1b).
+
+    The run issue is public, so an absolute path would put a developer's home
+    directory into a search index — the same reason factory_report keeps them
+    out of a PR body. Repo-relative is still enough to ``cd`` into and leaks
+    nothing; anything outside the repository falls back to that module's
+    placeholder rather than inventing a second convention.
+
+    The root is ``dirname(registry)`` — the registry is ``<repo root>/.factory``
+    by construction — so this needs no ``git`` subprocess and stays pure and
+    deterministic under a fixture registry.
+    """
+    if not worktree:
+        return "-"
+    try:
+        root = os.path.dirname(registry or factory_run.registry_root())
+        relative = os.path.relpath(os.path.abspath(worktree), root)
+    except (RuntimeError, OSError, ValueError):
+        # ValueError: os.path.relpath across Windows drive letters.
+        return factory_report.redact(worktree)
+    if relative.startswith(os.pardir) or os.path.isabs(relative):
+        return factory_report.redact(worktree)
+    return relative.replace(os.sep, "/")
+
+
+def log_tail(issue, stage, registry=None, lines=LOG_TAIL_LINES):
+    """The last *lines* lines of a stage log, or None when there is none.
+
+    Decoded with ``errors='replace'`` and labelled a lossy excerpt: a stage log
+    is binary end-to-end (#450) and a run issue must never be the reason a
+    failure cannot be read. Only the tail is read off disk — a build log can be
+    megabytes and the body budget is 60k.
+    """
+    if not stage:
+        return None
+    try:
+        path = factory_run.log_path(issue, stage, registry)
+        size = os.path.getsize(path)
+        with open(path, "rb") as fh:
+            if size > LOG_TAIL_BYTES:
+                fh.seek(size - LOG_TAIL_BYTES)
+            raw = fh.read()
+    except OSError:
+        return None
+    text = raw.decode("utf-8", errors="replace")
+    return "\n".join(text.splitlines()[-lines:])
+
+
+def _section_failure(ctx):
+    state = ctx["state"]
+    failure = state.get("failure")
+    if not failure:
+        return None
+    stage = state.get("stage")
+    out = ["- **Stage** %s" % (stage or "-"),
+           "- **Reason** %s" % (failure.get("message") or "-"),
+           "- **Worktree** `%s`" % display_worktree(state.get("worktree"),
+                                                    ctx["registry"])]
+    if ctx["shed_tail"]:
+        name = log_asset_name(state["issue"],
+                              int(state.get("attempt") or 1), stage) \
+            if stage else None
+        out += ["", "tail omitted — full log: %s"
+                % (asset_url(name, ctx["repo"]) if name else "not published")]
+        return out
+    tail = log_tail(state["issue"], stage, ctx["registry"])
+    if tail is None:
+        out += ["", "no stage log captured"]
+        return out
+    out += ["",
+            "<details><summary>%s log tail — last %d lines, lossy excerpt"
+            "</summary>" % (stage, LOG_TAIL_LINES),
+            "",
+            "````",
+            tail,
+            "````",
+            "",
+            "</details>"]
+    return out
+
+
 # Order is fixed and the list is data, not inlined markup: PRD-11 adds its
 # "Review findings" section by appending one entry here (R4).
 SECTIONS = (
+    ("Failure", _section_failure),
     ("Gate results", _section_gates),
     ("Decisions made", _section_decisions),
     ("Scenario evidence", _section_scenarios),

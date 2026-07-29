@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_publish
+import factory_report
 import factory_run
 import factory_status
 
@@ -246,3 +247,86 @@ class TestRenderBody(PublishTestCase):
         factory_run.append_event(500, 'gate', registry=reg, stage='BUILD',
                                  gate='make test | tee out', result='pass')
         self.assertIn(r'make test \| tee out', self.body(500, reg))
+
+
+class TestFailureSection(PublishTestCase):
+    def failed_body(self, reg):
+        return factory_publish.render_body(
+            factory_run.load_state(441, reg),
+            factory_publish.new_publish_state(441), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def test_matches_the_failed_golden(self):
+        """AC3/AC10."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        self.assertEqual(self.failed_body(reg),
+                         golden('expected_run_issue_body_failed.md'))
+
+    def test_says_so_when_the_log_helper_fail_opened(self):
+        """AC3: 'no stage log captured' rather than a missing section."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        self.assertIn('no stage log captured', self.failed_body(reg))
+
+    def test_tail_is_collapsed_and_marked_lossy(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        path = factory_run.log_path(441, 'BUILD', reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'\n'.join(b'line %d' % i for i in range(500)))
+        body = self.failed_body(reg)
+        self.assertIn('<details>', body)
+        self.assertIn('lossy excerpt', body)
+        self.assertIn('line 499', body)
+        self.assertNotIn('line 100\n', body)
+
+    def test_undecodable_bytes_do_not_raise(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        path = factory_run.log_path(441, 'BUILD', reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'ok\n\xff\xfe not utf-8 \xff\n')
+        self.assertIn('�', self.failed_body(reg))
+
+    def test_a_healthy_run_has_no_failure_section(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        body = factory_publish.render_body(
+            state, factory_publish.new_publish_state(440), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn('### Failure', body)
+
+
+class TestWorktreeIsNotLeaked(PublishTestCase):
+    """Q1b: the run issue is public, so the path is published repo-relative."""
+
+    def test_a_worktree_inside_the_repo_renders_relative(self):
+        registry = os.path.join(self.tmp, 'repo', '.factory')
+        worktree = os.path.join(self.tmp, 'repo', '.claude', 'worktrees',
+                                'factory-437')
+        self.assertEqual(
+            factory_publish.display_worktree(worktree, registry),
+            '.claude/worktrees/factory-437')
+
+    def test_separators_are_normalised_for_the_golden(self):
+        registry = os.path.join(self.tmp, 'repo', '.factory')
+        worktree = os.path.join(self.tmp, 'repo', 'a', 'b')
+        self.assertNotIn('\\', factory_publish.display_worktree(worktree,
+                                                                registry))
+
+    def test_a_worktree_outside_the_repo_is_redacted(self):
+        registry = os.path.join(self.tmp, 'repo', '.factory')
+        rendered = factory_publish.display_worktree(
+            os.path.join(self.tmp, 'elsewhere', 'wt'), registry)
+        self.assertEqual(rendered, factory_report.REDACTION)
+
+    def test_no_home_directory_reaches_the_body(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        state = factory_run.load_state(441, reg)
+        body = factory_publish.render_body(
+            state, factory_publish.new_publish_state(441), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn(state['worktree'], body)
+        self.assertIn('- **Worktree** `wt-441`', body)
+
+    def test_missing_worktree_renders_a_dash(self):
+        self.assertEqual(factory_publish.display_worktree(None, self.tmp), '-')
