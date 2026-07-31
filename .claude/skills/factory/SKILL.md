@@ -84,7 +84,11 @@ Kinds outside `factory_run.EVENT_KINDS` are refused. Do not write `state.json` o
 
 ## Publication cadence
 
-Call the publisher (PRD-12, #472) — never write a GitHub surface yourself:
+Call the publisher (PRD-12, #472) — never write a GitHub surface yourself. **"Yourself" includes
+running `gh`.** If a step would create, edit, or comment on any GitHub object, it goes through
+`factory_publish`; a raw `gh` write is refused by the harness permission gate and stalls the run
+(#481). The only sanctioned direct `gh` call is `gh auth setup-git`, which is local credential
+configuration and writes nothing.
 
 ```
 python tools/factory_publish.py --issue <N> --stage-completed <STAGE>
@@ -135,6 +139,8 @@ code does not distinguish it.**
 - Never pass `--no-verify` to `git commit` or `git push`. If a hook blocks you, fix the cause.
 - Never delete or prune a worktree or branch, and never `git reset --hard`.
 - Never edit `.claude/settings.local.json`, and never commit it.
+- Never create, edit, or comment on a GitHub object with a raw `gh` command. Route it through
+  `tools/factory_publish.py`.
 
 The deny gate mechanizes these, and it matches **raw command text** — a diagnostic that merely
 quotes a forbidden command is itself refused. Assemble such strings piecewise.
