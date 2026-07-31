@@ -55,6 +55,13 @@ FACTORY_ONLY = [
      'branch deletion'),
     (re.compile(r'\bgit\b[^\n;|&]*?\breset\b[^\n;|&]*?--hard\b'),
      'hard reset'),
+    # R8 (#437): a factory run must never skip a hook. A human can be asked;
+    # an unattended run cannot, so this is factory-only rather than
+    # unconditional. Matched anywhere in the argument run, in either spelling,
+    # so `git push -u origin b --no-verify` is caught as well as the prefix
+    # form that permissions.deny can reach.
+    (re.compile(r'\bgit\b[^\n;|&]*?\b(?:commit|push)\b[^\n;|&]*?--no-verify\b'),
+     'hook bypass (--no-verify)'),
 ]
 
 
