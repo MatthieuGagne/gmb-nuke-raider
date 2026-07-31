@@ -40,11 +40,15 @@ def find_make(env):
     return shutil.which('make', path=env.get('PATH'))
 
 
-def run_build(env, runner=subprocess.run):
-    """Run `make clean` then `make`. Returns (ok, message)."""
+def run_build(env, runner=subprocess.run, cwd=None):
+    """Run `make clean` then `make`. Returns (ok, message).
+
+    *cwd* selects the tree to build; the factory's reference-ROM cache builds a
+    detached `origin/master` worktree with it (#437 R5).
+    """
     for target in TARGETS:
         argv = ['make'] + ([target] if target else [])
-        result = runner(argv, env=env, capture_output=True, text=True)
+        result = runner(argv, env=env, cwd=cwd, capture_output=True, text=True)
         if result.returncode != 0:
             return False, '%s%s\npre-push build gate failed on "%s".\n' % (
                 result.stdout[-4000:], result.stderr[-4000:], ' '.join(argv))

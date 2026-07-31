@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import unittest
 
+from tools import prepush_build
 from tools.prepush_build import build_env, find_make, run_build
 
 
@@ -71,6 +72,31 @@ class RunBuildTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn('out', message)
         self.assertIn('err', message)
+
+
+class RunBuildCwdTest(unittest.TestCase):
+    def test_cwd_is_passed_through_to_the_runner(self):
+        seen = []
+
+        def runner(argv, **kwargs):
+            seen.append(kwargs.get('cwd'))
+            return subprocess.CompletedProcess(argv, 0, stdout='', stderr='')
+
+        ok, message = prepush_build.run_build({'PATH': ''}, runner=runner,
+                                              cwd='/some/worktree')
+        self.assertTrue(ok)
+        self.assertEqual(message, '')
+        self.assertEqual(seen, ['/some/worktree', '/some/worktree'])
+
+    def test_cwd_defaults_to_none(self):
+        seen = []
+
+        def runner(argv, **kwargs):
+            seen.append(kwargs.get('cwd'))
+            return subprocess.CompletedProcess(argv, 0, stdout='', stderr='')
+
+        prepush_build.run_build({'PATH': ''}, runner=runner)
+        self.assertEqual(seen, [None, None])
 
 
 if __name__ == '__main__':
