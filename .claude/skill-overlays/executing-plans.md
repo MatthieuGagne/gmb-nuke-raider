@@ -51,6 +51,27 @@ Stop at each checkpoint the plan defines and run the full sequence:
 
 Between batches: report what was implemented plus verification output, then wait. Do not roll into the next batch unprompted.
 
+### Factory mode
+
+Active when `NUKE_FACTORY_RUN` is set. It **overrides `### Batch execution with Smoketest
+Checkpoints`, `### Lessons Learned — HARD GATE` and `### Shipping` above.**
+
+- Batch checkpoints run headlessly: steps 1-3 unchanged (fetch+merge, `make clean && make`,
+  `make memory-check` — a FAIL still aborts), then
+  `python tools/smoketest_headless.py --scenario generic-smoke --json` in place of steps 4-5.
+  Do not launch Emulicious and do not wait for confirmation. Do not pause between batches.
+- The **Lessons Learned HARD GATE becomes a decisions-log entry.** There is no user to ask.
+  Record what a lesson would have been:
+  ```
+  python tools/factory_event.py --issue <N> --kind decision --field "text=lesson: <what surprised the run and what should change>"
+  ```
+  Do not invoke the `prd` skill and do not block the PR on an answer.
+- `### Shipping` — "never push before the Emulicious smoketest passes with user confirmation"
+  reads as "never push before the **headless** smoketest passes". The README rule and the
+  allowlist-promotion rule still apply.
+
+Outside a factory run every pause and every gate above fires exactly as written.
+
 ### Lessons Learned — HARD GATE
 
 After the smoketest passes and **before pushing or creating the PR**, explicitly ask:
