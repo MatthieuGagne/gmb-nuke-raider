@@ -23,12 +23,15 @@ def main():
     hook_common.reroot(data)
 
     tool_input = data.get('tool_input', {})
-    # Claude Code sends file_path; Pi sends path. Claude wins when both are
-    # present so a Claude payload can never be reinterpreted.
+    # Claude Code sends file_path; Pi sends path. Claude's key wins when its
+    # value is truthy; an empty file_path falls through to path.
     file_path = tool_input.get('file_path') or tool_input.get('path') or ''
 
     if not file_path:
         sys.exit(0)
+
+    if not isinstance(file_path, str):
+        sys.exit(0)  # malformed payload — fail open quietly, never traceback
 
     norm = file_path.replace('\\', '/')
     # Only act on .c and .h files under src/
