@@ -4,7 +4,7 @@ bank_post_build.py — post-build ROM bank validation.
 
 Checks:
   1. romusage budget (bank 1 WARN >90% or >=100%; others WARN >80% or >=100%)
-  2. state code must not appear in bank 2+ (addresses >= 0x20000)
+  2. state code must not appear beyond the -Wm-ya declared bank count
   3. __bank_ symbol values must match bank-manifest.json for pinned files
   4. highest bank in use must be < -Wm-ya declared count
 
@@ -21,6 +21,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+BANK_STRIDE = 0x10000    # .noi addresses advance one bank per 0x10000
 
 
 def _run_romusage(rom_path):
@@ -82,16 +84,34 @@ def _parse_noi(noi_path):
     return symbols
 
 
-def _check_state_symbols(symbols):
-    """Return list of (sym, hex_addr) for _state_* symbols in bank 3+ (addr >= 0x30000).
+def _check_state_symbols(symbols, declared=None):
+    """Return list of (sym, hex_addr) for _state_* symbols beyond ROM capacity.
 
-    Banks 0, 1, and 2 are all acceptable for state callbacks — invoke() in state_manager.c
-    uses each State's .bank field for safe cross-bank dispatch regardless of which bank
-    the callback actually lives in.  Bank 2 is allowed to relieve bank-1 pressure.
+    A state callback is safe in ANY bank the cartridge actually has: invoke() in
+    state_manager.c dispatches through each State's .bank field, so the call site
+    never assumes a bank.  The old rule stopped at bank 2, but that ceiling was
+    never justified by this argument — it was a snapshot of where the linker
+    happened to put things, and autobank legitimately spilled past it once banks
+    0/1/2 reached 95/100/95% (#461, ADR 0007).
+
+    What IS a real defect is a callback beyond the declared capacity: -Wm-yaN
+    declares banks 0..N-1, so a symbol at bank N or higher points into a bank the
+    ROM does not have.  The bound is read from the Makefile so it cannot rot when
+    -Wm-ya changes, and there is deliberately no hardcoded fallback: without
+    -Wm-ya the capacity is unknowable, so the check defers (_check_wm_ya reports
+    SKIP for the same input).
+
+    When romusage output is available this overlaps _check_wm_ya, which catches
+    the same overflow via the bank table.  It is retained because it is the only
+    capacity signal when romusage cannot run — the state that hid this very bug
+    until #441 made romusage resolvable on Windows.
     """
+    if declared is None:
+        return []
+    limit = declared * BANK_STRIDE
     bad = []
     for sym, addr in symbols.items():
-        if sym.startswith('_state_') and addr >= 0x30000:
+        if sym.startswith('_state_') and addr >= limit:
             bad.append((sym, hex(addr)))
     return bad
 
@@ -178,7 +198,13 @@ def _format_report(result):
         syms = ', '.join(f"{s} @ {a}" for s, a in result['bad_state_symbols'])
         lines.append(f"State symbols: FAIL — {syms}")
     else:
-        lines.append("State symbols: OK — all in bank 0/1/2")
+        declared = result['wm_ya_declared']
+        if declared is None:
+            lines.append("State symbols: OK — capacity unknown (no -Wm-ya)")
+        else:
+            lines.append(
+                f"State symbols: OK — all within declared capacity "
+                f"({declared} banks)")
 
     if result['bank_sym_errors']:
         lines.append("__bank_ symbols: FAIL")
@@ -225,16 +251,16 @@ def check(repo_root='.', romusage_output=None):
     banks = _parse_romusage(romusage_output)
     bank_results = _check_romusage(banks)
 
+    declared, highest, wm_ya_status = _check_wm_ya(makefile_path, banks)
+
     symbols = _parse_noi(noi_path)
-    bad_state = _check_state_symbols(symbols)
+    bad_state = _check_state_symbols(symbols, declared)
 
     manifest = {}
     if os.path.exists(manifest_path):
         with open(manifest_path) as f:
             manifest = json.load(f)
     bank_sym_errors = _check_bank_symbols(symbols, src_dir, manifest)
-
-    declared, highest, wm_ya_status = _check_wm_ya(makefile_path, banks)
 
     return {
         'bank_results': bank_results,

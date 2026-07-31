@@ -125,10 +125,27 @@ DEF _state_title 0x176A0
 DEF _state_hub 0xBAB
 """
 
-NOI_STATE_OVERFLOW = """\
+NOI_STATE_BANK3 = """\
 DEF _state_playing 0x17638
 DEF _state_title 0x34100
 """
+
+NOI_STATE_BANK31 = """\
+DEF _state_playing 0x17638
+DEF _state_title 0x1F0000
+"""
+
+NOI_STATE_BANK32 = """\
+DEF _state_playing 0x17638
+DEF _state_title 0x200000
+"""
+
+NOI_STATE_BANK16 = """\
+DEF _state_playing 0x17638
+DEF _state_title 0x100000
+"""
+
+MAKEFILE_YA32 = 'CFLAGS := -Wm-ya32\n'
 
 NOI_STATE_IN_BANK2 = """\
 DEF _state_playing 0x17638
@@ -144,14 +161,65 @@ class TestStateSymbols(unittest.TestCase):
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
-    def test_state_symbol_in_bank3_fail(self):
-        """State symbols in bank 3+ are flagged — banks 0/1/2 are acceptable."""
+    def test_state_symbol_in_bank3_is_now_ok(self):
+        """Bank 3 was the reported FAIL (#461). invoke() dispatch is bank-agnostic,
+        so bank 3 is as safe as bank 2 — the old ceiling was a snapshot, not a rule."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_OVERFLOW)
+            make_repo(d, noi=NOI_STATE_BANK3, makefile=MAKEFILE_YA32)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+
+    def test_state_symbol_at_highest_declared_bank_ok(self):
+        """-Wm-ya32 declares banks 0..31, so bank 31 is the last legal bank."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK31, makefile=MAKEFILE_YA32)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+
+    def test_state_symbol_beyond_declared_capacity_fails(self):
+        """Bank 32 under -Wm-ya32 is a bank the cartridge does not have."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         bad = result['bad_state_symbols']
         self.assertEqual(len(bad), 1)
         self.assertIn('_state_title', bad[0][0])
+
+    def test_bound_follows_the_makefile_not_a_constant(self):
+        """The same symbol that passes under -Wm-ya32 must FAIL under -Wm-ya16.
+        This is what proves the bound is derived rather than hardcoded (R5)."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK16, makefile='CFLAGS := -Wm-ya16\n')
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(len(result['bad_state_symbols']), 1)
+
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK16, makefile=MAKEFILE_YA32)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+
+    def test_no_wm_ya_skips_the_check(self):
+        """Capacity is unknowable without -Wm-ya, so the check defers rather than
+        inventing a default. _check_wm_ya already reports SKIP for this case."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK32, makefile='CFLAGS := -Wl-j\n')
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+        self.assertEqual(result['wm_ya_status'], 'SKIP')
+
+    def test_state_check_is_the_only_signal_when_romusage_is_unavailable(self):
+        """The non-redundancy case, and the exact condition that hid #461 for months.
+
+        With no romusage output there are no banks, so _check_wm_ya returns PASS and
+        the .noi-derived state check is the only capacity signal left. If this test
+        ever goes green-by-vacuum, the check really has become dead weight.
+        """
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
+            result = bank_post_build.check(d, romusage_output='')
+        self.assertEqual(result['wm_ya_status'], 'PASS')
+        self.assertEqual(len(result['bad_state_symbols']), 1)
+        self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
 
     def test_state_symbol_in_bank2_ok(self):
         """State symbols in bank 2 are allowed — invoke() uses .bank field for safe dispatch."""
@@ -300,8 +368,9 @@ class TestOverallStatus(unittest.TestCase):
         self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
     def test_state_overflow_overall_fail(self):
+        """A state symbol beyond declared capacity still drives overall FAIL."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_OVERFLOW)
+            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
 
