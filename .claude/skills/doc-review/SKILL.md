@@ -58,3 +58,31 @@ Follow the **abbreviated doc-only step sequence** from `CLAUDE.md`:
 4. Smoketest: launch ROM via **PowerShell tool** (Bash exits silently on Windows): `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`; **wait for the user to confirm it looks correct** before continuing
 5. Commit via **PowerShell tool**: `git add <files>; git commit -m "docs: <message>"`
 6. Push branch and create PR with `Closes #N` in the body
+
+---
+
+## Factory mode
+
+Active when `NUKE_FACTORY_RUN` is set — the doc-only route of a `/factory` run (#437 R10).
+It **overrides Step 3 and Step 4 above**.
+
+- **Step 1 (Scope Gate) still applies in full.** GATE already classified the spec via
+  `python tools/spec_lint.py --issue <N> --json` → `doc_only`. If any `.c`/`.h` file or
+  `bank-manifest.json` turns up here anyway, that is a contradiction: stop, record a `failure`
+  event, and follow the terminal-failure path in `.claude/skills/factory/references/stages.md`.
+- **Step 2 (Cross-File Consistency Check) still applies**, but "get explicit user confirmation"
+  is not available. Resolve each risk conservatively and record it:
+  ```
+  python tools/factory_event.py --issue <N> --kind decision --field "text=<risk and how it was resolved>"
+  ```
+- **Step 3 (Worktree Check):** the worktree already exists — PLAN created
+  `.claude/worktrees/factory-issue-<N>` on branch `factory-issue-<N>`. Do not create another and
+  do not rename the branch.
+- **Step 4:** the abbreviated sequence's steps 1-3 are unchanged (edit, fetch+merge, clean
+  build). Step 4's Emulicious launch is replaced by
+  `python tools/smoketest_headless.py --scenario generic-smoke --json` — **the clean build and
+  the smoketest are kept on the doc-only route** (#437 R10); only the human confirmation goes.
+  Steps 5-6 (commit, push, PR) are performed by the factory's SHIP stage with the
+  `factory_report`-rendered body. Never `--no-verify`.
+
+Outside a factory run every hard stop and confirmation above fires exactly as written.
