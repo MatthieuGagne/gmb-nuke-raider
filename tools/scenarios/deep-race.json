@@ -1,7 +1,7 @@
 {
   "name": "deep-race",
   "blocking": false,
-  "watch": ["_hp", "_px", "_py", "_active_lap_count", "_racer_active"],
+  "watch": ["_hp", "_px", "_py", "_active_lap_count", "_rs_laps", "_racer_active"],
   "steps": [
     {"action": "advance", "frames": 240},
     {"action": "press", "buttons": ["start"], "delay": 10},
@@ -32,6 +32,7 @@
 
     {"action": "press", "buttons": ["down"], "delay": 240},
     {"action": "assert_memory", "address": "_py", "value": 300, "op": "ge"},
+    {"action": "assert_memory", "address": "_rs_laps", "value": 1, "op": "ge"},
     {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
     {"action": "screenshot", "out": "build/smoketest/deep-race/lap-complete.png"}
   ]
