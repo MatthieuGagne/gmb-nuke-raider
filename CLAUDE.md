@@ -175,8 +175,12 @@ ADRs are closed on acceptance, so the default open-only filter reports zero and 
 
 Provenance is not a `Type` — "this came out of run N" lives in the issue body. `Log` typing is
 owned end-to-end by `tools/factory_publish.py` (ADR 0006 (#475)); `PRD` by the `/prd` skill;
-`ADR` by the `grill-with-docs` overlay. #465 is a documented exception: it is `docs:`-titled but
-stays `PRD`.
+`ADR` by the `grill-with-docs` overlay.
+
+Two documented exceptions to the table: #465 is `docs:`-titled but stays `PRD`; and **`Epic` is
+a seventh option, kept deliberately**, for a master issue that owns a set of child specs (#432).
+`Epic` has no title prefix and is set by hand — a `feat:`-titled epic keeps `Type = Epic`, not
+`PRD`. Do not remove it from the field.
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 

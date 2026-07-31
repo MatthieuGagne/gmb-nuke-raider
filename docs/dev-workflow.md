@@ -91,6 +91,10 @@ edited. `tools/factory_publish.py` performs the identical sequence for `log`-lab
 There is no `Follow-up` type — provenance belongs in the issue body. Only `prd`, `adr` and `log`
 exist as document labels; `Bug` and `Chore` are board types with no matching label.
 
+`Epic` is a seventh option, kept deliberately and outside the table: it marks a master issue that
+owns a set of child specs (#432). It has no title prefix and is assigned by hand, so a
+`feat:`-titled epic keeps `Type = Epic` rather than `PRD`. Do not remove it from the field.
+
 ### TDD cycle (for C files)
 
 When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatch the `gbdk-expert` agent with:
