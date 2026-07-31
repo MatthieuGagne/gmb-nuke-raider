@@ -59,6 +59,18 @@ CLAUDE.local.md
 # (see ADR 0001, issue #466)
 .claude/settings.local.json
 
+# Pi harness (issue #497). Deny-all-then-allow so anything Pi writes at
+# runtime — .pi/npm/ for project package installs, .pi/sessions/, and whatever
+# a later version adds — stays local, while the two committed files remain
+# tracked. Note `.pi/*` and not `.pi/`: git must still descend into the
+# directory for the negations below to be reachable.
+.pi/*
+!.pi/settings.json
+!.pi/agents/
+
+# pi-subagents run artifacts (transcripts, per-agent input/output at repo root)
+.pi-subagents/
+
 
 # Superpowers SDD workspace (transient ledger written by baseline subagent-driven-development)
 .superpowers/

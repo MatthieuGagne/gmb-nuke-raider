@@ -158,6 +158,36 @@ class NoVerifyTests(unittest.TestCase):
                 factory=True)[0], 2)
 
 
+class PiHarnessTests(unittest.TestCase):
+    """Pi registers its shell tool as `bash`, not Claude's `Bash` (#497 R5).
+
+    Matched case-insensitively, so the gate holds whichever harness is
+    driving. Without this the hook silently allows every command under Pi.
+    """
+
+    def test_pi_bash_force_push_is_refused(self):
+        code, err = run('git push --force origin feat', tool='bash')
+        self.assertEqual(code, 2)
+        self.assertIn('force push', err)
+
+    def test_pi_bash_pr_merge_is_refused(self):
+        self.assertEqual(run('gh pr merge 497 --squash', tool='bash')[0], 2)
+
+    def test_pi_bash_push_to_master_is_refused(self):
+        self.assertEqual(run('git push origin master', tool='bash')[0], 2)
+
+    def test_pi_bash_factory_rules_still_gated(self):
+        self.assertEqual(
+            run('git reset --hard HEAD~1', tool='bash', factory=True)[0], 2)
+
+    def test_pi_bash_allows_a_normal_push(self):
+        self.assertEqual(run('git push -u origin feat-x', tool='bash')[0], 0)
+
+    def test_unrelated_lowercase_tool_is_still_ignored(self):
+        self.assertEqual(
+            run('git push --force origin feat', tool='read')[0], 0)
+
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_run
 
