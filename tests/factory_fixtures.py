@@ -106,7 +106,7 @@ def build_registry(tmpdir):
             _png(os.path.join(shots, name))
 
         ev = lambda kind, **kw: factory_run.append_event(
-            436, kind, registry=reg, render=False, **kw)
+            436, kind, registry=reg, **kw)
         ev('start', slug='observability', branch='worktree-obs-436',
            worktree=wt436, plan='docs/plans/2026-07-26-issue436-observability.md',
            stage='GATE')
@@ -127,20 +127,20 @@ def build_registry(tmpdir):
            reason='force push')
         # Last event lands one minute before FIXED_NOW → active, not idle.
         _at(FIXED_NOW - timedelta(seconds=60))
-        factory_run.append_event(436, 'stage', registry=reg, render=False,
+        factory_run.append_event(436, 'stage', registry=reg,
                                  stage='VERIFY')
 
         _at(START)
         wt437 = _worktree(tmpdir, 437)
-        factory_run.append_event(437, 'start', registry=reg, render=False,
+        factory_run.append_event(437, 'start', registry=reg,
                                  slug='quiet', branch='worktree-quiet-437',
                                  worktree=wt437, stage='GATE')
         _at(FIXED_NOW - timedelta(hours=2))
-        factory_run.append_event(437, 'stage', registry=reg, render=False,
+        factory_run.append_event(437, 'stage', registry=reg,
                                  stage='BUILD')
 
         _at(START)
-        factory_run.append_event(999, 'start', registry=reg, render=False,
+        factory_run.append_event(999, 'start', registry=reg,
                                  slug='ghost', branch='worktree-ghost-999',
                                  worktree=_worktree(tmpdir, 999, create=False),
                                  stage='BUILD')
@@ -155,7 +155,7 @@ def build_shipped_run(tmpdir):
     reset = pinned_clock(START)
     try:
         ev = lambda kind, **kw: factory_run.append_event(
-            440, kind, registry=reg, render=False, **kw)
+            440, kind, registry=reg, **kw)
         ev('start', slug='observability', branch='worktree-obs-440',
            worktree=_worktree(tmpdir, 440),
            plan='docs/plans/2026-07-26-issue440-demo.md', stage='GATE')
@@ -184,7 +184,7 @@ def build_failed_run(tmpdir):
     reset = pinned_clock(START)
     try:
         ev = lambda kind, **kw: factory_run.append_event(
-            441, kind, registry=reg, render=False, **kw)
+            441, kind, registry=reg, **kw)
         ev('start', slug='autopsy-demo', branch='worktree-autopsy-441',
            worktree=_worktree(tmpdir, 441),
            plan='docs/plans/2026-07-26-issue441-demo.md', stage='GATE')

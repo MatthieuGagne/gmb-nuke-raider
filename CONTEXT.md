@@ -125,6 +125,16 @@ The current standing of a run, derived from the journal. Never the authority —
 if the two disagree, the journal is right.
 _Avoid_: the state file, run status, run record
 
+**Run issue**:
+The GitHub issue that renders one **Run**, re-written as the run progresses.
+_Avoid_: status issue, dashboard issue, tracking issue — and never the **spec
+issue**, which is the issue the run is working on
+
+**Published copy**:
+The rendering of a run on GitHub. Always allowed to lag the **Run registry**,
+which stays the authority.
+_Avoid_: the dashboard, the mirror, the remote state
+
 **Gate result**:
 The recorded outcome of one **Gate** within a stage.
 _Avoid_: gate — that names the check itself, not the record of how it came out

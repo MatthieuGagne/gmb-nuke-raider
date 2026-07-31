@@ -68,7 +68,7 @@ class TestNoAbsolutePaths(ReportTestCase):
     def test_a_decision_carrying_a_path_is_redacted(self):
         reg = factory_fixtures.build_failed_run(self.tmp)
         factory_run.append_event(
-            441, 'decision', registry=reg, render=False,
+            441, 'decision', registry=reg,
             text=r'Pinned GBDK_HOME to C:\gbdk for the build.')
         body = factory_report.render(factory_run.load_state(441, reg))
         self.assertNotIn('C:\\gbdk', body)
@@ -86,7 +86,7 @@ class TestNoAbsolutePaths(ReportTestCase):
 class TestPermissionSection(ReportTestCase):
     def test_permission_events_are_reported_when_present(self):
         reg = factory_fixtures.build_shipped_run(self.tmp)
-        factory_run.append_event(440, 'permission', registry=reg, render=False,
+        factory_run.append_event(440, 'permission', registry=reg,
                                  tool='Bash', outcome='denied',
                                  command='git push --force origin x')
         body = factory_report.render(factory_run.load_state(440, reg))
@@ -100,7 +100,7 @@ class TestPermissionSection(ReportTestCase):
 
     def test_pipe_in_a_command_is_escaped(self):
         reg = factory_fixtures.build_shipped_run(self.tmp)
-        factory_run.append_event(440, 'permission', registry=reg, render=False,
+        factory_run.append_event(440, 'permission', registry=reg,
                                  tool='Bash', outcome='blocked',
                                  command='ls | wc -l')
         body = factory_report.render(factory_run.load_state(440, reg))

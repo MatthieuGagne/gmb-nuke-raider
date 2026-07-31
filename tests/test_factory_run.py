@@ -157,8 +157,7 @@ class JournalTestCase(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def append(self, kind, issue=436, **fields):
-        return factory_run.append_event(issue, kind, registry=self.reg,
-                                        render=False, **fields)
+        return factory_run.append_event(issue, kind, registry=self.reg, **fields)
 
 
 class TestAppendAndRebuild(JournalTestCase):
@@ -256,6 +255,29 @@ class TestAppendAndRebuild(JournalTestCase):
 
     def test_unknown_run_is_none(self):
         self.assertIsNone(factory_run.load_state(12345, self.reg))
+
+    def test_start_records_the_pull_request(self):
+        """#472 correction 3: an emitter's pr= reaches the projection."""
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'start', registry=reg, slug='x',
+                                 branch='b', pr='https://example/pull/9')
+        self.assertEqual(factory_run.load_state(500, reg)['pr'],
+                         'https://example/pull/9')
+
+    def test_scenario_records_whether_it_was_blocking(self):
+        """#472 correction 3: an emitter's blocking= reaches the projection."""
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'scenario', registry=reg,
+                                 scenario='reach-race', result='pass',
+                                 blocking=True)
+        scenarios = factory_run.load_state(500, reg)['scenarios']
+        self.assertEqual(scenarios[0]['blocking'], True)
+
+    def test_append_event_takes_no_render_argument(self):
+        """#472 R14: rendering is not a side effect of the writer any more."""
+        reg = os.path.join(self.tmp, 'reg')
+        with self.assertRaises(TypeError):
+            factory_run.append_event(500, 'start', registry=reg, render=True)
 
 
 class TestOrderedGates(JournalTestCase):
