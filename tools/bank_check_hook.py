@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """PreToolUse hook: run bank_check for any src/*.c or src/*.h write/edit.
 
-Reads tool-use JSON from stdin. Exits 1 (blocking) if bank_check fails.
-Exits 0 silently for files outside src/, non-C/H files, or parse errors.
+Reads tool-use JSON from stdin. Exits 2 — the blocking PreToolUse exit code in
+both Claude Code and pi-hooks — if bank_check fails. Exits 0 silently for
+files outside src/, non-C/H files, or parse errors.
+
+Two payload shapes are accepted: Claude Code's Write/Edit send ``file_path``,
+Pi's write/edit send ``path`` (#497).
 """
 import os
 import subprocess
@@ -19,7 +23,9 @@ def main():
     hook_common.reroot(data)
 
     tool_input = data.get('tool_input', {})
-    file_path = tool_input.get('file_path', '')
+    # Claude Code sends file_path; Pi sends path. Claude wins when both are
+    # present so a Claude payload can never be reinterpreted.
+    file_path = tool_input.get('file_path') or tool_input.get('path') or ''
 
     if not file_path:
         sys.exit(0)
@@ -43,7 +49,11 @@ def main():
     if result.stderr:
         print(result.stderr, end='', file=sys.stderr)
 
-    sys.exit(result.returncode)
+    # bank_check exits 1 on failure, but 1 is a *non-blocking* hook error in
+    # both harnesses: pi-hooks only aborts the tool call on exit 2
+    # (@hsingjui/pi-hooks src/hooks/tool-hooks.ts), and Claude Code documents
+    # the same. Exit 1 is why this gate reported but never blocked.
+    sys.exit(2 if result.returncode != 0 else 0)
 
 
 if __name__ == '__main__':
