@@ -22,6 +22,14 @@ uint8_t race_state_get_laps(uint8_t slot) BANKED;   /* 0-based completed laps */
 uint8_t race_state_get_lap_total(void) BANKED;
 uint8_t race_state_all_cp_cleared(uint8_t slot) BANKED;
 
+/* Backing storage for the accessors above. Exported (non-static) for one reason
+ * only: the headless scenario engine resolves symbols by name from
+ * build/game-manifest.json / build/nuke-raider.noi, and `static` variables appear
+ * in neither, so lap progress could not be asserted (#448). NOT a caller API —
+ * game code uses race_state_get_laps() / race_state_get_cp(). */
+extern uint8_t rs_laps[MAX_RACERS];
+extern uint8_t rs_cp_next[MAX_RACERS];
+
 /* Position ranking — returns player's 1-based ordinal rank among all active slots */
 uint8_t race_state_rank_player(void) BANKED;
 

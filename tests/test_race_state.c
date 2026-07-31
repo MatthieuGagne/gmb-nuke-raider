@@ -401,6 +401,32 @@ void test_pos_from_manhattan_nonsquare_checkpoint(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, pos_from_manhattan(21, 5, 0, 5, &cp));
 }
 
+/* ---- exported backing arrays (#448) ---- */
+
+void test_rs_laps_readable_from_outside_module(void) {
+    /* rs_laps is exported (non-static) so headless scenarios can assert lap
+     * progress by symbol name. The load-bearing evidence here is that this
+     * translation unit COMPILES AND LINKS against the array at all — that is
+     * what proves the external linkage the scenario engine depends on. The
+     * accessor comparison is a guard against a future refactor turning the
+     * accessor into a read of some other storage. */
+    race_state_init(3u);
+    race_state_set_active(PLAYER_SLOT, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0u, rs_laps[PLAYER_SLOT]);
+
+    race_state_advance_lap(PLAYER_SLOT);   /* lap_total=3: 0+1 < 3, so laps -> 1 */
+
+    TEST_ASSERT_EQUAL_UINT8(1u, rs_laps[PLAYER_SLOT]);
+    TEST_ASSERT_EQUAL_UINT8(race_state_get_laps(PLAYER_SLOT), rs_laps[PLAYER_SLOT]);
+}
+
+void test_rs_cp_next_readable_from_outside_module(void) {
+    race_state_init(3u);
+    race_state_set_cp_for_test(PLAYER_SLOT, 2u);
+    TEST_ASSERT_EQUAL_UINT8(2u, rs_cp_next[PLAYER_SLOT]);
+    TEST_ASSERT_EQUAL_UINT8(race_state_get_cp(PLAYER_SLOT), rs_cp_next[PLAYER_SLOT]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_init_sets_lap_total);
@@ -422,6 +448,8 @@ int main(void) {
     RUN_TEST(test_advance_lap_final_returns_one);
     RUN_TEST(test_advance_lap_single_lap_race_returns_one);
     RUN_TEST(test_advance_lap_per_slot_independent);
+    RUN_TEST(test_rs_laps_readable_from_outside_module);
+    RUN_TEST(test_rs_cp_next_readable_from_outside_module);
     RUN_TEST(test_rank_player_alone_is_1);
     RUN_TEST(test_rank_player_more_laps_is_1);
     RUN_TEST(test_rank_player_fewer_laps_is_2);
