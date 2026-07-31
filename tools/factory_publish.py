@@ -902,6 +902,41 @@ def comment_once(state, publish, run_issue, warnings, registry=None,
     return True
 
 
+def open_pr(issue, branch, title, body_path, publish=None, warnings=None,
+            runner=subprocess.run):
+    """Open the run's pull request. Returns (url, created).
+
+    SHIP used to call ``gh pr create`` itself. That is the run's entire
+    deliverable, and a raw outward-facing gh write is exactly what a harness
+    permission gate stops — so a run could do all its work and then fail to
+    hand it over (#481). Every other GitHub write already goes through this
+    module; this closes the last hole.
+
+    Fail-open like the rest of this file: a PR that cannot be opened is
+    reported through *warnings* and never raises. The caller decides what that
+    means — and for SHIP it means a run failure, not a publish degradation,
+    because there is nothing to review without it.
+    """
+    warnings = warnings if warnings is not None else []
+    if not os.path.exists(body_path):
+        _warn(warnings, "PR not opened: body file missing (%s)" % body_path)
+        return None, False
+
+    proc = gh(["pr", "create", "--head", branch, "--title", title,
+               "--body-file", body_path], runner=runner)
+    if proc.returncode != 0:
+        if _already(proc, "already exists"):
+            # Idempotent by design: --resume must not fail on a second SHIP.
+            return None, False
+        _warn(warnings, "PR not opened: %s" % _tail(proc.stderr))
+        return None, False
+
+    url = (proc.stdout or "").strip().splitlines()[-1] if proc.stdout else None
+    if publish is not None and url:
+        publish["pr_url"] = url
+    return url, True
+
+
 def publish_run(issue, registry=None, stage_completed=None, terminal=False,
                 runner=subprocess.run, now=None):
     """Re-render this run's GitHub surfaces. Never raises (R11).
@@ -979,6 +1014,14 @@ def build_parser():
                         help="render the body to stdout, touch no network")
     parser.add_argument("--now", default=None,
                         help="pin the clock, UTC ISO-8601 (determinism seam)")
+    parser.add_argument("--open-pr", action="store_true", dest="open_pr",
+                        help="open the run's pull request")
+    parser.add_argument("--branch", default=None,
+                        help="head branch for --open-pr")
+    parser.add_argument("--title", default=None,
+                        help="PR title for --open-pr")
+    parser.add_argument("--body-file", default=None, dest="body_file",
+                        help="PR body file for --open-pr")
     return parser
 
 
@@ -997,6 +1040,27 @@ def main(argv=None):
               % (args.stage_completed, ", ".join(factory_run.STAGES)),
               file=sys.stderr)
         return EXIT_MISUSE
+
+    if args.open_pr:
+        missing = [n for n, v in (("--branch", args.branch),
+                                  ("--title", args.title),
+                                  ("--body-file", args.body_file))
+                   if not v]
+        if missing:
+            sys.stderr.write("factory-publish: --open-pr requires %s\n"
+                             % ", ".join(missing))
+            return EXIT_MISUSE
+        warnings = []
+        url, _ = open_pr(args.issue, args.branch, args.title, args.body_file,
+                         warnings=warnings)
+        for message in warnings:
+            sys.stderr.write("factory-publish: WARNING: %s\n" % message)
+        if url:
+            sys.stdout.write(url + "\n")
+            return 0
+        # The PR is the deliverable: unlike every other call in this tool,
+        # exit 1 here is a real failure, not a publication degradation.
+        return 1
 
     try:
         registry = args.registry or factory_run.registry_root()

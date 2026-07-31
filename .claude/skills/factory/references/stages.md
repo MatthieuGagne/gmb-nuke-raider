@@ -16,11 +16,15 @@ number. Pass `--attempt <k>` on every retry.
 1. `LOG GATE -- python tools/spec_lint.py --issue <N> --json`
 2. Record the gate result:
    `python tools/factory_event.py --issue <N> --kind gate --field stage=GATE --field gate=spec-lint --field result=<pass|fail>`
-3. **Exit 1 (invalid spec) → terminal, before any worktree exists.** Comment the missing
-   sections on the spec issue, then follow *Terminal failure* in `SKILL.md`:
+3. **Exit 1 (invalid spec) → terminal, before any worktree exists.** Do **not** comment on the
+   spec issue yourself — `factory_publish` owns every GitHub surface, and a raw `gh` write is
+   what stalls an unattended run (#481). Put the lint errors in the failure message instead:
    ```
-   gh issue comment <N> --body-file <path to a file listing the lint errors>
+   python tools/factory_event.py --issue <N> --kind failure --field "message=GATE: spec_lint rejected the spec — missing <sections>"
    ```
+   `comment_once` renders that verbatim into the spec-issue comment as
+   `Failed in GATE: <message>`, so the missing sections reach the human exactly once, through
+   the sanctioned path. Then follow *Terminal failure* in `SKILL.md`.
    Exit 2 is an operational error (could not fetch the issue) — also terminal, different message.
 4. Read `doc_only` from the JSON. `true` → the doc-only route (see *Doc-only route* below).
 5. `python tools/factory_publish.py --issue <N> --stage-completed GATE`
@@ -117,7 +121,14 @@ number. Pass `--attempt <k>` on every retry.
 3. `LOG SHIP -- git push -u origin factory-issue-<N>`. Budget ~29 s: the `pre-push` repository
    hook runs `make clean && make`. **Never `--no-verify`.** If push fails on credentials:
    `gh auth setup-git`.
-4. `LOG SHIP -- gh pr create --title "<type>: <summary> (#<N>)" --body-file .factory/runs/issue-<N>/pr-body.md`
+4. Open the PR through the publisher — never `gh pr create` directly (#481):
+   ```
+   LOG SHIP -- python tools/factory_publish.py --issue <N> --open-pr --branch factory-issue-<N> --title "<type>: <summary> (#<N>)" --body-file .factory/runs/issue-<N>/pr-body.md
+   ```
+   It prints the PR URL on stdout. **Exit 1 here is terminal, not a degradation** — this is the
+   one `factory_publish` call where that is true, because the PR is the run's deliverable and
+   there is nothing to review without it. An already-open PR for the branch exits 0 and prints
+   nothing new, so `--resume` is safe.
 5. `python tools/factory_event.py --issue <N> --kind finish --field result=shipped`
    plus a `--kind start --field pr=<url>` style update is **not** needed — record the PR with
    `--kind finish --field result=shipped --field pr=<url>`.
