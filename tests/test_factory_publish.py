@@ -1,4 +1,5 @@
 """Tests for tools/factory_publish.py"""
+import io
 import json
 import os
 import shutil
@@ -6,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_publish
@@ -971,3 +973,93 @@ class TestCli(PublishTestCase):
         self.assertEqual(
             factory_publish.exit_code(factory_publish.PublishResult(1, [], [])),
             factory_publish.EXIT_OK)
+
+
+class OpenPrTest(unittest.TestCase):
+    """factory_publish is the only thing that may create a PR (#481 R2)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.registry = self.tmp.name
+        self.addCleanup(self.tmp.cleanup)
+        self.body = os.path.join(self.registry, 'pr-body.md')
+        with open(self.body, 'w', encoding='utf-8') as fh:
+            fh.write('## Summary\n\nbody\n')
+
+    def _runner(self, code=0, out='https://github.com/o/r/pull/7\n', err=''):
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append(list(argv))
+            return subprocess.CompletedProcess(argv, code, out, err)
+
+        return runner, calls
+
+    def test_creates_the_pr_and_returns_its_url(self):
+        runner, calls = self._runner()
+        url, created = factory_publish.open_pr(
+            461, 'factory-issue-461', 'fix: thing (#461)', self.body,
+            runner=runner)
+        self.assertEqual(url, 'https://github.com/o/r/pull/7')
+        self.assertTrue(created)
+        self.assertEqual(calls[0][:3], ['gh', 'pr', 'create'])
+        self.assertIn('--body-file', calls[0])
+        self.assertIn(self.body, calls[0])
+
+    def test_passes_the_branch_as_head(self):
+        runner, calls = self._runner()
+        factory_publish.open_pr(461, 'factory-issue-461', 't', self.body,
+                                runner=runner)
+        self.assertIn('--head', calls[0])
+        self.assertIn('factory-issue-461', calls[0])
+
+    def test_scrubs_git_dir_from_the_environment(self):
+        seen = {}
+
+        def runner(argv, **kwargs):
+            seen.update(kwargs.get('env') or {})
+            return subprocess.CompletedProcess(argv, 0, 'u\n', '')
+
+        factory_publish.open_pr(461, 'b', 't', self.body, runner=runner)
+        self.assertNotIn('GIT_DIR', seen)
+        self.assertNotIn('GIT_WORK_TREE', seen)
+
+    def test_existing_pr_is_not_an_error(self):
+        runner, _ = self._runner(
+            code=1, out='',
+            err='a pull request for branch "factory-issue-461" already exists: #7')
+        warnings = []
+        url, created = factory_publish.open_pr(
+            461, 'factory-issue-461', 't', self.body, warnings=warnings,
+            runner=runner)
+        self.assertFalse(created)
+        self.assertEqual(warnings, [])
+
+    def test_real_failure_reports_and_does_not_raise(self):
+        runner, _ = self._runner(code=1, out='', err='HTTP 502')
+        warnings = []
+        url, created = factory_publish.open_pr(
+            461, 'b', 't', self.body, warnings=warnings, runner=runner)
+        self.assertIsNone(url)
+        self.assertFalse(created)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn('502', warnings[0])
+
+    def test_missing_body_file_is_reported_not_raised(self):
+        runner, calls = self._runner()
+        warnings = []
+        url, created = factory_publish.open_pr(
+            461, 'b', 't', os.path.join(self.registry, 'nope.md'),
+            warnings=warnings, runner=runner)
+        self.assertIsNone(url)
+        self.assertEqual(calls, [])
+        self.assertEqual(len(warnings), 1)
+
+
+class OpenPrCliTest(unittest.TestCase):
+    def test_open_pr_without_branch_is_misuse(self):
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(
+                ['--issue', '461', '--open-pr', '--title', 't',
+                 '--body-file', 'x.md'])
+        self.assertEqual(code, 2)
