@@ -127,7 +127,7 @@ After making changes, verify with:
 - `/test` skill — run `make test` (host-side unit tests, gcc only)
 - `/build` skill — run `make` (full ROM build)
 
-**Windows note:** `romusage` is unavailable on this machine, so `make bank-post-build` exits 2 with a `FileNotFoundError` — this is a known environment limitation, NOT a code defect. The bank manifest is still validated during the build via `bank_check.py`; verify banks manually from the `.noi`/`.map` file if needed.
+**Windows note:** If `make bank-post-build` exits 2 with a `FileNotFoundError`, GBDK's `bin/` directory is missing from `PATH` — add it and retry. The `_run_romusage` helper in `tools/bank_post_build.py` already reports this exact error. If `make bank-post-build` exits 1 with a report, that is a real failure and must never be dismissed as environmental.
 
 ## Implementation Mode
 
