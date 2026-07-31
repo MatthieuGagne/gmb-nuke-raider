@@ -39,8 +39,12 @@ exit 0, so it can never block a session. Shared reference material for the overl
 `.claude/skill-overlays/references/`.
 
 Only skills with **no** upstream baseline (`prd`, `bank-pre-write`, `doc-review`,
-`design-an-interface`, `triage-issue`, the asset-pipeline skills, …) remain as real
+`design-an-interface`, `triage-issue`, `factory`, the asset-pipeline skills, …) remain as real
 directories under `.claude/skills/`.
+
+`factory` is the one that carries a `references/` subdirectory of its own
+(`.claude/skills/factory/references/stages.md`) — the overlays' shared references live under
+`.claude/skill-overlays/references/` and are a separate tree.
 
 ---
 
@@ -439,6 +443,7 @@ worktree, so a run stays explainable after its worktree is deleted.
     publish/                        # staged assets under their published names
     logs/<STAGE>.log                # stage logs, appended by factory_log (#450)
     autopsy/attempt-<k>/            # evidence copied out of a failed attempt
+  cache/master-<sha>.gb             # reference ROM per master SHA, lazily filled (#437)
 ```
 
 `.factory/` is gitignored. Resolution is `dirname(abspath(git rev-parse --git-common-dir))` —
@@ -452,6 +457,9 @@ worktree, so a run stays explainable after its worktree is deleted.
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** (ADR 0005): tees stage command output into `logs/<STAGE>.log`. |
 | `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 0006 (#475)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
+| `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` is validated against `factory_run.EVENT_KINDS`. |
+| `tools/factory_cache.py` | **Sole writer of `cache/`** (#437 R5): the `origin/master` reference ROM, keyed by commit SHA, filled lazily on the first smoketest failure. |
+| `.claude/skills/factory/` | The orchestrator. Writes nothing itself — it calls the tools above and `factory_publish` at every stage transition, gate result and terminal event. |
 | `tools/factory_status.py` | Read-only terminal dashboard (`--json`). Writes nothing at all. |
 | `tools/factory_report.py` | Deterministic PR body from state + journal. Writes nothing in the registry. |
 | `tools/factory_permission_hook.py` | `Notification` hook: records a run blocked on a permission prompt. |
@@ -558,6 +566,10 @@ python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Comman
 python tools/factory_publish.py --issue 437 --stage-completed BUILD
 python tools/factory_publish.py --issue 437 --terminal
 python tools/factory_publish.py --issue 437 --dry-run
+python tools/factory_event.py --issue 437 --kind stage --field stage=BUILD
+python tools/factory_event.py --issue 437 --kind decision --field "text=widened the rule"
+python tools/factory_cache.py                           # reference ROM path on stdout
+python tools/factory_cache.py --print-only              # cache path, never builds
 ```
 
 `factory_status` and `factory_report` exit `0` whenever they render and `2` on operational
@@ -566,6 +578,11 @@ a tool error. `factory_log` passes the child's exit code through verbatim, retur
 the command cannot be spawned, and `2` on misuse (unknown `--stage`, bad `--now`, no command
 after `--`). Commands are argv lists — never `shell=True`; a compound command names its shell
 explicitly, as in the `pwsh -NoProfile -Command` example above.
+
+`factory_event` exits `0` when the event is appended and `2` on misuse (unknown kind, malformed
+`--field`, bad `--now`) — it never exits `1`, because a run's content is never this tool's
+error. `factory_cache` exits `0` with the ROM path on stdout, `1` when the reference build
+itself failed, and `2` when it could not run.
 
 ### Publishing to GitHub
 
@@ -642,10 +659,31 @@ on denied commands.
 This is the one agent-specific surface here. Under any other agent no permission events are
 recorded, and a run with none renders as normal, not broken.
 
+### Reference-ROM cache
+
+VERIFY's blocking smoketest can diff a run against a reference ROM built from `origin/master`
+and report the first WRAM divergence (`--ref-rom`). That divergence is where a smoketest
+diagnosis starts — the project's two-ROM doctrine, never code inspection alone.
+
+The reference costs a full clean build, and only the failure path consumes it, so the cache is
+filled **lazily**: `tools/factory_cache.py` is called only after the blocking smoketest has
+already failed. It resolves `origin/master`, and on a miss builds that SHA in a temporary
+detached worktree under `cache/`, copies the ROM to `cache/master-<sha>.gb`, and removes the
+temporary tree. A second failure on the same master reuses the cached ROM for free.
+
+The cache is a Python tool rather than inline shell for a reason that is not stylistic: the deny
+gate's `FACTORY_ONLY` rules refuse `git worktree remove` for any shell tool call made while
+`NUKE_FACTORY_RUN` is set. A `PreToolUse` hook sees tool calls, not the `subprocess` calls made
+inside one, so the temporary tree can be cleaned up here and nowhere else.
+
+Exit codes: `0` the ROM path is on stdout (hit or fill), `1` the reference build failed, `2` the
+tool could not run at all.
+
 ### Retention
 
-None. `.factory/` grows without bound from screenshots, traces, stage logs and staged assets
-until deleted by hand, and GitHub release assets grow with it — one flapping spec accumulates
-per-attempt assets indefinitely. Deleting old assets is always safe because the local registry
-is the source of truth (#450 R5), but no automatic policy is specified. Accepted cost for a solo
-project.
+None. `.factory/` grows without bound from screenshots, traces, stage logs, staged assets and
+**cached reference ROMs — one per distinct `origin/master` SHA that a run has diagnosed
+against** — until deleted by hand, and GitHub release assets grow with it: one flapping spec
+accumulates per-attempt assets indefinitely. Deleting old assets is always safe because the
+local registry is the source of truth (#450 R5), and deleting `cache/` is always safe because it
+refills lazily. No automatic policy is specified. Accepted cost for a solo project.
