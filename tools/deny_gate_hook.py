@@ -6,7 +6,9 @@ raw string rather than tokenising is deliberate: it catches wrapper forms such
 as ``bash -c "git push --force"`` with the same pattern that catches the bare
 command, which prefix-matched deny rules cannot do.
 
-Exit 2 blocks the call and returns stderr to Claude; exit 0 allows it.
+Exit 2 blocks the call and returns stderr to the agent; exit 0 allows it. Both
+harnesses gate on 2 specifically — under Pi, any other non-zero code is
+reported but does not block (@hsingjui/pi-hooks, src/hooks/tool-hooks.ts).
 
 Two rule sets:
   UNCONDITIONAL  never legitimate here.
@@ -28,6 +30,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hook_common
 
 SHELL_TOOLS = ('Bash', 'PowerShell')
+
+# Matched case-insensitively: Claude Code sends `Bash`/`PowerShell`, Pi sends
+# its raw lowercase tool name `bash` (#497 R5). Comparing on the lowered name
+# admits the Pi spelling without widening the set of gated tools.
+_SHELL_TOOLS_FOLDED = frozenset(t.lower() for t in SHELL_TOOLS)
+
+
+def is_shell_tool(tool_name):
+    """True when *tool_name* is a shell tool in either harness's spelling."""
+    return (isinstance(tool_name, str)
+            and tool_name.lower() in _SHELL_TOOLS_FOLDED)
 
 # A git push whose argument run contains a force flag in any spelling.
 # (?<![\w-]) stops -f matching inside --follow-tags.
@@ -101,7 +114,7 @@ def main():
     if data is None:
         sys.exit(0)  # fail open, consistent with the other hooks
 
-    if data.get('tool_name') not in SHELL_TOOLS:
+    if not is_shell_tool(data.get('tool_name')):
         sys.exit(0)
 
     command = data.get('tool_input', {}).get('command', '')
