@@ -151,9 +151,9 @@ force-pushes, never passes `--no-verify`, and never deletes a worktree or branch
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill, which labels the
 issue `prd`, adds it to the "Nuke Raider — Documents" project and sets `Type = PRD` as three
-explicit commands. `prd` joins `adr` and `log` as the label set for document kinds; `bug:`,
-`fix:`, `docs:` and `chore:` issues are not labeled — their kind is expressed on the board via
-`Type`.
+explicit commands. `prd` joins `adr`, `log` and `epic` as the label set for document
+kinds; `bug:`, `fix:`, `docs:` and `chore:` issues are not labeled — their kind is expressed on
+the board via `Type`.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
 in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues**, closed
 on acceptance and cited as `ADR NNNN (#issue)`. Allocate the next number with
@@ -166,6 +166,7 @@ ADRs are closed on acceptance, so the default open-only filter reports zero and 
 
 | Title prefix | Type |
 |---|---|
+| `feat:` carrying the `epic` label | Epic |
 | `feat:` | PRD |
 | `fix:` / `bug:` | Bug |
 | `docs:` / `chore:` / `refactor:` / `test:` | Chore |
@@ -173,14 +174,16 @@ ADRs are closed on acceptance, so the default open-only filter reports zero and 
 | `run …` | Log |
 | `review:` | Review |
 
+The `Epic` row is first: an epic is `feat:`-titled like any PRD, so the `epic` label — not the
+title — is what distinguishes it. A master issue that owns a set of child specs (#432) gets
+`--label epic` **in addition to** `prd`, and `Type = Epic` rather than `PRD`. Do not remove
+`Epic` from the field.
+
 Provenance is not a `Type` — "this came out of run N" lives in the issue body. `Log` typing is
 owned end-to-end by `tools/factory_publish.py` (ADR 0006 (#475)); `PRD` by the `/prd` skill;
-`ADR` by the `grill-with-docs` overlay.
+`ADR` by the `grill-with-docs` overlay; `Epic` by hand.
 
-Two documented exceptions to the table: #465 is `docs:`-titled but stays `PRD`; and **`Epic` is
-a seventh option, kept deliberately**, for a master issue that owns a set of child specs (#432).
-`Epic` has no title prefix and is set by hand — a `feat:`-titled epic keeps `Type = Epic`, not
-`PRD`. Do not remove it from the field.
+One documented exception to the table: #465 is `docs:`-titled but stays `PRD`.
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 

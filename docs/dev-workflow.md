@@ -81,6 +81,7 @@ edited. `tools/factory_publish.py` performs the identical sequence for `log`-lab
 
 | Title prefix | Type |
 |---|---|
+| `feat:` carrying the `epic` label | Epic |
 | `feat:` | PRD |
 | `fix:` / `bug:` | Bug |
 | `docs:` / `chore:` / `refactor:` / `test:` | Chore |
@@ -88,12 +89,13 @@ edited. `tools/factory_publish.py` performs the identical sequence for `log`-lab
 | `run …` | Log |
 | `review:` | Review |
 
-There is no `Follow-up` type — provenance belongs in the issue body. Only `prd`, `adr` and `log`
-exist as document labels; `Bug` and `Chore` are board types with no matching label.
+The `Epic` row is first and is matched by **label, not prefix**: an epic is `feat:`-titled like
+any other PRD. A master issue owning a set of child specs (#432) carries `epic` in addition to
+`prd`, and is typed `Epic`. It is the one type assigned by hand — `/prd` never sets it. Do not
+remove `Epic` from the field.
 
-`Epic` is a seventh option, kept deliberately and outside the table: it marks a master issue that
-owns a set of child specs (#432). It has no title prefix and is assigned by hand, so a
-`feat:`-titled epic keeps `Type = Epic` rather than `PRD`. Do not remove it from the field.
+There is no `Follow-up` type — provenance belongs in the issue body. `prd`, `adr`, `log` and
+`epic` are the document labels; `Bug` and `Chore` are board types with no matching label.
 
 ### TDD cycle (for C files)
 
