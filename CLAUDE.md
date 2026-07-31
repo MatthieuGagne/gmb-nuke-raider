@@ -99,6 +99,33 @@ Two things not obvious from frontmatter alone:
   through `tools/factory_event.py` and publishes to GitHub only through
   `tools/factory_publish.py` — never directly.
 
+### Pi harness
+
+`.pi/settings.json` exposes the same project skills and agents to the Pi coding agent
+(`pi`), so a session started there is not flying blind. It wires `skills: ["../.claude/skills"]`
+(all 18 project skills), the `pi-subagents` and `@hsingjui/pi-hooks` packages, and the four
+portable hooks with Pi's lowercase tool matchers (`bash`, `write|edit`). `.pi/agents/*.md` are
+thin wrappers: each carries Pi-native frontmatter and tells the child to read the matching
+`.claude/agents/<name>.md` and follow it, so persona text lives in exactly one place.
+
+**One-time step:** run `pi` from the repo root and accept the `/trust` prompt. Untrusted, Pi
+loads none of the above.
+
+**Gates that do not exist under Pi** — assume they are absent, do not rely on them:
+- `tools/skill_overlay_hook.py` — not ported. Both halves are Claude-shaped: the `PostToolUse`
+  half matches a `Skill` tool Pi does not have, and the `UserPromptSubmit` half parses `/<name>`
+  while Pi registers skills as `/skill:<name>`. **Skill overlays never inject under Pi**, so a
+  project delta in `.claude/skill-overlays/` is silently missing — read it yourself.
+- `tools/factory_permission_hook.py` — not ported. It is a `Notification` hook and pi-hooks
+  exposes no `Notification` event, so factory's permission-escalation path is unguarded.
+
+Also note the deny gate and bank check must exit **2** to block; under pi-hooks any other
+non-zero exit is reported as a hook error and the tool call proceeds anyway.
+
+Pi shell setup is **machine-local**, deliberately not committed: the build needs PowerShell,
+`GBDK_HOME`, and Git's `bin`/`usr\bin` on `PATH`, and pointing Pi's `shellPath` at them takes
+absolute paths. Configure that in `~/.pi/agent/settings.json`, not here.
+
 ## Debugging Rules
 
 - **Shifted crash ≠ known issue**: If a fix moves a crash from time X to time Y (e.g. 24s → 33s), do NOT treat it as the same known bug. Investigate whether it is a different root cause before closing the loop.
