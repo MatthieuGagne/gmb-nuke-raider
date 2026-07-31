@@ -94,19 +94,25 @@ def _check_state_symbols(symbols, declared=None):
     happened to put things, and autobank legitimately spilled past it once banks
     0/1/2 reached 95/100/95% (#461, ADR 0007).
 
-    What IS a real defect is a callback beyond the declared capacity: -Wm-yaN
-    declares banks 0..N-1, so a symbol at bank N or higher points into a bank the
-    ROM does not have.  The bound is read from the Makefile so it cannot rot when
-    -Wm-ya changes, and there is deliberately no hardcoded fallback: without
-    -Wm-ya the capacity is unknowable, so the check defers (_check_wm_ya reports
-    SKIP for the same input).
+    What IS a real defect is a state callback beyond the ROM's actual bank
+    capacity — a symbol whose address lands in a bank the cartridge does not
+    have.  The bound used below is read from the Makefile's -Wm-ya<N> value,
+    the only bank-count-shaped number the Makefile declares.  But -Wm-ya is
+    makebin's *RAM* bank count, not ROM: ROM banks are auto-sized (-yo A) and
+    never declared anywhere in the build.  The two just happen to coincide at
+    32 today, which is the only reason this bound has worked so far.  That
+    coincidence is fragile: if -Wm-ya is ever set for real SRAM (the roadmap
+    plans -Wm-ya1), this bound would wrongly shrink to 1 and flag every
+    healthy state symbol above bank 0.  Deriving the bound from the ROM's
+    actual bank capacity instead of -Wm-ya is a known follow-up, deliberately
+    left out of scope for #461.
 
     When romusage output is available this overlaps _check_wm_ya, which catches
     the same overflow via the bank table.  It is retained because it is the only
     capacity signal when romusage cannot run — the state that hid this very bug
     until #441 made romusage resolvable on Windows.
     """
-    if declared is None:
+    if not declared:
         return []
     limit = declared * BANK_STRIDE
     bad = []

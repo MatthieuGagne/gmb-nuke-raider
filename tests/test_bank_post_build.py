@@ -152,6 +152,10 @@ DEF _state_playing 0x17638
 DEF _state_results 0x24100
 """
 
+NOI_STATE_BANK0 = """\
+DEF _state_hub 0xBAB
+"""
+
 
 class TestStateSymbols(unittest.TestCase):
 
@@ -232,6 +236,16 @@ class TestStateSymbols(unittest.TestCase):
         noi = "DEF _state_hub 0xBAB\n"
         with tempfile.TemporaryDirectory() as d:
             make_repo(d, noi=noi)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+
+    def test_declared_zero_defers_like_no_wm_ya(self):
+        """-ya's documented default is 0, so -Wm-ya0 is a plausible way to write
+        'no SRAM'. declared=0 must defer exactly like declared=None (unknowable
+        capacity), not become limit=0 and flag every _state_* symbol — including
+        legitimate bank-0 ones — driving overall_status to FAIL on a healthy ROM."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK0, makefile='CFLAGS := -Wm-ya0\n')
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
