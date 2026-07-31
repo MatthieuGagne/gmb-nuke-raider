@@ -5,9 +5,8 @@
 # Format:  <Tool>: <command>
 # Blank lines and lines beginning with # are ignored.
 #
-# EXTENSION POINT: the five factory stages (#437) and the headless driver
-# (#438) append their commands here as they become real. Today this file
-# covers the CLAUDE.md gate sequence only.
+# EXTENSION POINT: the headless driver (#438) appends its commands here as
+# they become real. The five factory stages (#437) are covered below.
 #
 # NOT CHECKED — machine tier. These are covered by ~/.claude/settings.json
 # (template: .claude/settings.user.example.json), which this check does not
@@ -64,7 +63,9 @@ Bash: gh project item-edit --id ID --project-id ID --field-id ID
 Bash: python tools/factory_publish.py --issue 437 --stage-completed BUILD
 PowerShell: python tools/factory_publish.py --issue 437 --terminal
 
-# --- commits and push (routed through PowerShell per #437 R8) ---
+# --- commits and push ---
+# Tool choice is free: #441 moved the clean build to a pre-push repository
+# hook, which fires for every actor, so no tool skips a gate.
 PowerShell: git add -A
 PowerShell: git commit -m message
 PowerShell: git push -u origin feature-branch
@@ -73,3 +74,17 @@ PowerShell: make
 PowerShell: make test-tools
 PowerShell: gh pr create --title Title --body-file body.md
 PowerShell: Start-Process -FilePath java -ArgumentList -jar
+
+# --- factory stages (#437) ---
+Bash: python tools/spec_lint.py --issue 461 --json
+Bash: python tools/factory_event.py --issue 461 --kind stage
+Bash: python tools/factory_cache.py
+Bash: python tools/factory_log.py --stage VERIFY --issue 461
+Bash: python tools/factory_report.py --issue 461 --out body.md
+Bash: python tools/factory_status.py --json
+Bash: python tools/smoketest_headless.py --scenario generic-smoke --json
+Bash: python tools/trace.py --check --plans-only
+Bash: git worktree add .claude/worktrees/factory-issue-461 -b factory-issue-461
+Bash: git push -u origin factory-issue-461
+PowerShell: python tools/factory_event.py --issue 461 --kind decision
+PowerShell: python tools/factory_cache.py

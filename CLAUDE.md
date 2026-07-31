@@ -94,6 +94,10 @@ Two things not obvious from frontmatter alone:
   the installed version has moved (re-sync the overlay when it fires).
 - `bank-pre-write` / `bank-post-build` / `gb-memory-validator` fire **automatically** via hooks
   (PreToolUse on `src/*` writes, PostToolUse after a non-clean `make`); the skills are fallback references.
+- `factory` (`.claude/skills/factory/`) is the unattended orchestrator. It is invoked
+  explicitly as `/factory <issue#>` and never fires automatically. It writes run state only
+  through `tools/factory_event.py` and publishes to GitHub only through
+  `tools/factory_publish.py` — never directly.
 
 ## Debugging Rules
 
@@ -132,6 +136,14 @@ This project uses [Superpowers](https://github.com/obra/superpowers) (installed 
 
 **Outer loop:** brainstorming → PRD (`/prd`) → [separate session] writing-plans → subagent-driven-development
 
+**Factory loop (unattended):** `/factory <issue#>` drives a lint-passing PRD issue through
+GATE → PLAN → BUILD → VERIFY → SHIP with no interactive input, ending at a reviewable PR.
+Flags: `--stage <NAME>`, `--resume`, `--dry-run`. Run state lives in `.factory/runs/issue-<N>/`
+at the **main** repo root, so any session locates a run from the issue number alone
+(`python tools/factory_status.py`). The factory never merges, never commits to `master`, never
+force-pushes, never passes `--no-verify`, and never deletes a worktree or branch. Full contract:
+`.claude/skills/factory/SKILL.md` and its `references/stages.md`.
+
 **GitHub issue links:** When the user pastes a GitHub issue URL (e.g. `https://github.com/.../issues/N`), first fetch the issue and check its **Files Impacted** or **Out of Scope** sections. If ALL touched files qualify as doc-only (`.md`, `.txt`, `.json` except `bank-manifest.json`, files under `.claude/skills/` or `.claude/agents/`), invoke the `doc-review` skill. Otherwise invoke `writing-plans`. Do not ask for confirmation.
 **TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill). **Early-exit behavior:** the Makefile uses `|| exit 1` — it stops at the first failing test binary (alphabetical order). Test binaries after the first failure do NOT run. Fix all failures starting from the earliest binary; re-run `make test` after each fix to reveal the next hidden failure.
 **Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` hook (`tools/bank_check_hook.py`) and `bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, both bank skills, `bank_check.py`, `gbdk-expert`, `gb-memory-validator`, and this file.
@@ -157,6 +169,13 @@ with its Type set (ADR issues → Type = ADR, run logs → Type = Log).
    user-visible behavior, then push the branch and create the PR. The `pre-push` repository hook
    runs `make clean && make` and blocks the push if it fails — steps 2–3 are still yours to run,
    the hook only guarantees the tree you publish builds.
+
+*Factory-only exception:* during a `/factory` run (`NUKE_FACTORY_RUN` set) steps 4-5 — the
+Emulicious launch and the human visual confirmation — are replaced by the blocking headless
+smoketest, `python tools/smoketest_headless.py --scenario generic-smoke --json`. Steps 1-3
+(fetch+merge, clean build, `make memory-check`) and step 6 (README + push + PR) are unchanged,
+and a memory FAIL still aborts. This exception applies **only** inside a factory run; every
+manual session keeps the human gate verbatim.
 
 **GB skill gates:**
 - Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke `gbdk-expert` agent:

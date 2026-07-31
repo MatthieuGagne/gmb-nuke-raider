@@ -110,6 +110,54 @@ class FactoryGatedTests(unittest.TestCase):
         self.assertEqual(run('git branch --show-current', factory=True)[0], 0)
 
 
+class NoVerifyTests(unittest.TestCase):
+    """R8's never---no-verify rail, mechanized (#437).
+
+    Factory-only rather than unconditional: a human can be asked to justify a
+    hook bypass, an unattended run cannot.
+    """
+
+    def test_commit_no_verify_is_refused_during_a_factory_run(self):
+        self.assertEqual(
+            run('git commit --no-verify -m "wip"', factory=True)[0], 2)
+
+    def test_push_no_verify_is_refused_during_a_factory_run(self):
+        self.assertEqual(
+            run('git push --no-verify -u origin factory-issue-461',
+                factory=True)[0], 2)
+
+    def test_no_verify_after_other_flags_is_still_refused(self):
+        self.assertEqual(
+            run('git push -u origin factory-issue-461 --no-verify',
+                factory=True)[0], 2)
+
+    def test_wrapper_form_is_refused(self):
+        self.assertEqual(
+            run('bash -c "git commit --no-verify -m wip"', factory=True)[0], 2)
+
+    def test_refusal_names_the_reason(self):
+        code, err = run('git commit --no-verify -m "wip"', factory=True)
+        self.assertEqual(code, 2)
+        self.assertIn('no-verify', err)
+
+    def test_plain_commit_is_allowed(self):
+        self.assertEqual(
+            run('git commit -m "feat: add thing"', factory=True)[0], 0)
+
+    def test_unrelated_no_verify_word_is_allowed(self):
+        self.assertEqual(
+            run('python tools/verify_thing.py --no-verify-tls',
+                factory=True)[0], 0)
+
+    def test_no_verify_is_allowed_interactively(self):
+        self.assertEqual(run('git commit --no-verify -m "wip"')[0], 0)
+
+    def test_powershell_tool_is_covered_too(self):
+        self.assertEqual(
+            run('git commit --no-verify -m "wip"', tool='PowerShell',
+                factory=True)[0], 2)
+
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_run
 

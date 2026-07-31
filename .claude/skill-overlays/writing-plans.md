@@ -178,6 +178,29 @@ Only after an explicit affirmative, offer the execution choice:
 
 If Parallel Session is chosen, guide the user to open a new session in the worktree; that session uses `superpowers:executing-plans`.
 
+### Factory mode
+
+Active when `NUKE_FACTORY_RUN` is set — i.e. the PLAN stage of a `/factory` run. It **overrides
+the `### Handoff` subsection above**, and nothing else in this overlay.
+
+- The `<HARD-GATE>` blocking on explicit user approval **does not apply.** There is no user to
+  approve. Do not present the plan for approval and do not offer execution options.
+- The grill step in *Before you begin* is replaced by the **adversarial plan self-review**
+  subagent described in `.claude/skills/factory/references/stages.md`. Its charter includes
+  verifying the plan's *verification commands*, not just its code (#460).
+- Every unresolved judgment call from that self-review is recorded as a decision:
+  ```
+  python tools/factory_event.py --issue <N> --kind decision --field "text=<what and why>"
+  ```
+- The Plan Self-Review Checklist still runs in full. Check #3's Incomplete Warning block is
+  **not** presented to a user — an unjustified `**Parallelizable with:** none` is fixed in place
+  and the fix logged as a decision.
+- Everything else — the filename convention, the `**Issue:** #N` header, the batch structure,
+  the Smoketest Checkpoint blocks — is unchanged. The checkpoints themselves are executed
+  headlessly; see the `subagent-driven-development` overlay's Factory mode.
+
+Outside a factory run every checkpoint above fires exactly as written.
+
 ### Remember
 
 - Exact file paths always; complete code in the plan (not "add validation"); exact commands with expected output.

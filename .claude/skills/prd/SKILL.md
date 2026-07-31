@@ -59,3 +59,13 @@ When updating a PRD (e.g., after a new brainstorming session or scope change):
 
 - **No local file is created.** The GitHub issue is the single source of truth for the PRD.
 - Do NOT invoke `writing-plans` after this. The implementation plan is written in a separate session when the user is ready to build.
+- **Factory-ready:** a PRD is only runnable by `/factory` if it passes
+  `python tools/spec_lint.py --issue <N>` — all five sections (`Goal`, `Requirements`,
+  `Acceptance Criteria`, `Out of Scope`, `Files Impacted`) present and non-empty, at least one
+  `- R<n>:` requirement, at least one `- [ ]` acceptance criterion, and at least one
+  `- ` bullet under Files Impacted. Run the linter before reporting the issue URL.
+- **Files Impacted decides the route.** The linter classifies a spec doc-only when *every*
+  listed path is `*.md`, `*.txt`, `*.json` (except `bank-manifest.json`), or lives under
+  `.claude/skills/` or `.claude/agents/`. A single stray path — including one annotated "no
+  change needed" — sends the whole spec down the full code workflow. List only files the
+  implementation will actually touch.

@@ -56,6 +56,35 @@ After every implementer commit, dispatch the spec-compliance reviewer AND the co
 
 At each batch boundary from the plan: pause dispatching, run the checkpoint sequence (fetch+merge `origin/master`, `make clean && make`, `make memory-check`, ask the user before launching Emulicious from the worktree, wait for visual confirmation), then continue.
 
+### Factory mode
+
+Active when `NUKE_FACTORY_RUN` is set — i.e. the BUILD stage of a `/factory` run. It **overrides
+`### Batch boundaries are smoketest checkpoints` above**, and nothing else in this overlay.
+
+At each batch boundary, run the headless checkpoint instead of the Emulicious pause:
+
+1. `git fetch origin && git merge origin/master`
+2. `make clean && make`
+3. `make memory-check` — **any FAIL or ERROR aborts the run immediately.** No retry.
+4. `python tools/smoketest_headless.py --scenario generic-smoke --json` — this replaces "ask the
+   user before launching Emulicious" and "wait for visual confirmation". Exit 0 continues.
+5. Record the outcome:
+   ```
+   python tools/factory_event.py --issue <N> --kind scenario --field scenario=generic-smoke --field result=<pass|fail> --field blocking=true
+   ```
+
+Everything else stands unchanged and is **not** waived:
+
+- `### Parallel reviewer dispatch (mandatory)` — both reviewers, concurrently, every commit.
+- `### Pre-PR Gate (HARD STOP)` — all four checks.
+- `### Red flags — never` — all of them, including the bank gates and the worktree gate.
+
+Retry budget in factory mode is **2 attempts per task**. Append
+`--kind retry --field stage=BUILD --attempt <k>` before the second attempt. Exhausted → terminal
+failure; do not proceed to the next task.
+
+Outside a factory run the batch-boundary Emulicious pause fires exactly as written.
+
 ### Pre-PR Gate (HARD STOP)
 
 Run after the smoketest is confirmed and before pushing or creating a PR. All four must pass.

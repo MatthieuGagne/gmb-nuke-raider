@@ -48,6 +48,28 @@ Skip only for doc-only branches with no `src/*.c`, `src/*.h`, or asset changes.
 
 Never use `mgba-qt` (wrong emulator) or reference `wasteland-racer.gb` (wrong ROM name).
 
+### Factory mode
+
+Active when `NUKE_FACTORY_RUN` is set — i.e. the SHIP stage of a `/factory` run. It **overrides
+`### Smoketest gate` step 3-4 above** and the baseline's end-of-branch option menu.
+
+- Steps 1-2 of the smoketest gate (clean build, `make memory-check`) still run. A memory FAIL
+  still stops everything.
+- Step 3-4 — "ask the user for confirmation before launching the ROM", then "stop and wait for
+  explicit confirmation" — are replaced by the headless gate, already run by VERIFY:
+  `python tools/smoketest_headless.py --scenario generic-smoke --json`. Do not launch Emulicious.
+- The baseline's end-of-branch **option menu does not apply. The action is always push + PR**,
+  with the body rendered by `python tools/factory_report.py --issue <N>`. Do not ask which
+  option the user wants.
+- `### Update docs before the PR` still applies in full, including the README rule and the
+  allowlist-promotion rule.
+- `### PR conventions` still applies, except: do not ask the user to confirm the merge. **Report
+  the PR URL and stop.**
+- `### Never` still applies in full, and factory mode adds two: never `--no-verify`, and never
+  delete or prune the worktree or branch. The worktree is the run's evidence.
+
+Outside a factory run every confirmation above fires exactly as written.
+
 ### Update docs before the PR
 
 - **Any user-visible behavior changed** (new feature, changed controls, new screen, new module) → update the **Game Modules table** in `README.md`.
