@@ -333,8 +333,10 @@ blocking VERIFY gate for the agent factory.
   `static` variables appear in none of the three and cannot be watched or asserted.
   When a scenario needs one, the fix is to drop `static` deliberately and say so in the
   header — `rs_laps` / `rs_cp_next` (`src/race_state.c`) are exported for exactly this
-  reason (#448), which is why `deep-race` can assert `_rs_laps >= 1` instead of inferring a
-  lap from the car's geometry. Exported-for-assertion variables stay accessor-only for game
+  reason (#448), which is why `deep-race` can assert `_rs_laps >= 1` directly, instead of
+  only inferring a lap from the car's geometry. `_rs_laps` is `rs_laps[PLAYER_SLOT]`, slot 0
+  — the array base is the player's byte only because `PLAYER_SLOT == 0` (`src/config.h`).
+  Exported-for-assertion variables stay accessor-only for game
   code; a mirror variable is the wrong fix, because a desynced mirror makes the test lie.
 - Every run writes `build/smoketest/<scenario>/`: `results.json` (with a `verdict` field),
   `trace.jsonl` (WRAM sentinels sampled every 30 frames), and checkpoint screenshots.

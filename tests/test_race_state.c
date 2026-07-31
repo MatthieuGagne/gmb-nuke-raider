@@ -403,7 +403,7 @@ void test_pos_from_manhattan_nonsquare_checkpoint(void) {
 
 /* ---- exported backing arrays (#448) ---- */
 
-void test_rs_laps_readable_from_outside_module(void) {
+void test_rs_laps_exported_as_global(void) {
     /* rs_laps is exported (non-static) so headless scenarios can assert lap
      * progress by symbol name. The load-bearing evidence here is that this
      * translation unit COMPILES AND LINKS against the array at all — that is
@@ -420,7 +420,7 @@ void test_rs_laps_readable_from_outside_module(void) {
     TEST_ASSERT_EQUAL_UINT8(race_state_get_laps(PLAYER_SLOT), rs_laps[PLAYER_SLOT]);
 }
 
-void test_rs_cp_next_readable_from_outside_module(void) {
+void test_rs_cp_next_exported_as_global(void) {
     race_state_init(3u);
     race_state_set_cp_for_test(PLAYER_SLOT, 2u);
     TEST_ASSERT_EQUAL_UINT8(2u, rs_cp_next[PLAYER_SLOT]);
@@ -448,8 +448,8 @@ int main(void) {
     RUN_TEST(test_advance_lap_final_returns_one);
     RUN_TEST(test_advance_lap_single_lap_race_returns_one);
     RUN_TEST(test_advance_lap_per_slot_independent);
-    RUN_TEST(test_rs_laps_readable_from_outside_module);
-    RUN_TEST(test_rs_cp_next_readable_from_outside_module);
+    RUN_TEST(test_rs_laps_exported_as_global);
+    RUN_TEST(test_rs_cp_next_exported_as_global);
     RUN_TEST(test_rank_player_alone_is_1);
     RUN_TEST(test_rank_player_more_laps_is_1);
     RUN_TEST(test_rank_player_fewer_laps_is_2);
