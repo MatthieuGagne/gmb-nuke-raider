@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """Unit tests for tools/emit_manifest.py"""
+import contextlib
+import io
+import json
 import os
 import sys
 import unittest
@@ -145,6 +148,63 @@ class TestParseDefine(unittest.TestCase):
         path = self._write_c("#define PR_CONFIG_ROWS_EXTRA 99u\n")
         self.assertIsNone(em.parse_define(path, 'PR_CONFIG_ROWS'))
         os.unlink(path)
+
+
+class TestCuratedSymbols(unittest.TestCase):
+    def _em(self):
+        import emit_manifest
+        return emit_manifest
+
+    def test_lap_and_checkpoint_symbols_are_curated(self):
+        em = self._em()
+        self.assertIn('_rs_laps', em.CURATED_SYMBOLS)
+        self.assertIn('_rs_cp_next', em.CURATED_SYMBOLS)
+
+    def test_dead_cp_next_entry_is_retired(self):
+        # '_cp_next' never existed as a symbol: it always resolved to null.
+        em = self._em()
+        self.assertNotIn('_cp_next', em.CURATED_SYMBOLS)
+
+
+class TestManifestSymbolEmission(unittest.TestCase):
+    """Drives emit_manifest.main() for real, so a hoisted-but-unwired
+    CURATED_SYMBOLS list fails here instead of passing silently."""
+
+    _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+    def _repo(self, *parts):
+        return os.path.join(self._ROOT, *parts)
+
+    def test_main_emits_curated_symbols(self):
+        import emit_manifest
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.noi', delete=False)
+        f.write("DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n")
+        f.close()
+        argv = [
+            'emit_manifest.py',
+            '--noi', f.name,
+            '--overmap', self._repo('assets', 'maps', 'overmap.tmx'),
+            '--tracks', self._repo('assets', 'maps', 'track.tmx'),
+                        self._repo('assets', 'maps', 'track2.tmx'),
+                        self._repo('assets', 'maps', 'track3.tmx'),
+            '--tsx', self._repo('assets', 'maps', 'track.tsx'),
+            '--state-overmap', self._repo('src', 'state_overmap.c'),
+            '--state-prerace', self._repo('src', 'state_prerace.c'),
+        ]
+        buf = io.StringIO()
+        old_argv = sys.argv
+        sys.argv = argv
+        try:
+            with contextlib.redirect_stdout(buf):
+                emit_manifest.main()
+        finally:
+            sys.argv = old_argv
+            os.unlink(f.name)
+
+        symbols = json.loads(buf.getvalue())['symbols']
+        self.assertEqual(symbols['_rs_laps'], '0xc1a4')
+        self.assertEqual(symbols['_rs_cp_next'], '0xc1a8')
+        self.assertNotIn('_cp_next', symbols)
 
 
 if __name__ == '__main__':
