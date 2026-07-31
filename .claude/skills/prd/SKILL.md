@@ -37,13 +37,36 @@ One sentence: what this feature does and why it matters for the game.
 
    **Required in Notes:** include any relevant technical context gathered during design — budget numbers (OAM slots used, WRAM bytes, VRAM tiles), known constraints, bank assignments, and specific files impacted when known. This ensures subsequent sessions start informed.
 
-2. **Create a GitHub issue** with the full PRD content as the body:
+2. **Create a GitHub issue** with the full PRD content as the body, labeled `prd`:
    ```sh
-   gh issue create --title "feat: <feature name>" --body "<PRD content>"
+   gh issue create --title "feat: <feature name>" --label prd --body "<PRD content>"
    ```
-   Capture the issue number from the URL in the output.
+   Capture the issue number and URL from the output.
 
-3. Report the issue URL to the user.
+3. **Add the issue to the "Nuke Raider — Documents" project and set `Type = PRD`.** This is
+   three commands, not a convention — a PRD that is not on the board is invisible to the board.
+   Resolve the **field id and the option id by name**; option ids are regenerated whenever the
+   field's option set is edited, and `tools/factory_publish.py` already resolves `Log` this way
+   for run issues. The project id (`PVT_kwHOAv4a5M4BepB5`) is a stable constant and is written
+   literally, as `factory_publish.py` also does.
+
+   ```sh
+   # a. add the issue to the project, capturing the new item id
+   gh project item-add 3 --owner MatthieuGagne --url <issue URL> --format json
+   ```
+
+   ```sh
+   # b. resolve the Type field id and the id of its PRD option
+   gh project field-list 3 --owner MatthieuGagne --format json
+   ```
+
+   ```sh
+   # c. set Type = PRD on the item created in (a)
+   gh project item-edit --id <item id from a> --project-id PVT_kwHOAv4a5M4BepB5 \
+     --field-id <Type field id from b> --single-select-option-id <PRD option id from b>
+   ```
+
+4. Report the issue URL to the user.
 
 ## Updating an Existing PRD
 
