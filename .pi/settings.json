@@ -1,0 +1,50 @@
+{
+  "skills": ["../.claude/skills"],
+  "packages": ["pi-subagents", "@hsingjui/pi-hooks"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/deny_gate_hook.py",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "write|edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/bank_check_hook.py",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/emulicious_window_hook.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python tools/post_build_hook.py",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
