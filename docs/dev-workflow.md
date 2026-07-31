@@ -69,6 +69,34 @@ brainstorming skill
   → finishing-a-development-branch skill (tests → gates → smoketest → PR)
 ```
 
+### Document issues: label at creation, index at creation
+
+`/prd` creates the issue with `--label prd`, then adds it to the "Nuke Raider — Documents"
+project (number `3`, owner `MatthieuGagne`, id `PVT_kwHOAv4a5M4BepB5`) and sets `Type = PRD` —
+`gh issue create --label prd` → `gh project item-add` → `gh project item-edit`. Resolve the
+`Type` field id and the option id by name at runtime; option ids change when the option set is
+edited. `tools/factory_publish.py` performs the identical sequence for `log`-labeled run issues.
+
+`Type` records **kind only**:
+
+| Title prefix | Type |
+|---|---|
+| `feat:` carrying the `epic` label | Epic |
+| `feat:` | PRD |
+| `fix:` / `bug:` | Bug |
+| `docs:` / `chore:` / `refactor:` / `test:` | Chore |
+| `ADR NNNN:` | ADR |
+| `run …` | Log |
+| `review:` | Review |
+
+The `Epic` row is first and is matched by **label, not prefix**: an epic is `feat:`-titled like
+any other PRD. A master issue owning a set of child specs (#432) carries `epic` in addition to
+`prd`, and is typed `Epic`. It is the one type assigned by hand — `/prd` never sets it. Do not
+remove `Epic` from the field.
+
+There is no `Follow-up` type — provenance belongs in the issue body. `prd`, `adr`, `log` and
+`epic` are the document labels; `Bug` and `Chore` are board types with no matching label.
+
 ### TDD cycle (for C files)
 
 When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatch the `gbdk-expert` agent with:

@@ -25,7 +25,7 @@ If a **fact** can be found by exploring the codebase or environment, look it up 
 ### Paper trail
 
 - **Glossary / domain context** → `CONTEXT.md` at the repo root — the one design artifact this project keeps as a local file. Glossary only — totally devoid of implementation details. It is not a spec, not a scratchpad, not a decision log. **Written inside the worktree and merged via PR** — never edited directly in the main working tree, never committed straight to `master`.
-- **Decisions** → an `adr`-labeled **GitHub issue**, offered sparingly: only when the decision is hard to reverse, surprising without context, AND the result of a genuine trade-off. If any of the three is missing, skip the ADR. Title `ADR NNNN: <title>`; allocate NNNN with `gh issue list --label adr` + 1; close the issue on acceptance and add it to the "Nuke Raider — Documents" project with Type = ADR.
+- **Decisions** → an `adr`-labeled **GitHub issue**, offered sparingly: only when the decision is hard to reverse, surprising without context, AND the result of a genuine trade-off. If any of the three is missing, skip the ADR. Title `ADR NNNN: <title>`; allocate NNNN with `gh issue list --label adr --state all` + 1 (`--state all` is mandatory — ADRs are closed on acceptance, so the default open-only filter reports zero and would "prove" any number free); close the issue on acceptance and add it to the "Nuke Raider — Documents" project with Type = ADR.
 - Use the baseline's `CONTEXT-FORMAT.md` for the glossary and the baseline's `ADR-FORMAT.md` for the **content structure** of an ADR — its location and numbering prescription (a numbered file in a repo directory) is **overridden** here: in this project ADRs are GitHub issues.
 
 ### PRDs stay on GitHub
