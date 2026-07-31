@@ -152,8 +152,10 @@ force-pushes, never passes `--no-verify`, and never deletes a worktree or branch
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
 in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues**, closed
-on acceptance; allocate the next number with `gh issue list --label adr` + 1 (next is 0006),
-and cite them as `ADR NNNN (#issue)`. Every document issue — PRD, ADR, review, handoff, and
+on acceptance and cited as `ADR NNNN (#issue)`. Allocate the next number with
+`gh issue list --label adr --state all` + 1 (next is **0008**). `--state all` is mandatory:
+ADRs are closed on acceptance, so the default open-only filter reports zero and would
+"prove" any number free. Every document issue — PRD, ADR, review, handoff, and
 the `log`-labeled run logs — is added to the "Nuke Raider — Documents" project at creation
 with its Type set (ADR issues → Type = ADR, run logs → Type = Log).
 
