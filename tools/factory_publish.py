@@ -20,6 +20,7 @@ where the body is still writable, is reported in the body.
 Usage:
     python tools/factory_publish.py --issue 437 --stage-completed BUILD
     python tools/factory_publish.py --issue 437 --terminal
+    python tools/factory_publish.py --issue 437 --run-start
     python tools/factory_publish.py --issue 437 --dry-run
     or imported:  factory_publish.publish_run(437) -> PublishResult
 
@@ -70,6 +71,15 @@ DEFAULT_REPO = "MatthieuGagne/gmb-nuke-raider"
 PROJECT_NUMBER = 3
 PROJECT_OWNER = "MatthieuGagne"
 PROJECT_ID = "PVT_kwHOAv4a5M4BepB5"
+TYPE_FIELD = "Type"
+TYPE_LOG = "Log"
+# Single-select option names on the Documents board. Names only: the field id
+# and the option ids are resolved at call time, because GitHub regenerates
+# option ids whenever a field's option set is edited (R5).
+STATUS_FIELD = "Status"
+STATUS_TODO = "Todo"
+STATUS_IN_PROGRESS = "In Progress"
+STATUS_DONE = "Done"
 
 PUBLISH_FILE = "publish.json"
 PUBLISH_SCHEMA_VERSION = 1
@@ -109,6 +119,8 @@ def new_publish_state(issue):
         "issue": int(issue),
         "run_issue": None,          # the GitHub issue this run renders into
         "projected": False,         # added to the Documents project, Type=Log
+        "spec_item_id": None,       # Documents-project item for the spec issue
+        "run_item_id": None,        # Documents-project item for the run issue
         "commented_attempts": [],   # spec-issue comments already posted (R10)
         "uploaded": [],             # asset names already on the release (R7)
         "withheld": {},             # asset name -> reason the scan refused it
@@ -645,6 +657,81 @@ def ensure_release(warnings, runner=subprocess.run):
     return False
 
 
+def issue_url(number, repo=DEFAULT_REPO):
+    """The canonical URL of an issue. Constructed, never queried."""
+    return "https://github.com/%s/issues/%d" % (repo, int(number))
+
+
+def project_item_add(url, warnings, runner=subprocess.run):
+    """The Documents-project item id for *url*, or None.
+
+    ``gh project item-add`` is idempotent — an issue already on the board comes
+    back with its existing item id — so this is also the resolver, not just the
+    adder (R2).
+    """
+    add = gh(["project", "item-add", str(PROJECT_NUMBER), "--owner",
+              PROJECT_OWNER, "--url", url, "--format", "json"], runner=runner)
+    if add.returncode != 0:
+        _warn(warnings, "%s not added to the Documents project: %s"
+              % (url, _tail(add.stderr)))
+        return None
+    try:
+        return json.loads(add.stdout)["id"]
+    except (ValueError, KeyError, TypeError):
+        _warn(warnings, "project item id not parseable from item-add output")
+        return None
+
+
+def resolve_single_select(field_name, option_name, warnings,
+                          runner=subprocess.run):
+    """(field id, option id) for one single-select option, resolved by name.
+
+    Never a hardcoded id: option ids are regenerated whenever the field's
+    option set is edited, so a constant would silently write to a stale option
+    or fail outright (R5). One ``field-list`` per write is the price — a run
+    makes at most four of these calls, against 15-25 body edits, and a cache
+    would have to be invalidated by exactly the board edit this defends
+    against.
+    """
+    fields = gh(["project", "field-list", str(PROJECT_NUMBER), "--owner",
+                 PROJECT_OWNER, "--format", "json"], runner=runner)
+    field_id = option_id = None
+    try:
+        for field in json.loads(fields.stdout).get("fields") or []:
+            if field.get("name") != field_name:
+                continue
+            field_id = field.get("id")
+            for option in field.get("options") or []:
+                if option.get("name") == option_name:
+                    option_id = option.get("id")
+    except (ValueError, AttributeError):
+        pass
+    if not field_id or not option_id:
+        _warn(warnings, "project %s=%s not set: no %s field with a %s option "
+                        "in project %d"
+              % (field_name, option_name, field_name, option_name,
+                 PROJECT_NUMBER))
+        return None, None
+    return field_id, option_id
+
+
+def set_single_select(item_id, field_name, option_name, warnings,
+                      runner=subprocess.run):
+    """Set one single-select field on one project item. Fail-open (R6)."""
+    field_id, option_id = resolve_single_select(field_name, option_name,
+                                                warnings, runner=runner)
+    if not field_id or not option_id:
+        return False
+    edit = gh(["project", "item-edit", "--id", item_id, "--project-id",
+               PROJECT_ID, "--field-id", field_id,
+               "--single-select-option-id", option_id], runner=runner)
+    if edit.returncode != 0:
+        _warn(warnings, "project %s=%s not set: %s"
+              % (field_name, option_name, _tail(edit.stderr)))
+        return False
+    return True
+
+
 _ISSUE_NUMBER = re.compile(r"/issues/(\d+)\s*$")
 
 
@@ -937,6 +1024,40 @@ def open_pr(issue, branch, title, body_path, publish=None, warnings=None,
     return url, True
 
 
+def run_start(issue, registry=None, runner=subprocess.run):
+    """Mark the spec issue In Progress on the Documents board (R1).
+
+    Exactly two things: ensure board membership, then set Status. No run issue,
+    no rendered body, no asset — and never ``Type``, which stays with the human
+    and with ``/prd`` (R2).
+
+    Idempotent in the sense that matters: a ``--resume`` or a second attempt
+    adds no duplicate item, because the item id is cached in publish.json (R7).
+    The Status write itself is re-issued, and that is deliberate — it is what
+    puts a retried run back to In Progress after a failed attempt pushed the
+    spec to Todo.
+
+    Called before GATE, so it does not require — and does not check for — a
+    registry entry: the run directory it writes into is the one the ``start``
+    event has just created.
+    """
+    registry = registry or factory_run.registry_root()
+    publish = load_publish_state(issue, registry)
+    warnings = []
+    item_id = publish.get("spec_item_id") or \
+        project_item_add(issue_url(issue), warnings, runner=runner)
+    if item_id:
+        publish["spec_item_id"] = item_id
+        set_single_select(item_id, STATUS_FIELD, STATUS_IN_PROGRESS, warnings,
+                          runner=runner)
+    try:
+        save_publish_state(publish, registry)
+    except OSError as exc:
+        _warn(warnings, "publish state not saved: %s" % exc)
+    return PublishResult(publish.get("run_issue"), warnings,
+                         list(publish.get("uploaded") or []))
+
+
 def publish_run(issue, registry=None, stage_completed=None, terminal=False,
                 runner=subprocess.run, now=None):
     """Re-render this run's GitHub surfaces. Never raises (R11).
@@ -1010,6 +1131,9 @@ def build_parser():
                              % ", ".join(factory_run.STAGES))
     parser.add_argument("--terminal", action="store_true",
                         help="the run has ended: close the issue and comment")
+    parser.add_argument("--run-start", action="store_true", dest="run_start",
+                        help="mark the spec issue In Progress on the "
+                             "Documents board; makes no other write")
     parser.add_argument("--dry-run", action="store_true",
                         help="render the body to stdout, touch no network")
     parser.add_argument("--now", default=None,
@@ -1064,6 +1188,12 @@ def main(argv=None):
 
     try:
         registry = args.registry or factory_run.registry_root()
+        if args.run_start:
+            if args.dry_run:
+                print("factory_publish: --run-start writes to the board and "
+                      "cannot be combined with --dry-run", file=sys.stderr)
+                return EXIT_MISUSE
+            return exit_code(run_start(args.issue, registry=registry))
         if args.dry_run:
             state = factory_run.load_state(args.issue, registry)
             if state is None:
