@@ -4,9 +4,9 @@ bank_post_build.py — post-build ROM bank validation.
 
 Checks:
   1. romusage budget (bank 1 WARN >90% or >=100%; others WARN >80% or >=100%)
-  2. state code must not appear beyond the -Wm-ya declared bank count
+  2. state code must not appear beyond the ROM's real bank capacity
   3. __bank_ symbol values must match bank-manifest.json for pinned files
-  4. highest bank in use must be < -Wm-ya declared count
+  4. highest bank in use must be < the ROM's real bank capacity
 
 Exits 0 on PASS/WARN, 1 on FAIL.
 
@@ -23,6 +23,12 @@ import subprocess
 import sys
 
 BANK_STRIDE = 0x10000    # .noi addresses advance one bank per 0x10000
+
+# Cartridge header (Pan Docs). 0x148 is the ROM-size code makebin writes from
+# the auto-sized image; every code it emits maps to `2 << code` banks.
+ROM_SIZE_OFFSET = 0x148
+ROM_SIZE_CODE_MAX = 0x08
+HEADER_MIN_LEN = 0x150
 
 
 def _run_romusage(rom_path):
@@ -55,6 +61,45 @@ def _parse_romusage(output):
     return banks
 
 
+def _read_rom_capacity(rom_path):
+    """Return the cartridge's real ROM bank count, or None if undeterminable.
+
+    The bound comes from the built ROM, not the Makefile.  Two sources were
+    available (#487 R1) and this is the one that answers the question actually
+    being asked:
+
+    * romusage's bank table lists only banks the linker put content in, so its
+      maximum is a floor on *usage*.  It cannot report that a cartridge has 32
+      banks while 4 are occupied — which is exactly the bound both capacity
+      checks need.
+    * Header byte 0x148 is what makebin writes from the auto-sized image
+      (`-yo A`), and what the MBC and every emulator read to size the cart.  It
+      is also readable when romusage cannot run — the state that hid #461.
+
+    `-Wm-ya` is deliberately not consulted.  It is makebin's *RAM* bank count
+    (`-ya n  number of ram banks`); ROM banks are auto-sized and never declared
+    anywhere in this build.  The built header proves the flag is discarded:
+    0x148=0x04 (32 banks) alongside 0x149=0x00 (no RAM banks) under -Wm-ya32.
+    That `-Wm-ya32` and 32 ROM banks agree today is a coincidence, and the
+    roadmap's `-Wm-ya1` SRAM save is the day it stops agreeing.
+
+    Returns None — never a guessed default (#487 R3) — when the ROM is absent,
+    truncated, or carries a size code this mapping does not cover.  Callers must
+    defer on None, not substitute a bound.
+    """
+    try:
+        with open(rom_path, 'rb') as fh:
+            header = fh.read(HEADER_MIN_LEN)
+    except OSError:
+        return None
+    if len(header) < HEADER_MIN_LEN:
+        return None
+    code = header[ROM_SIZE_OFFSET]
+    if code > ROM_SIZE_CODE_MAX:
+        return None      # incl. legacy 0x52/0x53/0x54, which makebin never emits
+    return 2 << code
+
+
 def _check_romusage(banks):
     """Return list of (bank_num, pct, status) for each bank."""
     results = []
@@ -84,7 +129,7 @@ def _parse_noi(noi_path):
     return symbols
 
 
-def _check_state_symbols(symbols, declared=None):
+def _check_state_symbols(symbols, capacity=None):
     """Return list of (sym, hex_addr) for _state_* symbols beyond ROM capacity.
 
     A state callback is safe in ANY bank the cartridge actually has: invoke() in
@@ -96,25 +141,25 @@ def _check_state_symbols(symbols, declared=None):
 
     What IS a real defect is a state callback beyond the ROM's actual bank
     capacity — a symbol whose address lands in a bank the cartridge does not
-    have.  The bound used below is read from the Makefile's -Wm-ya<N> value,
-    the only bank-count-shaped number the Makefile declares.  But -Wm-ya is
-    makebin's *RAM* bank count, not ROM: ROM banks are auto-sized (-yo A) and
-    never declared anywhere in the build.  The two just happen to coincide at
-    32 today, which is the only reason this bound has worked so far.  That
-    coincidence is fragile: if -Wm-ya is ever set for real SRAM (the roadmap
-    plans -Wm-ya1), this bound would wrongly shrink to 1 and flag every
-    healthy state symbol above bank 0.  Deriving the bound from the ROM's
-    actual bank capacity instead of -Wm-ya is a known follow-up, deliberately
-    left out of scope for #461.
+    have.  `capacity` is that bank count, read from the built ROM's cartridge
+    header by _read_rom_capacity; see its docstring for why the header rather
+    than -Wm-ya or the romusage table (#487).  None means capacity could not be
+    determined, and the check defers rather than inventing a bound.
 
-    When romusage output is available this overlaps _check_wm_ya, which catches
-    the same overflow via the bank table.  It is retained because it is the only
-    capacity signal when romusage cannot run — the state that hid this very bug
-    until #441 made romusage resolvable on Windows.
+    The guard is `is None`, and _check_capacity and _format_report agree with
+    it.  A falsy guard would also swallow capacity 0 — unreachable from this
+    source, but a falsy guard here paired with an `is None` guard in the report
+    is precisely what produced the "all within declared capacity (0 banks)"
+    line on a path that had in fact deferred.
+
+    When romusage output is available this overlaps _check_capacity, which
+    catches the same overflow via the bank table.  It is retained because it is
+    the only capacity signal when romusage cannot run — the state that hid this
+    very bug until #441 made romusage resolvable on Windows.
     """
-    if not declared:
+    if capacity is None:
         return []
-    limit = declared * BANK_STRIDE
+    limit = capacity * BANK_STRIDE
     bad = []
     for sym, addr in symbols.items():
         if sym.startswith('_state_') and addr >= limit:
@@ -160,34 +205,30 @@ def _check_bank_symbols(symbols, src_dir, manifest):
     return errors
 
 
-def _check_wm_ya(makefile_path, banks):
-    """Return (declared, highest, status).
+def _check_capacity(capacity, banks):
+    """Return (highest_bank, status) for the banks romusage reported.
 
-    -Wm-yaN declares N banks (numbered 0 to N-1). Bank N or higher is overflow.
+    A cartridge of N banks numbers them 0 to N-1, so bank N or higher is
+    overflow.  `capacity` is None when it could not be determined, and the
+    check reports SKIP rather than assuming one (#487 R3).
     """
-    if not os.path.exists(makefile_path):
-        return None, None, 'SKIP'
-    with open(makefile_path) as f:
-        content = f.read()
-    m = re.search(r'-Wm-ya(\d+)', content)
-    if not m:
-        return None, None, 'SKIP'
-    declared = int(m.group(1))
+    if capacity is None:
+        return None, 'SKIP'
     if not banks:
-        return declared, 0, 'PASS'
+        return 0, 'PASS'
     highest = max(b[0] for b in banks)
-    status = 'FAIL' if highest >= declared else 'PASS'
-    return declared, highest, status
+    status = 'FAIL' if highest >= capacity else 'PASS'
+    return highest, status
 
 
 def overall_status(result):
     """Return 'PASS', 'WARN', or 'FAIL' from a check() result dict."""
     if (result['bad_state_symbols']
             or result['bank_sym_errors']
-            or result['wm_ya_status'] == 'FAIL'
+            or result['capacity_status'] == 'FAIL'
             or any(r[2] == 'FAIL' for r in result['bank_results'])):
         return 'FAIL'
-    if (result['wm_ya_status'] == 'WARN'
+    if (result['capacity_status'] == 'WARN'
             or any(r[2] == 'WARN' for r in result['bank_results'])):
         return 'WARN'
     return 'PASS'
@@ -204,13 +245,14 @@ def _format_report(result):
         syms = ', '.join(f"{s} @ {a}" for s, a in result['bad_state_symbols'])
         lines.append(f"State symbols: FAIL — {syms}")
     else:
-        declared = result['wm_ya_declared']
-        if declared is None:
-            lines.append("State symbols: OK — capacity unknown (no -Wm-ya)")
+        capacity = result['rom_capacity']
+        if capacity is None:
+            lines.append("State symbols: OK — ROM capacity unknown "
+                         "(cartridge header unreadable)")
         else:
             lines.append(
-                f"State symbols: OK — all within declared capacity "
-                f"({declared} banks)")
+                f"State symbols: OK — all within ROM capacity "
+                f"({capacity} banks)")
 
     if result['bank_sym_errors']:
         lines.append("__bank_ symbols: FAIL")
@@ -219,17 +261,20 @@ def _format_report(result):
     else:
         lines.append("__bank_ symbols: OK")
 
-    if result['wm_ya_status'] == 'SKIP':
-        lines.append("-Wm-ya capacity: SKIP (no -Wm-ya in Makefile)")
-    elif result['wm_ya_status'] == 'FAIL':
+    if result['capacity_status'] == 'SKIP':
+        lines.append("ROM capacity: SKIP (cartridge header unreadable — "
+                     "no build/nuke-raider.gb, or an unmapped size code)")
+    elif result['capacity_status'] == 'FAIL':
         lines.append(
-            f"-Wm-ya capacity: FAIL — {result['wm_ya_declared']} banks declared, "
-            f"highest in use is {result['wm_ya_highest']}"
+            f"ROM capacity: FAIL — {result['rom_capacity']} banks "
+            f"(cartridge header 0x148), highest bank in use is "
+            f"{result['highest_bank']}"
         )
     else:
         lines.append(
-            f"-Wm-ya capacity: OK — {result['wm_ya_declared']} declared, "
-            f"highest {result['wm_ya_highest']}"
+            f"ROM capacity: OK — {result['rom_capacity']} banks "
+            f"(cartridge header 0x148), highest bank in use "
+            f"{result['highest_bank']}"
         )
 
     lines.append('')
@@ -247,7 +292,6 @@ def check(repo_root='.', romusage_output=None):
     """
     rom_path = os.path.join(repo_root, 'build', 'nuke-raider.gb')
     noi_path = os.path.join(repo_root, 'build', 'nuke-raider.noi')
-    makefile_path = os.path.join(repo_root, 'Makefile')
     manifest_path = os.path.join(repo_root, 'bank-manifest.json')
     src_dir = os.path.join(repo_root, 'src')
 
@@ -257,10 +301,13 @@ def check(repo_root='.', romusage_output=None):
     banks = _parse_romusage(romusage_output)
     bank_results = _check_romusage(banks)
 
-    declared, highest, wm_ya_status = _check_wm_ya(makefile_path, banks)
+    # One capacity read feeds both capacity-dependent checks (#487 R2) — the
+    # two cannot disagree because there is only one source.
+    capacity = _read_rom_capacity(rom_path)
+    highest, capacity_status = _check_capacity(capacity, banks)
 
     symbols = _parse_noi(noi_path)
-    bad_state = _check_state_symbols(symbols, declared)
+    bad_state = _check_state_symbols(symbols, capacity)
 
     manifest = {}
     if os.path.exists(manifest_path):
@@ -272,9 +319,9 @@ def check(repo_root='.', romusage_output=None):
         'bank_results': bank_results,
         'bad_state_symbols': bad_state,
         'bank_sym_errors': bank_sym_errors,
-        'wm_ya_declared': declared,
-        'wm_ya_highest': highest,
-        'wm_ya_status': wm_ya_status,
+        'rom_capacity': capacity,
+        'highest_bank': highest,
+        'capacity_status': capacity_status,
     }
 
 

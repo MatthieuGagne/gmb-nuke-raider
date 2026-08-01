@@ -231,7 +231,7 @@ Every `src/*.c` file must have an entry in `bank-manifest.json` before it is wri
 | OAM | 40 sprites | Player = 2; rest for enemies/projectiles/HUD |
 | VRAM BG tiles | 192 (DMG bank 0) + 192 (CGB bank 1) | CGB bank 1 for color variants |
 | WRAM | 8 KB | Large arrays must be `global` or `static`, never local |
-| ROM | MBC5, 32 banks (`-Wm-ya32`), up to 512 KB | Code stays in bank 0; assets tagged for banking |
+| ROM | MBC5, 512 KB = 32 banks, auto-sized by makebin (`-yo A`) and recorded in cartridge header `0x148` | `-autobank` places code past bank 0 — state code sits in banks 2-3 today; assets tagged for banking. `-Wm-ya32` in `CFLAGS` is **not** the ROM bank count: `-ya` is makebin's *RAM* bank count and the value is discarded (header `0x149=0x00`) |
 
 Run `make memory-check` to validate budgets. Any FAIL or ERROR must be fixed before continuing.
 
