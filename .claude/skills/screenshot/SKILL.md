@@ -19,7 +19,7 @@ Before writing any navigation steps, read `build/game-manifest.json`. It contain
 - `navigation.overmap_to_hub` — paths to city hubs
 - `controls` — button mappings per state; `prerace.cursor_to_start` gives the exact DOWN-press count to reach the START row
 - `tracks` — per-track spawn pixel coords, racer waypoints, checkpoint rects
-- `symbols` — WRAM addresses for key debugging state (`_cam_scx_shadow`, `_px`, `_py`, `_hp`, `_active_lap_count`, `_cp_next`, `_racer_active`, etc.)
+- `symbols` — WRAM addresses for key debugging state (`_cam_scx_shadow`, `_px`, `_py`, `_hp`, `_active_lap_count`, `_rs_laps`, `_rs_cp_next`, `_racer_active`, etc.)
 
 Prefer manifest values over hardcoded coordinates or guessed paths.
 

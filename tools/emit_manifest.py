@@ -20,6 +20,16 @@ from collections import deque
 
 GID_FLAGS = 0x0FFFFFFF
 
+# Curated WRAM symbols exported into build/game-manifest.json (None when the name
+# does not resolve). Module-level so tests/test_emit_manifest.py can assert it.
+# _rs_laps / _rs_cp_next are deliberately non-static in src/race_state.c so the
+# headless scenario engine can assert lap progress by name (#448).
+CURATED_SYMBOLS = [
+    '_cam_scx_shadow', '_cam_scy_shadow', '_current_race_id',
+    '_px', '_py', '_hp', '_active_lap_count',
+    '_rs_laps', '_rs_cp_next', '_racer_active'
+]
+
 
 def bfs(grid, w, h, start_tx, start_ty, end_tx, end_ty):
     """BFS on a flat tile grid (0=not walkable). Returns direction list or None."""
@@ -213,10 +223,7 @@ def main():
     tiles = {str(k): v for k, v in parse_tsx_tile_types(args.tsx).items()}
 
     # Symbols — curated WRAM addresses from .noi (None if static or not yet promoted)
-    curated = [
-        '_cam_scx_shadow', '_cam_scy_shadow', '_current_race_id',
-        '_px', '_py', '_hp', '_active_lap_count', '_cp_next', '_racer_active'
-    ]
+    curated = CURATED_SYMBOLS
     all_syms = parse_noi(args.noi)
     symbols = {name: all_syms.get(name) for name in curated}
 

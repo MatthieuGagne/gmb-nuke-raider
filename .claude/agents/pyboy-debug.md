@@ -183,7 +183,7 @@ Run **at least 2 rounds** before concluding.
 
 **Round 2+ — Targeted investigation:**
 1. Based on Round 1 findings, write a focused script targeting the specific subsystem
-   - If `_cp_next` looks wrong: loop frame-by-frame printing CP/lap values while driving
+   - If `_rs_cp_next` looks wrong: loop frame-by-frame printing CP/lap values while driving
    - If the screen looks incorrect: compare RAM Watch values against what the visuals show
    - If timing is suspect: poll a key variable every 10 frames and print a timeline
 2. Save screenshot to `{WORKTREE_ROOT}/build/pyboy-debug-002.png` (increment per round)
@@ -219,9 +219,12 @@ When raw memory values need interpretation (enum values, state constants), read 
 
 - `{WORKTREE_ROOT}/src/<module>.c` — enum values, constants, state machine logic
 - `{WORKTREE_ROOT}/src/<module>.h` — type definitions, `#define` constants
-- `{WORKTREE_ROOT}/build/nuke-raider.map` — for `static` vars not in `symbols`
+- `{WORKTREE_ROOT}/build/nuke-raider.map` — last resort for non-static globals whose names exceed
+  9 characters (the `.map` truncates names to 9 chars — e.g. `_rs_cp_next` appears there as
+  `_rs_cp_ne`). A `static` variable cannot be read from the manifest, the `.noi`, or the `.map` —
+  the fix is to drop `static` deliberately, as `src/race_state.c` does.
 
-Example: if `_cp_next` reads 3 but the track only has 2 checkpoints, read `src/race.h` for the checkpoint count constant.
+Example: if `_rs_cp_next` reads 3 but the track only has 2 checkpoints, read `src/race.h` for the checkpoint count constant.
 
 ## Screenshot Naming
 
@@ -280,10 +283,10 @@ Fields that cannot be determined **must emit `null`** — do not omit the field,
   "symptom": "race ends after 1 lap instead of 3; finish tile triggers immediately on lap 1",
   "registers": [],
   "stack_trace": null,
-  "hypothesis": "Unit test passes but ROM behavior wrong. _cp_next reads 0 when the finish tile fires on lap 1, meaning the checkpoint gate was never checked before the finish-tile handler ran. The finish tile AABB overlaps with CP3's hitbox boundary — player on the low race line hits the finish tile before triggering CP3, so _cp_next never advances to 4 (all-clear) and the finish handler accepts cp_next=0 as valid.",
+  "hypothesis": "Unit test passes but ROM behavior wrong. _rs_cp_next reads 0 when the finish tile fires on lap 1, meaning the checkpoint gate was never checked before the finish-tile handler ran. The finish tile AABB overlaps with CP3's hitbox boundary — player on the low race line hits the finish tile before triggering CP3, so _rs_cp_next never advances to 4 (all-clear) and the finish handler accepts cp_next=0 as valid.",
   "memory_snapshot": {
     "_active_lap_count": 1,
-    "_cp_next": 0,
+    "_rs_cp_next": 0,
     "_px": 96,
     "_py": 50,
     "_hp": 3,

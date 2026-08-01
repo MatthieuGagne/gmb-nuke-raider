@@ -4,8 +4,11 @@
 #include "player.h"    /* player_get_x(), player_get_y(), DIR_T/B/L/R/... */
 #include "racer.h"     /* racer_get_px(), racer_get_py() */
 
-static uint8_t rs_cp_next[MAX_RACERS];
-static uint8_t rs_laps[MAX_RACERS];
+/* Exported (non-static) so the headless scenario engine can resolve _rs_laps /
+ * _rs_cp_next from the linker output and assert real race progress (#448).
+ * Game code must keep using the accessors below — these are not a caller API. */
+uint8_t rs_cp_next[MAX_RACERS];
+uint8_t rs_laps[MAX_RACERS];
 static uint8_t rs_active[MAX_RACERS];
 static uint8_t rs_lap_total;
 
