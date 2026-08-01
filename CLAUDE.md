@@ -195,7 +195,8 @@ appear in its body as `### D1: …`, `### D2: …`. Before filing a second, sear
 
 **Key resolution.** A decision taken while working a **child spec** under an epic keys off the
 child spec, never the epic. A decision with **no work item** makes the ADR its own work item, so
-its key is its own issue number — the one case that needs a retitle after `gh issue create`.
+its key is its own issue number — the ADR is **self-keyed**, and it is the one case that needs a
+retitle after `gh issue create`.
 
 **Lifecycle.** An ADR issue stays **open** while its work item is open and is closed when the
 work item closes; a self-keyed ADR closes on acceptance. A decision taken later, against an
