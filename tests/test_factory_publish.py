@@ -417,6 +417,274 @@ class TestBodyBudget(PublishTestCase):
         self.assertIn('truncated at the', body)
 
 
+def big_plan(tasks=8, filler=300):
+    """A plan the size of a real one, with headings hidden inside fences.
+
+    docs/plans/2026-08-01-issue471-adversarial-review-stage.md is 3199 lines
+    and quotes whole markdown documents inside ```` blocks. The fenced
+    'Task 999' and 'Smoketest Checkpoint 9' lines below are what a scanner
+    that ignores fences trips over.
+    """
+    lines = ['# Demo Implementation Plan', '',
+             '**Issue:** #514', '',
+             '**Goal:** demonstrate the structural summary.', '',
+             '**Architecture:** one module, three layers.', '',
+             '## Global Constraints', '',
+             '- Python 3 stdlib only.', '',
+             '## File Structure', '',
+             '- `tools/factory_publish.py` — the publisher.', '']
+    for n in range(1, tasks + 1):
+        lines += ['## Task %d: component %d' % (n, n), '',
+                  '**Depends on:** Task %d' % (n - 1), '',
+                  '**Parallelizable with:** none — shares the module.', '',
+                  '**Files:**',
+                  '- Modify: `tools/factory_publish.py`',
+                  '- Test: `tests/test_factory_publish.py`', '',
+                  '- [ ] **Step 1: Write the failing test**', '',
+                  '````python']
+        lines += ['# %d fenced comment line %d' % (n, i)
+                  for i in range(filler)]
+        lines += ['## Task 999: a heading that lives inside a fence',
+                  '```',
+                  '### Smoketest Checkpoint 9 — also fenced',
+                  '````', '']
+    return '\n'.join(lines) + '\n'
+
+
+class TestSummarizePlan(PublishTestCase):
+    def summary(self, text=None):
+        return factory_publish.summarize_plan(text or big_plan())
+
+    def test_preamble_stops_at_the_first_task_heading(self):
+        """R3: everything above the first batch/task heading."""
+        preamble, _tasks = self.summary()
+        self.assertIn('# Demo Implementation Plan', preamble)
+        self.assertIn('## Global Constraints', preamble)
+        self.assertIn('## File Structure', preamble)
+        self.assertFalse([l for l in preamble if l.startswith('## Task ')])
+
+    def test_every_task_heading_is_kept(self):
+        _preamble, tasks = self.summary()
+        self.assertEqual([t[0] for t in tasks],
+                         ['## Task %d: component %d' % (n, n)
+                          for n in range(1, 9)])
+
+    def test_files_and_depends_lines_ride_with_their_task(self):
+        """R3: the heading plus its **Files:** and **Depends on:** lines."""
+        _preamble, tasks = self.summary()
+        self.assertIn('**Depends on:** Task 0', tasks[0])
+        self.assertIn('**Files:**', tasks[0])
+        self.assertIn('- Modify: `tools/factory_publish.py`', tasks[0])
+
+    def test_task_steps_are_dropped(self):
+        _preamble, tasks = self.summary()
+        self.assertFalse([l for l in tasks[0] if 'Step 1' in l])
+
+    def test_headings_inside_a_fence_are_not_tasks(self):
+        """The whole reason the scanner tracks fences."""
+        preamble, tasks = self.summary()
+        blob = '\n'.join(preamble + [l for t in tasks for l in t])
+        self.assertNotIn('Task 999', blob)
+        self.assertNotIn('Smoketest Checkpoint 9', blob)
+
+    def test_no_fenced_content_survives(self):
+        preamble, tasks = self.summary()
+        blob = '\n'.join(preamble + [l for t in tasks for l in t])
+        self.assertNotIn('```', blob)
+        self.assertNotIn('fenced comment line', blob)
+
+    def test_a_batch_heading_also_ends_the_preamble(self):
+        text = ('# T\n\n**Goal:** g\n\n'
+                '### Smoketest Checkpoint 1 — thing\n\nbody\n')
+        preamble, tasks = factory_publish.summarize_plan(text)
+        self.assertIn('**Goal:** g', preamble)
+        self.assertNotIn('### Smoketest Checkpoint 1 — thing', preamble)
+        self.assertEqual(tasks, [])
+
+    def test_a_plan_with_no_tasks_is_all_preamble(self):
+        preamble, tasks = factory_publish.summarize_plan('# T\n\nprose\n')
+        self.assertEqual(preamble, ['# T', '', 'prose'])
+        self.assertEqual(tasks, [])
+
+    def test_an_empty_plan_does_not_raise(self):
+        self.assertEqual(factory_publish.summarize_plan(''), ([], []))
+
+
+class TestRenderPlanBody(PublishTestCase):
+    def body(self, text=None, publish=None, budget=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = publish or factory_publish.new_publish_state(440)
+        kw = {} if budget is None else {'budget': budget}
+        # `text if text is not None`, never `text or`: '' is a meaningful
+        # value here — it is what publish_plan passes when the scan refused
+        # the file — and `or` would silently swap it for the full plan.
+        return factory_publish.render_plan_body(
+            state, publish, big_plan() if text is None else text, **kw)
+
+    def test_a_2400_line_plan_renders_under_the_budget(self):
+        """AC3."""
+        body = self.body()
+        self.assertLessEqual(len(body), factory_publish.BODY_BUDGET)
+
+    def test_every_task_heading_and_its_files_line_survive(self):
+        """AC3: assert on the content, not that a body was produced."""
+        body = self.body()
+        for n in range(1, 9):
+            self.assertIn('## Task %d: component %d' % (n, n), body)
+        self.assertIn('**Files:**', body)
+        self.assertIn('- Test: `tests/test_factory_publish.py`', body)
+
+    def test_no_fenced_code_block_reaches_the_body(self):
+        """AC3."""
+        self.assertNotIn('```', self.body())
+
+    def test_body_links_the_full_plan_asset(self):
+        """R3: an explicit truncation marker and a link to the asset."""
+        body = self.body()
+        self.assertIn('issue-440-plan.md', body)
+        self.assertIn('Structural summary', body)
+
+    def test_body_cross_links_the_run_issue(self):
+        """R11."""
+        publish = factory_publish.new_publish_state(440)
+        publish['run_issue'] = 481
+        self.assertIn('Run dashboard: #481', self.body(publish=publish))
+
+    def test_body_names_the_spec_issue(self):
+        """R11: either surface is reachable from the other."""
+        self.assertIn('**Spec** #440', self.body())
+
+    def test_withheld_asset_says_so_instead_of_linking(self):
+        publish = factory_publish.new_publish_state(440)
+        publish['withheld']['issue-440-plan.md'] = 'credential-shaped string'
+        body = self.body(publish=publish)
+        self.assertIn('withheld', body)
+        self.assertNotIn('releases/download', body)
+
+    def test_empty_text_renders_a_body_with_no_summary(self):
+        """The withheld path: publish_plan passes '' so no plan text can
+        reach a public issue when the scan refused the file."""
+        publish = factory_publish.new_publish_state(440)
+        publish['withheld']['issue-440-plan.md'] = 'credential-shaped string'
+        body = self.body(text='', publish=publish)
+        self.assertIn('**Spec** #440', body)
+        self.assertIn('withheld', body)
+        self.assertNotIn('## Task', body)
+
+    def test_over_budget_sheds_the_file_lists_first(self):
+        """R3: the shed doctrine, each cut leaving its own marker.
+
+        Assert the marker constant, never the word 'omitted': that word is
+        also in PLAN_SUMMARY_LINK, which is in *every* body, so a substring
+        test would pass on a body that shed nothing at all.
+        """
+        body = self.body(budget=1200)
+        self.assertLessEqual(len(body), 1200)
+        self.assertIn('## Task 1: component 1', body)
+        self.assertIn(factory_publish.PLAN_SHED_FILES, body)
+        self.assertNotIn('- Modify: `tools/factory_publish.py`', body)
+        self.assertNotIn(factory_publish.PLAN_SHED_PREAMBLE, body)
+        self.assertIn('## Global Constraints', body)
+
+    def test_a_tighter_budget_sheds_the_preamble_too(self):
+        """R3: the second shed level, which budget=1200 never reaches."""
+        body = self.body(budget=750)
+        self.assertLessEqual(len(body), 750)
+        self.assertIn(factory_publish.PLAN_SHED_PREAMBLE, body)
+        self.assertNotIn('## Global Constraints', body)
+        self.assertIn('## Task 1: component 1', body)
+
+    def test_hard_truncation_is_the_backstop(self):
+        body = self.body(budget=400)
+        self.assertLessEqual(len(body), 400)
+        self.assertIn('truncated at the', body)
+
+    def test_body_carries_a_machine_owned_marker(self):
+        self.assertIn(factory_publish.PLAN_BODY_MARKER, self.body())
+
+    def test_body_ends_with_exactly_one_newline(self):
+        body = self.body()
+        self.assertTrue(body.endswith('\n'))
+        self.assertFalse(body.endswith('\n\n'))
+
+
+class TestPlanSourcing(PublishTestCase):
+    def state_with_plan(self, text='# T\n\nprose\n', name='p.md'):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        rel = 'docs/plans/' + name
+        full = os.path.join(state['worktree'], 'docs', 'plans', name)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(text)
+        state['plan'] = rel
+        return state, full
+
+    def test_plan_is_read_from_the_worktree(self):
+        """R5: docs/plans/ is gitignored — the working copy is the only copy."""
+        state, full = self.state_with_plan()
+        self.assertEqual(factory_publish.plan_path(state), full)
+        self.assertEqual(factory_publish.read_plan(state), '# T\n\nprose\n')
+
+    def test_no_plan_recorded_reads_as_none(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state['plan'] = None
+        self.assertIsNone(factory_publish.plan_path(state))
+        self.assertIsNone(factory_publish.read_plan(state))
+
+    def test_a_missing_file_reads_as_none_rather_than_raising(self):
+        """R10: a vanished worktree is a degradation, never an exception."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        self.assertIsNone(factory_publish.read_plan(state))
+
+    def test_an_absolute_plan_path_is_used_as_given(self):
+        state, full = self.state_with_plan()
+        state['plan'] = full
+        self.assertEqual(factory_publish.plan_path(state), full)
+
+    def test_undecodable_bytes_do_not_raise(self):
+        state, full = self.state_with_plan()
+        with open(full, 'wb') as fh:
+            fh.write(b'# T\n\xff\xfe not utf-8\n')
+        self.assertIn('�', factory_publish.read_plan(state))
+
+    def test_asset_name_is_per_issue_not_per_attempt(self):
+        """R5 makes this asset a living mirror, so it carries no attempt."""
+        self.assertEqual(factory_publish.plan_asset_name(514),
+                         'issue-514-plan.md')
+
+    def test_asset_name_is_neither_a_log_nor_a_screenshot(self):
+        """It must not be picked up by the stage-log or scenario tables."""
+        name = factory_publish.plan_asset_name(514)
+        self.assertIsNone(factory_publish._parse_log_asset(name))
+        self.assertFalse(name.endswith('.png'))
+
+
+class TestRenderPlanTitle(PublishTestCase):
+    def title(self, **overrides):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state.update(overrides)
+        return factory_publish.render_plan_title(state)
+
+    def test_title_is_plan_slug_and_spec_number(self):
+        """R1."""
+        self.assertEqual(self.title(), 'plan: observability (#440)')
+
+    def test_slug_falls_back_to_the_plan_filename(self):
+        self.assertEqual(
+            self.title(slug=None,
+                       plan='docs/plans/2026-08-01-issue440-body-budget.md'),
+            'plan: body-budget (#440)')
+
+    def test_slug_falls_back_again_when_there_is_no_plan_path(self):
+        self.assertEqual(self.title(slug=None, plan=None),
+                         'plan: (no slug) (#440)')
+
+
 class TestSecretScan(PublishTestCase):
     def scan(self, payload):
         path = os.path.join(self.tmp, 'BUILD.log')

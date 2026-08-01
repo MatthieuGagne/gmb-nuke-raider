@@ -424,6 +424,269 @@ def _stage_rank(stage):
     return stages.index(stage) if stage in stages else len(stages)
 
 
+# ── Plan publication (#514) ──────────────────────────────────────────────────
+#
+# A factory run's plan is 1800-3200 lines of markdown with inline code, and it
+# never reaches the branch: docs/plans/ is gitignored, so the worktree working
+# copy is the only copy that exists. The issue body is therefore a structural
+# summary and the release asset is the normal read path (R3/R4), not an
+# overflow fallback.
+
+PLAN_LABEL = "plan"
+PLAN_LABEL_COLOR = "1D76DB"
+PLAN_LABEL_DESC = "Factory execution plan for one run"
+PLAN_TYPE_OPTION = "Plan"
+
+PLAN_BODY_MARKER = ("<!-- factory-publish plan v1 — regenerated on every "
+                    "publish; manual edits are overwritten -->")
+PLAN_SUMMARY_LINK = ("_Structural summary — fenced code and task steps "
+                     "omitted. Full plan: %s_")
+PLAN_SUMMARY_WITHHELD = ("_Structural summary — fenced code and task steps "
+                         "omitted. Full plan withheld: %s_")
+PLAN_SHED_FILES = "_Task file lists omitted — see the full plan._"
+PLAN_SHED_PREAMBLE = "_Preamble omitted — see the full plan._"
+
+# A fence opens with three or more backticks or tildes, indented at most three
+# spaces (CommonMark). The closer must use the same character and be at least
+# as long, which is exactly how a ```` block holds a ``` one — and plans do
+# that constantly, because they quote markdown documents verbatim.
+_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+_TASK_HEADING = re.compile(r"^#{2,4}\s+Task\s+\d+\b")
+_BATCH_HEADING = re.compile(
+    r"^#{2,4}\s+(Batch\b|Parallel Execution Groups\b|Smoketest Checkpoint\b)")
+_ANY_HEADING = re.compile(r"^#{1,6}\s")
+_FILES_LINE = re.compile(r"^\*\*Files:\*\*")
+_DEPENDS_LINE = re.compile(r"^\*\*Depends on:\*\*")
+
+# The plan asset carries no attempt number, unlike every other asset here. R5
+# makes it a living mirror re-uploaded whenever the plan changes, so a
+# per-attempt immutable copy would contradict the re-sync it exists for.
+PLAN_ASSET_TEMPLATE = "issue-%d-plan.md"
+
+
+def plan_asset_name(issue):
+    """``issue-<N>-plan.md`` — one per spec issue, updated in place."""
+    return PLAN_ASSET_TEMPLATE % int(issue)
+
+
+def _fenced(lines):
+    """Yield ``(line, inside_a_fence)`` for every line of a markdown document.
+
+    Both the opening and the closing fence report True: they are part of the
+    block, not of the prose around it.
+    """
+    fence = None
+    for line in lines:
+        match = _FENCE.match(line)
+        if fence is None:
+            if match:
+                fence = match.group(1)
+                yield line, True
+            else:
+                yield line, False
+        else:
+            closes = (match and match.group(1)[0] == fence[0]
+                      and len(match.group(1)) >= len(fence))
+            if closes:
+                fence = None
+            yield line, True
+
+
+def _collapse(lines):
+    """Trim trailing space, drop edge blanks, collapse blank runs to one.
+
+    Deleting a fenced block leaves the blank lines that surrounded it, and a
+    summary made mostly of vertical whitespace is what a reader has to scroll
+    past to reach the tasks.
+    """
+    out = []
+    for line in lines:
+        if line.strip():
+            out.append(line.rstrip())
+        elif out and out[-1] != "":
+            out.append("")
+    while out and out[-1] == "":
+        out.pop()
+    return out
+
+
+def summarize_plan(text):
+    """``(preamble_lines, task_blocks)`` — R3's structural summary.
+
+    The preamble is everything above the first task or batch heading, with
+    fenced blocks removed. Each task block is its ``## Task N:`` heading plus
+    its ``**Depends on:**`` line and its ``**Files:**`` line with the bullet
+    list that follows; the steps, and every fenced block, are dropped.
+
+    Fence tracking is load-bearing rather than defensive: real plans quote
+    whole markdown documents inside ```` blocks, so a line-oriented scan for
+    ``## Task`` finds headings that belong to a code sample.
+    """
+    marked = list(_fenced(text.splitlines()))
+    first = None
+    for index, (line, fence) in enumerate(marked):
+        if fence:
+            continue
+        if _TASK_HEADING.match(line) or _BATCH_HEADING.match(line):
+            first = index
+            break
+
+    head = marked if first is None else marked[:first]
+    preamble = _collapse([line for line, fence in head if not fence])
+    tasks = []
+    if first is None:
+        return preamble, tasks
+
+    index = first
+    while index < len(marked):
+        line, fence = marked[index]
+        index += 1
+        if fence or not _TASK_HEADING.match(line):
+            continue
+        block = [line.rstrip()]
+        while index < len(marked):
+            line, fence = marked[index]
+            if not fence and _ANY_HEADING.match(line):
+                break
+            if fence:
+                index += 1
+                continue
+            if _DEPENDS_LINE.match(line):
+                block.append(line.rstrip())
+            elif _FILES_LINE.match(line):
+                block.append(line.rstrip())
+                index += 1
+                while index < len(marked):
+                    bullet, bullet_fence = marked[index]
+                    if bullet_fence or not bullet.lstrip().startswith("- "):
+                        break
+                    block.append(bullet.rstrip())
+                    index += 1
+                continue
+            index += 1
+        tasks.append(block)
+    return preamble, tasks
+
+
+def plan_path(state):
+    """Absolute path to the run's plan file, or None when there is none.
+
+    Resolved against the worktree, never against git: ``docs/plans/`` is
+    gitignored, so the branch never carries the file and the working copy is
+    the only place it exists (R5).
+
+    Normalised, because ``state["plan"]`` is recorded with forward slashes
+    and ``os.path.join`` does not translate them on Windows — the mixed
+    separator opens fine but is not comparable, and this path is compared.
+    """
+    plan = state.get("plan")
+    if not plan:
+        return None
+    if os.path.isabs(plan):
+        return plan
+    worktree = state.get("worktree")
+    if not worktree:
+        return None
+    return os.path.normpath(os.path.join(worktree, plan))
+
+
+def read_plan(state):
+    """The plan's text, or None when it cannot be read.
+
+    ``errors="replace"`` for the same reason ``log_tail`` uses it: a plan a
+    publisher cannot decode must still publish, badly, rather than not at all.
+    """
+    path = plan_path(state)
+    if path is None:
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _plan_slug(state):
+    """The run's slug for the plan issue title.
+
+    ``state["slug"]`` is the intended source but nothing in the factory
+    currently emits it — ``stages.md`` step 3 records only worktree and
+    branch — so the plan filename is the fallback. PRD-3 fixes the filename
+    as ``YYYY-MM-DD-issue<N>-<slug>.md``, which makes the slug recoverable
+    without inventing a second naming convention.
+    """
+    slug = state.get("slug")
+    if slug:
+        return slug
+    plan = state.get("plan")
+    if plan:
+        stem = os.path.splitext(os.path.basename(plan))[0]
+        match = re.match(r"^\d{4}-\d{2}-\d{2}-issue\d+-(.+)$", stem)
+        if match:
+            return match.group(1)
+        if stem:
+            return stem
+    return "(no slug)"
+
+
+def render_plan_title(state):
+    """``plan: <slug> (#<N>)`` (R1). Pure."""
+    return "plan: %s (#%d)" % (_plan_slug(state), int(state["issue"]))
+
+
+def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
+                     budget=BODY_BUDGET):
+    """The plan issue body, bounded at *budget* characters (R3).
+
+    Render, measure, then shed in a fixed order until it fits: the task file
+    lists first, then the preamble, each cut leaving an explicit marker.
+    Never shed: the header, the task headings, and the link to the full plan —
+    a summary that has lost its task list is not a summary of a plan. A hard
+    truncation is the backstop, exactly as in ``render_body``.
+
+    An empty *plan_text* is meaningful, not an error: it is what
+    ``publish_plan`` passes when ``scan_secrets`` refused the file, and it
+    renders a body with a header and a withheld marker and no plan text at
+    all. The scan guards the issue body as well as the asset — the body is
+    the more exposed of the two, because it is indexed.
+    """
+    issue = int(state["issue"])
+    name = plan_asset_name(issue)
+    withheld = (publish.get("withheld") or {}).get(name)
+    link = PLAN_SUMMARY_WITHHELD % withheld if withheld else \
+        PLAN_SUMMARY_LINK % asset_url(name, repo)
+
+    # redact() for the same reason display_worktree() uses it: state["plan"]
+    # may be absolute, and this body is a public issue.
+    header = ["**Spec** #%d · **Plan** `%s` · **Branch** `%s`"
+              % (issue, factory_report.redact(state.get("plan") or "-"),
+                 state.get("branch") or "-")]
+    run_issue = publish.get("run_issue")
+    if run_issue:
+        header += ["", "Run dashboard: #%d" % run_issue]
+
+    preamble, tasks = summarize_plan(plan_text)
+
+    def build(drop_files, drop_preamble):
+        out = list(header)
+        if drop_preamble:
+            out += ["", PLAN_SHED_PREAMBLE]
+        elif preamble:
+            out += [""] + preamble
+        for block in tasks:
+            out += [""] + ([block[0]] if drop_files else block)
+        if drop_files and tasks:
+            out += ["", PLAN_SHED_FILES]
+        out += ["", link, "", PLAN_BODY_MARKER]
+        return "\n".join(out) + "\n"
+
+    for shed in ((False, False), (True, False), (True, True)):
+        body = build(*shed)
+        if len(body) <= budget:
+            return body
+    return body[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER
+
+
 def _render(ctx):
     state = ctx["state"]
     out = ["**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
