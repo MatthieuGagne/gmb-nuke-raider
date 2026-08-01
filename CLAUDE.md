@@ -205,8 +205,8 @@ again. Every `### Dn` carries its own `Status: Accepted` or
 
 **Citations** are written
 `[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in markdown and
-`(ADR 441)` in code comments. To cite one decision rather than the whole ADR, append its key —
-`ADR 441 D2` — inside the same link text; the target is unchanged. That target is always the
+`(ADR 441)` in code comments. To cite one decision rather than the whole ADR, append its `Dn` to
+the link text — `ADR 441 D2` — leaving the target unchanged. That target is always the
 **ADR's own issue**, never the work item whose number is the key, and a citation never carries a
 bare second issue number.
 
