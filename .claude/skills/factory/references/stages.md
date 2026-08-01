@@ -11,6 +11,23 @@ number. Pass `--attempt <k>` on every retry.
 
 ---
 
+## Run start — before GATE
+
+Once per run, from *Session setup* in `SKILL.md` (step 4), after the `start` event and before
+the first stage:
+
+```
+python tools/factory_publish.py --issue <N> --run-start
+```
+
+It sets `Status = In Progress` on the spec issue's Documents-board item, adding the item first
+if the issue was never on the board. It adds no duplicate item on a `--resume` or a second
+attempt — the item id is cached in `publish.json` — and the Status write is re-issued on
+purpose, which is what lifts a spec back out of `Todo` after a failed attempt. Exit `1` is a
+degradation, never a run failure: note the `factory-publish: WARNING:` line and continue.
+
+---
+
 ## GATE
 
 1. `LOG GATE -- python tools/spec_lint.py --issue <N> --json`
