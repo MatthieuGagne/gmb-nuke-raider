@@ -17,8 +17,19 @@ SOURCE_PATH = os.path.join(os.path.dirname(__file__), '..', 'tools',
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def make_repo(d, noi='', makefile='CFLAGS := -Wm-ya16\n', manifest=None, src_files=None):
-    """Create a minimal repo layout in temp dir d."""
+def make_repo(d, noi='', makefile='CFLAGS := -autobank\n', manifest=None,
+              src_files=None, rom_code=0x04):
+    """Create a minimal repo layout in temp dir d.
+
+    `rom_code` is the cartridge header ROM-size code (0x04 = 32 banks, matching
+    the real build). Pass rom_code=None to omit the ROM entirely — the case
+    where capacity is undeterminable and both checks must defer.
+
+    The default Makefile no longer carries -Wm-ya: nothing reads it any more,
+    and a fixture that still declared a bank count would imply the checker
+    cares. Only test_the_makefile_no_longer_influences_any_result passes a
+    -Wm-ya Makefile now, and its whole point is that the value is inert.
+    """
     os.makedirs(os.path.join(d, 'build'), exist_ok=True)
     os.makedirs(os.path.join(d, 'src'), exist_ok=True)
 
@@ -27,6 +38,9 @@ def make_repo(d, noi='', makefile='CFLAGS := -Wm-ya16\n', manifest=None, src_fil
 
     with open(os.path.join(d, 'Makefile'), 'w') as f:
         f.write(makefile)
+
+    if rom_code is not None:
+        write_rom(d, code=rom_code)
 
     m = manifest if manifest is not None else {}
     with open(os.path.join(d, 'bank-manifest.json'), 'w') as f:
@@ -227,14 +241,19 @@ DEF _state_playing 0x17638
 DEF _state_title 0x100000
 """
 
-MAKEFILE_YA32 = 'CFLAGS := -Wm-ya32\n'
-
 NOI_STATE_IN_BANK2 = """\
 DEF _state_playing 0x17638
 DEF _state_results 0x24100
 """
 
 NOI_STATE_BANK0 = """\
+DEF _state_hub 0xBAB
+"""
+
+# Banks 2 and 3: where autobank actually places state code on today's build.
+NOI_STATE_BANKS_2_AND_3 = """\
+DEF _state_playing 0x24100
+DEF _state_title 0x34100
 DEF _state_hub 0xBAB
 """
 
@@ -251,59 +270,98 @@ class TestStateSymbols(unittest.TestCase):
         """Bank 3 was the reported FAIL (#461). invoke() dispatch is bank-agnostic,
         so bank 3 is as safe as bank 2 — the old ceiling was a snapshot, not a rule."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK3, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANK3)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
-    def test_state_symbol_at_highest_declared_bank_ok(self):
-        """-Wm-ya32 declares banks 0..31, so bank 31 is the last legal bank."""
+    def test_sram_makefile_does_not_flag_a_healthy_rom(self):
+        """AC1, the regression that motivates #487. A ROM with 32 real banks and
+        state code in banks 1-3 is healthy. Under the old -Wm-ya-derived bound,
+        the roadmap's `-Wm-ya1` shrank capacity to 1 bank and flagged every state
+        symbol above bank 0 while check 4 FAILed on the same coincidence. Neither
+        check may react to the Makefile at all now."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK31, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANKS_2_AND_3,
+                      makefile='CFLAGS := -Wm-yt1b -Wm-ya1\n', rom_code=0x04)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+        self.assertEqual(result['capacity_status'], 'PASS')
+        self.assertEqual(result['rom_capacity'], 32)
+        self.assertEqual(bank_post_build.overall_status(result), 'PASS')
+
+    def test_the_makefile_no_longer_influences_any_result(self):
+        """R2 in one assertion: identical repos differing only in their Makefile
+        must produce identical results — including a Makefile with no -Wm-ya at
+        all. This is what makes it impossible to fix one check and leave the
+        other reading the flag."""
+        results = []
+        for makefile in ('CFLAGS := -Wm-ya1\n', 'CFLAGS := -Wm-ya32\n',
+                         'CFLAGS := -autobank\n'):
+            with tempfile.TemporaryDirectory() as d:
+                make_repo(d, noi=NOI_STATE_BANKS_2_AND_3, makefile=makefile)
+                results.append(bank_post_build.check(
+                    d, romusage_output=ROMUSAGE_HEALTHY))
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[1], results[2])
+
+    def test_state_symbol_at_highest_real_bank_ok(self):
+        """AC2, lower side: 32 banks means banks 0..31, so bank 31 is legal."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK31, rom_code=0x04)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
-    def test_state_symbol_beyond_declared_capacity_fails(self):
-        """Bank 32 under -Wm-ya32 is a bank the cartridge does not have."""
+    def test_state_symbol_beyond_real_capacity_fails(self):
+        """AC2, upper side: bank 32 on a 32-bank cart does not exist."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANK32, rom_code=0x04)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         bad = result['bad_state_symbols']
         self.assertEqual(len(bad), 1)
         self.assertIn('_state_title', bad[0][0])
 
-    def test_bound_follows_the_makefile_not_a_constant(self):
-        """The same symbol that passes under -Wm-ya32 must FAIL under -Wm-ya16.
-        This is what proves the bound is derived rather than hardcoded (R5)."""
+    def test_bound_follows_the_cartridge_not_a_constant(self):
+        """The same symbol that passes on a 32-bank cart must FAIL on a 16-bank
+        one. This is what proves the bound is derived rather than hardcoded."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK16, makefile='CFLAGS := -Wm-ya16\n')
+            make_repo(d, noi=NOI_STATE_BANK16, rom_code=0x03)   # 16 banks
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(len(result['bad_state_symbols']), 1)
 
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK16, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANK16, rom_code=0x04)   # 32 banks
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
-    def test_no_wm_ya_skips_the_check(self):
-        """Capacity is unknowable without -Wm-ya, so the check defers rather than
-        inventing a default. _check_wm_ya already reports SKIP for this case."""
+    def test_no_rom_defers_both_checks(self):
+        """R3: with no ROM there is no capacity, so both checks defer rather
+        than inventing a bound. Replaces the old no--Wm-ya deferral case."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK32, makefile='CFLAGS := -Wl-j\n')
+            make_repo(d, noi=NOI_STATE_BANK32, rom_code=None)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
-        self.assertEqual(result['wm_ya_status'], 'SKIP')
+        self.assertEqual(result['capacity_status'], 'SKIP')
+        self.assertIsNone(result['rom_capacity'])
+        self.assertEqual(bank_post_build.overall_status(result), 'PASS')
+
+    def test_unreadable_size_code_defers_both_checks(self):
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATE_BANK32, rom_code=0x52)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
+        self.assertEqual(result['bad_state_symbols'], [])
+        self.assertEqual(result['capacity_status'], 'SKIP')
 
     def test_state_check_is_the_only_signal_when_romusage_is_unavailable(self):
-        """The non-redundancy case, and the exact condition that hid #461 for months.
-
-        With no romusage output there are no banks, so _check_wm_ya returns PASS and
-        the .noi-derived state check is the only capacity signal left. If this test
-        ever goes green-by-vacuum, the check really has become dead weight.
+        """The non-redundancy case, and the exact condition that hid #461 for
+        months. With no romusage output there are no banks, so the check-4 half
+        returns PASS and the .noi-derived state check is the only capacity signal
+        left. Reading capacity from the ROM header rather than the bank table is
+        what keeps this case answerable at all.
         """
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANK32, rom_code=0x04)
             result = bank_post_build.check(d, romusage_output='')
-        self.assertEqual(result['wm_ya_status'], 'PASS')
+        self.assertEqual(result['capacity_status'], 'PASS')
         self.assertEqual(len(result['bad_state_symbols']), 1)
         self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
 
@@ -315,19 +373,8 @@ class TestStateSymbols(unittest.TestCase):
         self.assertEqual(result['bad_state_symbols'], [])
 
     def test_state_symbol_in_bank0_ok(self):
-        noi = "DEF _state_hub 0xBAB\n"
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=noi)
-            result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
-        self.assertEqual(result['bad_state_symbols'], [])
-
-    def test_declared_zero_defers_like_no_wm_ya(self):
-        """-ya's documented default is 0, so -Wm-ya0 is a plausible way to write
-        'no SRAM'. declared=0 must defer exactly like declared=None (unknowable
-        capacity), not become limit=0 and flag every _state_* symbol — including
-        legitimate bank-0 ones — driving overall_status to FAIL on a healthy ROM."""
-        with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK0, makefile='CFLAGS := -Wm-ya0\n')
+            make_repo(d, noi=NOI_STATE_BANK0)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(result['bad_state_symbols'], [])
 
@@ -380,7 +427,7 @@ class TestBankSymbols(unittest.TestCase):
         self.assertEqual(result['bank_sym_errors'], [])
 
 
-# ── Check 4: -Wm-ya capacity ───────────────────────────────────────────────────
+# ── Check 4: ROM capacity ──────────────────────────────────────────────────────
 
 ROMUSAGE_3_BANKS = """\
 ROM_0        0x0000 -> 0x3FFF    16384     9488    58%     6896    42%
@@ -399,36 +446,59 @@ ROM_16       0x4000 -> 0x7FFF    16384      100     1%    16284    99%
 """
 
 
-class TestWmYaCapacity(unittest.TestCase):
+class TestCapacity(unittest.TestCase):
 
-    def test_highest_bank_below_declared(self):
+    def test_highest_bank_below_capacity(self):
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, makefile='CFLAGS := -Wm-ya16\n')
+            make_repo(d, rom_code=0x03)          # 16 banks
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_3_BANKS)
-        self.assertEqual(result['wm_ya_status'], 'PASS')
-        self.assertEqual(result['wm_ya_declared'], 16)
-        self.assertEqual(result['wm_ya_highest'], 2)
+        self.assertEqual(result['capacity_status'], 'PASS')
+        self.assertEqual(result['rom_capacity'], 16)
+        self.assertEqual(result['highest_bank'], 2)
 
     def test_highest_bank_at_limit_is_ok(self):
-        """Bank 15 is the last valid bank when -Wm-ya16 (banks 0-15)."""
+        """AC2, lower side for check 4: 16 banks means bank 15 is the last valid one."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, makefile='CFLAGS := -Wm-ya16\n')
+            make_repo(d, rom_code=0x03)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_16_BANKS)
-        self.assertEqual(result['wm_ya_status'], 'PASS')
+        self.assertEqual(result['capacity_status'], 'PASS')
 
-    def test_highest_bank_exceeds_declared_fail(self):
+    def test_highest_bank_exceeds_capacity_fail(self):
+        """AC2, upper side for check 4."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, makefile='CFLAGS := -Wm-ya16\n')
+            make_repo(d, rom_code=0x03)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_OVERFLOW_BANKS)
-        self.assertEqual(result['wm_ya_status'], 'FAIL')
-        self.assertEqual(result['wm_ya_highest'], 16)
-        self.assertEqual(result['wm_ya_declared'], 16)
+        self.assertEqual(result['capacity_status'], 'FAIL')
+        self.assertEqual(result['highest_bank'], 16)
+        self.assertEqual(result['rom_capacity'], 16)
 
-    def test_no_wm_ya_in_makefile_skipped(self):
+    def test_no_rom_skips(self):
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, makefile='CFLAGS := -autobank\n')
+            make_repo(d, rom_code=None)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_3_BANKS)
-        self.assertEqual(result['wm_ya_status'], 'SKIP')
+        self.assertEqual(result['capacity_status'], 'SKIP')
+
+    def test_report_names_the_capacity_source_truthfully(self):
+        """AC3's report requirement, pinned at the unit level: the line must say
+        where the number came from, and must not claim the Makefile declared it."""
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATES_OK, rom_code=0x04)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_3_BANKS)
+        report = bank_post_build._format_report(result)
+        self.assertIn('ROM capacity: OK — 32 banks (cartridge header 0x148)',
+                      report)
+        self.assertIn('highest bank in use 2', report)
+        self.assertNotIn('-Wm-ya', report)
+        self.assertNotIn('declared', report)
+
+    def test_skip_report_says_why_it_could_not_tell(self):
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, noi=NOI_STATES_OK, rom_code=None)
+            result = bank_post_build.check(d, romusage_output=ROMUSAGE_3_BANKS)
+        report = bank_post_build._format_report(result)
+        self.assertIn('ROM capacity: SKIP', report)
+        self.assertIn('cartridge header unreadable', report)
+        self.assertNotIn('-Wm-ya', report)
 
 
 # ── Overall exit code ─────────────────────────────────────────────────────────
@@ -448,7 +518,7 @@ class TestOverallStatus(unittest.TestCase):
         self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
     # Bank pressure alone never escalates to FAIL (43491d8) — see the
-    # TestRomusageBudget notes. Only state-symbol, __bank_ and -Wm-ya
+    # TestRomusageBudget notes. Only state-symbol, __bank_ and ROM-capacity
     # problems produce an overall FAIL.
 
     def test_bank1_full_overall_warn(self):
@@ -464,9 +534,9 @@ class TestOverallStatus(unittest.TestCase):
         self.assertEqual(bank_post_build.overall_status(result), 'WARN')
 
     def test_state_overflow_overall_fail(self):
-        """A state symbol beyond declared capacity still drives overall FAIL."""
+        """A state symbol beyond real capacity still drives overall FAIL."""
         with tempfile.TemporaryDirectory() as d:
-            make_repo(d, noi=NOI_STATE_BANK32, makefile=MAKEFILE_YA32)
+            make_repo(d, noi=NOI_STATE_BANK32, rom_code=0x04)
             result = bank_post_build.check(d, romusage_output=ROMUSAGE_HEALTHY)
         self.assertEqual(bank_post_build.overall_status(result), 'FAIL')
 
