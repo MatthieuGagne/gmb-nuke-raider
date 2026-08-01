@@ -185,30 +185,30 @@ Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact
 in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues.**
 
 **An ADR's key is the issue number of the work item being worked when the decision was taken** —
-not a counter, and not the ADR issue's own number. The title is
-`ADR <work item#>: <decision title>`. GitHub allocated that number when the work item was filed,
-so nothing is read before writing and two concurrent sessions can never collide: filing is a
-single `gh issue create` with no follow-up retitle.
+not a counter, and not the ADR issue's own number. The work item is the `prd`/`bug`/`chore`
+issue being implemented, never a run log, a review, or another ADR. The title is
+`ADR <work item#>: <decision title>`.
 
-**One ADR per work item.** That is what makes the key unique. Several decisions taken on the
-same work item share one ADR issue and appear in its body as `### D1: …`, `### D2: …`. Cite an
-individual decision as `ADR 441 D2`.
+**One ADR per work item.** Several decisions taken on the same work item share one ADR issue and
+appear in its body as `### D1: …`, `### D2: …`, so look for an existing ADR before filing a
+second. Cite an individual decision as `ADR 441 D2`.
 
-**Key resolution in the two ambiguous cases.** A decision taken while working a **child spec**
-under an epic keys off the child spec, never the epic. A decision with **no work item** makes
-the ADR its own work item, so its key is its own issue number. The two cannot collide — two
-GitHub issues cannot share a number.
+**Key resolution.** A decision taken while working a **child spec** under an epic keys off the
+child spec, never the epic. A decision with **no work item** makes the ADR its own work item, so
+its key is its own issue number — the one case that needs a retitle after `gh issue create`,
+since an issue's number does not exist until it does.
 
-**Lifecycle.** An ADR issue stays **open** while its work item is open, and is closed when the
-work item closes. A decision taken later, against an already-closed work item, is added by
-reopening the ADR, appending the next `Dn`, and closing it again.
-
-**Status is per decision**, not per issue: every `### Dn` carries its own `Status: Accepted` or
-`Status: Superseded by ADR <key> D<n>`.
+**Lifecycle.** An ADR issue stays **open** while its work item is open and is closed when the
+work item closes; a self-keyed ADR closes on acceptance. A decision taken later, against an
+already-closed work item, is added by reopening the ADR, appending the next `Dn`, and closing it
+again. Every `### Dn` carries its own `Status: Accepted` or
+`Status: Superseded by ADR <key> D<n>` — status is per decision, not per issue.
 
 **Citations** are written
-`[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in markdown and
-`(ADR 441)` in code comments — never with a bare second issue number.
+`[ADR 441 D2](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in markdown and
+`(ADR 441 D2)` in code comments; drop the ` D2` to cite the ADR as a whole. The link target is
+always the **ADR's own issue**, never the work item whose number is the key, and a citation
+never carries a bare second issue number.
 
 **Project `Type` means kind, and nothing else.** Every document issue is added to the
 "Nuke Raider — Documents" project when it is created, with `Type` set from the title prefix:
