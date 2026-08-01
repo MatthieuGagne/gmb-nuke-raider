@@ -100,9 +100,11 @@ There is no `Follow-up` type — provenance belongs in the issue body. `prd`, `a
 ### Architecture decisions: keyed by their work item
 
 An ADR is an `adr`-labeled GitHub issue whose **key is the issue number of the work item that
-was being worked when the decision was taken** — not an allocated counter, and not the ADR
-issue's own number. The title is `ADR <work item#>: <decision title>`. GitHub allocated that
-number when the work item was filed, so no counter is read before writing.
+was being worked when the decision was taken** — not an allocated counter, and — except in the
+no-work-item case below — not the ADR issue's own number. The work item is the PRD, bug or chore
+issue being implemented, never a run log, a review, or another ADR. The title is
+`ADR <work item#>: <decision title>`. GitHub allocated that number when the work item was filed,
+so no counter is read before writing.
 
 **One ADR per work item.** Several decisions taken on the same work item share one ADR issue and
 appear in its body as `### D1: …`, `### D2: …`. Before filing a second, search issue titles for
@@ -111,8 +113,9 @@ individual decision as `ADR 441 D2`.
 
 **The two ambiguous cases.** A decision taken while working a **child spec** under an epic keys
 off the child spec, never the epic. A decision with **no work item** makes the ADR its own work
-item, so its key is its own issue number — the one case that needs a retitle after
-`gh issue create`. They cannot collide, because two GitHub issues cannot share a number.
+item, so its key is its own issue number — the ADR is **self-keyed**, and it is the one case
+that needs a retitle after `gh issue create`. They cannot collide, because two GitHub issues
+cannot share a number.
 
 **Lifecycle.** The ADR issue stays open while its work item is open and is closed when the work
 item closes — replacing the older "closed on acceptance" rule, which now survives only for a
@@ -137,15 +140,18 @@ Status: Accepted
 Context / Decision / Consequences, per the baseline `ADR-FORMAT.md`.
 
 ### D2: The tool suite runs on commit, the clean build on push
-Status: Superseded by ADR 461 D1
+Status: Superseded by ADR <key> D<n>
 
 …
 ```
 
-Seven ADRs predate this scheme. They are being retitled to their work-item key, each keeping an
-alias line in its body that names the number it previously carried, so citations in
-already-merged PR bodies and closed issues stay resolvable. Nothing parses ADR keys — there is
-no validator and no lint rule, by design.
+The `Status:` line is shown with metavariables on purpose: every concrete key in this repo names
+a real ADR, and an example that supersedes one of them reads as a fact rather than a form.
+
+Seven ADRs predate this scheme (issues #466–#470, #475 and #490). Each takes its work-item key
+as its title and keeps an alias line in its body naming the number it previously carried, so
+citations in already-merged PR bodies and closed issues stay resolvable. Nothing parses ADR
+keys — there is no validator and no lint rule, by design.
 
 ### TDD cycle (for C files)
 
