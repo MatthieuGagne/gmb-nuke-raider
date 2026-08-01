@@ -65,12 +65,12 @@ Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git`
 - **Machine** (`~/.claude/settings.json`, outside the repo): `env` values and any allow rule containing an absolute path. Template: `.claude/settings.user.example.json`.
 - **Repo** (`.claude/settings.json`, tracked): the curated allowlist, the deny list, and all
   **agent** hook wiring — **repository** hook wiring lives in tracked `.githooks/` (see
-  ADR 0002 (#467)). No absolute paths, no `env`. Validated by
+  [ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)). No absolute paths, no `env`. Validated by
   `python tools/allowlist_lint.py`, enforced by `make test-tools`. Any matcher naming one shell
   tool must name both (`Bash|PowerShell`) — the hygiene check fails otherwise.
 - **Scratch** (`.claude/settings.local.json`, gitignored): transient session approvals. Never commit it.
 
-**Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: ADR 0001 (#466).
+**Promotion rule:** a permission approved during a session is either promoted deliberately — rewritten as a generalized rule in the canonical form for its tool (`Bash(prefix:*)`, `PowerShell(prefix *)`) and added to the tracked repo file — or discarded. Never copy a one-shot approval into version control. Rationale and the deny-gate design: [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
 
 **Always create a PR after pushing a branch** — no need to ask. Include `Closes #N` in the PR body to auto-close the related GitHub issue on merge. When a PR is merged, verify that the linked issue is closed; if not, close it manually with `gh issue close N`.
 
@@ -182,11 +182,33 @@ explicit commands. `prd` joins `adr`, `log` and `epic` as the label set for docu
 kinds; `bug:`, `fix:`, `docs:` and `chore:` issues are not labeled — their kind is expressed on
 the board via `Type`.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
-in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues**, closed
-on acceptance and cited as `ADR NNNN (#issue)`. Allocate the next number with
-`gh issue list --label adr --state all` + 1 (next is **0008**). `--state all` is mandatory:
-ADRs are closed on acceptance, so the default open-only filter reports zero and would
-"prove" any number free.
+in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues.**
+
+**An ADR's key is the issue number of the work item being worked when the decision was taken** —
+not a counter, and not the ADR issue's own number. The title is
+`ADR <work item#>: <decision title>`. GitHub allocated that number when the work item was filed,
+so nothing is read before writing and two concurrent sessions can never collide: filing is a
+single `gh issue create` with no follow-up retitle.
+
+**One ADR per work item.** That is what makes the key unique. Several decisions taken on the
+same work item share one ADR issue and appear in its body as `### D1: …`, `### D2: …`. Cite an
+individual decision as `ADR 441 D2`.
+
+**Key resolution in the two ambiguous cases.** A decision taken while working a **child spec**
+under an epic keys off the child spec, never the epic. A decision with **no work item** makes
+the ADR its own work item, so its key is its own issue number. The two cannot collide — two
+GitHub issues cannot share a number.
+
+**Lifecycle.** An ADR issue stays **open** while its work item is open, and is closed when the
+work item closes. A decision taken later, against an already-closed work item, is added by
+reopening the ADR, appending the next `Dn`, and closing it again.
+
+**Status is per decision**, not per issue: every `### Dn` carries its own `Status: Accepted` or
+`Status: Superseded by ADR <key> D<n>`.
+
+**Citations** are written
+`[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in markdown and
+`(ADR 441)` in code comments — never with a bare second issue number.
 
 **Project `Type` means kind, and nothing else.** Every document issue is added to the
 "Nuke Raider — Documents" project when it is created, with `Type` set from the title prefix:
@@ -197,7 +219,7 @@ ADRs are closed on acceptance, so the default open-only filter reports zero and 
 | `feat:` | PRD |
 | `fix:` / `bug:` | Bug |
 | `docs:` / `chore:` / `refactor:` / `test:` | Chore |
-| `ADR NNNN:` | ADR |
+| `ADR <work item#>:` | ADR |
 | `run …` | Log |
 | `review:` | Review |
 
@@ -207,7 +229,7 @@ title — is what distinguishes it. A master issue that owns a set of child spec
 `Epic` from the field.
 
 Provenance is not a `Type` — "this came out of run N" lives in the issue body. `Log` typing is
-owned end-to-end by `tools/factory_publish.py` (ADR 0006 (#475)); `PRD` by the `/prd` skill;
+owned end-to-end by `tools/factory_publish.py` ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)); `PRD` by the `/prd` skill;
 `ADR` by the `grill-with-docs` overlay; `Epic` by hand.
 
 One documented exception to the table: #465 is `docs:`-titled but stays `PRD`.
