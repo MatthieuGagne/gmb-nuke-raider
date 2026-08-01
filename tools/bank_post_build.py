@@ -24,6 +24,12 @@ import sys
 
 BANK_STRIDE = 0x10000    # .noi addresses advance one bank per 0x10000
 
+# Cartridge header (Pan Docs). 0x148 is the ROM-size code makebin writes from
+# the auto-sized image; every code it emits maps to `2 << code` banks.
+ROM_SIZE_OFFSET = 0x148
+ROM_SIZE_CODE_MAX = 0x08
+HEADER_MIN_LEN = 0x150
+
 
 def _run_romusage(rom_path):
     """Run romusage -a and return stdout.
@@ -53,6 +59,45 @@ def _parse_romusage(output):
         if m:
             banks.append((int(m.group(1)), int(m.group(2))))
     return banks
+
+
+def _read_rom_capacity(rom_path):
+    """Return the cartridge's real ROM bank count, or None if undeterminable.
+
+    The bound comes from the built ROM, not the Makefile.  Two sources were
+    available (#487 R1) and this is the one that answers the question actually
+    being asked:
+
+    * romusage's bank table lists only banks the linker put content in, so its
+      maximum is a floor on *usage*.  It cannot report that a cartridge has 32
+      banks while 4 are occupied — which is exactly the bound both capacity
+      checks need.
+    * Header byte 0x148 is what makebin writes from the auto-sized image
+      (`-yo A`), and what the MBC and every emulator read to size the cart.  It
+      is also readable when romusage cannot run — the state that hid #461.
+
+    `-Wm-ya` is deliberately not consulted.  It is makebin's *RAM* bank count
+    (`-ya n  number of ram banks`); ROM banks are auto-sized and never declared
+    anywhere in this build.  The built header proves the flag is discarded:
+    0x148=0x04 (32 banks) alongside 0x149=0x00 (no RAM banks) under -Wm-ya32.
+    That `-Wm-ya32` and 32 ROM banks agree today is a coincidence, and the
+    roadmap's `-Wm-ya1` SRAM save is the day it stops agreeing.
+
+    Returns None — never a guessed default (#487 R3) — when the ROM is absent,
+    truncated, or carries a size code this mapping does not cover.  Callers must
+    defer on None, not substitute a bound.
+    """
+    try:
+        with open(rom_path, 'rb') as fh:
+            header = fh.read(HEADER_MIN_LEN)
+    except OSError:
+        return None
+    if len(header) < HEADER_MIN_LEN:
+        return None
+    code = header[ROM_SIZE_OFFSET]
+    if code > ROM_SIZE_CODE_MAX:
+        return None      # incl. legacy 0x52/0x53/0x54, which makebin never emits
+    return 2 << code
 
 
 def _check_romusage(banks):

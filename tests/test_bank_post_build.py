@@ -37,6 +37,88 @@ def make_repo(d, noi='', makefile='CFLAGS := -Wm-ya16\n', manifest=None, src_fil
             f.write(content)
 
 
+def write_rom(d, code=0x04, length=0x150):
+    """Write a stub ROM into d/build whose header byte 0x148 carries *code*.
+
+    Only the header matters to the checker, so the body is zero-filled: a real
+    512 KB ROM in every test would cost disk for no added signal. `length` is a
+    parameter so the truncated-header case can be exercised.
+    """
+    os.makedirs(os.path.join(d, 'build'), exist_ok=True)
+    path = os.path.join(d, 'build', 'nuke-raider.gb')
+    data = bytearray(length)
+    if length > bank_post_build.ROM_SIZE_OFFSET:
+        data[bank_post_build.ROM_SIZE_OFFSET] = code
+    with open(path, 'wb') as fh:
+        fh.write(bytes(data))
+    return path
+
+
+# ── Capacity source: the cartridge header ──────────────────────────────────────
+
+class TestRomCapacity(unittest.TestCase):
+    """The bound comes from the ROM the build actually produced (#487 R1)."""
+
+    def test_every_size_code_makebin_emits_maps_to_a_bank_count(self):
+        expected = {0x00: 2, 0x01: 4, 0x02: 8, 0x03: 16, 0x04: 32,
+                    0x05: 64, 0x06: 128, 0x07: 256, 0x08: 512}
+        for code, banks in expected.items():
+            with self.subTest(code=code):
+                with tempfile.TemporaryDirectory() as d:
+                    path = write_rom(d, code=code)
+                    self.assertEqual(bank_post_build._read_rom_capacity(path),
+                                     banks)
+
+    def test_this_projects_real_header_reads_as_32_banks(self):
+        """0x148=0x04 is what build/nuke-raider.gb actually carries — 512 KB
+        auto-sized by makebin, the number -Wm-ya32 only coincides with."""
+        with tempfile.TemporaryDirectory() as d:
+            path = write_rom(d, code=0x04)
+            self.assertEqual(bank_post_build._read_rom_capacity(path), 32)
+
+    def test_missing_rom_defers(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'build', 'nuke-raider.gb')
+            self.assertIsNone(bank_post_build._read_rom_capacity(path))
+
+    def test_truncated_rom_defers(self):
+        """A file too short to contain the header cannot answer the question."""
+        with tempfile.TemporaryDirectory() as d:
+            path = write_rom(d, code=0x04, length=0x100)
+            self.assertIsNone(bank_post_build._read_rom_capacity(path))
+
+    def test_unmapped_size_code_defers_rather_than_guessing(self):
+        """0x52 is a legacy code makebin never emits. R3 forbids inventing a
+        bound, so an unrecognised code must defer, not fall back to a default."""
+        with tempfile.TemporaryDirectory() as d:
+            path = write_rom(d, code=0x52)
+            self.assertIsNone(bank_post_build._read_rom_capacity(path))
+
+    def test_capacity_is_never_zero_or_one(self):
+        """Task 2 deletes the old `declared=0 must defer` regression test, and
+        it is only safe to delete because this holds: the smallest code maps to
+        2 banks, so a non-None capacity is always >= 2 and the `limit = 0` case
+        that test guarded is unreachable from this source."""
+        for code in range(0x00, bank_post_build.ROM_SIZE_CODE_MAX + 1):
+            with self.subTest(code=code):
+                with tempfile.TemporaryDirectory() as d:
+                    path = write_rom(d, code=code)
+                    self.assertGreaterEqual(
+                        bank_post_build._read_rom_capacity(path), 2)
+
+    def test_no_hardcoded_bank_count_fallback_in_the_function(self):
+        """R3 has no behavioural hole once the three defer tests above pass, so
+        this pins the shape instead: inside _read_rom_capacity every non-derived
+        return is None. Scoped to the function body — a whole-file regex would
+        match `return 2 << code` (the derivation) and fail on correct code."""
+        with open(SOURCE_PATH, encoding='utf-8') as fh:
+            src = fh.read()
+        body = src[src.index('def _read_rom_capacity'):]
+        body = body[:body.index('\ndef ', 1)]
+        self.assertEqual(body.count('return None'), 3)
+        self.assertNotRegex(body, r'return\s+(?!2\s*<<)\d+\b')
+
+
 ROMUSAGE_HEALTHY = """\
 Bank         Range                Size     Used  Used%     Free  Free%
 --------     ----------------  -------  -------  -----  -------  -----
