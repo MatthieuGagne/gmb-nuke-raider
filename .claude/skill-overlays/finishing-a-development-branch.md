@@ -74,7 +74,7 @@ Outside a factory run every confirmation above fires exactly as written.
 
 - **Any user-visible behavior changed** (new feature, changed controls, new screen, new module) → update the **Game Modules table** in `README.md`.
 - **Any `.claude/skills/`, `.claude/agents/`, or `CLAUDE.md` file changed** → update `docs/dev-workflow.md` in the same PR. The two are co-authoritative and must agree.
-- **Any new tool permission approved this session** → promote it into the tracked `.claude/settings.json` as a generalized rule in its tool's canonical form (`Bash(prefix:*)`, `PowerShell(prefix *)`), or discard it. Never commit `.claude/settings.local.json` — it is gitignored scratch. Validate with `python tools/allowlist_lint.py`. See ADR 0001 (#466).
+- **Any new tool permission approved this session** → promote it into the tracked `.claude/settings.json` as a generalized rule in its tool's canonical form (`Bash(prefix:*)`, `PowerShell(prefix *)`), or discard it. Never commit `.claude/settings.local.json` — it is gitignored scratch. Validate with `python tools/allowlist_lint.py`. See [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
 
 ### PR conventions
 
