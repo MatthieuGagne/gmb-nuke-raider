@@ -1,8 +1,11 @@
 #!/bin/sh
 # Repository hook — tool suite gate (ADR 441).
 #
-# Runs the ~6s Python tool suite before every commit, from any shell, tool or
-# agent. It deliberately does NOT call make: the Makefile pins SHELL := bash
+# Runs the whole Python tool suite before every commit, from any shell, tool or
+# agent. No duration is quoted here on purpose: the cost tracks the test count,
+# so any figure rots silently — an earlier "~6s" in this comment outlived its
+# truth by several hundred tests. Measure `make test-tools` when you need the
+# number. It deliberately does NOT call make: the Makefile pins SHELL := bash
 # and expects GBDK_HOME, so a commit from a bare cmd.exe would die on
 # "make: bash: command not found" for a reason unrelated to the tests, which is
 # worse than no gate. Keep the command below byte-identical to the Makefile's

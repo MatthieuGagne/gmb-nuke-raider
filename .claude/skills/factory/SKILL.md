@@ -56,7 +56,7 @@ Exact command sequences are in `references/stages.md` — follow them literally.
 | PLAN | Create the factory worktree and branch, write the plan, adversarially self-review it | Plan self-review cannot be waived |
 | BUILD | subagent-driven-development in factory mode; all GB hard gates fire unchanged | 2 attempts per task |
 | VERIFY | fetch+merge, clean build, memory check, blocking smoketest, evidence scenario | memory FAIL aborts immediately; smoketest gets 1 differential-guided fix attempt |
-| SHIP | Push, open the PR with the reporter body | `pre-push` runs `make clean && make` (~29 s) |
+| SHIP | Push, open the PR with the reporter body | `pre-push` runs `make clean && make` |
 
 ## Every command goes through the stage-log helper
 

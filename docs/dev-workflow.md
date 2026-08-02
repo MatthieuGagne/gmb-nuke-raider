@@ -199,8 +199,8 @@ Write → verify → commit. No bank gates required.
 ### Test runner
 
 ```bash
-make test                # unit suite — C game logic (gcc + Unity, no GBDK needed), ~170 s
-make test-tools          # tool suite — this repo's own Python tooling, ~6 s
+make test                # unit suite — C game logic (gcc + Unity, no GBDK needed)
+make test-tools          # tool suite — this repo's own Python tooling
 ```
 
 The tool suite **discovers** every `tests/test_*.py`: adding a test module gates it, with no
@@ -221,8 +221,13 @@ tool, any agent, or a human in a plain terminal. They are split by cost. Rationa
 
 | Hook | Runs | Cost | Blocks |
 |------|------|------|--------|
-| `.githooks/pre-commit` | tool suite (unittest discovery, direct — not via `make`) | ~6 s | the commit |
-| `.githooks/pre-push` | `tools/prepush_build.py` → `make clean && make` | ~29 s | the push |
+| `.githooks/pre-commit` | tool suite (unittest discovery, direct — not via `make`) | the whole tool suite — grows with the test count | the commit |
+| `.githooks/pre-push` | `tools/prepush_build.py` → `make clean && make` | one clean ROM build | the push |
+
+Neither cost is quoted as a duration: both drift, and a stale figure in a table is worse than no
+figure — measure `make test-tools` and `make clean && make` when you need real numbers. Do not
+assume the commit gate is the cheaper of the two just because it runs on the more frequent
+action; that was true when the split was designed and is worth re-measuring before you rely on it.
 
 `.githooks/` is tracked. `make` (and `make test-tools`) depends on a `hooks` target that runs
 `python tools/install_hooks.py`, which sets `core.hooksPath` idempotently — so a fresh clone is

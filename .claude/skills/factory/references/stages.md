@@ -107,7 +107,10 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 3. **Retry budget: 2 attempts per task.** On the second attempt append
    `--kind retry --field stage=BUILD --attempt <k>` first. Exhausted → terminal failure.
 4. Commits: tool choice is free (#441 voided the old PowerShell-routing premise — repository
-   hooks fire for every actor). Budget ~6 s per commit for the `pre-commit` tool suite.
+   hooks fire for every actor). Give every commit an explicit **300 s timeout**: the
+   `pre-commit` hook runs the whole tool suite, which is past the 120 s default, and a
+   default-timeout call is killed mid-hook. This is a ceiling, not a measurement — if a commit
+   ever exceeds it, that is the signal, not a number to bump.
    **Never `--no-verify`.**
 5. `python tools/factory_publish.py --issue <N> --stage-completed BUILD`
 
@@ -151,8 +154,9 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    `LOG SHIP -- python tools/factory_report.py --issue <N> --out .factory/runs/issue-<N>/pr-body.md`
    It already contains the gate table, *Decisions made*, scenario evidence or the FAILED
    section, and `Closes #<N>`.
-3. `LOG SHIP -- git push -u origin factory-issue-<N>`. Budget ~29 s: the `pre-push` repository
-   hook runs `make clean && make`. **Never `--no-verify`.** If push fails on credentials:
+3. `LOG SHIP -- git push -u origin factory-issue-<N>`. Budget a full clean build, not a push: the
+   `pre-push` repository hook runs `make clean && make`. **Never `--no-verify`.** If push fails on
+   credentials:
    `gh auth setup-git`.
 4. Open the PR through the publisher — never `gh pr create` directly (#481):
    ```
