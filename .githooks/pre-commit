@@ -1,5 +1,5 @@
 #!/bin/sh
-# Repository hook — tool suite gate (#441, ADR 0002).
+# Repository hook — tool suite gate (ADR 441).
 #
 # Runs the ~6s Python tool suite before every commit, from any shell, tool or
 # agent. It deliberately does NOT call make: the Makefile pins SHELL := bash

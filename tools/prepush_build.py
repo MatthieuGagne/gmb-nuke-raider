@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clean-build gate, run by the pre-push repository hook (#441, ADR 0002).
+"""Clean-build gate, run by the pre-push repository hook (ADR 441).
 
 CLAUDE.md has always required a clean build immediately before a push; this
 makes that rule enforceable instead of leaving it to discipline. It runs on the
@@ -7,7 +7,7 @@ rare action (push, ~29s) rather than the frequent one (commit, gated by the
 ~6s tool suite instead).
 
 Machine-specific values arrive from the environment so this file stays free of
-absolute paths (ADR 0001):
+absolute paths (ADR 443):
 
   GBDK_HOME          GBDK install root, consumed by the Makefile.
   MAKE_PATH_PREPEND  Optional. Prepended to PATH so make finds bash and the
