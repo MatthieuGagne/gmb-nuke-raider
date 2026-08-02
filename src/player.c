@@ -185,7 +185,7 @@ void player_update(void) BANKED {
      * sfx_play(SFX_SHOOT) is called inside projectile_fire() — only fires when a
      * projectile actually spawns (every PROJ_FIRE_COOLDOWN frames), not every frame. */
     if (KEY_PRESSED(J_A)) {
-        uint8_t scr_x = (uint8_t)(px + 12 + DIR_DX[player_dir] * 8);
+        uint8_t scr_x = (uint8_t)(px + 12 + DIR_DX[player_dir] * 8 - (int16_t)cam_x);
         uint8_t scr_y = (uint8_t)(py - cam_y + 20 + DIR_DY[player_dir] * 8);
         projectile_fire(scr_x, scr_y, player_dir, PROJ_OWNER_PLAYER);
     }
@@ -255,7 +255,7 @@ void player_render(void) BANKED {
 
     if (s_player_dead) return;   /* explosion_render owns the 4 OAM slots now */
 
-    hw_x = (uint8_t)(px + 8u);
+    hw_x = (uint8_t)(px + 8u - (int16_t)cam_x);
     hw_y = (uint8_t)(py - cam_y + 16);
     flip = DIR_FLIP[player_dir];
 

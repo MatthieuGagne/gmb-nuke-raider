@@ -445,7 +445,7 @@ void test_dir_LT_flipx(void) {
 
 /* ===== Bullet spawn position (issue #339) ================================ */
 /* setUp: player at (88,8), cam_y=0.
- * OAM center formula: scr_x = px+16, scr_y = py-cam_y+24
+ * OAM center formula: scr_x = px+16 - cam_x, scr_y = py-cam_y+24
  * Front offset: DIR_DX[dir]*8, DIR_DY[dir]*8                               */
 
 static void setup_dir_and_fire(uint8_t dpad_buttons) {
@@ -491,6 +491,34 @@ void test_bullet_spawn_northeast(void) {
     TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
+
+    /* ===== cam_x scroll bug (issue #552) ============================= */
+
+    void test_player_render_subtracts_cam_x(void) {
+        active_map_w = 64u;              /* > 20 so cam_max_x != 0 */
+        camera_init(88, 8);
+        player_set_pos(400, 100);
+        camera_update(player_get_x(), player_get_y());  /* cam_x becomes non-zero */
+        TEST_ASSERT_NOT_EQUAL_UINT16(0u, cam_x);  /* sanity: test actually bites */
+        player_render();
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)(player_get_x() + 8u - (int16_t)cam_x), mock_sprite_x[0]);
+    }
+
+    void test_player_fire_spawns_bullet_at_screen_x(void) {
+        active_map_w = 64u;
+        camera_init(88, 8);
+        player_set_pos(400, 100);
+        player_set_dir(DIR_T);
+        camera_update(player_get_x(), player_get_y());
+        TEST_ASSERT_NOT_EQUAL_UINT16(0u, cam_x);
+        projectile_init(0u);
+        player_apply_physics(J_A, TILE_ROAD);
+        player_reset_vel();
+        input = J_A;
+        player_update();
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)(player_get_x() + 12 + player_dir_dx(DIR_T) * 8 - (int16_t)cam_x),
+                                projectile_get_x(0u));
+    }
 
 /* --- directional hitbox ------------------------------------------------- */
 
@@ -678,6 +706,9 @@ int main(void) {
     RUN_TEST(test_bullet_spawn_east);
     RUN_TEST(test_bullet_spawn_west);
     RUN_TEST(test_bullet_spawn_northeast);
+    /* AC: cam_x scroll bug (issue #552) */
+    RUN_TEST(test_player_render_subtracts_cam_x);
+    RUN_TEST(test_player_fire_spawns_bullet_at_screen_x);
     /* AC: directional hitbox */
     RUN_TEST(test_hitbox_cardinal_wall_blocks);
     RUN_TEST(test_hitbox_diagonal_along_wall_passes);
