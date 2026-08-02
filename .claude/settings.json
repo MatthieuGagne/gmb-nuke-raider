@@ -95,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/deny_gate_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/deny_gate_hook.py\"",
             "timeout": 15,
             "statusMessage": "deny gate..."
           }
@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/bank_check_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/bank_check_hook.py\"",
             "timeout": 60,
             "statusMessage": "bank-pre-write check..."
           }
@@ -117,7 +117,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/emulicious_window_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/emulicious_window_hook.py\"",
             "timeout": 15,
             "statusMessage": "Resetting Emulicious window position..."
           }
@@ -130,7 +130,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/post_build_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/post_build_hook.py\"",
             "timeout": 300,
             "statusMessage": "bank-post-build + memory-check..."
           }
@@ -141,7 +141,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/skill_overlay_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/skill_overlay_hook.py\"",
             "timeout": 15,
             "statusMessage": "skill overlay lookup..."
           }
@@ -153,7 +153,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/skill_overlay_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/skill_overlay_hook.py\"",
             "timeout": 15,
             "statusMessage": "skill overlay lookup..."
           }
@@ -165,7 +165,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/factory_permission_hook.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/tools/factory_permission_hook.py\"",
             "timeout": 15,
             "statusMessage": "recording permission prompt..."
           }
