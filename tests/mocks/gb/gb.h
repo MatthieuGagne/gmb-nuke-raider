@@ -5,6 +5,26 @@
 
 #include <stdint.h>
 
+/* The whole of this header is mock scaffolding: several file-scope statics stand in for
+ * hardware registers and are written by only some translation units, so every TU that does
+ * not touch one gets -Wunused-variable under the -Wall -Wextra in TEST_FLAGS. Across 35 test
+ * binaries that produced 6,877 warnings per `make test` run (#525).
+ *
+ * The suppression is a balanced region rather than a per-variable __attribute__((unused)) on
+ * purpose: a new mock static added anywhere in the body below is inside the region by
+ * construction, so the storm cannot come back through a forgotten attribute (R4). The region
+ * is popped before the final #endif, so -Wall -Wextra stays fully in force for the game
+ * sources and for the including test file (R2) — nothing here is a real defect, everything
+ * outside it still is.
+ *
+ * Do not write a glob such as "src" + slash + star + ".c" in this comment: the slash-star
+ * sequence trips -Wcomment once per translation unit, which is its own 1,745-line storm.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 /* SDCC ROM-placement qualifiers — noop on gcc */
 #ifndef __code
 #define __code
@@ -136,5 +156,10 @@ static uint8_t LYC_REG  = 0;
 /* LCDC register — hud.c writes bit 6 (window tile map select) */
 static uint8_t LCDC_REG = 0x91U; /* realistic boot value: LCD on, BG on, tile data at 0x8000 */
 #define LCDCF_WIN9C00 0x40U       /* LCDC bit 6: window tile map at 0x9C00 */
+
+/* ==== ADD NEW MOCK DECLARATIONS ABOVE THIS LINE ====
+ * Anything below this pop is outside the -Wunused suppression region and re-opens the
+ * 6,877-warning storm (#525 R4). */
+#pragma GCC diagnostic pop
 
 #endif /* MOCK_GB_H */
