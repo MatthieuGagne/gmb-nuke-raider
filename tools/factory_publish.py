@@ -831,7 +831,7 @@ def ensure_project_type_log(publish, issue_url, warnings,
     return True
 
 
-def finish_project_status(state, publish, run_issue, warnings,
+def finish_project_status(state, publish, run_url, warnings,
                           runner=subprocess.run):
     """The terminal board writes (#513 R4).
 
@@ -842,13 +842,21 @@ def finish_project_status(state, publish, run_issue, warnings,
 
     Outside the ``projected`` guard on purpose. Behind it, these writes would
     no-op on every run after the first publish (#513, Notes). The spec half is
-    also outside ``run_issue``: a failed run whose dashboard issue could not be
+    also outside ``run_url``: a failed run whose dashboard issue could not be
     created is exactly when a spec pinned at In Progress would mislead longest.
+
+    ``run_url`` is the caller's to resolve, not this function's: ``publish_run``
+    passes it only when ``ensure_project_type_log`` already succeeded (the item
+    id is cached, so ``project_item_add`` below is never called again) or
+    short-circuited on an already-``projected`` record (the add below is then
+    the *first* attempt this publish, not a retry). It passes ``None`` exactly
+    when ``ensure_project_type_log`` already attempted the add this publish and
+    failed — recomputing the same URL and calling ``project_item_add`` again
+    here would just repeat that failed call and double the warning for it.
     """
-    if run_issue:
+    if run_url:
         run_item = publish.get("run_item_id") or project_item_add(
-            publish.get("run_issue_url") or issue_url(run_issue), warnings,
-            runner=runner)
+            run_url, warnings, runner=runner)
         if run_item:
             publish["run_item_id"] = run_item
             set_single_select(run_item, STATUS_FIELD, STATUS_DONE, warnings,
@@ -1110,14 +1118,17 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
     number = ensure_run_issue(state, publish, title, body, warnings,
                               registry=registry, runner=runner)
 
+    joined = False
+    run_url = None
     if number:
-        url = publish.get("run_issue_url") or \
-            "https://github.com/%s/issues/%d" % (DEFAULT_REPO, number)
-        ensure_project_type_log(publish, url, warnings, runner=runner)
+        run_url = publish.get("run_issue_url") or issue_url(number)
+        joined = ensure_project_type_log(publish, run_url, warnings,
+                                         runner=runner)
     if terminal:
         if number:
             set_issue_state(number, False, warnings, runner=runner)
-        finish_project_status(state, publish, number, warnings, runner=runner)
+        finish_project_status(state, publish, run_url if joined else None,
+                              warnings, runner=runner)
         comment_once(state, publish, number, warnings, registry=registry,
                      runner=runner)
 

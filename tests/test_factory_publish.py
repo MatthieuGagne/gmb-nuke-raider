@@ -1119,7 +1119,8 @@ class TestPublishRun(PublishTestCase):
     def test_every_gh_failure_leaves_the_outcome_unchanged(self):
         """AC9: one marked warning each, never an exception."""
         for key in ('issue create', 'issue edit', 'release upload',
-                    'issue comment', 'label create', 'release create'):
+                    'issue comment', 'label create', 'release create',
+                    'project item-add', 'project item-edit'):
             with self.subTest(key=key):
                 reg = factory_fixtures.build_shipped_run(
                     tempfile.mkdtemp(dir=self.tmp))
@@ -1187,6 +1188,26 @@ class TestPublishRun(PublishTestCase):
         self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
         self.assertTrue(any('Status=Done' in w for w in result.warnings),
                         result.warnings)
+
+    def test_a_fresh_terminal_run_never_retries_a_failed_run_item_add(self):
+        """Regression for the reviewer's Finding 1: a fresh run (no cached
+        item ids) whose first publish is also terminal and whose Documents
+        board is unreachable must warn about the run issue's own failed
+        add exactly once, not once from ensure_project_type_log and again
+        from finish_project_status — and the spec issue's own add warning,
+        a distinct call against a distinct URL, must still be there."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        fake = FakeGh({'issue create': (0, ISSUE_URL + '\n', '')},
+                     default=(1, '', 'HTTP 403'))
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        run_warning = "%s not added to the Documents project: HTTP 403" % (
+            ISSUE_URL)
+        spec_warning = "%s not added to the Documents project: HTTP 403" % (
+            factory_publish.issue_url(441))
+        self.assertEqual(result.warnings.count(run_warning), 1)
+        self.assertIn(spec_warning, result.warnings)
 
 
 class TestCli(PublishTestCase):
