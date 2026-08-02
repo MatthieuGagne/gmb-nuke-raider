@@ -3,7 +3,11 @@ name: writing-plans
 baseline: superpowers@6.2.0
 ---
 
-Project (Nuke Raider) additions and overrides for the baseline writing-plans skill. On conflict, this overlay wins.
+Project (Nuke Raider) additions and overrides for the baseline writing-plans skill. On conflict,
+this overlay wins — but an override earns that only by stating what the baseline cannot know
+(#527 R7).
+
+**Baseline audit:** content of `superpowers@6.2.0` read and compared on 2026-08-02 (#527 R6).
 
 ## Overrides (do NOT follow the baseline here)
 
@@ -11,10 +15,15 @@ Project (Nuke Raider) additions and overrides for the baseline writing-plans ski
   or any other baseline location, and NOT the issue-less `YYYY-MM-DD-<feature-name>.md` form.
   `<N>` is the GitHub issue number the plan implements; `<slug>` is lowercase, hyphen-separated
   (e.g. `docs/plans/2026-07-26-issue435-traceability.md`).
+  **Why:** the baseline's own line says user preferences override the default location, and
+  `tools/trace.py --check` parses this exact filename to link a plan to its spec issue.
 
 ## Project additions
 
 ### Before you begin
+
+**Why:** the baseline assumes a worktree already exists and names no sync step; a stale branch
+is this repo's most common plan-time defect, and `grill-with-docs` is a local skill.
 
 - **First action, before anything else:** pull and merge latest master into the current worktree branch:
   ```bash
@@ -25,6 +34,12 @@ Project (Nuke Raider) additions and overrides for the baseline writing-plans ski
 - **Last step before writing:** invoke the `grill-with-docs` skill — it surfaces requirements, acceptance criteria, scope, and GB hardware constraints. Only once the grilling is satisfied, proceed to writing the plan.
 
 ### Hard Gate Sequence
+
+**Why:** the baseline's task template is language-agnostic and knows nothing about ROM banking,
+SDCC, or this project's agents. This table is **plan content** — what a plan document must
+contain so an implementer sees the sequence — not a runtime invocation list, so #527 R4's
+removal of manual gate invocations does not reach it. Steps 2 and 7 name gates that also fire
+automatically as hooks; the plan records them so the implementer knows what must have reported.
 
 Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence — no exceptions:
 
@@ -50,6 +65,11 @@ grep -r CONSTANT_NAME tests/
 Include ALL matching test files in the task's file list — not just the ones you remembered. Missing a file means surprise failures during parallel execution, after other tasks' commits have already landed.
 
 ### Smoketestable batches
+
+**Why:** the baseline right-sizes tasks around a reviewer's gate; it has no concept of a
+checkpoint where a ROM must visibly run. The `#### Parallel Execution Groups` table is also what
+licenses the `subagent-driven-development` overlay's parallel-implementer override — without it,
+the baseline's "never dispatch implementers in parallel" stands.
 
 **Tasks MUST be grouped into batches of 2–4.** Each batch ends with a **Smoketest Checkpoint** — a point where the ROM runs in Emulicious and the user confirms it looks correct. A good batch boundary = any point where the game should visually work end-to-end (even partially). If a batch cannot be independently smoke-tested, the plan must explain why.
 
@@ -100,12 +120,19 @@ Tell the user what to verify visually. Wait for confirmation before proceeding t
 
 ### Plan document header
 
+**Why:** only the `**Issue:** #N` line and the *Open questions* block are this project's — the
+rest of the header, including `## Global Constraints`, is the baseline's and is reproduced here
+so the two cannot drift apart. `tools/trace.py` parses the issue line; nothing upstream knows
+this project files its specs as GitHub issues.
+
 Every plan MUST start with this header:
 
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or
+> superpowers:executing-plans to implement this plan task-by-task — the choice is the user's,
+> made at the Handoff below.
 
 **Issue:** #N
 
@@ -118,7 +145,16 @@ Every plan MUST start with this header:
 ## Open questions (must resolve before starting)
 
 - [Question 1 — or delete this line if none]
+
+## Global Constraints
+
+[The spec's project-wide requirements — exact values copied verbatim. Every task's requirements
+implicitly include this section, and it is the attention lens the task reviewer is handed.]
 ```
+
+`## Global Constraints` is the baseline's block and is **mandatory**: the
+`subagent-driven-development` baseline copies it verbatim into every task reviewer's prompt. A
+plan without it hands each reviewer an empty constraints block.
 
 The `**Issue:** #N` line is mandatory and must sit on its own line, exactly in this form —
 `tools/trace.py` parses it to link the plan back to its spec issue, and the issue number must
@@ -127,9 +163,17 @@ a plan with no issue cannot be traced.
 
 ### Task templates
 
+**Why:** the baseline's task template has no GB hard-gate steps and no `**Depends on:**` /
+`**Parallelizable with:**` annotations, both of which this project's execution path requires.
+
 See `.claude/skill-overlays/references/task-templates.md` for the two task templates: the 11-step C-File Task Template (for `src/*.c` / `src/*.h`, all HARD GATE steps) and the Non-C Task Template (markdown/Python/JSON/assets).
 
 ### Plan Self-Review Checklist (HARD STOP before presenting to user)
+
+**Why:** this **extends** the baseline's three-point self-review (spec coverage, placeholder
+scan, type consistency) rather than replacing it — checks #1, #3, #4 and #6 are project-specific
+(magic numbers vs `config.h`, the parallel annotations, the group tables, `trace.py`). Run the
+baseline's three as well; they are not repeated here.
 
 Run this before offering the execution handoff. Fix any failures first.
 
@@ -162,6 +206,10 @@ Run this before offering the execution handoff. Fix any failures first.
 
 ### Handoff
 
+**Why:** the baseline recommends subagent-driven execution and presents the choice immediately;
+here the choice is the user's with no recommendation, and it is gated on an explicit affirmative.
+The baseline cannot know that this project's plans are handed off across sessions and worktrees.
+
 After saving the plan, present the full plan to the user.
 
 <HARD-GATE>
@@ -179,6 +227,13 @@ Only after an explicit affirmative, offer the execution choice:
 If Parallel Session is chosen, guide the user to open a new session in the worktree; that session uses `superpowers:executing-plans`.
 
 ### Factory mode
+
+**Why:** the factory runs unattended, so every step that waits on a human must have a
+replacement or be waived; the baseline has no notion of an unattended run. Note the one place
+this deliberately goes *beyond* the baseline: the baseline's self-review is explicitly "a
+checklist you run yourself — not a subagent dispatch", while factory mode adds an adversarial
+review subagent. That is bought with the absence of a human reviewer, not with a claim that the
+baseline is wrong.
 
 Active when `NUKE_FACTORY_RUN` is set — i.e. the PLAN stage of a `/factory` run. It **overrides
 the `### Handoff` subsection above**, and nothing else in this overlay.
@@ -202,6 +257,10 @@ the `### Handoff` subsection above**, and nothing else in this overlay.
 Outside a factory run every checkpoint above fires exactly as written.
 
 ### Remember
+
+**Why:** the first three lines restate baseline rules on purpose — they are the ones this
+project's plans most often drop. The rest (skill/agent names, the C template, the Lessons
+Learned gate) are project-specific.
 
 - Exact file paths always; complete code in the plan (not "add validation"); exact commands with expected output.
 - Reference skills and agents by name (e.g. `bank-pre-write` skill, `gbdk-expert` agent).

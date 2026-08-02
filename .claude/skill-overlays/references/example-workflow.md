@@ -10,20 +10,20 @@ A worked end-to-end walkthrough of subagent-driven development, including a para
 
 Task 1: Add foo module
 
-[Dispatch implementer with: task text + context + GB gate instructions]
+[Record BASE: git rev-parse HEAD]
+[Dispatch implementer with: brief path + report path + context]
 
 Implementer: "Before I begin — should foo_init() take a config struct?"
 
 You: "No config needed, just init to defaults"
 
-Implementer: [Follows TDD, invokes bank-pre-write, gbdk-expert, writes C, runs tests,
-              builds ROM, invokes bank-post-build, commits]
+Implementer: [Follows TDD; the bank-pre-write hook fires on the src/ write; writes C,
+              runs tests, builds ROM; the bank-post-build and memory-check hooks fire
+              post-build; commits]
 
-[Dispatch spec reviewer]
-Spec reviewer: ✅ Spec compliant
-
-[Dispatch code quality reviewer]
-Code reviewer: ✅ Approved
+[Verify the commit landed: git log --oneline -1]
+[Run scripts/review-package PLAN_FILE BASE HEAD; dispatch ONE task reviewer with the printed path]
+Task reviewer: Spec ✅ compliant. Task quality: Approved.
 
 [Mark Task 1 complete]
 
@@ -35,19 +35,20 @@ Task 3 + Task 4: Parallel batch (Group A in Parallel Execution Groups table)
 Implementer 3: [Implements Task 3, commits sha-abc]
 Implementer 4: [Implements Task 4, commits sha-def]
 
-[Dispatch spec reviewer + code quality reviewer in parallel for the batch]
-Spec reviewer: ✅ Both tasks spec compliant
-Code reviewer: ✅ Both approved
+[Verify both commits landed: git log --oneline -2]
+[One review package per task, from each task's recorded BASE; one task reviewer per task]
+Task reviewer 3: Spec ✅ compliant. Task quality: Approved.
+Task reviewer 4: Spec ✅ compliant. Task quality: Approved.
 
 [Mark Task 3 complete, Task 4 complete]
 
 ...
 
 [After all tasks]
-[Dispatch final code-reviewer]
+[Run review-package PLAN_FILE MERGE_BASE HEAD; dispatch final code-reviewer on the most capable model]
 Final reviewer: All requirements met
 
-[Run bank-post-build + gb-memory-validator]
+[Check the bank-post-build and memory-check hook output from the last build — any FAIL stops here]
 [Run smoketest → user confirms]
 [Use finishing-a-development-branch]
 ```

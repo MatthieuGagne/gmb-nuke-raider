@@ -3,13 +3,26 @@ name: grill-with-docs
 baseline: grill-with-docs@2026-07-26
 ---
 
-Project (Nuke Raider) additions and overrides for the baseline grill-with-docs skill. On conflict, this overlay wins.
+Project (Nuke Raider) additions and overrides for the baseline grill-with-docs skill. On
+conflict, this overlay wins — but an override earns that only by stating what the baseline
+cannot know (#527 R7).
 
-**What the baseline actually is:** a thin wrapper installed at `~/.claude/skills/grill-with-docs/` (from `mattpocock/skills`, `skills/engineering/grill-with-docs`). It does one thing — run a `/grilling` session using the `/domain-modeling` skill. Both dependencies are installed alongside it (`~/.claude/skills/grilling/`, `~/.claude/skills/domain-modeling/`); if either is missing the wrapper is inert, so reinstall rather than improvising. It is marked `disable-model-invocation: true`, so it runs only when the user invokes it explicitly.
+**Baseline audit:** content of `grill-with-docs@2026-07-26` read and compared on 2026-08-02
+(#527 R6). This baseline is **not** a superpowers skill, so the injection hook's version canary
+never fires for it — the audit is the only check it gets.
+
+**What the baseline actually is:** a thin wrapper installed at `~/.claude/skills/grill-with-docs/` (from `mattpocock/skills`, `skills/engineering/grill-with-docs`). Its `SKILL.md` body is one sentence — run a `/grilling` session using the `/domain-modeling` skill. Both dependencies are installed alongside it (`~/.claude/skills/grilling/`, `~/.claude/skills/domain-modeling/`); if either is missing the wrapper is inert, so reinstall rather than improvising. It is marked `disable-model-invocation: true`, so it runs only when the user invokes it explicitly.
+
+Because the wrapper delegates everything, `CONTEXT-FORMAT.md` and `ADR-FORMAT.md` live in
+`~/.claude/skills/domain-modeling/`, not in `grill-with-docs/`. Everything below is therefore an
+addition to a one-line baseline, not a correction of it.
 
 ## Project additions
 
 ### Grill dimensions
+
+**Why:** the wrapper delegates to a general-purpose grilling skill that knows nothing about a
+Game Boy's budgets or this project's definition of done.
 
 Beyond the baseline's general stress-testing, every grill in this project must cover:
 
@@ -20,9 +33,16 @@ Beyond the baseline's general stress-testing, every grill in this project must c
 
 ### Explore before asking
 
+**Why:** a grilling skill's instinct is to ask; in this codebase most of what it would ask is
+discoverable, and asking wastes the user's turns on facts.
+
 If a **fact** can be found by exploring the codebase or environment, look it up instead of asking. The **decisions** are the user's — put each one to them and wait. For anything spanning more than 2 files or any open-ended search, dispatch the Explore agent rather than accumulating inline reads.
 
 ### Paper trail
+
+**Why:** `domain-modeling`'s `ADR-FORMAT.md` prescribes numbered ADR files in a repo directory.
+This project keys ADRs off the work item and files them as GitHub issues, which no upstream
+skill can know. The `ADR-FORMAT.md` *content structure* is still used verbatim.
 
 - **Glossary / domain context** → `CONTEXT.md` at the repo root — the one design artifact this project keeps as a local file. Glossary only — totally devoid of implementation details. It is not a spec, not a scratchpad, not a decision log. **Written inside the worktree and merged via PR** — never edited directly in the main working tree, never committed straight to `master`.
 - **Decisions** → an `adr`-labeled **GitHub issue**, offered sparingly: only when the decision is hard to reverse, surprising without context, AND the result of a genuine trade-off. If any of the three is missing, skip the ADR. Filing procedure:
@@ -36,12 +56,18 @@ If a **fact** can be found by exploring the codebase or environment, look it up 
     `Status = Todo`, resolving both fields' ids and their option ids by name — the same
     `gh project field-list` lookup the neighbouring instructions use, since option ids are
     regenerated whenever the option set is edited.
-- Use the baseline's `CONTEXT-FORMAT.md` for the glossary and the baseline's `ADR-FORMAT.md` for the **content structure** of an ADR — its location and numbering prescription (a numbered file in a repo directory) is **overridden** by the filing procedure above: here an ADR is a GitHub issue keyed off its work item, not a numbered file.
+- Use `domain-modeling`'s `CONTEXT-FORMAT.md` for the glossary and its `ADR-FORMAT.md` for the **content structure** of an ADR — the location and numbering prescription (a numbered file in a repo directory) is **overridden** by the filing procedure above: here an ADR is a GitHub issue keyed off its work item, not a numbered file.
 
 ### PRDs stay on GitHub
+
+**Why:** same reason as the `brainstorming` overlay's no-local-spec rule — a local PRD file would
+be a second source of truth beside the GitHub issue.
 
 The grill's output feeds the `prd` skill, which files a **GitHub issue**. Never write a local PRD file. `CONTEXT.md` is the *only* design artifact that lives in the repo — requirements, feature specs, and decisions do not.
 
 ### Tone
+
+**Why:** `docs/game/game-design.md` is the binding tone authority for this game and exists
+nowhere upstream.
 
 Feature and copy decisions are grilled against `docs/game/game-design.md` — post-apocalyptic wasteland, sparse dry humor, every word earns its place.
