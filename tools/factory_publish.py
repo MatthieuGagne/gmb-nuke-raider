@@ -1367,6 +1367,44 @@ def open_pr(issue, branch, title, body_path, publish=None, warnings=None,
     return url, True
 
 
+CLOSES_LINE = "Closes #%d"
+
+
+def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
+    """The PR body path, with ``Closes #<plan issue>`` appended (R7).
+
+    Returns the original path when there is no plan issue or the body already
+    closes it, and a staged copy otherwise — the file handed in is never
+    rewritten, because it is ``factory_report``'s deterministic output and the
+    SHIP stage may re-render it.
+
+    ``factory_report`` is deliberately not taught about this: the plan issue
+    number lives in ``publish.json``, which only this module owns, and
+    widening that boundary is what ADR 0006 (#475) exists to prevent.
+
+    Fail-open like the rest of this file, and specifically *not* covered by
+    the ``--open-pr`` exception: a PR that ships without the plan link is a
+    degradation, while a PR that does not ship at all is a run failure (R10).
+    """
+    warnings = warnings if warnings is not None else []
+    try:
+        number = load_publish_state(issue, registry).get("plan_issue")
+        if not number:
+            return body_path
+        with open(body_path, encoding="utf-8") as fh:
+            body = fh.read()
+        line = CLOSES_LINE % int(number)
+        if re.search(r"(?m)^%s\s*$" % re.escape(line), body):
+            return body_path
+        if body and not body.endswith("\n"):
+            body += "\n"
+        return write_body_file(issue, body + line + "\n", registry,
+                               name="publish-pr-body.md")
+    except (OSError, RuntimeError, ValueError) as exc:
+        _warn(warnings, "plan issue not linked from the PR body: %s" % exc)
+        return body_path
+
+
 def publish_run(issue, registry=None, stage_completed=None, terminal=False,
                 runner=subprocess.run, now=None):
     """Re-render this run's GitHub surfaces. Never raises (R11).
@@ -1485,10 +1523,11 @@ def main(argv=None):
                              % ", ".join(missing))
             return EXIT_MISUSE
         warnings = []
-        url, _ = open_pr(args.issue, args.branch, args.title, args.body_file,
+        body_file = pr_body_with_plan(args.issue, args.body_file,
+                                      registry=args.registry,
+                                      warnings=warnings)
+        url, _ = open_pr(args.issue, args.branch, args.title, body_file,
                          warnings=warnings)
-        for message in warnings:
-            sys.stderr.write("factory-publish: WARNING: %s\n" % message)
         if url:
             sys.stdout.write(url + "\n")
             return 0

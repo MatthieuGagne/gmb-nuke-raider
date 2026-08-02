@@ -1738,6 +1738,71 @@ class OpenPrTest(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
 
 
+class PrBodyWithPlanTest(PublishTestCase):
+    """R7: the Closes line is appended by the publisher, not the reporter."""
+
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_shipped_run(self.tmp)
+        self.body = os.path.join(self.tmp, 'pr-body.md')
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('## Summary\n\nbody\n\nCloses #440\n')
+
+    def with_plan(self, number=482, **kw):
+        if number is not None:
+            publish = factory_publish.new_publish_state(440)
+            publish['plan_issue'] = number
+            factory_publish.save_publish_state(publish, self.reg)
+        return factory_publish.pr_body_with_plan(
+            440, self.body, registry=self.reg, **kw)
+
+    def read(self, path):
+        with open(path, encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_body_ends_with_closes_the_plan_issue(self):
+        """AC6."""
+        self.assertTrue(self.read(self.with_plan()).endswith('Closes #482\n'))
+
+    def test_the_specs_own_closes_line_survives(self):
+        """factory_report's Closes #<spec> is what actually closes the spec."""
+        self.assertIn('Closes #440\n', self.read(self.with_plan()))
+
+    def test_no_plan_issue_returns_the_original_path_untouched(self):
+        self.assertEqual(self.with_plan(number=None), self.body)
+
+    def test_the_original_body_file_is_never_rewritten(self):
+        self.with_plan()
+        self.assertNotIn('482', self.read(self.body))
+
+    def test_a_second_call_does_not_append_twice(self):
+        first = self.read(self.with_plan())
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(first)
+        self.assertEqual(self.read(self.with_plan()).count('Closes #482'), 1)
+
+    def test_a_missing_body_file_warns_and_falls_back(self):
+        """R10: never terminal — --open-pr reports the real failure itself."""
+        warnings = []
+        missing = os.path.join(self.tmp, 'nope.md')
+        publish = factory_publish.new_publish_state(440)
+        publish['plan_issue'] = 482
+        factory_publish.save_publish_state(publish, self.reg)
+        path = factory_publish.pr_body_with_plan(440, missing,
+                                                 registry=self.reg,
+                                                 warnings=warnings)
+        self.assertEqual(path, missing)
+        self.assertEqual(len(warnings), 1)
+
+    def test_factory_report_still_closes_only_the_spec_issue(self):
+        """AC6: the ADR 0006 boundary is not widened."""
+        state = factory_run.load_state(440, self.reg)
+        rendered = factory_report.render(state)
+        self.assertIn('Closes #440', rendered)
+        self.assertNotIn('482', rendered)
+        self.assertNotIn('plan_issue', rendered)
+
+
 class OpenPrCliTest(unittest.TestCase):
     def test_open_pr_without_branch_is_misuse(self):
         with redirect_stderr(io.StringIO()):
