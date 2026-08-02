@@ -1,9 +1,24 @@
 """Stage log capture: tee a factory stage command's output into the run registry.
 
-Runs a command, streams its output to the console unchanged, and appends the
-same bytes to ``<registry>/runs/issue-<N>/logs/<STAGE>.log``. stderr is merged
-into stdout on a single pipe, so the log preserves real interleaving. Binary
-end-to-end: the log's bytes and the console's bytes are the same stream.
+Runs a command, appends its output to
+``<registry>/runs/issue-<N>/logs/<STAGE>.log``, and reports on the console.
+stderr is merged into stdout on a single pipe, so the log preserves real
+interleaving. Binary end-to-end: the log receives the child's bytes verbatim.
+
+The console copy is asymmetric (#529). A command that **fails** prints its full
+output, byte-identical to the logged body — a failing gate is where every line
+matters. A command that **succeeds** prints one ``factory-log: ok`` summary line
+naming the stage, exit code, output size and log path: the bytes are already on
+disk, and reproducing them costs thousands of tokens to convey one bit. Pass
+``--stream`` (``stream=True``) to restore the live tee for one invocation. The
+summary is suppressed whenever the log sink failed — output is never quieted in
+favour of a file that was not written.
+
+One consequence of buffering: while a command is still running the console is
+silent, so a wrapped command that hangs or is killed by a harness timeout prints
+nothing at all. The bytes are still in the stage log — tail
+``<registry>/runs/issue-<N>/logs/<STAGE>.log``, whose path is fixed by the
+``--stage`` and ``--issue`` that were passed in.
 
 Each invocation appends a single-line, fixed-prefix header and trailer, so
 ``grep '^===== factory-log'`` reconstructs the invocation list with no parser:
@@ -33,6 +48,7 @@ shell explicitly; callers (#437, #438) copy this pattern:
 Usage:
     python tools/factory_log.py --stage BUILD --issue 450 -- make clean
     python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Command "make clean; make"
+    python tools/factory_log.py --stage GATE --issue 529 --stream -- python tools/spec_lint.py --issue 529 --json
     or imported:  factory_log.run_logged(cmd, stage="BUILD", issue=450) -> int
 
 Exit codes:
@@ -54,6 +70,7 @@ sys.path.remove(_TOOLS_DIR)
 CHUNK_SIZE = 65536
 INTERRUPT_GRACE_SECONDS = 5   # Ctrl-C: how long to wait for the child's own exit
 WARNING_PREFIX = "factory-log: WARNING: "
+SUMMARY_PREFIX = "factory-log: ok "
 
 
 def _warn(message):
@@ -65,6 +82,7 @@ class _LogSink:
 
     def __init__(self, handle):
         self._handle = handle
+        self.ok = handle is not None
 
     def write(self, data):
         if self._handle is None:
@@ -74,6 +92,7 @@ class _LogSink:
             self._handle.flush()
         except OSError as exc:
             self._handle = None
+            self.ok = False
             _warn("log write failed, further output not logged: %s" % exc)
 
     def close(self):
@@ -134,9 +153,26 @@ def _trailer(stage, exit_code):
             % (stage, exit_code, factory_run.timestamp())).encode("utf-8")
 
 
+def _summary(stage, cmd, path, total_bytes, total_lines):
+    """One line standing in for a passing command's output (#529).
+
+    ``total_lines`` counts newline bytes, so output whose last line has no
+    trailing newline reads one low. It is a size hint, not a tally.
+    """
+    return ((SUMMARY_PREFIX + "stage=%s exit=0 bytes=%d lines=%d log=%s cmd: %s\n")
+            % (stage, total_bytes, total_lines, path, " ".join(cmd))).encode("utf-8")
+
+
 def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
-               log_path=None, env=None, console=None, popen=subprocess.Popen):
-    """Run *cmd*, teeing its merged stdout+stderr to console and stage log.
+               log_path=None, env=None, console=None, popen=subprocess.Popen,
+               stream=False):
+    """Run *cmd*, logging its merged stdout+stderr and reporting on the console.
+
+    The stage log always receives every byte as it arrives. The console gets
+    the full output when the command fails, and a single ``factory-log: ok``
+    summary line when it succeeds (#529) — the bytes are on disk, and a passing
+    gate carries one bit of information. Pass ``stream=True`` (``--stream``) to
+    restore the live tee for one invocation.
 
     Returns the child's exit code verbatim, or 127 when it cannot be spawned.
     *console* and *popen* are test seams (the ``runner=`` idiom from
@@ -147,7 +183,12 @@ def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
                          "factory_run.STAGES (#436): %s"
                          % (stage, ", ".join(factory_run.STAGES)))
     out = sys.stdout.buffer if console is None else console
-    log = _LogSink(_open_log(_resolve_log_path(stage, issue, log_path)))
+    resolved = _resolve_log_path(stage, issue, log_path)
+    log = _LogSink(_open_log(resolved))
+    held = None if stream else []
+    total_bytes = 0
+    total_lines = 0
+    reported = False
     try:
         log.write(_header(stage, attempt, cmd, cwd))
         try:
@@ -158,14 +199,20 @@ def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
             print("factory-log: cannot spawn %r: %s" % (cmd[0], exc),
                   file=sys.stderr)
             log.write(_trailer(stage, 127))
+            reported = True
             return 127
         try:
             while True:
                 chunk = child.stdout.read1(CHUNK_SIZE)
                 if not chunk:
                     break
-                out.write(chunk)
-                out.flush()
+                if held is None:
+                    out.write(chunk)
+                    out.flush()
+                else:
+                    held.append(chunk)
+                    total_bytes += len(chunk)
+                    total_lines += chunk.count(b"\n")
                 log.write(chunk)
             exit_code = child.wait()
         except KeyboardInterrupt:
@@ -178,8 +225,25 @@ def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
                 child.wait()
                 exit_code = 130
         log.write(_trailer(stage, exit_code))
+        if held is not None:
+            # log.ok guards the one claim the summary makes that could be
+            # false: that the output is retrievable from `resolved`.
+            if exit_code == 0 and log.ok:
+                out.write(_summary(stage, cmd, resolved, total_bytes,
+                                   total_lines))
+            else:
+                for chunk in held:
+                    out.write(chunk)
+            out.flush()
+            reported = True
         return exit_code
     finally:
+        # An exception between the first chunk and the report would otherwise
+        # swallow buffered bytes the streaming version had already printed.
+        if held is not None and not reported:
+            for chunk in held:
+                out.write(chunk)
+            out.flush()
         log.close()
 
 
@@ -206,6 +270,8 @@ def build_parser():
                         help="working directory for the command")
     parser.add_argument("--log-path", default=None,
                         help="write the log here instead of the registry")
+    parser.add_argument("--stream", action="store_true",
+                        help="stream full output even on success (escape hatch)")
     parser.add_argument("--now", default=None,
                         help="pin the clock, UTC ISO-8601 (determinism seam)")
     return parser
@@ -231,7 +297,7 @@ def main(argv=None):
         factory_run.set_clock(lambda: pinned)
     return run_logged(cmd, stage=args.stage, issue=args.issue,
                       attempt=args.attempt, cwd=args.cwd,
-                      log_path=args.log_path)
+                      log_path=args.log_path, stream=args.stream)
 
 
 if __name__ == "__main__":

@@ -85,10 +85,10 @@ class TestTee(LogTestCase):
         self.assertEqual(text.count('cwd: '), 2)
 
     def test_console_and_log_bytes_identical(self):
-        """AC4: the log's bytes and the console's bytes are the same stream."""
+        """AC4 (#450) under --stream: console bytes and log bytes are one stream."""
         code, console, err = self.run_logged(child(
             "import sys; sys.stdout.buffer.write(b'A\\rB\\nC');"
-            "sys.stdout.buffer.flush()"))
+            "sys.stdout.buffer.flush()"), stream=True)
         self.assertEqual(code, 0)
         self.assertEqual(console, b'A\rB\nC')
         body = self.log_bytes()
@@ -101,7 +101,7 @@ class TestTee(LogTestCase):
         """AC8: no CRLF translation, no replacement characters."""
         code, console, err = self.run_logged(child(
             "import sys; sys.stdout.buffer.write(b'\\xff\\xfe\\rraw');"
-            "sys.stdout.buffer.flush()"))
+            "sys.stdout.buffer.flush()"), stream=True)
         self.assertEqual(code, 0)
         self.assertEqual(console, b'\xff\xfe\rraw')
         self.assertIn(b'\xff\xfe\rraw', self.log_bytes())
@@ -152,6 +152,160 @@ class TestTee(LogTestCase):
             open(sentinel, 'w').close()
             worker.join(timeout=15)
         self.assertEqual(result.get('code'), 0)
+
+
+class TestQuietOnSuccess(LogTestCase):
+    """#529: the console copy is redundant when the command passed."""
+
+    MARKER = 'MARKER529'
+    # The child splits the marker so it never appears intact in argv — the
+    # summary echoes the command, and an intact marker would make every
+    # "output is absent" assertion below vacuous.
+    NOISY = ("import sys;"
+             "m = 'MARK' + 'ER529';"
+             "sys.stdout.buffer.write((m + ' one\\n' + m + ' two\\n').encode());"
+             "sys.stdout.buffer.flush();"
+             "sys.stderr.buffer.write(b'err\\n');"
+             "sys.stderr.buffer.flush()")
+    NOISY_BYTES = 32   # 14 + 14 + 4, identical on Windows and Linux
+    NOISY_LINES = 3
+
+    def test_success_prints_one_summary_line_not_the_output(self):
+        """AC1: compact console output on success."""
+        code, console, err = self.run_logged(child(self.NOISY))
+        self.assertEqual(code, 0)
+        text = console.decode('utf-8')
+        self.assertNotIn(self.MARKER, text)
+        self.assertEqual(len(text.splitlines()), 1, text)
+        self.assertTrue(text.startswith(factory_log.SUMMARY_PREFIX), text)
+
+    def test_success_summary_names_stage_exit_size_log_and_command(self):
+        """AC1: 'enough to confirm what ran and that it passed'."""
+        code, console, err = self.run_logged(child(self.NOISY))
+        self.assertEqual(code, 0)
+        text = console.decode('utf-8')
+        self.assertIn('stage=BUILD', text)
+        self.assertIn('exit=0', text)
+        self.assertIn('bytes=%d' % self.NOISY_BYTES, text)
+        self.assertIn('lines=%d' % self.NOISY_LINES, text)
+        self.assertIn('log=%s' % self.log, text)
+        self.assertIn('cmd: ', text)
+        self.assertIn(sys.executable, text)
+
+    def test_success_log_file_still_holds_the_whole_output(self):
+        """AC1 second half: quiet console, complete file.
+
+        Asserts on the output slice, not the whole file — the header's
+        ``cmd:`` line would satisfy a naive substring search on its own.
+        """
+        self.run_logged(child(self.NOISY))
+        body = self.log_bytes()
+        marker = b'----- output -----\n'
+        start = body.index(marker) + len(marker)
+        end = body.rindex(b'===== factory-log stage=BUILD exit=')
+        # sorted(): stdout is block-buffered on the merged pipe, stderr is not,
+        # so arrival order is buffering-dependent.
+        self.assertEqual(sorted(body[start:end].split(b'\n')),
+                         sorted([b'MARKER529 one', b'MARKER529 two',
+                                 b'err', b'']))
+
+    def test_failure_prints_the_full_output(self):
+        """AC2: a failing command is unchanged — every byte reaches the console."""
+        code, console, err = self.run_logged(
+            child(self.NOISY + "; sys.exit(3)"))
+        self.assertEqual(code, 3)
+        self.assertIn(b'MARKER529 one', console)
+        self.assertIn(b'MARKER529 two', console)
+        self.assertIn(b'err', console)
+        self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
+
+    def test_failure_console_matches_the_logged_body_byte_for_byte(self):
+        """AC2: 'exactly as it is today' — no reordering, no re-encoding."""
+        code, console, err = self.run_logged(child(
+            "import sys; sys.stdout.buffer.write(b'A\\rB\\n\\xff');"
+            "sys.stdout.buffer.flush(); sys.exit(1)"))
+        self.assertEqual(code, 1)
+        body = self.log_bytes()
+        marker = b'----- output -----\n'
+        start = body.index(marker) + len(marker)
+        end = body.rindex(b'===== factory-log stage=BUILD exit=')
+        self.assertEqual(console, body[start:end])
+
+    def test_log_body_is_exactly_header_output_trailer_on_success(self):
+        """AC3: the file the autopsy reads is spelled out, not inferred.
+
+        ``factory_fixtures.pinned_clock()`` auto-advances by ``STEP`` per call,
+        so the header and trailer carry consecutive stamps. Do NOT call
+        ``factory_run.timestamp()`` here — every call burns a tick.
+        """
+        started = factory_fixtures.START.isoformat(timespec='seconds')
+        ended = (factory_fixtures.START
+                 + factory_fixtures.STEP).isoformat(timespec='seconds')
+        self.run_logged(child(
+            "import sys; sys.stdout.buffer.write(b'payload\\n')"))
+        body = self.log_bytes()
+        self.assertTrue(body.startswith(
+            b'===== factory-log stage=BUILD started=' + started.encode()), body)
+        self.assertIn(b'\n----- output -----\npayload\n'
+                      b'===== factory-log stage=BUILD exit=0 ended='
+                      + ended.encode(), body)
+
+    def test_spawn_failure_still_returns_127_and_says_so(self):
+        """AC4: distinct codes survive buffering."""
+        code, console, err = self.run_logged(['definitely-not-a-real-command-529'])
+        self.assertEqual(code, 127)
+        self.assertIn('factory-log: cannot spawn', err)
+        self.assertIn(b'exit=127', self.log_bytes())
+        self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
+
+    def test_success_with_a_dead_log_sink_falls_back_to_full_output(self):
+        """AC4 fail-open: never point at a log that was never written."""
+        blocker = os.path.join(self.tmp, 'blocker')
+        open(blocker, 'w').close()
+        bad = os.path.join(blocker, 'sub', 'BUILD.log')
+        code, console, err = self.run_logged(
+            child("import sys; sys.stdout.buffer.write(b'kept\\n')"),
+            log_path=bad)
+        self.assertEqual(code, 0)
+        self.assertIn(b'kept', console)
+        self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
+        self.assert_one_warning(err)
+
+
+class TestStreamEscapeHatch(LogTestCase):
+    """AC5: one invocation opts back into the live tee."""
+
+    VERBATIM = "import sys; sys.stdout.buffer.write(b'verbatim\\n')"
+
+    def test_stream_true_restores_full_output_on_success(self):
+        code, console, err = self.run_logged(child(self.VERBATIM), stream=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(console, b'verbatim\n')
+        self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
+
+    def test_stream_true_still_writes_the_same_log(self):
+        self.run_logged(child(self.VERBATIM), stream=True)
+        self.assertIn(b'verbatim\n', self.log_bytes())
+
+
+class TestAutopsySourceIntact(LogTestCase):
+    """AC6: the failing-stage log the autopsy and publisher read is complete."""
+
+    def test_registry_log_holds_every_line_after_a_failure(self):
+        reg = os.path.join(self.tmp, 'registry')
+        payload = b''.join(b'row %d\n' % i for i in range(200))
+        with mock.patch.dict(os.environ, {'NUKE_FACTORY_REGISTRY': reg}):
+            code, console, err = self.run_logged(
+                child("import sys; sys.stdout.buffer.write(%r); sys.exit(4)"
+                      % payload),
+                issue=529, log_path=None)
+            path = factory_run.log_path(529, 'BUILD')
+        self.assertEqual(code, 4)
+        with open(path, 'rb') as fh:
+            body = fh.read()
+        for i in (0, 99, 199):
+            self.assertIn(b'row %d\n' % i, body)
+        self.assertIn(b'exit=4', body)
 
 
 class ExplodingChild:
@@ -261,17 +415,30 @@ class TestCli(unittest.TestCase):
                               capture_output=True)
         return proc.returncode, proc.stdout, proc.stderr
 
+    MARK = "import sys; sys.stdout.buffer.write(b'MARK' + b'ER529\\n')"
+
     def test_happy_path_streams_logs_and_pins_the_clock(self):
         code, out, err = self.run_cli(
             '--stage', 'BUILD', '--log-path', self.log, '--attempt', '2',
-            '--now', '2026-07-27T12:00:00+00:00',
-            '--', sys.executable, '-c', "print('hi')")
+            '--stream', '--now', '2026-07-27T12:00:00+00:00',
+            '--', sys.executable, '-c', self.MARK)
         self.assertEqual(code, 0)
-        self.assertIn(b'hi', out)
+        self.assertEqual(out, b'MARKER529\n')
         with open(self.log, 'rb') as fh:
             body = fh.read()
         self.assertIn(b'attempt=2 started=2026-07-27T12:00:00+00:00', body)
         self.assertIn(b'exit=0 ended=2026-07-27T12:00:00+00:00', body)
+
+    def test_cli_is_quiet_on_success_without_stream(self):
+        """AC1 + AC5 through the CLI: the flag is what makes the difference."""
+        code, out, err = self.run_cli(
+            '--stage', 'BUILD', '--log-path', self.log,
+            '--', sys.executable, '-c', self.MARK)
+        self.assertEqual(code, 0)
+        self.assertTrue(out.startswith(factory_log.SUMMARY_PREFIX.encode()), out)
+        self.assertNotIn(b'MARKER529', out)
+        with open(self.log, 'rb') as fh:
+            self.assertIn(b'MARKER529\n', fh.read())
 
     def test_child_exit_code_passes_through(self):
         code, out, err = self.run_cli(
