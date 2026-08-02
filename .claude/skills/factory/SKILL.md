@@ -108,10 +108,12 @@ does exactly one thing: put the spec issue on the Documents board and set its
 It creates no run issue and never sets `Type` — classification stays with the human and with
 `/prd`. At terminal the run issue goes to `Status = Done`, and a **failed** run puts the spec
 back to `Todo`; a successful one leaves it `In Progress`, because the PR is open and the merge
-is what finishes the spec.
+is what finishes the spec. Known limitation: a retried run's dashboard issue is reopened but
+keeps `Status = Done` while it is live — the `In Progress` write happens only when the run issue
+first joins the board, not on every reopen.
 
-Call it at **every stage transition, every gate result, and at terminal** (SHIP success and
-terminal failure alike) — roughly 15-25 edits per run.
+Call `--stage-completed` and `--terminal` at **every stage transition, every gate result, and at
+terminal** (SHIP success and terminal failure alike) — roughly 15-25 edits per run.
 
 **Exit code 1 means "published with degradation". It is reportable, never a run failure.**
 Note the `factory-publish: WARNING:` lines and carry on. Exit 2 is misuse — fix the call.

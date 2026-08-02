@@ -13,8 +13,7 @@ number. Pass `--attempt <k>` on every retry.
 
 ## Run start — before GATE
 
-Once per run, from *Session setup* in `SKILL.md` (step 4), after the `start` event and before
-the first stage:
+Once per run, from *Session setup* in `SKILL.md` (step 4), before GATE:
 
 ```
 python tools/factory_publish.py --issue <N> --run-start

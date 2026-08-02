@@ -819,6 +819,21 @@ class TestRunStart(PublishTestCase):
             factory_publish.load_publish_state(440, reg)['spec_item_id'],
             'PVTI_spec')
 
+    def test_field_list_failure_is_reported_not_the_schema_message(self):
+        """Review item 6: a failed ``field-list`` (403/network) must not be
+        reported as "no such field" — that misdirects the reader at the
+        board schema instead of at auth. spec_item_id is already cached, so
+        the only remaining GitHub call is the failing field-list."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['spec_item_id'] = 'PVTI_spec'
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake(**{'project field-list': (1, '', 'HTTP 403')})
+        result = factory_publish.run_start(440, registry=reg, runner=fake)
+        self.assertEqual(len(result.warnings), 1)
+        self.assertIn('HTTP 403', result.warnings[0])
+        self.assertNotIn('no Status field', result.warnings[0])
+
     def stub_gh(self, fake):
         """Replace the module-global gh() so main() touches no network."""
         real = factory_publish.gh
@@ -860,13 +875,24 @@ class TestRunStart(PublishTestCase):
         self.assertEqual(fake.calls, [])
 
     def test_run_start_with_open_pr_is_misuse(self):
-        """--run-start makes exactly one write; --open-pr is a different one."""
+        """--run-start makes exactly one write; --open-pr is a different one.
+
+        --branch/--title/--body-file are supplied (a real, existing body
+        file) so this would genuinely reach ``pr create`` if the combined-flag
+        guard were removed — without them the missing-args check alone would
+        already return EXIT_MISUSE and the guard's removal would go unnoticed.
+        """
         reg = factory_fixtures.build_shipped_run(self.tmp)
         fake = self.fake()
         self.stub_gh(fake)
+        body_path = os.path.join(self.tmp, 'pr-body.md')
+        with open(body_path, 'w', encoding='utf-8') as fh:
+            fh.write('body\n')
         with redirect_stderr(io.StringIO()):
             code = factory_publish.main(['--issue', '440', '--registry', reg,
-                                         '--run-start', '--open-pr'])
+                                         '--run-start', '--open-pr',
+                                         '--branch', 'b', '--title', 't',
+                                         '--body-file', body_path])
         self.assertEqual(code, factory_publish.EXIT_MISUSE)
         self.assertEqual(fake.calls, [])
 

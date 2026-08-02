@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Publish a factory run to GitHub: run issue, stage-log and screenshot assets.
 
-Sole writer of the GitHub surfaces — the run issue, the release assets, and the
-spec-issue comment. ``factory_run`` stays the sole writer of run state and the
+Sole writer of the GitHub surfaces — the run issue, the release assets, the
+spec-issue comment, and the Documents-board item fields on both. ``factory_run``
+stays the sole writer of run state and the
 journal; ``factory_log`` stays the sole writer of ``logs/``. This module's own
 durable memory is ``runs/issue-<N>/publish.json``, which nothing else writes:
 the same narrowing ADR 450 applied to the log subtree, extended to a
@@ -696,6 +697,10 @@ def resolve_single_select(field_name, option_name, warnings,
     """
     fields = gh(["project", "field-list", str(PROJECT_NUMBER), "--owner",
                  PROJECT_OWNER, "--format", "json"], runner=runner)
+    if fields.returncode != 0:
+        _warn(warnings, "project field-list failed, %s=%s not set: %s"
+              % (field_name, option_name, _tail(fields.stderr)))
+        return None, None
     field_id = option_id = None
     try:
         for field in json.loads(fields.stdout).get("fields") or []:
@@ -708,7 +713,7 @@ def resolve_single_select(field_name, option_name, warnings,
     except (ValueError, AttributeError):
         pass
     if not field_id or not option_id:
-        _warn(warnings, "project %s=%s not set: no %s field with a %s option "
+        _warn(warnings, "project %s=%s not set: no %s field with option %r "
                         "in project %d"
               % (field_name, option_name, field_name, option_name,
                  PROJECT_NUMBER))
@@ -840,25 +845,14 @@ def finish_project_status(state, publish, run_url, warnings,
     and it is the merge — which this module never observes — that finishes the
     spec.
 
-    Outside the ``projected`` guard on purpose. Behind it, these writes would
-    no-op on every run after the first publish (#513, Notes). The spec half is
-    also outside ``run_url``: a failed run whose dashboard issue could not be
-    created is exactly when a spec pinned at In Progress would mislead longest.
+    Outside the ``projected`` guard on purpose: behind it, these writes would
+    no-op on every run after the first publish. The spec half is also outside
+    ``run_url``: a failed run whose dashboard issue could not be created is
+    exactly when a spec pinned at In Progress would mislead longest.
 
-    ``run_url`` is the caller's to resolve, not this function's: ``publish_run``
-    passes it when the run item is cached (``project_item_add`` below then
-    makes no network call at all — it only needs the URL to pass to
-    ``project_item_add`` if the cache is empty) or when the record was
-    already ``projected`` before this publish with no cached id (the add
-    below is then the *first* attempt this publish, not a retry). It passes
-    ``None`` exactly when neither is true: the run issue has no resolvable
-    board item this publish, because the only add attempt made for it this
-    publish — inside ``ensure_project_type_log`` — failed. Retrying that
-    same failed add here would just repeat the call and double the warning
-    for it; gating on ``ensure_project_type_log``'s overall return value
-    instead of on this narrower condition would also (wrongly) skip the
-    Done write whenever the add succeeds but a later step in that function,
-    such as the ``Type`` write, fails — the id is still perfectly usable.
+    ``run_url`` is ``None`` exactly when this publish's only add attempt for
+    the run issue already failed (inside ``ensure_project_type_log``) —
+    retrying it here would just repeat the call and double the warning for it.
     """
     if run_url:
         run_item = publish.get("run_item_id") or project_item_add(
@@ -1067,8 +1061,8 @@ def run_start(issue, registry=None, runner=subprocess.run):
     spec to Todo.
 
     Called before GATE, so it does not require — and does not check for — a
-    registry entry: the run directory it writes into is the one the ``start``
-    event has just created.
+    registry entry: the run directory may not exist yet — ``save_publish_state``
+    creates it, and the later ``start`` event reuses it.
     """
     registry = registry or factory_run.registry_root()
     publish = load_publish_state(issue, registry)
@@ -1132,11 +1126,8 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
     if terminal:
         if number:
             set_issue_state(number, False, warnings, runner=runner)
-        # A resolvable board item is one already cached (the add succeeded,
-        # even if the later Type write did not) or one never attempted this
-        # publish at all (an already-projected record with no cached id).
-        # Neither case should retry a failed add — see
-        # finish_project_status()'s docstring.
+        # Resolvable: the add already succeeded, or was never attempted this
+        # publish (see finish_project_status()'s docstring re run_url=None).
         resolved = bool(publish.get("run_item_id")) or was_projected
         finish_project_status(state, publish, run_url if resolved else None,
                               warnings, runner=runner)
