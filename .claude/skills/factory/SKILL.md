@@ -95,6 +95,11 @@ python tools/factory_publish.py --issue <N> --stage-completed <STAGE>
 python tools/factory_publish.py --issue <N> --terminal
 ```
 
+The publisher owns three GitHub objects per run: the **run issue** (`Type = Log`, the execution
+record), the **plan issue** (`Type = Plan`, created at PLAN completion and re-synced on every
+later publish — #514), and the **PR** at SHIP. The plan issue is never closed by the publisher;
+the PR body closes it on merge. A dry run and a terminal failure both leave it open on purpose.
+
 Call it at **every stage transition, every gate result, and at terminal** (SHIP success and
 terminal failure alike) — roughly 15-25 edits per run.
 
