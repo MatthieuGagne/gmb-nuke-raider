@@ -453,7 +453,9 @@ def big_plan(tasks=8, filler=300):
 
 class TestSummarizePlan(PublishTestCase):
     def summary(self, text=None):
-        return factory_publish.summarize_plan(text or big_plan())
+        preamble, tasks, _unterminated = factory_publish.summarize_plan(
+            big_plan() if text is None else text)
+        return preamble, tasks
 
     def test_preamble_stops_at_the_first_task_heading(self):
         """R3: everything above the first batch/task heading."""
@@ -496,18 +498,30 @@ class TestSummarizePlan(PublishTestCase):
     def test_a_batch_heading_also_ends_the_preamble(self):
         text = ('# T\n\n**Goal:** g\n\n'
                 '### Smoketest Checkpoint 1 — thing\n\nbody\n')
-        preamble, tasks = factory_publish.summarize_plan(text)
+        preamble, tasks = self.summary(text)
         self.assertIn('**Goal:** g', preamble)
         self.assertNotIn('### Smoketest Checkpoint 1 — thing', preamble)
         self.assertEqual(tasks, [])
 
     def test_a_plan_with_no_tasks_is_all_preamble(self):
-        preamble, tasks = factory_publish.summarize_plan('# T\n\nprose\n')
+        preamble, tasks = self.summary('# T\n\nprose\n')
         self.assertEqual(preamble, ['# T', '', 'prose'])
         self.assertEqual(tasks, [])
 
     def test_an_empty_plan_does_not_raise(self):
-        self.assertEqual(factory_publish.summarize_plan(''), ([], []))
+        self.assertEqual(factory_publish.summarize_plan(''), ([], [], False))
+
+    def test_an_unterminated_fence_is_reported_not_swallowed(self):
+        text = ('# T\n\nprose\n\n## Task 1: kept\n\n**Files:**\n- a\n\n'
+                '```python\nopened and never closed\n\n'
+                '## Task 2: lost inside the fence\n')
+        preamble, tasks, unterminated = factory_publish.summarize_plan(text)
+        self.assertTrue(unterminated)
+        self.assertEqual([t[0] for t in tasks], ['## Task 1: kept'])
+
+    def test_a_balanced_document_is_not_reported_as_unterminated(self):
+        _p, _t, unterminated = factory_publish.summarize_plan(big_plan())
+        self.assertFalse(unterminated)
 
 
 class TestRenderPlanBody(PublishTestCase):
@@ -586,6 +600,7 @@ class TestRenderPlanBody(PublishTestCase):
         self.assertNotIn('- Modify: `tools/factory_publish.py`', body)
         self.assertNotIn(factory_publish.PLAN_SHED_PREAMBLE, body)
         self.assertIn('## Global Constraints', body)
+        self.assertNotIn('truncated at the', body)
 
     def test_a_tighter_budget_sheds_the_preamble_too(self):
         """R3: the second shed level, which budget=1200 never reaches."""
@@ -594,6 +609,7 @@ class TestRenderPlanBody(PublishTestCase):
         self.assertIn(factory_publish.PLAN_SHED_PREAMBLE, body)
         self.assertNotIn('## Global Constraints', body)
         self.assertIn('## Task 1: component 1', body)
+        self.assertNotIn('truncated at the', body)
 
     def test_hard_truncation_is_the_backstop(self):
         body = self.body(budget=400)
@@ -607,6 +623,28 @@ class TestRenderPlanBody(PublishTestCase):
         body = self.body()
         self.assertTrue(body.endswith('\n'))
         self.assertFalse(body.endswith('\n\n'))
+
+    def test_an_absolute_path_in_the_header_is_redacted(self):
+        """The body is a public issue; every other path here is redacted."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state['plan'] = r'C:\Users\someone\repo\docs\plans\p.md'
+        body = factory_publish.render_plan_body(
+            state, factory_publish.new_publish_state(440), big_plan())
+        self.assertNotIn('someone', body)
+        self.assertIn(factory_report.REDACTION, body)
+
+    def test_an_absolute_path_in_the_plan_text_is_redacted(self):
+        """Plans name machine-specific toolchain paths in their preamble."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- gcc lives at C:/Users/someone/mingw64/bin/gcc.exe')
+        body = self.body(text=text)
+        self.assertNotIn('someone', body)
+
+    def test_an_unterminated_fence_says_so_in_the_body(self):
+        body = self.body(text='# T\n\np\n\n## Task 1: a\n\n```\nunclosed\n')
+        self.assertIn(factory_publish.PLAN_UNTERMINATED, body)
 
 
 class TestPlanSourcing(PublishTestCase):
@@ -683,6 +721,10 @@ class TestRenderPlanTitle(PublishTestCase):
     def test_slug_falls_back_again_when_there_is_no_plan_path(self):
         self.assertEqual(self.title(slug=None, plan=None),
                          'plan: (no slug) (#440)')
+
+    def test_an_undated_plan_filename_falls_back_to_its_stem(self):
+        self.assertEqual(self.title(slug=None, plan='docs/plans/notes.md'),
+                         'plan: notes (#440)')
 
 
 class TestSecretScan(PublishTestCase):

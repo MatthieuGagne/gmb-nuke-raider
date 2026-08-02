@@ -445,6 +445,9 @@ PLAN_SUMMARY_WITHHELD = ("_Structural summary — fenced code and task steps "
                          "omitted. Full plan withheld: %s_")
 PLAN_SHED_FILES = "_Task file lists omitted — see the full plan._"
 PLAN_SHED_PREAMBLE = "_Preamble omitted — see the full plan._"
+PLAN_UNTERMINATED = ("_The plan ends inside an unclosed code fence — the "
+                     "summary above stops there and may be incomplete. Read "
+                     "the full plan._")
 
 # A fence opens with three or more backticks or tildes, indented at most three
 # spaces (CommonMark). The closer must use the same character and be at least
@@ -470,26 +473,32 @@ def plan_asset_name(issue):
 
 
 def _fenced(lines):
-    """Yield ``(line, inside_a_fence)`` for every line of a markdown document.
+    """``(pairs, unterminated)`` — every line tagged with whether it sits
+    inside a fenced block, and whether the document ended still inside one.
 
     Both the opening and the closing fence report True: they are part of the
-    block, not of the prose around it.
+    block, not of the prose around it. An unterminated fence is reported
+    rather than swallowed — it makes every later line read as code, and the
+    tail of a 3000-line plan would otherwise disappear from the summary with
+    nothing to say it had.
     """
+    out = []
     fence = None
     for line in lines:
         match = _FENCE.match(line)
         if fence is None:
             if match:
                 fence = match.group(1)
-                yield line, True
+                out.append((line, True))
             else:
-                yield line, False
+                out.append((line, False))
         else:
             closes = (match and match.group(1)[0] == fence[0]
                       and len(match.group(1)) >= len(fence))
             if closes:
                 fence = None
-            yield line, True
+            out.append((line, True))
+    return out, fence is not None
 
 
 def _collapse(lines):
@@ -511,7 +520,8 @@ def _collapse(lines):
 
 
 def summarize_plan(text):
-    """``(preamble_lines, task_blocks)`` — R3's structural summary.
+    """``(preamble_lines, task_blocks, unterminated)`` — R3's structural
+    summary, plus whether the document ended inside an unclosed fence.
 
     The preamble is everything above the first task or batch heading, with
     fenced blocks removed. Each task block is its ``## Task N:`` heading plus
@@ -522,7 +532,7 @@ def summarize_plan(text):
     whole markdown documents inside ```` blocks, so a line-oriented scan for
     ``## Task`` finds headings that belong to a code sample.
     """
-    marked = list(_fenced(text.splitlines()))
+    marked, unterminated = _fenced(text.splitlines())
     first = None
     for index, (line, fence) in enumerate(marked):
         if fence:
@@ -535,7 +545,7 @@ def summarize_plan(text):
     preamble = _collapse([line for line, fence in head if not fence])
     tasks = []
     if first is None:
-        return preamble, tasks
+        return preamble, tasks, unterminated
 
     index = first
     while index < len(marked):
@@ -565,7 +575,7 @@ def summarize_plan(text):
                 continue
             index += 1
         tasks.append(block)
-    return preamble, tasks
+    return preamble, tasks, unterminated
 
 
 def plan_path(state):
@@ -665,7 +675,15 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
     if run_issue:
         header += ["", "Run dashboard: #%d" % run_issue]
 
-    preamble, tasks = summarize_plan(plan_text)
+    preamble, tasks, unterminated = summarize_plan(plan_text)
+    # Every line below is lifted verbatim from a local file and published to
+    # a public, indexed issue. Plans routinely name machine-specific
+    # toolchain paths in their preamble and absolute paths in a Files
+    # bullet, so the redaction display_worktree() applies to a worktree path
+    # applies to all of it.
+    preamble = [factory_report.redact(line) for line in preamble]
+    tasks = [[factory_report.redact(line) for line in block]
+             for block in tasks]
 
     def build(drop_files, drop_preamble):
         out = list(header)
@@ -677,6 +695,8 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
             out += [""] + ([block[0]] if drop_files else block)
         if drop_files and tasks:
             out += ["", PLAN_SHED_FILES]
+        if unterminated:
+            out += ["", PLAN_UNTERMINATED]
         out += ["", link, "", PLAN_BODY_MARKER]
         return "\n".join(out) + "\n"
 
