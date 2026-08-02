@@ -1,5 +1,5 @@
 #!/bin/sh
-# Repository hook — clean ROM build gate (#441, ADR 0002).
+# Repository hook — clean ROM build gate (ADR 441).
 #
 # git passes <remote> <url> as arguments and the refs on stdin; neither is
 # needed. The gate is unconditional on the working tree about to be published,

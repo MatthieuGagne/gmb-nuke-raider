@@ -4,7 +4,7 @@
 Repository hooks are only a gate if they are installed by default: a gate that
 requires reading a setup doc is opt-in, which is the failure mode #441 exists
 to remove. `make` invokes this, so any clone that builds once is gated
-(ADR 0002).
+(ADR 441).
 
 The write is local-scope and idempotent, and is undone with
 `git config --unset core.hooksPath`. It lands in the *common* repository

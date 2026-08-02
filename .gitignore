@@ -56,7 +56,7 @@ docs/plans/
 CLAUDE.local.md
 
 # Claude scratch settings tier — transient session approvals, never committed
-# (see ADR 0001, issue #466)
+# (see ADR 443)
 .claude/settings.local.json
 
 # Pi harness (issue #497). Deny-all-then-allow so anything Pi writes at

@@ -29,7 +29,7 @@ at the PR and nowhere else.
 
 1. Export the correlation variable for this session: `NUKE_FACTORY_RUN=<issue#>`. It is what
    links permission prompts and deny-gate refusals to this run. Never set it from a settings
-   file — the repo tier forbids `env` (ADR 0001 (#466)).
+   file — the repo tier forbids `env` ([ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)).
 2. Read the existing run state: `python tools/factory_status.py --json` and look for this issue.
    - No entry, and no `--resume` → this is a fresh run. Append the `start` event at GATE.
    - Entry exists, `--resume` given → validate the recorded `worktree` still exists on disk. If

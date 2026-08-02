@@ -5,12 +5,12 @@ The registry lives at ``<main repo root>/.factory/runs/issue-<N>/`` — outside
 every worktree, so a run stays explainable after its worktree is gone.
 
 The journal (``journal.jsonl``) is the source of truth and ``state.json`` is a
-cached projection of it; see ADR 0003 (issue #468). ``append_event()``
+cached projection of it; see ADR 436. ``append_event()``
 writes the journal line first, then re-saves state atomically, so state can lag
 the journal by one event and can never lead it.
 
 This module is the sole writer of run state and the journal; ``factory_log.py``
-is the sole writer of the ``logs/`` subtree (ADR 0005, #450). Every other
+is the sole writer of the ``logs/`` subtree (ADR 450). Every other
 factory tool reads. It is a library, not a CLI: ``factory_status.py`` and
 ``factory_report.py`` are the command-line surfaces.
 
@@ -317,7 +317,7 @@ def ordered_gates(state):
 def append_event(issue, kind, registry=None, **fields):
     """Append one event, then re-save the projection. Returns the event.
 
-    Journal first, state second — see ADR 0003. Fields whose value is None are
+    Journal first, state second — see ADR 436. Fields whose value is None are
     dropped so the journal stays readable. This function performs no rendering
     and no network I/O: publication to GitHub is an explicit call into
     factory_publish, never a side effect of the writer (#472 R6).

@@ -228,7 +228,7 @@ $(TARGET): src/overmap_car_sprite.c
 test-tools: hooks
 	python -m unittest discover -s tests -p 'test_*.py'
 
-# Repository hooks (ADR 0002). Idempotent: only writes core.hooksPath when it
+# Repository hooks (ADR 441). Idempotent: only writes core.hooksPath when it
 # is missing or wrong, so a build that is already gated changes nothing.
 hooks:
 	python tools/install_hooks.py .

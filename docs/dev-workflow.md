@@ -55,7 +55,7 @@ directories under `.claude/skills/`.
   happen in a worktree. Use `EnterWorktree` or the `using-git-worktrees` skill before any write.
 - **Integrate via PR only.** Never merge feature branches to master locally.
 - Use `gh` for all GitHub operations. Run `gh auth setup-git` if push fails.
-- **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See [ADR 0001 (#466)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
+- **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
 
 ---
 
@@ -85,7 +85,7 @@ edited. `tools/factory_publish.py` performs the identical sequence for `log`-lab
 | `feat:` | PRD |
 | `fix:` / `bug:` | Bug |
 | `docs:` / `chore:` / `refactor:` / `test:` | Chore |
-| `ADR NNNN:` | ADR |
+| `ADR <work item#>:` | ADR |
 | `run …` | Log |
 | `review:` | Review |
 
@@ -96,6 +96,62 @@ remove `Epic` from the field.
 
 There is no `Follow-up` type — provenance belongs in the issue body. `prd`, `adr`, `log` and
 `epic` are the document labels; `Bug` and `Chore` are board types with no matching label.
+
+### Architecture decisions: keyed by their work item
+
+An ADR is an `adr`-labeled GitHub issue whose **key is the issue number of the work item that
+was being worked when the decision was taken** — not an allocated counter, and — except in the
+no-work-item case below — not the ADR issue's own number. The work item is the PRD, bug or chore
+issue being implemented, never a run log, a review, or another ADR. The title is
+`ADR <work item#>: <decision title>`. GitHub allocated that number when the work item was filed,
+so no counter is read before writing.
+
+**One ADR per work item.** Several decisions taken on the same work item share one ADR issue and
+appear in its body as `### D1: …`, `### D2: …`. Before filing a second, search issue titles for
+`ADR <key>`, closed issues included; if one exists, append the next `Dn` instead. Cite an
+individual decision as `ADR 441 D2`.
+
+**The two ambiguous cases.** A decision taken while working a **child spec** under an epic keys
+off the child spec, never the epic. A decision with **no work item** makes the ADR its own work
+item, so its key is its own issue number — the ADR is **self-keyed**, and it is the one case
+that needs a retitle after `gh issue create`. They cannot collide, because two GitHub issues
+cannot share a number.
+
+**Lifecycle.** The ADR issue stays open while its work item is open and is closed when the work
+item closes — replacing the older "closed on acceptance" rule, which now survives only for a
+self-keyed ADR. A decision taken later, against an already-closed work item, is added by
+reopening the ADR, appending the next `Dn`, and closing it again.
+
+**Status is per decision**, not per issue: each `### Dn` carries `Status: Accepted` or
+`Status: Superseded by ADR <key> D<n>`.
+
+**Citation form.** `[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in
+markdown, `(ADR 441)` in code comments; append `Dn` to the link text to cite one decision. The
+link target is always the ADR's own issue, never the work item whose number is the key. Never a
+bare second issue number, and never both the work item and the ADR — the key already names the
+work item.
+
+A multi-decision body:
+
+```markdown
+### D1: Local gates are repository hooks, not agent hooks
+Status: Accepted
+
+Context / Decision / Consequences, per the baseline `ADR-FORMAT.md`.
+
+### D2: The tool suite runs on commit, the clean build on push
+Status: Superseded by ADR <key> D<n>
+
+…
+```
+
+The `Status:` line is shown with metavariables on purpose: every concrete key in this repo names
+a real ADR, and an example that supersedes one of them reads as a fact rather than a form.
+
+Seven ADRs predate this scheme (issues #466–#470, #475 and #490). Each takes its work-item key
+as its title and keeps an alias line in its body naming the number it previously carried, so
+citations in already-merged PR bodies and closed issues stay resolvable. Nothing parses ADR
+keys — there is no validator and no lint rule, by design.
 
 ### TDD cycle (for C files)
 
@@ -144,7 +200,7 @@ that reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exis
 
 Local gates are **repository hooks**, not agent hooks, so they see every actor — any shell, any
 tool, any agent, or a human in a plain terminal. They are split by cost. Rationale:
-[ADR 0002 (#467)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467).
+[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467).
 
 | Hook | Runs | Cost | Blocks |
 |------|------|------|--------|
@@ -231,7 +287,7 @@ Every `src/*.c` file must have an entry in `bank-manifest.json` before it is wri
 | OAM | 40 sprites | Player = 2; rest for enemies/projectiles/HUD |
 | VRAM BG tiles | 192 (DMG bank 0) + 192 (CGB bank 1) | CGB bank 1 for color variants |
 | WRAM | 8 KB | Large arrays must be `global` or `static`, never local |
-| ROM | MBC5, 32 banks (`-Wm-ya32`), up to 512 KB | Code stays in bank 0; assets tagged for banking |
+| ROM | MBC5, 512 KB = 32 banks, auto-sized by makebin (`-yo A`) and recorded in cartridge header `0x148` | `-autobank` places code past bank 0 — state code sits in banks 2-3 today; assets tagged for banking. `-Wm-ya32` in `CFLAGS` is **not** the ROM bank count: `-ya` is makebin's *RAM* bank count and the value is discarded (header `0x149=0x00`) |
 
 Run `make memory-check` to validate budgets. Any FAIL or ERROR must be fixed before continuing.
 
@@ -490,8 +546,8 @@ worktree, so a run stays explainable after its worktree is deleted.
 | Tool | Role |
 |------|------|
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
-| `tools/factory_log.py` | **Sole writer of the `logs/` subtree** (ADR 0005): tees stage command output into `logs/<STAGE>.log`. |
-| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 0006 (#475)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
+| `tools/factory_log.py` | **Sole writer of the `logs/` subtree** ([ADR 450](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/470)): tees stage command output into `logs/<STAGE>.log`. |
+| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
 | `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` is validated against `factory_run.EVENT_KINDS`. |
 | `tools/factory_cache.py` | **Sole writer of `cache/`** (#437 R5): the `origin/master` reference ROM, keyed by commit SHA, filled lazily on the first smoketest failure. |
 | `.claude/skills/factory/` | The orchestrator. Writes nothing itself — it calls the tools above and `factory_publish` at every stage transition, gate result and terminal event. |
@@ -507,7 +563,7 @@ first, then re-saves state atomically (temp file + `os.replace`), so state can l
 by one event and can never lead it. `load_state()` replays the journal whenever state is
 missing, unparseable, of a foreign schema version, or behind the journal — a torn write
 self-heals instead of being fatal. An unparseable JSONL line is discarded on read, never an
-error. Full rationale: [ADR 0003 (#468)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/468).
+error. Full rationale: [ADR 436](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/468).
 
 Event kinds: `start`, `stage`, `gate`, `decision`, `retry`, `scenario`, `permission`,
 `failure`, `finish`. Every event carries `ts`, `issue`, `attempt`, `kind`.
@@ -623,7 +679,7 @@ itself failed, and `2` when it could not run.
 
 A run's durable, shareable rendering is a **run issue** on GitHub, written only by
 `tools/factory_publish.py`
-([ADR 0006 (#475)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)).
+([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)).
 One run issue per **spec** issue — created on the first publish,
 reused forever after, reopened when a later attempt starts, closed at terminal. Its number
 lives in `publish.json`, so it is never recreated. It carries the `log` label and sits in the
@@ -685,7 +741,7 @@ exist yet at GATE stage. A non-numeric value stays truthy, so the deny gate's fa
 rules still fire while the run is treated as unattributable and nothing is journalled; that is
 how the deny-gate tests exercise the rules without writing to the real registry. It is set by
 the session or driver process, never by a settings file: the repo tier forbids `env` (see
-[ADR 0001 (#466)](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)).
+[ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)).
 
 Note that the deny gate matches on raw command text, so a diagnostic that merely *quotes* a
 forbidden command is itself refused. Assemble such strings piecewise in tooling that reports
