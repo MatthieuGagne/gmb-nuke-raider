@@ -69,8 +69,10 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    ```
    The path is **repo-relative** — the publisher resolves it against the run's worktree, which is
    the only place it exists: `docs/plans/` is gitignored, so the plan never reaches the branch.
-5. **Adversarial plan self-review** — dispatch a subagent whose charter is to attack the plan,
-   not to approve it. It must check, at minimum:
+5. **Adversarial plan self-review** — dispatch a subagent **with `model: opus`** (the most
+   capable tier: this is the run's only defence against unrunnable or self-defeating
+   verification steps, and an omitted model would inherit whatever tier the session started on
+   — #528 R6). Its charter is to attack the plan, not to approve it. It must check, at minimum:
    - Does every spec requirement map to a task?
    - **Do the plan's verification commands actually work?** This is the #460 mandate. Hunt
      specifically for: asserts that pass no matter what (self-defeating), commands that assume
