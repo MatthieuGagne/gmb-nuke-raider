@@ -2,7 +2,7 @@
 """Append one factory run event from the command line (#437).
 
 `factory_run` is the sole writer of run state and the journal, but it is a
-library with no CLI (ADR 0003 (#468)) — `factory_status` and `factory_report`
+library with no CLI (ADR 436) — `factory_status` and `factory_report`
 are read-only surfaces, so nothing could write an event from a skill's prose.
 This is that surface: a thin argv wrapper over `factory_run.append_event`.
 

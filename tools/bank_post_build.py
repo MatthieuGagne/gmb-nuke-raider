@@ -28,7 +28,7 @@ BANK_STRIDE = 0x10000    # .noi addresses advance one bank per 0x10000
 def _run_romusage(rom_path):
     """Run romusage -a and return stdout.
 
-    The binary is resolved from PATH: ADR 0001 forbids absolute machine paths
+    The binary is resolved from PATH: ADR 443 forbids absolute machine paths
     in tracked files, and this function held one for long enough to make
     `make bank-post-build` unrunnable on the machine that ships it (#441).
     """
@@ -92,7 +92,7 @@ def _check_state_symbols(symbols, declared=None):
     never assumes a bank.  The old rule stopped at bank 2, but that ceiling was
     never justified by this argument — it was a snapshot of where the linker
     happened to put things, and autobank legitimately spilled past it once banks
-    0/1/2 reached 95/100/95% (#461, ADR 0007).
+    0/1/2 reached 95/100/95% (ADR 461).
 
     What IS a real defect is a state callback beyond the ROM's actual bank
     capacity — a symbol whose address lands in a bank the cartridge does not
