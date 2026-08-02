@@ -2,8 +2,8 @@
 """Publish a factory run to GitHub: run issue, stage-log and screenshot assets.
 
 Sole writer of the GitHub surfaces — the run issue, the release assets, the
-spec-issue comment, and the Documents-board item fields on both. ``factory_run``
-stays the sole writer of run state and the
+spec-issue comment, and the Documents-board item fields on both the spec and
+run issues. ``factory_run`` stays the sole writer of run state and the
 journal; ``factory_log`` stays the sole writer of ``logs/``. This module's own
 durable memory is ``runs/issue-<N>/publish.json``, which nothing else writes:
 the same narrowing ADR 450 applied to the log subtree, extended to a
