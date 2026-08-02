@@ -286,13 +286,139 @@ def render(finding):
 
 
 # --------------------------------------------------------------------------
-# CLI
+# Discovery and baseline
 # --------------------------------------------------------------------------
 
-def run_all(root, banned, write=False):
-    """Implemented in Task 2 (baseline compare)."""
-    raise NotImplementedError("--all lands in Task 2")
+# R12. The set is intersected with `git ls-files` (P1): docs/plans/ is
+# gitignored but carries two tracked legacy plans, so a bare glob would mix
+# tracked documents with whatever local plans a machine happens to hold, and
+# the baseline would stop being reproducible.
+# A bare "*.md" is NOT usable here: fnmatch translates `*` to `.*`, which
+# matches `/`, so it would sweep tests/unity/docs/, .pi/agents/, src/CLAUDE.md
+# and every other Markdown file in the tree — 82 files instead of the R12 set,
+# and a 172 KB baseline mostly made of vendored Unity documentation. The
+# repository-root rule is expressed as "no slash in the path" instead.
+INCLUDE_GLOBS = (
+    "docs/**/*.md",
+    ".claude/skills/**/*.md",
+    ".claude/agents/**/*.md",
+    "tests/fixtures/factory/expected_*.md",
+)
+EXCLUDE_PATHS = ("docs/STORY_BIBLE.md", "CLAUDE.local.md")
+EXCLUDE_PREFIXES = ("docs/game/", ".claude/skill-overlays/",
+                    ".claude/skills/simplified-technical-english/")
 
+BASELINE_NAME = os.path.join("tools", "ste_baseline.json")
+BASELINE_VERSION = 1
+
+
+def tracked_files(root):
+    proc = subprocess.run(["git", "-C", root, "ls-files"],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError("git ls-files failed: %s" % proc.stderr.strip())
+    return [line.strip() for line in proc.stdout.split("\n") if line.strip()]
+
+
+def _included(path):
+    if not path.endswith(".md"):
+        return False
+    if path in EXCLUDE_PATHS:
+        return False
+    if any(path.startswith(prefix) for prefix in EXCLUDE_PREFIXES):
+        return False
+    if "/" not in path:                 # R12: repository-root *.md
+        return True
+    for glob in INCLUDE_GLOBS:
+        if "**" in glob:
+            head, _, tail = glob.partition("**/")
+            if path.startswith(head) and fnmatch.fnmatch(
+                    os.path.basename(path), tail):
+                return True
+        elif fnmatch.fnmatch(path, glob):
+            return True
+    return False
+
+
+def discover(root, tracked=None):
+    """The `--all` file set: repo-relative POSIX paths, sorted, deduplicated."""
+    if tracked is None:
+        tracked = tracked_files(root)
+    found = {p.replace("\\", "/") for p in tracked}
+    return sorted(p for p in found if _included(p))
+
+
+def load_baseline(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return data.get("findings") or {}
+
+
+def write_baseline(path, findings):
+    counts = {}
+    for finding in findings:
+        counts.setdefault(finding.path, {})
+        key = key_of(finding)
+        counts[finding.path][key] = counts[finding.path].get(key, 0) + 1
+    payload = {"version": BASELINE_VERSION,
+               "note": "Pre-existing findings (#517 R11). Forward-only: this "
+                       "file records what the tree already said, it does not "
+                       "excuse new prose.",
+               "findings": {path: dict(sorted(keys.items()))
+                            for path, keys in sorted(counts.items())}}
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+
+
+def suppress(findings, baseline):
+    """Drop findings the baseline already records, counting repeats."""
+    budget = {path: dict(keys) for path, keys in baseline.items()}
+    out = []
+    for finding in findings:
+        key = key_of(finding)
+        left = budget.get(finding.path, {}).get(key, 0)
+        if left > 0:
+            budget[finding.path][key] = left - 1
+            continue
+        out.append(finding)
+    return out
+
+
+def run_all(root, banned, write=False, baseline_path=None, tracked=None):
+    """Lint the tracked documentation set. Always exits 0 (P7).
+
+    `--all` runs inside `make test-tools`, which the pre-commit hook and CI both
+    gate on. Baseline suppression is keyed on the offending text, so one more
+    ``step`` or ``build`` in any scanned document is a non-baselined
+    banned-synonym hit — 750 and 431 of those words already sit in the tree.
+    Failing here would turn the next ordinary documentation change red for a
+    word nobody can avoid. The hit still prints, and the file-path and
+    ``--issue`` forms still exit 1, which is where an author can act on it.
+    """
+    baseline_path = baseline_path or os.path.join(root, BASELINE_NAME)
+    findings = []
+    for rel in discover(root, tracked=tracked):
+        findings += scan_file(os.path.join(root, rel), banned, display=rel)
+    if write:
+        write_baseline(baseline_path, findings)
+        print("ste_lint: baseline written to %s (%d findings)"
+              % (baseline_path, len(findings)))
+        return 0
+    fresh = suppress(findings, load_baseline(baseline_path))
+    _report(fresh)
+    return 0
+
+
+# --------------------------------------------------------------------------
+# CLI
+# --------------------------------------------------------------------------
 
 def _fetch_issue_body(issue_number):
     """Fetch a GitHub issue body via gh. Raise RuntimeError on failure."""
