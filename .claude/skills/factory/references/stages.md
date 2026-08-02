@@ -11,11 +11,13 @@ number. Pass `--attempt <k>` on every retry.
 
 `LOG <STAGE> --stream -- <cmd>` is the same wrapper with `--stream` added before the `--`.
 
-Six invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
+Seven invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
 quiet on success without it (#529). They are GATE's `spec_lint --json`, PLAN's
-`trace.py --check --plans-only`, both `smoketest_headless --json` runs, `factory_cache.py`, and
-SHIP's `factory_publish --open-pr`. Every other wrapped command is gated on its exit code alone,
-so the summary line is enough.
+`trace.py --check --plans-only`, both `smoketest_headless --json` runs, `factory_cache.py`,
+VERIFY's evidence scenario, and SHIP's `factory_publish --open-pr`. VERIFY's is stated as a rule
+rather than a literal command line because step 6's scenario is composed ad hoc — there is no
+fixed command to tag. Every other wrapped command is gated on its exit code alone, so the summary
+line is enough.
 
 ---
 

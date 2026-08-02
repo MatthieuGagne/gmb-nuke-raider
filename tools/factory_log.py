@@ -210,6 +210,8 @@ def run_logged(cmd, *, stage, issue=None, attempt=None, cwd=None,
                     out.write(chunk)
                     out.flush()
                 else:
+                    # Unbounded on purpose: the log file (written below) is the
+                    # durable copy, so this buffer only has to survive one command.
                     held.append(chunk)
                     total_bytes += len(chunk)
                     total_lines += chunk.count(b"\n")
