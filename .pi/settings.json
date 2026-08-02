@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/deny_gate_hook.py",
+            "command": "python \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/tools/deny_gate_hook.py\"",
             "timeout": 15
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/bank_check_hook.py",
+            "command": "python \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/tools/bank_check_hook.py\"",
             "timeout": 60
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/emulicious_window_hook.py",
+            "command": "python \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/tools/emulicious_window_hook.py\"",
             "timeout": 15
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python tools/post_build_hook.py",
+            "command": "python \"$(git rev-parse --show-toplevel 2>/dev/null || echo .)/tools/post_build_hook.py\"",
             "timeout": 300
           }
         ]
