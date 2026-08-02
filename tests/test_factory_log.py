@@ -390,6 +390,15 @@ class TestFailOpen(LogTestCase):
         self.assertIn(b'partial output', body)
         self.assertNotIn(b'exit=', body)
 
+    def test_exception_mid_read_still_flushes_buffered_bytes(self):
+        """#529: buffering must not swallow output an exception interrupts."""
+        console = io.BytesIO()
+        with self.assertRaises(RuntimeError):
+            factory_log.run_logged(
+                ['whatever'], stage='BUILD', log_path=self.log,
+                console=console, popen=lambda *a, **k: ExplodingChild())
+        self.assertEqual(console.getvalue(), b'partial output')
+
     def test_keyboard_interrupt_records_the_childs_exit(self):
         """Grill: Ctrl-C — wait briefly, write the trailer, return."""
         console = io.BytesIO()
