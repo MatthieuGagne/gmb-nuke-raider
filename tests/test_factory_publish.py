@@ -1386,6 +1386,23 @@ class TestPlanAsset(PlanRunTestCase):
         self.assertIsNone(self.publish['plan_sha256'])
         self.assertEqual(len(warnings), 1)
 
+    def test_the_withheld_marker_in_the_body_carries_no_absolute_path(self):
+        """The withheld reason is formatted into a public issue verbatim.
+
+        The plan path must be absolute AND exist: an absolute path that does
+        not exist takes publish_plan's 'cannot read' early return and never
+        reaches the scanner, so the withheld branch is never entered and the
+        test proves nothing.
+        """
+        self.state['plan'] = self.plan_file
+        self.write_plan('# T\n\ntoken ghp_' + 'A' * 36 + '\n')
+        fake = self.fake()
+        self.publish_plan(fake, [])
+        withheld = self.publish['withheld']['issue-440-plan.md']
+        self.assertNotIn(self.tmp, withheld)
+        self.assertIn(factory_report.REDACTION, withheld)
+        self.assertNotIn(self.tmp, self.body_sent(fake))
+
 
 class TestPublishRunPlan(PlanRunTestCase):
     def run_publish(self, fake, **kw):

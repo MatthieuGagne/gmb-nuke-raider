@@ -682,8 +682,8 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
     # Every line below is lifted verbatim from a local file and published to
     # a public, indexed issue. Plans routinely name machine-specific
     # toolchain paths in their preamble and absolute paths in a Files
-    # bullet, so the same redaction display_worktree() gives a worktree path
-    # is what this text needs too.
+    # bullet, and this text needs exactly the redaction display_worktree()
+    # already gives a worktree path.
     preamble = [factory_report.redact(line) for line in preamble]
     tasks = [[factory_report.redact(line) for line in block]
              for block in tasks]
@@ -1181,14 +1181,15 @@ def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
     name = plan_asset_name(issue)
     if reason:
         publish.setdefault("withheld", {})[name] = "%s — local copy: %s" % (
-            reason, state.get("plan") or "the run's worktree")
+            reason,
+            factory_report.redact(state.get("plan") or "the run's worktree"))
         _warn(warnings, "plan asset withheld: %s (the run is unaffected)"
               % reason)
         return False
     # A mirror clears as well as sets: once the author removes the offending
     # string, a stale entry here would keep the body rendering the withheld
     # marker forever and make R5's re-sync one-way.
-    (publish.get("withheld") or {}).pop(name, None)
+    publish.setdefault("withheld", {}).pop(name, None)
 
     try:
         digest = factory_run.sha256_file(path)
