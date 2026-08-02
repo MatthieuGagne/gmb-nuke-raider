@@ -32,7 +32,10 @@ If a **fact** can be found by exploring the codebase or environment, look it up 
   - **Ambiguous keys.** A decision taken under a **child spec** of an epic keys off the child spec, never the epic. A decision with **no work item** makes the ADR its own work item — it is **self-keyed**, its key is its own issue number, and it is the one case needing a retitle after `gh issue create` — file it with the decision title alone, then `gh issue edit <N> --title "ADR <N>: <decision title>"` once GitHub has assigned the number.
   - **Lifecycle.** The issue stays **open** while its work item is open and is closed when the work item closes; a self-keyed ADR closes on acceptance.
   - **Citations.** `[ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467)` in markdown, `(ADR 441)` in code comments; append `Dn` to the link text to cite one decision. The link target is always the ADR's own issue, never the work item whose number is the key. Never a bare second issue number.
-  - **Board.** Add it to the "Nuke Raider — Documents" project with `Type = ADR`.
+  - **Board.** Add it to the "Nuke Raider — Documents" project with `Type = ADR` and
+    `Status = Todo`, resolving both fields' ids and their option ids by name — the same
+    `gh project field-list` lookup the neighbouring instructions use, since option ids are
+    regenerated whenever the option set is edited.
 - Use the baseline's `CONTEXT-FORMAT.md` for the glossary and the baseline's `ADR-FORMAT.md` for the **content structure** of an ADR — its location and numbering prescription (a numbered file in a repo directory) is **overridden** by the filing procedure above: here an ADR is a GitHub issue keyed off its work item, not a numbered file.
 
 ### PRDs stay on GitHub

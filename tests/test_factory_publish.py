@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -856,12 +857,21 @@ class TestScreenshotSourcing(PublishTestCase):
 
 
 class FakeGh:
-    """Records gh invocations and replays canned results. No network, ever."""
+    """Records gh invocations and replays canned results. No network, ever.
+
+    Each `issue create` returns a *distinct* issue number, starting at 481.
+    A run now publishes two issues — the run issue and the plan issue — and a
+    fake that gave both the same number made every assertion about "which
+    issue" silently unfalsifiable.
+    """
+
+    ISSUE_BASE = 481
 
     def __init__(self, results=None, default=(0, '', '')):
         self.calls = []
         self.results = dict(results or {})
         self.default = default
+        self.created = 0
 
     def key(self, argv):
         """First two non-flag words, e.g. 'issue create' or 'release upload'."""
@@ -870,7 +880,13 @@ class FakeGh:
 
     def __call__(self, argv, **kwargs):
         self.calls.append((list(argv), kwargs))
-        code, out, err = self.results.get(self.key(argv), self.default)
+        key = self.key(argv)
+        code, out, err = self.results.get(key, self.default)
+        if key == 'issue create' and code == 0 and '/issues/' in (out or ''):
+            number = self.ISSUE_BASE + self.created
+            self.created += 1
+            out = re.sub(r'/issues/\d+', '/issues/%d' % number, out).strip()
+            out += '\n'
         return subprocess.CompletedProcess(list(argv), code, out, err)
 
     def argv_for(self, key):
@@ -937,13 +953,19 @@ ISSUE_URL = 'https://github.com/MatthieuGagne/gmb-nuke-raider/issues/481'
 FIELD_LIST = json.dumps({'fields': [
     {'id': 'F_type', 'name': 'Type',
      'options': [{'id': 'O_adr', 'name': 'ADR'}, {'id': 'O_log', 'name': 'Log'}]},
-    {'id': 'F_status', 'name': 'Status'}]})
+    {'id': 'F_status', 'name': 'Status',
+     'options': [{'id': 'O_todo', 'name': 'Todo'},
+                 {'id': 'O_inprogress', 'name': 'In Progress'},
+                 {'id': 'O_done', 'name': 'Done'}]}]})
 PLAN_FIELD_LIST = json.dumps({'fields': [
     {'id': 'F_type', 'name': 'Type',
      'options': [{'id': 'O_adr', 'name': 'ADR'},
                  {'id': 'O_log', 'name': 'Log'},
                  {'id': 'O_plan', 'name': 'Plan'}]},
-    {'id': 'F_status', 'name': 'Status'}]})
+    {'id': 'F_status', 'name': 'Status',
+     'options': [{'id': 'O_todo', 'name': 'Todo'},
+                 {'id': 'O_inprogress', 'name': 'In Progress'},
+                 {'id': 'O_done', 'name': 'Done'}]}]})
 
 
 class TestRunIssueLifecycle(PublishTestCase):
@@ -1070,6 +1092,214 @@ class TestProjectTypeLog(PublishTestCase):
         self.assertFalse(factory_publish.ensure_project_type_log(
             publish, ISSUE_URL, warnings, runner=fake))
         self.assertEqual(len(warnings), 1)
+
+    def test_joining_the_board_also_sets_status_in_progress(self):
+        """AC3: Type = Log and Status = In Progress in one join."""
+        publish = factory_publish.new_publish_state(440)
+        fake = self.fake()
+        warnings = []
+        self.assertTrue(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, warnings, runner=fake))
+        self.assertEqual(warnings, [])
+        edits = fake.argv_for('project item-edit')
+        self.assertEqual(len(edits), 2)
+        self.assertIn('O_log', edits[0])
+        self.assertIn('F_status', edits[1])
+        self.assertIn('O_inprogress', edits[1])
+        self.assertEqual(publish['run_item_id'], 'PVTI_x')
+
+
+class TestRunStart(PublishTestCase):
+    """--run-start: the spec issue goes In Progress, and nothing else (R1)."""
+
+    def fake(self, **overrides):
+        results = {'project item-add': (0, json.dumps({'id': 'PVTI_spec'}), ''),
+                   'project field-list': (0, FIELD_LIST, ''),
+                   'project item-edit': (0, '', '')}
+        results.update(overrides)
+        return FakeGh(results)
+
+    def test_sets_status_in_progress_and_writes_nothing_else(self):
+        """AC1."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        result = factory_publish.run_start(440, registry=reg, runner=fake)
+        self.assertEqual(result.warnings, [])
+        edit = fake.argv_for('project item-edit')[0]
+        self.assertIn('PVTI_spec', edit)
+        self.assertIn('F_status', edit)
+        self.assertIn('O_inprogress', edit)
+        keys = [fake.key(argv) for argv, _ in fake.calls]
+        self.assertEqual(keys, ['project item-add', 'project field-list',
+                                'project item-edit'])
+
+    def test_adds_the_item_first_and_never_sets_type(self):
+        """AC2: item-add, then the Status edit — and no Type edit, ever."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        factory_publish.run_start(440, registry=reg, runner=fake)
+        keys = [fake.key(argv) for argv, _ in fake.calls]
+        self.assertLess(keys.index('project item-add'),
+                        keys.index('project item-edit'))
+        add = fake.argv_for('project item-add')[0]
+        self.assertIn('--url', add)
+        self.assertIn('https://github.com/MatthieuGagne/gmb-nuke-raider/'
+                      'issues/440', add)
+        edits = fake.argv_for('project item-edit')
+        self.assertEqual(len(edits), 1)
+        flat = ' '.join(a for argv in edits for a in argv)
+        self.assertNotIn('F_type', flat)
+        self.assertNotIn('O_log', flat)
+
+    def test_option_ids_come_from_field_list_not_a_constant(self):
+        """AC6: option ids are regenerated when the option set is edited."""
+        altered = json.dumps({'fields': [
+            {'id': 'F_status_v2', 'name': 'Status',
+             'options': [{'id': 'O_inprogress_v2', 'name': 'In Progress'}]}]})
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake(**{'project field-list': (0, altered, '')})
+        factory_publish.run_start(440, registry=reg, runner=fake)
+        edit = fake.argv_for('project item-edit')[0]
+        self.assertIn('F_status_v2', edit)
+        self.assertIn('O_inprogress_v2', edit)
+
+    def test_total_project_failure_warns_once_and_exits_one(self):
+        """AC7."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = FakeGh(default=(1, '', 'HTTP 403'))
+        buf = io.StringIO()
+        with redirect_stderr(buf):
+            result = factory_publish.run_start(440, registry=reg, runner=fake)
+        self.assertEqual(len(result.warnings), 1)
+        self.assertEqual(buf.getvalue().count(factory_publish.WARNING_PREFIX), 1)
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)
+
+    def test_second_call_reuses_the_cached_item_id(self):
+        """AC8: no duplicate item-add, and publish.json still loads."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        factory_publish.run_start(440, registry=reg, runner=self.fake())
+        second = self.fake()
+        factory_publish.run_start(440, registry=reg, runner=second)
+        self.assertEqual(second.argv_for('project item-add'), [])
+        self.assertEqual(
+            factory_publish.load_publish_state(440, reg)['spec_item_id'],
+            'PVTI_spec')
+
+    def test_field_list_failure_is_reported_not_the_schema_message(self):
+        """Review item 6: a failed ``field-list`` (403/network) must not be
+        reported as "no such field" — that misdirects the reader at the
+        board schema instead of at auth. spec_item_id is already cached, so
+        the only remaining GitHub call is the failing field-list."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['spec_item_id'] = 'PVTI_spec'
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake(**{'project field-list': (1, '', 'HTTP 403')})
+        result = factory_publish.run_start(440, registry=reg, runner=fake)
+        self.assertEqual(len(result.warnings), 1)
+        self.assertIn('HTTP 403', result.warnings[0])
+        self.assertNotIn('no Status field', result.warnings[0])
+
+    def stub_gh(self, fake):
+        """Replace the module-global gh() so main() touches no network."""
+        real = factory_publish.gh
+        factory_publish.gh = lambda argv, runner=None: fake(['gh'] + list(argv))
+        self.addCleanup(setattr, factory_publish, 'gh', real)
+
+    def test_cli_routes_to_run_start(self):
+        """AC1 through main(): one Status edit, no other GitHub write."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                     '--run-start'])
+        self.assertEqual(code, factory_publish.EXIT_OK)
+        self.assertTrue(fake.argv_for('project item-edit'))
+        self.assertEqual(fake.argv_for('issue create'), [])
+        self.assertEqual(fake.argv_for('issue edit'), [])
+        self.assertEqual(fake.argv_for('release upload'), [])
+        self.assertEqual(fake.argv_for('label create'), [])
+
+    def test_cli_exits_one_when_the_board_is_unreachable(self):
+        """AC7: the CLI half — 1 is a degradation, never a run failure."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        self.stub_gh(FakeGh(default=(1, '', 'HTTP 403')))
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start'])
+        self.assertEqual(code, factory_publish.EXIT_DEGRADED)
+
+    def test_run_start_with_dry_run_is_misuse(self):
+        """--dry-run promises to touch no network; --run-start is a write."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start', '--dry-run'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_open_pr_is_misuse(self):
+        """--run-start makes exactly one write; --open-pr is a different one.
+
+        --branch/--title/--body-file are supplied (a real, existing body
+        file) so this would genuinely reach ``pr create`` if the combined-flag
+        guard were removed — without them the missing-args check alone would
+        already return EXIT_MISUSE and the guard's removal would go unnoticed.
+        """
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        body_path = os.path.join(self.tmp, 'pr-body.md')
+        with open(body_path, 'w', encoding='utf-8') as fh:
+            fh.write('body\n')
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start', '--open-pr',
+                                         '--branch', 'b', '--title', 't',
+                                         '--body-file', body_path])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_stage_completed_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start',
+                                         '--stage-completed', 'BUILD'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_terminal_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start', '--terminal'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+
+class TestPublishStateIsAdditive(PublishTestCase):
+    def test_a_record_written_before_the_item_cache_still_loads(self):
+        """AC9: no schema_version bump, so no orphaned run issue."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = factory_publish.publish_path(440, reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump({'schema_version': 1, 'issue': 440, 'run_issue': 481,
+                       'projected': True, 'commented_attempts': [1],
+                       'uploaded': [], 'withheld': {}}, fh)
+        publish = factory_publish.load_publish_state(440, reg)
+        self.assertEqual(publish['run_issue'], 481)
+        self.assertIsNone(publish['spec_item_id'])
+        self.assertIsNone(publish['run_item_id'])
+        self.assertEqual(factory_publish.PUBLISH_SCHEMA_VERSION, 1)
 
 
 class TestAssetUpload(PublishTestCase):
@@ -1486,8 +1716,13 @@ class TestPublishRunPlan(PlanRunTestCase):
         self.assertEqual(result.warnings, [])
         self.assertEqual(len(fake.argv_for('issue create')), 2)
         publish = factory_publish.load_publish_state(440, self.reg)
+        # publish_plan runs before ensure_run_issue in publish_run, so the
+        # plan issue claims the first 'issue create' (481) and the run issue
+        # the second (482) — two distinct GitHub objects, not one shared
+        # number.
         self.assertEqual(publish['plan_issue'], 481)
-        self.assertEqual(publish['run_issue'], 481)
+        self.assertEqual(publish['run_issue'], 482)
+        self.assertNotEqual(publish['run_issue'], publish['plan_issue'])
 
     def test_calling_stage_completed_plan_twice_creates_one_plan_issue(self):
         """AC2."""
@@ -1522,7 +1757,10 @@ class TestPublishRunPlan(PlanRunTestCase):
         self.run_publish(fake, terminal=True)
         closed = [argv[argv.index('close') + 1]
                   for argv in fake.argv_for('issue close')]
-        self.assertEqual(closed, ['481'])
+        # The run issue, never the plan: the first publish above creates the
+        # plan issue first (481) and the run issue second (482) — only 482
+        # is ever closed.
+        self.assertEqual(closed, ['482'])
 
     def test_a_failed_run_leaves_the_plan_issue_open(self):
         """AC8: a run that never ships leaves standing evidence.
@@ -1602,11 +1840,43 @@ class TestPublishRun(PublishTestCase):
         kw.setdefault('now', factory_fixtures.FIXED_NOW)
         return factory_publish.publish_run(440, runner=fake, **kw)
 
+    def seed_items(self, issue=440, registry=None):
+        """A run already on the board: both item ids cached, so the terminal
+        writes are distinguishable by item id in the recorded argv.
+
+        The seeded number is deliberately far from ``FakeGh.ISSUE_BASE``
+        (481): the run issue here is never actually created through the fake
+        (it is pre-cached), so the class's own plan file makes the plan
+        issue the first real ``issue create`` call and it claims 481. A
+        seeded run issue of 481 would coincidentally collide with a
+        genuinely distinct plan issue and make item-add calls for the two
+        indistinguishable by URL.
+        """
+        publish = factory_publish.new_publish_state(issue)
+        publish.update({'run_issue': 900, 'projected': True,
+                        'run_item_id': 'PVTI_run',
+                        'spec_item_id': 'PVTI_spec'})
+        factory_publish.save_publish_state(publish, registry or self.reg)
+
+    def status_edits(self, fake):
+        """(item id, option id) for every Status item-edit, in call order."""
+        out = []
+        for argv in fake.argv_for('project item-edit'):
+            if 'F_status' not in argv:
+                continue
+            out.append((argv[argv.index('--id') + 1],
+                        argv[argv.index('--single-select-option-id') + 1]))
+        return out
+
     def test_first_publish_creates_labels_and_types_the_issue(self):
         """AC1."""
         fake = self.fake()
         result = self.run_publish(fake, stage_completed='BUILD')
-        self.assertEqual(result.run_issue, 481)
+        # publish_plan runs before ensure_run_issue in publish_run, and the
+        # class's setUp gives this run a real plan file — so the plan issue
+        # is the first 'issue create' this publish makes (481) and the run
+        # issue is the second (482).
+        self.assertEqual(result.run_issue, 482)
         self.assertEqual(result.warnings, [])
         self.assertTrue(fake.argv_for('label create'))
         self.assertTrue(fake.argv_for('issue create'))
@@ -1653,8 +1923,8 @@ class TestPublishRun(PublishTestCase):
         self.run_publish(second, stage_completed='BUILD')
         self.assertTrue(second.argv_for('issue reopen'))
         # Select by title, never by position: publish_plan edits the plan
-        # issue before ensure_run_issue edits the run issue, and FakeGh gives
-        # both the same number.
+        # issue before ensure_run_issue edits the run issue, so 'the second
+        # issue edit call' is not a stable way to mean 'the run issue'.
         titles = [argv[argv.index('--title') + 1]
                   for argv in second.argv_for('issue edit')]
         self.assertTrue(
@@ -1666,7 +1936,8 @@ class TestPublishRun(PublishTestCase):
     def test_every_gh_failure_leaves_the_outcome_unchanged(self):
         """AC9: one marked warning each, never an exception."""
         for key in ('issue create', 'issue edit', 'release upload',
-                    'issue comment', 'label create', 'release create'):
+                    'issue comment', 'label create', 'release create',
+                    'project item-add', 'project item-edit'):
             with self.subTest(key=key):
                 reg = factory_fixtures.build_shipped_run(
                     tempfile.mkdtemp(dir=self.tmp))
@@ -1682,6 +1953,135 @@ class TestPublishRun(PublishTestCase):
         before = len(factory_run.read_journal(440, self.reg))
         self.run_publish(self.fake(), stage_completed='BUILD')
         self.assertEqual(len(factory_run.read_journal(440, self.reg)), before)
+
+    def test_terminal_failure_settles_run_done_and_spec_todo(self):
+        """AC4."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        self.seed_items(441, reg)
+        fake = self.fake()
+        factory_publish.publish_run(441, registry=reg, terminal=True,
+                                    runner=fake,
+                                    now=factory_fixtures.FIXED_NOW)
+        self.assertEqual(self.status_edits(fake),
+                         [('PVTI_run', 'O_done'), ('PVTI_spec', 'O_todo')])
+
+    def test_terminal_success_leaves_the_spec_alone(self):
+        """AC5: the PR is open, not merged — the merge closes the spec."""
+        self.seed_items()
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
+
+    def test_terminal_status_is_not_behind_the_projected_guard(self):
+        """The trap in #513's Notes: `projected` covers membership and the
+        one-time Type write only."""
+        self.seed_items()
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        # Scoped to the run issue's own URL, not a bare "no item-add at all":
+        # this class's plan file makes the plan issue a fresh create every
+        # run, and it correctly makes its own item-add — that is a different
+        # issue from the run issue this test is actually about (#514).
+        run_url = '/issues/%d' % factory_publish.load_publish_state(
+            440, self.reg)['run_issue']
+        self.assertEqual(
+            [a for a in fake.argv_for('project item-add') if run_url in a],
+            [])
+        self.assertTrue(self.status_edits(fake))
+
+    def test_the_spec_returns_to_todo_even_with_no_run_issue(self):
+        """R4 is conditioned on the run having failed, not on the dashboard
+        issue existing — that is the case where the board would lie longest."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        publish = factory_publish.new_publish_state(441)
+        publish['spec_item_id'] = 'PVTI_spec'
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake(**{'issue create': (1, '', 'HTTP 502')})
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        self.assertIsNone(result.run_issue)
+        self.assertEqual(self.status_edits(fake), [('PVTI_spec', 'O_todo')])
+
+    def test_a_failing_status_write_leaves_the_outcome_unchanged(self):
+        """AC7: the call is still made, the warning is marked, and
+        publish_run still returns its PublishResult."""
+        self.seed_items()
+        fake = self.fake(**{'project item-edit': (1, '', 'HTTP 403')})
+        result = self.run_publish(fake, terminal=True)
+        self.assertEqual(result.run_issue, 900)
+        self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
+        self.assertTrue(any('Status=Done' in w for w in result.warnings),
+                        result.warnings)
+
+    def test_a_fresh_terminal_run_never_retries_a_failed_run_item_add(self):
+        """Regression for the reviewer's Finding 1: a fresh run (no cached
+        item ids) whose first publish is also terminal and whose Documents
+        board is unreachable must warn about the run issue's own failed
+        add exactly once, not once from ensure_project_type_log and again
+        from finish_project_status — and the spec issue's own add warning,
+        a distinct call against a distinct URL, must still be there."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        fake = FakeGh({'issue create': (0, ISSUE_URL + '\n', '')},
+                     default=(1, '', 'HTTP 403'))
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        run_warning = "%s not added to the Documents project: HTTP 403" % (
+            ISSUE_URL)
+        spec_warning = "%s not added to the Documents project: HTTP 403" % (
+            factory_publish.issue_url(441))
+        self.assertEqual(result.warnings.count(run_warning), 1)
+        self.assertIn(spec_warning, result.warnings)
+
+    def test_a_cached_run_item_still_gets_its_done_write_when_type_fails(self):
+        """Regression for the re-reviewer's "new breakage" finding: a fresh
+        run where ``project item-add`` succeeds (the id gets cached) but the
+        immediately-following ``Type`` write fails must still resolve the
+        run item and issue its terminal ``Done`` write — the id is perfectly
+        usable, only the unrelated ``Type`` edit failed. Uses a field list
+        that carries ``Status`` but not ``Type`` (rather than the empty
+        ``{"fields": []}`` from test_missing_type_option_warns_once) so the
+        Status writes this test asserts on can still resolve their field and
+        option ids."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        status_only = json.dumps({'fields': [
+            {'id': 'F_status', 'name': 'Status',
+             'options': [{'id': 'O_todo', 'name': 'Todo'},
+                         {'id': 'O_inprogress', 'name': 'In Progress'},
+                         {'id': 'O_done', 'name': 'Done'}]}]})
+        fake = self.fake(**{'project field-list': (0, status_only, '')})
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        run_url = factory_publish.issue_url(result.run_issue)
+        adds_for_run = [a for a in fake.argv_for('project item-add')
+                       if run_url in a]
+        self.assertEqual(len(adds_for_run), 1)
+        self.assertIn(('PVTI_x', 'O_done'), self.status_edits(fake))
+
+    def test_a_previously_projected_record_with_no_cached_id_still_adds_and_marks_done(self):
+        """Case 4: a publish.json written before ``run_item_id`` existed —
+        ``projected`` True, no cached id. The add inside
+        ``finish_project_status`` is the first attempt this publish, not a
+        retry, and it must still resolve to a terminal ``Done`` write."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        # 900, not 481: this reuses setUp's worktree (build_shipped_run is
+        # deterministic per tmpdir), so its plan file is on disk and this
+        # publish's own plan issue is a fresh create — the first one, since
+        # the run issue below is only cached, never actually created through
+        # the fake. A seeded 481 here would coincidentally collide with that
+        # genuinely distinct plan issue.
+        publish.update({'run_issue': 900, 'projected': True})
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake()
+        self.run_publish(fake, terminal=True, registry=reg)
+        run_url = factory_publish.issue_url(900)
+        adds_for_run = [a for a in fake.argv_for('project item-add')
+                       if run_url in a]
+        self.assertEqual(len(adds_for_run), 1)
+        self.assertEqual(self.status_edits(fake), [('PVTI_x', 'O_done')])
 
 
 class TestCli(PublishTestCase):

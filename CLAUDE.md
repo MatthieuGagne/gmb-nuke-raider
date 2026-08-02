@@ -236,6 +236,13 @@ typing are both owned end-to-end by `tools/factory_publish.py` ([ADR 472](https:
 
 One documented exception to the table: #465 is `docs:`-titled but stays `PRD`.
 
+**Every document issue added to the board gets an explicit `Status` at creation** — `Type` says
+what a document is, `Status` says where it is. `Todo` for anything a human or `/prd` files;
+`In Progress` for a factory run issue, which is running by the time it exists. A factory run
+moves its spec to `In Progress` at run start and back to `Todo` if the run fails, and moves its
+own run issue to `Done` at terminal. Resolve the field and option ids by name from
+`gh project field-list` — option ids are regenerated whenever the option set is edited.
+
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, use the `using-git-worktrees` skill or `EnterWorktree` tool to enter a worktree. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree, STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
