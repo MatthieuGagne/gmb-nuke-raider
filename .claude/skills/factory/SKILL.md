@@ -71,6 +71,22 @@ verbatim, so gate on that exit code exactly as if the helper were not there. `12
 command could not be spawned; `2` means the helper itself was misused. A
 `factory-log: WARNING:` line on stderr means the log was not captured; the run continues.
 
+**A passing command prints one line, not its output** (#529):
+
+```
+factory-log: ok stage=VERIFY exit=0 bytes=12043 lines=118 log=<path> cmd: make
+```
+
+Nothing is lost — the complete, byte-exact output is in the stage log named on that line, which
+is what the autopsy bundle and the published log assets read. A command that **fails** still
+prints everything, unchanged, because that is where every line matters.
+
+Two consequences to plan around. Add `--stream` after `--issue` when the orchestrator has to
+*read* the command's stdout — a `--json` payload, a printed path or URL; `references/stages.md`
+marks every such invocation. And while a command is running the console is silent, so a wrapped
+command that hangs or is killed prints nothing: tail
+`.factory/runs/issue-<N>/logs/<STAGE>.log`, whose path is fixed by the stage and issue you passed.
+
 ## Recording state
 
 State is written only through `tools/factory_event.py`:
