@@ -191,9 +191,9 @@ force-pushes, never passes `--no-verify`, and never deletes a worktree or branch
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill, which labels the
 issue `prd`, adds it to the "Nuke Raider — Documents" project and sets `Type = PRD` as three
-explicit commands. `prd` joins `adr`, `log`, `plan` and `epic` as the label set for document
-kinds; `bug:`, `fix:`, `docs:` and `chore:` issues are not labeled — their kind is expressed on
-the board via `Type`.
+explicit commands. `prd` joins `adr`, `log`, `plan`, `epic` and `idea` as the label set for
+document kinds; `bug:`, `fix:`, `docs:` and `chore:` issues are not labeled — their kind is
+expressed on the board via `Type`.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
 in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues.**
 
@@ -237,6 +237,7 @@ bare second issue number.
 | `run …` | Log |
 | `plan: …` | Plan |
 | `review:` | Review |
+| `idea:` | Idea |
 
 The `Epic` row is first: an epic is `feat:`-titled like any PRD, so the `epic` label — not the
 title — is what distinguishes it. A master issue that owns a set of child specs (#432) gets
@@ -248,6 +249,15 @@ typing are both owned end-to-end by `tools/factory_publish.py` ([ADR 472](https:
 `ADR` by the `grill-with-docs` overlay; `Epic` by hand.
 
 One documented exception to the table: #465 is `docs:`-titled but stays `PRD`.
+
+**`Idea` is the uncommitted end of the board.** An `idea:` issue is a proposal nobody has
+committed to yet: free-form body, no acceptance criteria, `Status = Todo`, label `idea`. It is
+never worked directly — no branch, no worktree, no factory run — and `/factory` cannot run one
+regardless, because GATE's `spec_lint` rejects a spec with no acceptance criteria. Promotion
+files a **new** PRD issue linking back (`Refines #N`); the idea is then closed with a comment
+naming the PRD, never converted in place — one issue keeps one kind, and closing preserves where
+the PRD came from. Rejection closes it as *not planned* with a one-line reason. An idea left open
+is an idea still unclaimed; nothing else may sit in that swimlane.
 
 **Every document issue added to the board gets an explicit `Status` at creation** — `Type` says
 what a document is, `Status` says where it is. `Todo` for anything a human or `/prd` files;
