@@ -33,6 +33,19 @@ here in weaker form is how an overlay silently reverts an upstream improvement.
 
 ## Project additions
 
+### Task-review model tier
+
+**Why:** the baseline mandates an explicit model on every dispatch but cannot know which tier
+this project wants for its own reviewer; without a declared value the review inherits the
+session model, which is the failure the accepted bullet above warns about.
+
+Dispatch the per-task review with **`model: sonnet`** — the mid tier, not the session default.
+Its charter is checking a diff against a fixed constraints block, and a reviewer miss is caught
+downstream by `make test`, `make memory-check`, the blocking smoketest and human PR review; the
+mid tier is the floor for reviewers, never the cheapest tier (#528 R3, R4). The *rule* — always
+specify a model — stays with the baseline bullet under *Accepted from the baseline*; this
+section supplies only the value.
+
 ### Verify subagent claims against version control
 
 **Why:** the baseline treats the implementer's report as the record of what happened; this

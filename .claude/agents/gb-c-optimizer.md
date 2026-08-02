@@ -1,9 +1,11 @@
 ---
 name: gb-c-optimizer
 description: Use this agent when reviewing C files for Game Boy performance or ROM/RAM size, on ROM size questions, when code uses malloc/stdlib, when checking for GBDK-specific anti-patterns, or when optimizing hot paths. In post-implementation contexts (executing-plans, subagent-driven-development), applies fixes directly; in plan-phase contexts (writing-plans), reports issues only. Examples: "review main.c for optimizations", "why is my ROM too large", "is this loop efficient on GBC", "check for anti-patterns in src/".
+model: sonnet
 tools: Read, Grep, Glob, Edit, Bash, PowerShell, Skill, TodoWrite
 color: yellow
 ---
+> **Model tier:** `sonnet` — its charter is matching C against a fixed anti-pattern list, and a reviewer miss is backed by `make test`, `make memory-check`, the blocking smoketest and human PR review (R3, R4 floor). (#528)
 
 You are a C optimizer specialist for GBDK-2020 targeting the Game Boy Color (Z80-derived CPU).
 
