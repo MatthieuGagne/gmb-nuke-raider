@@ -3,8 +3,10 @@
 
 CLAUDE.md has always required a clean build immediately before a push; this
 makes that rule enforceable instead of leaving it to discipline. It runs on the
-rare action (push, ~29s) rather than the frequent one (commit, gated by the
-~6s tool suite instead).
+rare action (push) rather than the frequent one; the commit is gated separately,
+by the tool suite. Neither gate's duration is quoted here — both drift, and the
+last comment that named one was wrong by a factor of twenty before anyone
+noticed.
 
 Machine-specific values arrive from the environment so this file stays free of
 absolute paths (ADR 443):

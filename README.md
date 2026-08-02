@@ -34,7 +34,7 @@ Unit tests compile with `gcc` — no hardware or emulator needed:
 
 ```sh
 make test        # unit suite — C game logic
-make test-tools  # tool suite — the Python tooling in tools/, ~6 s
+make test-tools  # tool suite — the Python tooling in tools/
 ```
 
 ### Headless smoketest
