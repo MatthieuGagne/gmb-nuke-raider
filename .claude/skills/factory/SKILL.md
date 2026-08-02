@@ -97,7 +97,10 @@ python tools/factory_publish.py --issue <N> --terminal
 
 The publisher owns three GitHub objects per run: the **run issue** (`Type = Log`, the execution
 record), the **plan issue** (`Type = Plan`, created at PLAN completion and re-synced on every
-later publish — #514), and the **PR** at SHIP. The plan issue is never closed by the publisher;
+later publish — #514), and the **PR** at SHIP. `Type = Plan` is a one-time manual prerequisite: a
+human must add a `Plan` option to the `Type` field of project 3 ("Nuke Raider — Documents");
+until then the plan issue is still created and labelled, only untyped, with one warning per
+publish. The plan issue is never closed by the publisher;
 the PR body closes it on merge. A dry run and a terminal failure both leave it open on purpose.
 
 Call it at **every stage transition, every gate result, and at terminal** (SHIP success and

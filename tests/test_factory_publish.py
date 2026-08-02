@@ -642,6 +642,22 @@ class TestRenderPlanBody(PublishTestCase):
         body = self.body(text=text)
         self.assertNotIn('someone', body)
 
+    def test_a_url_in_the_plan_survives_redaction(self):
+        """redact() alone turns https://host/x into http<path>."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- See https://github.com/MatthieuGagne/gmb-nuke-raider/issues/514')
+        body = self.body(text=text)
+        self.assertIn(
+            'https://github.com/MatthieuGagne/gmb-nuke-raider/issues/514',
+            body)
+
+    def test_a_file_url_is_still_redacted(self):
+        text = big_plan().replace('- Python 3 stdlib only.',
+                                  '- see file:///C:/Users/someone/x.md')
+        body = self.body(text=text)
+        self.assertNotIn('someone', body)
+
     def test_an_unterminated_fence_says_so_in_the_body(self):
         body = self.body(text='# T\n\np\n\n## Task 1: a\n\n```\nunclosed\n')
         self.assertIn(factory_publish.PLAN_UNTERMINATED, body)
@@ -1266,6 +1282,21 @@ class TestPlanIssueLifecycle(PlanRunTestCase):
         self.assertNotIn(self.tmp, warnings[0])
         self.assertIn(self.PLAN_REL, warnings[0])
 
+    def test_an_absolute_plan_path_is_redacted_from_the_warning(self):
+        """The sibling test above uses the relative fixture path, so it
+        passes whether or not the redaction is there.
+
+        plan_path() explicitly supports an absolute state["plan"], and the
+        warning text reaches the stage log, which is published as a release
+        asset.
+        """
+        self.state['plan'] = os.path.join(self.tmp, 'gone', 'plan.md')
+        warnings = []
+        self.assertIsNone(self.publish_plan(self.fake(), warnings))
+        self.assertEqual(len(warnings), 1)
+        self.assertNotIn(self.tmp, warnings[0])
+        self.assertIn(factory_report.REDACTION, warnings[0])
+
     def test_a_run_with_no_plan_recorded_is_silent(self):
         """Every publish before PLAN step 4 — not a degradation."""
         self.state['plan'] = None
@@ -1401,6 +1432,28 @@ class TestPlanAsset(PlanRunTestCase):
         withheld = self.publish['withheld']['issue-440-plan.md']
         self.assertNotIn(self.tmp, withheld)
         self.assertIn(factory_report.REDACTION, withheld)
+        self.assertNotIn(self.tmp, self.body_sent(fake))
+
+    def test_an_unreadable_plan_does_not_leak_its_path_into_the_body(self):
+        """scan_secrets' 'unreadable' reason embeds str(OSError), which
+        embeds the absolute path it could not open.
+
+        The credential-shaped case above cannot catch this: its reason is a
+        fixed literal with no path in it, so it only ever exercised the
+        second half of the withheld string.
+        """
+        self.state['plan'] = self.plan_file
+        original = factory_publish.scan_secrets
+        factory_publish.scan_secrets = lambda path: (
+            "unreadable, not scanned: [Errno 13] Permission denied: %r" % path)
+        try:
+            fake = self.fake()
+            self.publish_plan(fake, [])
+        finally:
+            factory_publish.scan_secrets = original
+        withheld = self.publish['withheld']['issue-440-plan.md']
+        self.assertIn(factory_report.REDACTION, withheld)
+        self.assertNotIn(self.tmp, withheld)
         self.assertNotIn(self.tmp, self.body_sent(fake))
 
 

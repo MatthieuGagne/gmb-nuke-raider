@@ -68,10 +68,15 @@ number. Pass `--attempt <k>` on every retry.
 7. `python tools/factory_publish.py --issue <N> --stage-completed PLAN`
    This is where the **plan issue** appears (#514): title `plan: <slug> (#<N>)`, label `plan`,
    `Type = Plan` on the Documents project, a structural summary in the body and the byte-exact
-   plan as the `factory-logs` release asset `issue-<N>-plan.md`. It is created once and re-synced
+   plan as the `factory-logs` release asset `issue-<N>-plan.md`. `Type = Plan` requires a
+   one-time manual prerequisite: a human must add a `Plan` option to the `Type` field of project
+   3 ("Nuke Raider — Documents"). Until that option exists, the issue is still created and
+   labelled, only untyped, with one warning per publish. It is created once and re-synced
    on every later publish, so plan edits made during BUILD show up without another command. The
-   run's PR closes it automatically. A plan that cannot be read is one `factory-publish: WARNING:`
-   line and exit 1 — reportable, never a run failure.
+   plan asset is re-uploaded in place, not appended: a later attempt's plan replaces an earlier
+   one, unlike stage logs, which keep per-attempt history. The run's PR closes it automatically.
+   A plan that cannot be read is one `factory-publish: WARNING:` line and exit 1 — reportable,
+   never a run failure.
 8. **`--dry-run` stops here**, with the run state recording the PLAN stage.
 
 ## BUILD

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Publish a factory run to GitHub: run issue, stage-log and screenshot assets.
+"""Publish a factory run to GitHub: run issue, plan issue, stage-log and
+screenshot assets, spec-issue comment, and pull request.
 
-Sole writer of the GitHub surfaces — the run issue, the release assets, and the
-spec-issue comment. ``factory_run`` stays the sole writer of run state and the
-journal; ``factory_log`` stays the sole writer of ``logs/``. This module's own
+Sole writer of the GitHub surfaces — the run issue, the plan issue, the
+release assets, the spec-issue comment, and the pull request.
+``factory_run`` stays the sole writer of run state and the journal;
+``factory_log`` stays the sole writer of ``logs/``. This module's own
 durable memory is ``runs/issue-<N>/publish.json``, which nothing else writes:
 the same narrowing ADR 450 applied to the log subtree, extended to a
 third owner — ADR 472.
@@ -647,6 +649,29 @@ def render_plan_title(state):
     return "plan: %s (#%d)" % (_plan_slug(state), int(state["issue"]))
 
 
+_URL = re.compile(r"https?://[^\s)>\]]+")
+
+
+def _redact_prose(text):
+    """``factory_report.redact`` for free-form plan prose, sparing URLs.
+
+    ABSOLUTE_PATH's drive-letter alternative has no left boundary, so it
+    matches the ``s://host/path`` tail of every https URL and turns a
+    citation into ``http<path>``. Plan preambles cite issue and PR URLs
+    constantly and this body exists to be read, so http(s) URLs are held out
+    and everything around them is redacted normally. Only http and https are
+    spared: a ``file:///C:/Users/...`` URL is a path and must still go.
+    """
+    out = []
+    last = 0
+    for match in _URL.finditer(text):
+        out.append(factory_report.redact(text[last:match.start()]))
+        out.append(match.group(0))
+        last = match.end()
+    out.append(factory_report.redact(text[last:]))
+    return "".join(out)
+
+
 def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
                      budget=BODY_BUDGET):
     """The plan issue body, bounded at *budget* characters (R3).
@@ -684,9 +709,8 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
     # toolchain paths in their preamble and absolute paths in a Files
     # bullet, and this text needs exactly the redaction display_worktree()
     # already gives a worktree path.
-    preamble = [factory_report.redact(line) for line in preamble]
-    tasks = [[factory_report.redact(line) for line in block]
-             for block in tasks]
+    preamble = [_redact_prose(line) for line in preamble]
+    tasks = [[_redact_prose(line) for line in block] for block in tasks]
 
     def build(drop_files, drop_preamble):
         out = list(header)
@@ -1180,11 +1204,16 @@ def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
     issue = int(state["issue"])
     name = plan_asset_name(issue)
     if reason:
+        # redact BOTH halves: scan_secrets' "unreadable, not scanned: <exc>"
+        # variant carries str(OSError), which embeds the absolute path it
+        # failed to open. Redacting only the neighbouring value on this line
+        # is the mistake 81808b7 and c901676 already fixed twice.
+        safe = factory_report.redact(reason)
         publish.setdefault("withheld", {})[name] = "%s — local copy: %s" % (
-            reason,
+            safe,
             factory_report.redact(state.get("plan") or "the run's worktree"))
         _warn(warnings, "plan asset withheld: %s (the run is unaffected)"
-              % reason)
+              % safe)
         return False
     # A mirror clears as well as sets: once the author removes the offending
     # string, a stale entry here would keep the body rendering the withheld
@@ -1262,7 +1291,8 @@ def publish_plan(state, publish, warnings, registry=None,
     text = read_plan(state)
     if text is None:
         _warn(warnings, "plan not published: cannot read %s"
-              % (state.get("plan") or "the recorded path"))
+              % factory_report.redact(state.get("plan")
+                                      or "the recorded path"))
         return publish.get("plan_issue")
 
     # One scan, two surfaces. A credential-shaped string withholds the asset
@@ -1385,6 +1415,11 @@ def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
     Fail-open like the rest of this file, and specifically *not* covered by
     the ``--open-pr`` exception: a PR that ships without the plan link is a
     degradation, while a PR that does not ship at all is a run failure (R10).
+
+    ``TypeError`` is in the caught set because ``plan_issue`` is read back
+    from a JSON file: a non-numeric value survives the ``if not number``
+    guard and reaches ``int()``, and this is the one call site with no
+    enclosing handler.
     """
     warnings = warnings if warnings is not None else []
     try:
@@ -1400,7 +1435,7 @@ def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
             body += "\n"
         return write_body_file(issue, body + line + "\n", registry,
                                name="publish-pr-body.md")
-    except (OSError, RuntimeError, ValueError) as exc:
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
         _warn(warnings, "plan issue not linked from the PR body: %s" % exc)
         return body_path
 
