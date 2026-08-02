@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Shared helpers for Claude Code hook scripts.
 
-Hook commands are registered with repo-relative script paths so the script that
-runs is always the current worktree's copy. The *working directory* a hook
-inherits is whatever the session last used, which can be a subdirectory, so
-every hook re-roots itself from the payload's ``cwd`` before doing work that
-assumes the repo root.
+Hook commands are registered with a project-root-anchored script path, so the
+interpreter finds the script whatever the working directory is (#526): Claude
+Code's ``.claude/settings.json`` uses its ``${CLAUDE_PROJECT_DIR}`` placeholder,
+Pi's ``.pi/settings.json`` uses ``$(git rev-parse --show-toplevel)`` because
+pi-hooks substitutes no placeholders and runs the command under ``bash -c``.
+
+That anchor only locates the *script*. The *working directory* a hook inherits
+is still whatever the session last used, which can be a subdirectory or a path
+outside the repository, so every hook re-roots itself from the payload's
+``cwd`` before doing work that assumes the repo root.
 """
 import json
 import os
