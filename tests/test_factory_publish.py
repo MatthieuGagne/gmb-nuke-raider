@@ -726,6 +726,21 @@ class TestProjectTypeLog(PublishTestCase):
             publish, ISSUE_URL, warnings, runner=fake))
         self.assertEqual(len(warnings), 1)
 
+    def test_joining_the_board_also_sets_status_in_progress(self):
+        """AC3: Type = Log and Status = In Progress in one join."""
+        publish = factory_publish.new_publish_state(440)
+        fake = self.fake()
+        warnings = []
+        self.assertTrue(factory_publish.ensure_project_type_log(
+            publish, ISSUE_URL, warnings, runner=fake))
+        self.assertEqual(warnings, [])
+        edits = fake.argv_for('project item-edit')
+        self.assertEqual(len(edits), 2)
+        self.assertIn('O_log', edits[0])
+        self.assertIn('F_status', edits[1])
+        self.assertIn('O_inprogress', edits[1])
+        self.assertEqual(publish['run_item_id'], 'PVTI_x')
+
 
 class TestRunStart(PublishTestCase):
     """--run-start: the spec issue goes In Progress, and nothing else (R1)."""
@@ -841,6 +856,38 @@ class TestRunStart(PublishTestCase):
         with redirect_stderr(io.StringIO()):
             code = factory_publish.main(['--issue', '440', '--registry', reg,
                                          '--run-start', '--dry-run'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_open_pr_is_misuse(self):
+        """--run-start makes exactly one write; --open-pr is a different one."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start', '--open-pr'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_stage_completed_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start',
+                                         '--stage-completed', 'BUILD'])
+        self.assertEqual(code, factory_publish.EXIT_MISUSE)
+        self.assertEqual(fake.calls, [])
+
+    def test_run_start_with_terminal_is_misuse(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        fake = self.fake()
+        self.stub_gh(fake)
+        with redirect_stderr(io.StringIO()):
+            code = factory_publish.main(['--issue', '440', '--registry', reg,
+                                         '--run-start', '--terminal'])
         self.assertEqual(code, factory_publish.EXIT_MISUSE)
         self.assertEqual(fake.calls, [])
 
@@ -995,6 +1042,25 @@ class TestPublishRun(PublishTestCase):
         kw.setdefault('now', factory_fixtures.FIXED_NOW)
         return factory_publish.publish_run(440, runner=fake, **kw)
 
+    def seed_items(self, issue=440, registry=None):
+        """A run already on the board: both item ids cached, so the terminal
+        writes are distinguishable by item id in the recorded argv."""
+        publish = factory_publish.new_publish_state(issue)
+        publish.update({'run_issue': 481, 'projected': True,
+                        'run_item_id': 'PVTI_run',
+                        'spec_item_id': 'PVTI_spec'})
+        factory_publish.save_publish_state(publish, registry or self.reg)
+
+    def status_edits(self, fake):
+        """(item id, option id) for every Status item-edit, in call order."""
+        out = []
+        for argv in fake.argv_for('project item-edit'):
+            if 'F_status' not in argv:
+                continue
+            out.append((argv[argv.index('--id') + 1],
+                        argv[argv.index('--single-select-option-id') + 1]))
+        return out
+
     def test_first_publish_creates_labels_and_types_the_issue(self):
         """AC1."""
         fake = self.fake()
@@ -1069,6 +1135,58 @@ class TestPublishRun(PublishTestCase):
         before = len(factory_run.read_journal(440, self.reg))
         self.run_publish(self.fake(), stage_completed='BUILD')
         self.assertEqual(len(factory_run.read_journal(440, self.reg)), before)
+
+    def test_terminal_failure_settles_run_done_and_spec_todo(self):
+        """AC4."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        self.seed_items(441, reg)
+        fake = self.fake()
+        factory_publish.publish_run(441, registry=reg, terminal=True,
+                                    runner=fake,
+                                    now=factory_fixtures.FIXED_NOW)
+        self.assertEqual(self.status_edits(fake),
+                         [('PVTI_run', 'O_done'), ('PVTI_spec', 'O_todo')])
+
+    def test_terminal_success_leaves_the_spec_alone(self):
+        """AC5: the PR is open, not merged — the merge closes the spec."""
+        self.seed_items()
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
+
+    def test_terminal_status_is_not_behind_the_projected_guard(self):
+        """The trap in #513's Notes: `projected` covers membership and the
+        one-time Type write only."""
+        self.seed_items()
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        self.assertEqual(fake.argv_for('project item-add'), [])
+        self.assertTrue(self.status_edits(fake))
+
+    def test_the_spec_returns_to_todo_even_with_no_run_issue(self):
+        """R4 is conditioned on the run having failed, not on the dashboard
+        issue existing — that is the case where the board would lie longest."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        publish = factory_publish.new_publish_state(441)
+        publish['spec_item_id'] = 'PVTI_spec'
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake(**{'issue create': (1, '', 'HTTP 502')})
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        self.assertIsNone(result.run_issue)
+        self.assertEqual(self.status_edits(fake), [('PVTI_spec', 'O_todo')])
+
+    def test_a_failing_status_write_leaves_the_outcome_unchanged(self):
+        """AC7: the call is still made, the warning is marked, and
+        publish_run still returns its PublishResult."""
+        self.seed_items()
+        fake = self.fake(**{'project item-edit': (1, '', 'HTTP 403')})
+        result = self.run_publish(fake, terminal=True)
+        self.assertEqual(result.run_issue, 481)
+        self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
+        self.assertTrue(any('Status=Done' in w for w in result.warnings),
+                        result.warnings)
 
 
 class TestCli(PublishTestCase):

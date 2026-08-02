@@ -71,11 +71,12 @@ DEFAULT_REPO = "MatthieuGagne/gmb-nuke-raider"
 PROJECT_NUMBER = 3
 PROJECT_OWNER = "MatthieuGagne"
 PROJECT_ID = "PVT_kwHOAv4a5M4BepB5"
+# Single-select field and option names on the Documents board, for both Type
+# and Status. Names only: the field id and the option ids are resolved at
+# call time, because GitHub regenerates option ids whenever a field's option
+# set is edited (#513 R5).
 TYPE_FIELD = "Type"
 TYPE_LOG = "Log"
-# Single-select option names on the Documents board. Names only: the field id
-# and the option ids are resolved at call time, because GitHub regenerates
-# option ids whenever a field's option set is edited (R5).
 STATUS_FIELD = "Status"
 STATUS_TODO = "Todo"
 STATUS_IN_PROGRESS = "In Progress"
@@ -667,7 +668,7 @@ def project_item_add(url, warnings, runner=subprocess.run):
 
     ``gh project item-add`` is idempotent — an issue already on the board comes
     back with its existing item id — so this is also the resolver, not just the
-    adder (R2).
+    adder (#513 R2).
     """
     add = gh(["project", "item-add", str(PROJECT_NUMBER), "--owner",
               PROJECT_OWNER, "--url", url, "--format", "json"], runner=runner)
@@ -688,7 +689,7 @@ def resolve_single_select(field_name, option_name, warnings,
 
     Never a hardcoded id: option ids are regenerated whenever the field's
     option set is edited, so a constant would silently write to a stale option
-    or fail outright (R5). One ``field-list`` per write is the price — a run
+    or fail outright (#513 R5). One ``field-list`` per write is the price — a run
     makes at most four of these calls, against 15-25 body edits, and a cache
     would have to be invalidated by exactly the board edit this defends
     against.
@@ -717,7 +718,7 @@ def resolve_single_select(field_name, option_name, warnings,
 
 def set_single_select(item_id, field_name, option_name, warnings,
                       runner=subprocess.run):
-    """Set one single-select field on one project item. Fail-open (R6)."""
+    """Set one single-select field on one project item. Fail-open (#513 R6)."""
     field_id, option_id = resolve_single_select(field_name, option_name,
                                                 warnings, runner=runner)
     if not field_id or not option_id:
@@ -800,53 +801,66 @@ def set_issue_state(number, want_open, warnings, runner=subprocess.run):
 
 def ensure_project_type_log(publish, issue_url, warnings,
                             runner=subprocess.run):
-    """Add the run issue to "Nuke Raider — Documents" with Type = Log.
+    """Add the run issue to "Nuke Raider — Documents", Type = Log,
+    Status = In Progress.
 
-    Once per run, not once per publish: this is four API calls and the Logs
-    view only needs the item to exist. Projects views have no API, so the view
-    itself was built by hand (R13) and this only feeds it.
+    Once per run, not once per publish: the Logs view only needs the item to
+    exist, and a run that has just joined the board is by definition running
+    (#513 R3). Projects views have no API, so the view itself was built by
+    hand (R13) and this only feeds it.
+
+    The ``projected`` guard covers board **membership** and the one-time
+    ``Type`` write. It deliberately does not cover the terminal ``Status``
+    writes — see ``finish_project_status()``.
     """
     if publish.get("projected"):
         return True
-    add = gh(["project", "item-add", str(PROJECT_NUMBER), "--owner",
-              PROJECT_OWNER, "--url", issue_url, "--format", "json"],
-             runner=runner)
-    if add.returncode != 0:
-        _warn(warnings, "run issue not added to the Documents project: %s"
-              % _tail(add.stderr))
+    item_id = publish.get("run_item_id") or \
+        project_item_add(issue_url, warnings, runner=runner)
+    if not item_id:
         return False
-    try:
-        item_id = json.loads(add.stdout)["id"]
-    except (ValueError, KeyError, TypeError):
-        _warn(warnings, "project item id not parseable from item-add output")
+    publish["run_item_id"] = item_id
+    if not set_single_select(item_id, TYPE_FIELD, TYPE_LOG, warnings,
+                             runner=runner):
         return False
-
-    fields = gh(["project", "field-list", str(PROJECT_NUMBER), "--owner",
-                 PROJECT_OWNER, "--format", "json"], runner=runner)
-    field_id = option_id = None
-    try:
-        for field in json.loads(fields.stdout).get("fields") or []:
-            if field.get("name") != "Type":
-                continue
-            field_id = field.get("id")
-            for option in field.get("options") or []:
-                if option.get("name") == "Log":
-                    option_id = option.get("id")
-    except (ValueError, AttributeError):
-        pass
-    if not field_id or not option_id:
-        _warn(warnings, "project Type=Log not set: no Type field with a Log "
-                        "option in project %d" % PROJECT_NUMBER)
-        return False
-
-    edit = gh(["project", "item-edit", "--id", item_id, "--project-id",
-               PROJECT_ID, "--field-id", field_id,
-               "--single-select-option-id", option_id], runner=runner)
-    if edit.returncode != 0:
-        _warn(warnings, "project Type=Log not set: %s" % _tail(edit.stderr))
-        return False
+    # A failed Status write is a degradation, not a reason to re-join the
+    # board on the next publish: membership and Type are already correct.
+    set_single_select(item_id, STATUS_FIELD, STATUS_IN_PROGRESS, warnings,
+                      runner=runner)
     publish["projected"] = True
     return True
+
+
+def finish_project_status(state, publish, run_issue, warnings,
+                          runner=subprocess.run):
+    """The terminal board writes (#513 R4).
+
+    The run issue is Done either way. The spec goes back to Todo only when the
+    run failed: a successful run leaves it In Progress, because the PR is open
+    and it is the merge — which this module never observes — that finishes the
+    spec.
+
+    Outside the ``projected`` guard on purpose. Behind it, these writes would
+    no-op on every run after the first publish (#513, Notes). The spec half is
+    also outside ``run_issue``: a failed run whose dashboard issue could not be
+    created is exactly when a spec pinned at In Progress would mislead longest.
+    """
+    if run_issue:
+        run_item = publish.get("run_item_id") or project_item_add(
+            publish.get("run_issue_url") or issue_url(run_issue), warnings,
+            runner=runner)
+        if run_item:
+            publish["run_item_id"] = run_item
+            set_single_select(run_item, STATUS_FIELD, STATUS_DONE, warnings,
+                              runner=runner)
+    if not state.get("failure"):
+        return
+    spec_item = publish.get("spec_item_id") or project_item_add(
+        issue_url(state["issue"]), warnings, runner=runner)
+    if spec_item:
+        publish["spec_item_id"] = spec_item
+        set_single_select(spec_item, STATUS_FIELD, STATUS_TODO, warnings,
+                          runner=runner)
 
 
 # ── Assets ───────────────────────────────────────────────────────────────────
@@ -1025,14 +1039,15 @@ def open_pr(issue, branch, title, body_path, publish=None, warnings=None,
 
 
 def run_start(issue, registry=None, runner=subprocess.run):
-    """Mark the spec issue In Progress on the Documents board (R1).
+    """Mark the spec issue In Progress on the Documents board (#513 R1).
 
     Exactly two things: ensure board membership, then set Status. No run issue,
     no rendered body, no asset — and never ``Type``, which stays with the human
-    and with ``/prd`` (R2).
+    and with ``/prd`` (#513 R2).
 
     Idempotent in the sense that matters: a ``--resume`` or a second attempt
-    adds no duplicate item, because the item id is cached in publish.json (R7).
+    adds no duplicate item, because the item id is cached in publish.json
+    (#513 R7).
     The Status write itself is re-issued, and that is deliberate — it is what
     puts a retried run back to In Progress after a failed attempt pushed the
     spec to Todo.
@@ -1102,6 +1117,7 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
     if terminal:
         if number:
             set_issue_state(number, False, warnings, runner=runner)
+        finish_project_status(state, publish, number, warnings, runner=runner)
         comment_once(state, publish, number, warnings, registry=registry,
                      runner=runner)
 
@@ -1165,6 +1181,23 @@ def main(argv=None):
               file=sys.stderr)
         return EXIT_MISUSE
 
+    if args.run_start:
+        # --run-start makes exactly one write and no other, so it cannot be
+        # combined with any flag that requests a different write or a
+        # different contract. This check must not depend on registry_root()
+        # succeeding — it has to fire even outside a git repo — and it has to
+        # sit ahead of the --open-pr branch below, which would otherwise run
+        # to completion instead of ever inspecting --run-start.
+        conflicts = [flag for flag, present in (
+            ("--dry-run", args.dry_run),
+            ("--open-pr", args.open_pr),
+            ("--stage-completed", args.stage_completed),
+            ("--terminal", args.terminal)) if present]
+        if conflicts:
+            print("factory_publish: --run-start cannot be combined with %s"
+                  % ", ".join(conflicts), file=sys.stderr)
+            return EXIT_MISUSE
+
     if args.open_pr:
         missing = [n for n, v in (("--branch", args.branch),
                                   ("--title", args.title),
@@ -1189,10 +1222,6 @@ def main(argv=None):
     try:
         registry = args.registry or factory_run.registry_root()
         if args.run_start:
-            if args.dry_run:
-                print("factory_publish: --run-start writes to the board and "
-                      "cannot be combined with --dry-run", file=sys.stderr)
-                return EXIT_MISUSE
             return exit_code(run_start(args.issue, registry=registry))
         if args.dry_run:
             state = factory_run.load_state(args.issue, registry)
