@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -417,6 +418,348 @@ class TestBodyBudget(PublishTestCase):
         self.assertIn('truncated at the', body)
 
 
+def big_plan(tasks=8, filler=300):
+    """A plan the size of a real one, with headings hidden inside fences.
+
+    docs/plans/2026-08-01-issue471-adversarial-review-stage.md is 3199 lines
+    and quotes whole markdown documents inside ```` blocks. The fenced
+    'Task 999' and 'Smoketest Checkpoint 9' lines below are what a scanner
+    that ignores fences trips over.
+    """
+    lines = ['# Demo Implementation Plan', '',
+             '**Issue:** #514', '',
+             '**Goal:** demonstrate the structural summary.', '',
+             '**Architecture:** one module, three layers.', '',
+             '## Global Constraints', '',
+             '- Python 3 stdlib only.', '',
+             '## File Structure', '',
+             '- `tools/factory_publish.py` — the publisher.', '']
+    for n in range(1, tasks + 1):
+        lines += ['## Task %d: component %d' % (n, n), '',
+                  '**Depends on:** Task %d' % (n - 1), '',
+                  '**Parallelizable with:** none — shares the module.', '',
+                  '**Files:**',
+                  '- Modify: `tools/factory_publish.py`',
+                  '- Test: `tests/test_factory_publish.py`', '',
+                  '- [ ] **Step 1: Write the failing test**', '',
+                  '````python']
+        lines += ['# %d fenced comment line %d' % (n, i)
+                  for i in range(filler)]
+        lines += ['## Task 999: a heading that lives inside a fence',
+                  '```',
+                  '### Smoketest Checkpoint 9 — also fenced',
+                  '````', '']
+    return '\n'.join(lines) + '\n'
+
+
+class TestSummarizePlan(PublishTestCase):
+    def summary(self, text=None):
+        preamble, tasks, _unterminated = factory_publish.summarize_plan(
+            big_plan() if text is None else text)
+        return preamble, tasks
+
+    def test_preamble_stops_at_the_first_task_heading(self):
+        """R3: everything above the first batch/task heading."""
+        preamble, _tasks = self.summary()
+        self.assertIn('# Demo Implementation Plan', preamble)
+        self.assertIn('## Global Constraints', preamble)
+        self.assertIn('## File Structure', preamble)
+        self.assertFalse([l for l in preamble if l.startswith('## Task ')])
+
+    def test_every_task_heading_is_kept(self):
+        _preamble, tasks = self.summary()
+        self.assertEqual([t[0] for t in tasks],
+                         ['## Task %d: component %d' % (n, n)
+                          for n in range(1, 9)])
+
+    def test_files_and_depends_lines_ride_with_their_task(self):
+        """R3: the heading plus its **Files:** and **Depends on:** lines."""
+        _preamble, tasks = self.summary()
+        self.assertIn('**Depends on:** Task 0', tasks[0])
+        self.assertIn('**Files:**', tasks[0])
+        self.assertIn('- Modify: `tools/factory_publish.py`', tasks[0])
+
+    def test_task_steps_are_dropped(self):
+        _preamble, tasks = self.summary()
+        self.assertFalse([l for l in tasks[0] if 'Step 1' in l])
+
+    def test_headings_inside_a_fence_are_not_tasks(self):
+        """The whole reason the scanner tracks fences."""
+        preamble, tasks = self.summary()
+        blob = '\n'.join(preamble + [l for t in tasks for l in t])
+        self.assertNotIn('Task 999', blob)
+        self.assertNotIn('Smoketest Checkpoint 9', blob)
+
+    def test_no_fenced_content_survives(self):
+        preamble, tasks = self.summary()
+        blob = '\n'.join(preamble + [l for t in tasks for l in t])
+        self.assertNotIn('```', blob)
+        self.assertNotIn('fenced comment line', blob)
+
+    def test_a_batch_heading_also_ends_the_preamble(self):
+        text = ('# T\n\n**Goal:** g\n\n'
+                '### Smoketest Checkpoint 1 — thing\n\nbody\n')
+        preamble, tasks = self.summary(text)
+        self.assertIn('**Goal:** g', preamble)
+        self.assertNotIn('### Smoketest Checkpoint 1 — thing', preamble)
+        self.assertEqual(tasks, [])
+
+    def test_a_plan_with_no_tasks_is_all_preamble(self):
+        preamble, tasks = self.summary('# T\n\nprose\n')
+        self.assertEqual(preamble, ['# T', '', 'prose'])
+        self.assertEqual(tasks, [])
+
+    def test_an_empty_plan_does_not_raise(self):
+        self.assertEqual(factory_publish.summarize_plan(''), ([], [], False))
+
+    def test_an_unterminated_fence_is_reported_not_swallowed(self):
+        text = ('# T\n\nprose\n\n## Task 1: kept\n\n**Files:**\n- a\n\n'
+                '```python\nopened and never closed\n\n'
+                '## Task 2: lost inside the fence\n')
+        preamble, tasks, unterminated = factory_publish.summarize_plan(text)
+        self.assertTrue(unterminated)
+        self.assertEqual([t[0] for t in tasks], ['## Task 1: kept'])
+
+    def test_a_balanced_document_is_not_reported_as_unterminated(self):
+        _p, _t, unterminated = factory_publish.summarize_plan(big_plan())
+        self.assertFalse(unterminated)
+
+
+class TestRenderPlanBody(PublishTestCase):
+    def body(self, text=None, publish=None, budget=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = publish or factory_publish.new_publish_state(440)
+        kw = {} if budget is None else {'budget': budget}
+        # `text if text is not None`, never `text or`: '' is a meaningful
+        # value here — it is what publish_plan passes when the scan refused
+        # the file — and `or` would silently swap it for the full plan.
+        return factory_publish.render_plan_body(
+            state, publish, big_plan() if text is None else text, **kw)
+
+    def test_a_2400_line_plan_renders_under_the_budget(self):
+        """AC3."""
+        body = self.body()
+        self.assertLessEqual(len(body), factory_publish.BODY_BUDGET)
+
+    def test_every_task_heading_and_its_files_line_survive(self):
+        """AC3: assert on the content, not that a body was produced."""
+        body = self.body()
+        for n in range(1, 9):
+            self.assertIn('## Task %d: component %d' % (n, n), body)
+        self.assertIn('**Files:**', body)
+        self.assertIn('- Test: `tests/test_factory_publish.py`', body)
+
+    def test_no_fenced_code_block_reaches_the_body(self):
+        """AC3."""
+        self.assertNotIn('```', self.body())
+
+    def test_body_links_the_full_plan_asset(self):
+        """R3: an explicit truncation marker and a link to the asset."""
+        body = self.body()
+        self.assertIn('issue-440-plan.md', body)
+        self.assertIn('Structural summary', body)
+
+    def test_body_cross_links_the_run_issue(self):
+        """R11."""
+        publish = factory_publish.new_publish_state(440)
+        publish['run_issue'] = 481
+        self.assertIn('Run dashboard: #481', self.body(publish=publish))
+
+    def test_body_names_the_spec_issue(self):
+        """R11: either surface is reachable from the other."""
+        self.assertIn('**Spec** #440', self.body())
+
+    def test_withheld_asset_says_so_instead_of_linking(self):
+        publish = factory_publish.new_publish_state(440)
+        publish['withheld']['issue-440-plan.md'] = 'credential-shaped string'
+        body = self.body(publish=publish)
+        self.assertIn('withheld', body)
+        self.assertNotIn('releases/download', body)
+
+    def test_empty_text_renders_a_body_with_no_summary(self):
+        """The withheld path: publish_plan passes '' so no plan text can
+        reach a public issue when the scan refused the file."""
+        publish = factory_publish.new_publish_state(440)
+        publish['withheld']['issue-440-plan.md'] = 'credential-shaped string'
+        body = self.body(text='', publish=publish)
+        self.assertIn('**Spec** #440', body)
+        self.assertIn('withheld', body)
+        self.assertNotIn('## Task', body)
+
+    def test_over_budget_sheds_the_file_lists_first(self):
+        """R3: the shed doctrine, each cut leaving its own marker.
+
+        Assert the marker constant, never the word 'omitted': that word is
+        also in PLAN_SUMMARY_LINK, which is in *every* body, so a substring
+        test would pass on a body that shed nothing at all.
+        """
+        body = self.body(budget=1200)
+        self.assertLessEqual(len(body), 1200)
+        self.assertIn('## Task 1: component 1', body)
+        self.assertIn(factory_publish.PLAN_SHED_FILES, body)
+        self.assertNotIn('- Modify: `tools/factory_publish.py`', body)
+        self.assertNotIn(factory_publish.PLAN_SHED_PREAMBLE, body)
+        self.assertIn('## Global Constraints', body)
+        self.assertNotIn('truncated at the', body)
+
+    def test_a_tighter_budget_sheds_the_preamble_too(self):
+        """R3: the second shed level, which budget=1200 never reaches."""
+        body = self.body(budget=750)
+        self.assertLessEqual(len(body), 750)
+        self.assertIn(factory_publish.PLAN_SHED_PREAMBLE, body)
+        self.assertNotIn('## Global Constraints', body)
+        self.assertIn('## Task 1: component 1', body)
+        self.assertNotIn('truncated at the', body)
+
+    def test_hard_truncation_is_the_backstop(self):
+        body = self.body(budget=400)
+        self.assertLessEqual(len(body), 400)
+        self.assertIn('truncated at the', body)
+
+    def test_body_carries_a_machine_owned_marker(self):
+        self.assertIn(factory_publish.PLAN_BODY_MARKER, self.body())
+
+    def test_body_ends_with_exactly_one_newline(self):
+        body = self.body()
+        self.assertTrue(body.endswith('\n'))
+        self.assertFalse(body.endswith('\n\n'))
+
+    def test_an_absolute_path_in_the_header_is_redacted(self):
+        """The body is a public issue; every other path here is redacted."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state['plan'] = r'C:\Users\someone\repo\docs\plans\p.md'
+        body = factory_publish.render_plan_body(
+            state, factory_publish.new_publish_state(440), big_plan())
+        self.assertNotIn('someone', body)
+        self.assertIn(factory_report.REDACTION, body)
+
+    def test_an_absolute_path_in_the_plan_text_is_redacted(self):
+        """Plans name machine-specific toolchain paths in their preamble."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- gcc lives at C:/Users/someone/mingw64/bin/gcc.exe')
+        body = self.body(text=text)
+        self.assertNotIn('someone', body)
+
+    def test_a_url_in_the_plan_survives_redaction(self):
+        """redact() alone turns https://host/x into http<path>."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- See https://github.com/MatthieuGagne/gmb-nuke-raider/issues/514')
+        body = self.body(text=text)
+        self.assertIn(
+            'https://github.com/MatthieuGagne/gmb-nuke-raider/issues/514',
+            body)
+
+    def test_a_file_url_is_still_redacted(self):
+        text = big_plan().replace('- Python 3 stdlib only.',
+                                  '- see file:///C:/Users/someone/x.md')
+        body = self.body(text=text)
+        self.assertNotIn('someone', body)
+
+    def test_a_path_inside_a_url_query_string_is_redacted(self):
+        """The hole the URL-holdout approach had: text inside a URL match
+        was copied out verbatim, so a path glued to one rode through."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- log: https://ci.example.com/b?out=C:\\Users\\alice\\log.txt')
+        body = self.body(text=text)
+        self.assertNotIn('alice', body)
+
+    def test_a_posix_home_path_inside_a_url_is_redacted(self):
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- log: https://ci.example.com/b?p=/home/alice/z')
+        body = self.body(text=text)
+        self.assertNotIn('alice', body)
+
+    def test_an_unterminated_fence_says_so_in_the_body(self):
+        body = self.body(text='# T\n\np\n\n## Task 1: a\n\n```\nunclosed\n')
+        self.assertIn(factory_publish.PLAN_UNTERMINATED, body)
+
+
+class TestPlanSourcing(PublishTestCase):
+    def state_with_plan(self, text='# T\n\nprose\n', name='p.md'):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        rel = 'docs/plans/' + name
+        full = os.path.join(state['worktree'], 'docs', 'plans', name)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(text)
+        state['plan'] = rel
+        return state, full
+
+    def test_plan_is_read_from_the_worktree(self):
+        """R5: docs/plans/ is gitignored — the working copy is the only copy."""
+        state, full = self.state_with_plan()
+        self.assertEqual(factory_publish.plan_path(state), full)
+        self.assertEqual(factory_publish.read_plan(state), '# T\n\nprose\n')
+
+    def test_no_plan_recorded_reads_as_none(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state['plan'] = None
+        self.assertIsNone(factory_publish.plan_path(state))
+        self.assertIsNone(factory_publish.read_plan(state))
+
+    def test_a_missing_file_reads_as_none_rather_than_raising(self):
+        """R10: a vanished worktree is a degradation, never an exception."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        self.assertIsNone(factory_publish.read_plan(state))
+
+    def test_an_absolute_plan_path_is_used_as_given(self):
+        state, full = self.state_with_plan()
+        state['plan'] = full
+        self.assertEqual(factory_publish.plan_path(state), full)
+
+    def test_undecodable_bytes_do_not_raise(self):
+        state, full = self.state_with_plan()
+        with open(full, 'wb') as fh:
+            fh.write(b'# T\n\xff\xfe not utf-8\n')
+        self.assertIn('�', factory_publish.read_plan(state))
+
+    def test_asset_name_is_per_issue_not_per_attempt(self):
+        """R5 makes this asset a living mirror, so it carries no attempt."""
+        self.assertEqual(factory_publish.plan_asset_name(514),
+                         'issue-514-plan.md')
+
+    def test_asset_name_is_neither_a_log_nor_a_screenshot(self):
+        """It must not be picked up by the stage-log or scenario tables."""
+        name = factory_publish.plan_asset_name(514)
+        self.assertIsNone(factory_publish._parse_log_asset(name))
+        self.assertFalse(name.endswith('.png'))
+
+
+class TestRenderPlanTitle(PublishTestCase):
+    def title(self, **overrides):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state.update(overrides)
+        return factory_publish.render_plan_title(state)
+
+    def test_title_is_plan_slug_and_spec_number(self):
+        """R1."""
+        self.assertEqual(self.title(), 'plan: observability (#440)')
+
+    def test_slug_falls_back_to_the_plan_filename(self):
+        self.assertEqual(
+            self.title(slug=None,
+                       plan='docs/plans/2026-08-01-issue440-body-budget.md'),
+            'plan: body-budget (#440)')
+
+    def test_slug_falls_back_again_when_there_is_no_plan_path(self):
+        self.assertEqual(self.title(slug=None, plan=None),
+                         'plan: (no slug) (#440)')
+
+    def test_an_undated_plan_filename_falls_back_to_its_stem(self):
+        self.assertEqual(self.title(slug=None, plan='docs/plans/notes.md'),
+                         'plan: notes (#440)')
+
+
 class TestSecretScan(PublishTestCase):
     def scan(self, payload):
         path = os.path.join(self.tmp, 'BUILD.log')
@@ -514,12 +857,21 @@ class TestScreenshotSourcing(PublishTestCase):
 
 
 class FakeGh:
-    """Records gh invocations and replays canned results. No network, ever."""
+    """Records gh invocations and replays canned results. No network, ever.
+
+    Each `issue create` returns a *distinct* issue number, starting at 481.
+    A run now publishes two issues — the run issue and the plan issue — and a
+    fake that gave both the same number made every assertion about "which
+    issue" silently unfalsifiable.
+    """
+
+    ISSUE_BASE = 481
 
     def __init__(self, results=None, default=(0, '', '')):
         self.calls = []
         self.results = dict(results or {})
         self.default = default
+        self.created = 0
 
     def key(self, argv):
         """First two non-flag words, e.g. 'issue create' or 'release upload'."""
@@ -528,7 +880,13 @@ class FakeGh:
 
     def __call__(self, argv, **kwargs):
         self.calls.append((list(argv), kwargs))
-        code, out, err = self.results.get(self.key(argv), self.default)
+        key = self.key(argv)
+        code, out, err = self.results.get(key, self.default)
+        if key == 'issue create' and code == 0 and '/issues/' in (out or ''):
+            number = self.ISSUE_BASE + self.created
+            self.created += 1
+            out = re.sub(r'/issues/\d+', '/issues/%d' % number, out).strip()
+            out += '\n'
         return subprocess.CompletedProcess(list(argv), code, out, err)
 
     def argv_for(self, key):
@@ -595,6 +953,15 @@ ISSUE_URL = 'https://github.com/MatthieuGagne/gmb-nuke-raider/issues/481'
 FIELD_LIST = json.dumps({'fields': [
     {'id': 'F_type', 'name': 'Type',
      'options': [{'id': 'O_adr', 'name': 'ADR'}, {'id': 'O_log', 'name': 'Log'}]},
+    {'id': 'F_status', 'name': 'Status',
+     'options': [{'id': 'O_todo', 'name': 'Todo'},
+                 {'id': 'O_inprogress', 'name': 'In Progress'},
+                 {'id': 'O_done', 'name': 'Done'}]}]})
+PLAN_FIELD_LIST = json.dumps({'fields': [
+    {'id': 'F_type', 'name': 'Type',
+     'options': [{'id': 'O_adr', 'name': 'ADR'},
+                 {'id': 'O_log', 'name': 'Log'},
+                 {'id': 'O_plan', 'name': 'Plan'}]},
     {'id': 'F_status', 'name': 'Status',
      'options': [{'id': 'O_todo', 'name': 'Todo'},
                  {'id': 'O_inprogress', 'name': 'In Progress'},
@@ -1047,6 +1414,402 @@ class TestAssetUpload(PublishTestCase):
         self.assertEqual(len(names), 5)
 
 
+class PlanRunTestCase(PublishTestCase):
+    """A shipped run whose plan file actually exists on disk."""
+
+    PLAN_REL = 'docs/plans/2026-08-01-issue440-demo.md'
+
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, self.reg)
+        self.plan_file = os.path.join(state['worktree'], 'docs', 'plans',
+                                      '2026-08-01-issue440-demo.md')
+        os.makedirs(os.path.dirname(self.plan_file), exist_ok=True)
+        self.write_plan(big_plan())
+        # Every stage this class publishes needs its log on disk, or
+        # publish_stage_log adds a 'no stage log captured' warning of its own
+        # and every warning count below is off by one — including the AC7
+        # assertion, whose entire point is 'exactly one'.
+        for stage in ('PLAN', 'BUILD'):
+            path = factory_run.log_path(440, stage, self.reg)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'wb') as fh:
+                fh.write(b'make: ok\n')
+        # A second 'start' overrides only the fields it carries: apply_event
+        # skips None fields and only touches 'stage' when the event has one,
+        # so the fixture's SHIP stage, attempt 1 and slug all survive. The
+        # unpinned clock is safe because every condition asserted in this
+        # class is decided by 'finished'/'failure', which outrank elapsed.
+        factory_run.append_event(440, 'start', registry=self.reg,
+                                 plan=self.PLAN_REL)
+        self.state = factory_run.load_state(440, self.reg)
+        self.publish = factory_publish.new_publish_state(440)
+
+    def write_plan(self, text):
+        with open(self.plan_file, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(text)
+        return text
+
+    def fake(self, **overrides):
+        results = {'issue create': (0, ISSUE_URL + '\n', ''),
+                   'project item-add': (0, json.dumps({'id': 'PVTI_x'}), ''),
+                   'project field-list': (0, PLAN_FIELD_LIST, '')}
+        results.update(overrides)
+        return FakeGh(results)
+
+    def publish_plan(self, fake, warnings=None):
+        return factory_publish.publish_plan(
+            self.state, self.publish,
+            warnings if warnings is not None else [], registry=self.reg,
+            runner=fake)
+
+    def body_sent(self, fake, key='issue create'):
+        argv = fake.argv_for(key)[-1]
+        with open(argv[argv.index('--body-file') + 1], encoding='utf-8') as fh:
+            return fh.read()
+
+
+class TestPlanIssueLifecycle(PlanRunTestCase):
+    def test_first_publish_creates_a_labelled_plan_issue(self):
+        """R1/AC2."""
+        fake = self.fake()
+        self.assertEqual(self.publish_plan(fake), 481)
+        argv = fake.argv_for('issue create')[0]
+        self.assertIn('--label', argv)
+        self.assertIn('plan', argv)
+        self.assertIn('plan: observability (#440)', argv)
+        self.assertEqual(self.publish['plan_issue'], 481)
+
+    def test_a_second_publish_edits_and_never_creates_a_second(self):
+        """AC2: exactly one plan issue, whatever the call count."""
+        first = self.fake()
+        self.publish_plan(first)
+        second = self.fake()
+        self.publish_plan(second)
+        self.assertEqual(second.argv_for('issue create'), [])
+        self.assertIn('481', second.argv_for('issue edit')[0])
+
+    def test_the_plan_issue_is_typed_plan_in_the_project(self):
+        """R1."""
+        fake = self.fake()
+        self.publish_plan(fake)
+        edit = fake.argv_for('project item-edit')[0]
+        self.assertIn('O_plan', edit)
+        self.assertTrue(self.publish['plan_projected'])
+
+    def test_project_typing_happens_once_not_per_publish(self):
+        fake = self.fake()
+        self.publish_plan(fake)
+        again = self.fake()
+        self.publish_plan(again)
+        self.assertEqual(again.argv_for('project item-add'), [])
+
+    def test_the_body_goes_through_a_file_never_argv(self):
+        fake = self.fake()
+        self.publish_plan(fake)
+        self.assertIn('## Task 1: component 1', self.body_sent(fake))
+
+    def test_a_missing_plan_costs_exactly_one_warning(self):
+        """AC7/R10: one read, so one failure point, so one warning."""
+        os.remove(self.plan_file)
+        warnings = []
+        fake = self.fake()
+        self.assertIsNone(self.publish_plan(fake, warnings))
+        self.assertEqual(len(warnings), 1)
+        self.assertIn('cannot read', warnings[0])
+        self.assertEqual(fake.argv_for('issue create'), [])
+
+    def test_a_warning_never_leaks_an_absolute_path(self):
+        """The run issue is public; factory_report keeps paths out of the PR."""
+        os.remove(self.plan_file)
+        warnings = []
+        self.publish_plan(self.fake(), warnings)
+        self.assertNotIn(self.tmp, warnings[0])
+        self.assertIn(self.PLAN_REL, warnings[0])
+
+    def test_an_absolute_plan_path_is_redacted_from_the_warning(self):
+        """The sibling test above uses the relative fixture path, so it
+        passes whether or not the redaction is there.
+
+        plan_path() explicitly supports an absolute state["plan"], and the
+        warning text reaches the stage log, which is published as a release
+        asset.
+        """
+        self.state['plan'] = os.path.join(self.tmp, 'gone', 'plan.md')
+        warnings = []
+        self.assertIsNone(self.publish_plan(self.fake(), warnings))
+        self.assertEqual(len(warnings), 1)
+        self.assertNotIn(self.tmp, warnings[0])
+        self.assertIn(factory_report.REDACTION, warnings[0])
+
+    def test_a_run_with_no_plan_recorded_is_silent(self):
+        """Every publish before PLAN step 4 — not a degradation."""
+        self.state['plan'] = None
+        warnings = []
+        fake = self.fake()
+        self.assertIsNone(self.publish_plan(fake, warnings))
+        self.assertEqual(warnings, [])
+        self.assertEqual(fake.calls, [])
+
+    def test_create_failure_warns_once_and_returns_none(self):
+        """R10."""
+        warnings = []
+        fake = self.fake(**{'issue create': (1, '', 'HTTP 502')})
+        self.assertIsNone(self.publish_plan(fake, warnings))
+        self.assertIn('plan issue not created', ' '.join(warnings))
+        self.assertIsNone(self.publish['plan_issue'])
+
+    def test_edit_failure_keeps_the_number_we_already_own(self):
+        self.publish['plan_issue'] = 481
+        warnings = []
+        self.publish_plan(self.fake(**{'issue edit': (1, '', 'HTTP 502')}),
+                          warnings)
+        self.assertEqual(self.publish['plan_issue'], 481)
+        self.assertEqual(len(warnings), 1)
+
+
+class TestPlanResync(PlanRunTestCase):
+    def test_editing_the_plan_updates_the_body(self):
+        """AC5."""
+        fake = self.fake()
+        self.publish_plan(fake)
+        self.assertIn('## Task 1: component 1', self.body_sent(fake))
+        self.write_plan(big_plan().replace('component 1', 'renamed unit'))
+        second = self.fake()
+        self.publish_plan(second)
+        body = self.body_sent(second, 'issue edit')
+        self.assertIn('renamed unit', body)
+        self.assertNotIn('component 1', body)
+
+    def test_editing_the_plan_re_uploads_the_asset(self):
+        """AC5: the asset is a mirror, so it is clobbered, not duplicated."""
+        fake = self.fake()
+        self.publish_plan(fake)
+        self.write_plan(big_plan(tasks=9))
+        second = self.fake()
+        self.publish_plan(second)
+        argv = second.argv_for('release upload')[0]
+        self.assertIn('--clobber', argv)
+        self.assertEqual(self.publish['uploaded'].count('issue-440-plan.md'), 1)
+
+    def test_an_unchanged_plan_is_not_re_uploaded(self):
+        fake = self.fake()
+        self.publish_plan(fake)
+        second = self.fake()
+        self.publish_plan(second)
+        self.assertEqual(second.argv_for('release upload'), [])
+
+
+class TestPlanAsset(PlanRunTestCase):
+    def staged(self, fake):
+        """The staged file `gh release upload` was pointed at.
+
+        Not a fixed index: FakeGh records the argv `gh()` builds, which is
+        ['gh', 'release', 'upload', 'factory-logs', <path>, '--clobber'] for
+        this asset. The existing tests use [-1], which is '--clobber' here.
+        """
+        argv = fake.argv_for('release upload')[0]
+        return [a for a in argv
+                if a.endswith(factory_publish.plan_asset_name(440))][0]
+
+    def test_uploaded_asset_is_byte_identical_to_the_plan(self):
+        """AC4: sha256, not 'an upload was attempted'."""
+        fake = self.fake()
+        self.publish_plan(fake)
+        self.assertEqual(factory_run.sha256_file(self.staged(fake)),
+                         factory_run.sha256_file(self.plan_file))
+
+    def test_the_ledger_records_the_asset(self):
+        """R4."""
+        fake = self.fake()
+        self.publish_plan(fake)
+        self.assertIn('issue-440-plan.md', self.publish['uploaded'])
+        self.assertEqual(self.publish['plan_sha256'],
+                         factory_run.sha256_file(self.plan_file))
+
+    def test_a_credential_shaped_plan_is_withheld_from_both_surfaces(self):
+        """The scan guards the issue body as well as the asset.
+
+        Withholding only the asset would be worse than useless: the summary
+        renders plan text straight into a public, indexed issue, so a plan
+        that trips the scanner must not reach the body either.
+        """
+        self.write_plan('# T\n\ntoken ghp_' + 'A' * 36 + '\n')
+        warnings = []
+        fake = self.fake()
+        self.publish_plan(fake, warnings)
+        self.assertEqual(fake.argv_for('release upload'), [])
+        self.assertIn('issue-440-plan.md', self.publish['withheld'])
+        body = self.body_sent(fake)
+        self.assertIn('withheld', body)
+        self.assertNotIn('ghp_', body)
+
+    def test_a_cleaned_plan_stops_being_withheld(self):
+        """R5's re-sync is two-way: the marker clears when the plan does."""
+        self.write_plan('# T\n\ntoken ghp_' + 'A' * 36 + '\n')
+        self.publish_plan(self.fake(), [])
+        self.write_plan(big_plan())
+        fake = self.fake()
+        self.publish_plan(fake, [])
+        self.assertEqual(self.publish['withheld'], {})
+        self.assertIn('releases/download', self.body_sent(fake, 'issue edit'))
+
+    def test_an_upload_failure_does_not_stop_the_issue(self):
+        """R10: the summary is still worth publishing without the asset."""
+        warnings = []
+        fake = self.fake(**{'release upload': (1, '', 'HTTP 502')})
+        self.assertEqual(self.publish_plan(fake, warnings), 481)
+        self.assertIsNone(self.publish['plan_sha256'])
+        self.assertEqual(len(warnings), 1)
+
+    def test_the_withheld_marker_in_the_body_carries_no_absolute_path(self):
+        """The withheld reason is formatted into a public issue verbatim.
+
+        The plan path must be absolute AND exist: an absolute path that does
+        not exist takes publish_plan's 'cannot read' early return and never
+        reaches the scanner, so the withheld branch is never entered and the
+        test proves nothing.
+        """
+        self.state['plan'] = self.plan_file
+        self.write_plan('# T\n\ntoken ghp_' + 'A' * 36 + '\n')
+        fake = self.fake()
+        self.publish_plan(fake, [])
+        withheld = self.publish['withheld']['issue-440-plan.md']
+        self.assertNotIn(self.tmp, withheld)
+        self.assertIn(factory_report.REDACTION, withheld)
+        self.assertNotIn(self.tmp, self.body_sent(fake))
+
+    def test_an_unreadable_plan_does_not_leak_its_path_into_the_body(self):
+        """scan_secrets' 'unreadable' reason embeds str(OSError), which
+        embeds the absolute path it could not open.
+
+        The credential-shaped case above cannot catch this: its reason is a
+        fixed literal with no path in it, so it only ever exercised the
+        second half of the withheld string.
+        """
+        self.state['plan'] = self.plan_file
+        original = factory_publish.scan_secrets
+        factory_publish.scan_secrets = lambda path: (
+            "unreadable, not scanned: [Errno 13] Permission denied: %r" % path)
+        try:
+            fake = self.fake()
+            self.publish_plan(fake, [])
+        finally:
+            factory_publish.scan_secrets = original
+        withheld = self.publish['withheld']['issue-440-plan.md']
+        self.assertIn(factory_report.REDACTION, withheld)
+        self.assertNotIn(self.tmp, withheld)
+        self.assertNotIn(self.tmp, self.body_sent(fake))
+
+
+class TestPublishRunPlan(PlanRunTestCase):
+    def run_publish(self, fake, **kw):
+        kw.setdefault('registry', self.reg)
+        kw.setdefault('now', factory_fixtures.FIXED_NOW)
+        return factory_publish.publish_run(440, runner=fake, **kw)
+
+    def test_stage_completed_plan_publishes_both_surfaces(self):
+        """AC1: run issue and plan issue, and nothing else."""
+        fake = self.fake()
+        result = self.run_publish(fake, stage_completed='PLAN')
+        self.assertEqual(result.warnings, [])
+        self.assertEqual(len(fake.argv_for('issue create')), 2)
+        publish = factory_publish.load_publish_state(440, self.reg)
+        # publish_plan runs before ensure_run_issue in publish_run, so the
+        # plan issue claims the first 'issue create' (481) and the run issue
+        # the second (482) — two distinct GitHub objects, not one shared
+        # number.
+        self.assertEqual(publish['plan_issue'], 481)
+        self.assertEqual(publish['run_issue'], 482)
+        self.assertNotEqual(publish['run_issue'], publish['plan_issue'])
+
+    def test_calling_stage_completed_plan_twice_creates_one_plan_issue(self):
+        """AC2."""
+        self.run_publish(self.fake(), stage_completed='PLAN')
+        second = self.fake()
+        self.run_publish(second, stage_completed='PLAN')
+        self.assertEqual(second.argv_for('issue create'), [])
+
+    def test_the_run_body_cross_links_the_plan_issue(self):
+        """R11."""
+        fake = self.fake()
+        self.run_publish(fake, stage_completed='PLAN')
+        second = self.fake()
+        self.run_publish(second, stage_completed='BUILD')
+        self.assertIn('**Plan** #481',
+                      self.body_sent(second, 'issue edit'))
+
+    def test_a_deleted_plan_still_updates_the_run_issue(self):
+        """AC7: exit 1, one warning, run issue unaffected."""
+        os.remove(self.plan_file)
+        fake = self.fake()
+        result = self.run_publish(fake, stage_completed='PLAN')
+        self.assertEqual(len(result.warnings), 1)
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)
+        self.assertTrue(fake.argv_for('issue create'))
+
+    def test_terminal_never_closes_the_plan_issue(self):
+        """AC8/R9: only a merged PR closes it."""
+        self.run_publish(self.fake(), stage_completed='PLAN')
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        closed = [argv[argv.index('close') + 1]
+                  for argv in fake.argv_for('issue close')]
+        # The run issue, never the plan: the first publish above creates the
+        # plan issue first (481) and the run issue second (482) — only 482
+        # is ever closed.
+        self.assertEqual(closed, ['482'])
+
+    def test_a_failed_run_leaves_the_plan_issue_open(self):
+        """AC8: a run that never ships leaves standing evidence.
+
+        Asserts what is *closed*, not what is absent: 'no reopen call' is
+        true of any terminal publish and would not fail if the plan issue
+        were closed alongside the run issue.
+        """
+        self.run_publish(self.fake(), stage_completed='PLAN')
+        factory_run.append_event(440, 'failure', registry=self.reg,
+                                 message='boom')
+        fake = self.fake()
+        self.run_publish(fake, terminal=True)
+        publish = factory_publish.load_publish_state(440, self.reg)
+        closed = [argv[argv.index('close') + 1]
+                  for argv in fake.argv_for('issue close')]
+        self.assertEqual(closed, [str(publish['run_issue'])])
+        self.assertTrue(publish['plan_issue'])
+
+    def test_a_dry_run_creates_the_plan_issue_and_leaves_it_open(self):
+        """AC8's other half.
+
+        `/factory --dry-run` is a skill-level flag with no code path in this
+        module: stages.md PLAN step 8 says it stops after the PLAN publish.
+        So a dry run *is* exactly one `--stage-completed PLAN` and nothing
+        after it, which is what this simulates. `factory_publish --dry-run`
+        is a different flag entirely — it renders to stdout and touches no
+        network — and is not what AC8 is about.
+        """
+        fake = self.fake()
+        self.run_publish(fake, stage_completed='PLAN')
+        self.assertEqual(fake.argv_for('issue close'), [])
+        self.assertTrue(
+            factory_publish.load_publish_state(440, self.reg)['plan_issue'])
+
+    def test_no_code_path_closes_a_plan_issue(self):
+        """AC8, as a canary over the whole module rather than one scenario.
+
+        Three occurrences today: the definition, and the two calls in
+        publish_run that reopen and close the *run* issue. A fourth means a
+        new caller exists and must be read against R9 by hand. This is a
+        canary, not a proof — the two scenario tests above it are the
+        evidence.
+        """
+        with open(factory_publish.__file__, encoding='utf-8') as fh:
+            source = fh.read()
+        self.assertEqual(source.count('set_issue_state('), 3)
+
+
 class TestPublishRun(PublishTestCase):
     def setUp(self):
         super().setUp()
@@ -1055,11 +1818,20 @@ class TestPublishRun(PublishTestCase):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'wb') as fh:
             fh.write(b'make: ok\n')
+        # The fixture records a plan path but never writes the file, and
+        # publish_run now reads it. Without this the whole class degrades on
+        # a missing plan and every 'no warnings' assertion below is false.
+        state = factory_run.load_state(440, self.reg)
+        plan = os.path.join(state['worktree'], state['plan'].replace('/', os.sep))
+        os.makedirs(os.path.dirname(plan), exist_ok=True)
+        with open(plan, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('# Demo Implementation Plan\n\n**Issue:** #440\n\n'
+                     '## Task 1: demo\n\n**Files:**\n- Modify: `x.py`\n')
 
     def fake(self, **overrides):
         results = {'issue create': (0, ISSUE_URL + '\n', ''),
                    'project item-add': (0, json.dumps({'id': 'PVTI_x'}), ''),
-                   'project field-list': (0, FIELD_LIST, '')}
+                   'project field-list': (0, PLAN_FIELD_LIST, '')}
         results.update(overrides)
         return FakeGh(results)
 
@@ -1070,9 +1842,18 @@ class TestPublishRun(PublishTestCase):
 
     def seed_items(self, issue=440, registry=None):
         """A run already on the board: both item ids cached, so the terminal
-        writes are distinguishable by item id in the recorded argv."""
+        writes are distinguishable by item id in the recorded argv.
+
+        The seeded number is deliberately far from ``FakeGh.ISSUE_BASE``
+        (481): the run issue here is never actually created through the fake
+        (it is pre-cached), so the class's own plan file makes the plan
+        issue the first real ``issue create`` call and it claims 481. A
+        seeded run issue of 481 would coincidentally collide with a
+        genuinely distinct plan issue and make item-add calls for the two
+        indistinguishable by URL.
+        """
         publish = factory_publish.new_publish_state(issue)
-        publish.update({'run_issue': 481, 'projected': True,
+        publish.update({'run_issue': 900, 'projected': True,
                         'run_item_id': 'PVTI_run',
                         'spec_item_id': 'PVTI_spec'})
         factory_publish.save_publish_state(publish, registry or self.reg)
@@ -1091,7 +1872,11 @@ class TestPublishRun(PublishTestCase):
         """AC1."""
         fake = self.fake()
         result = self.run_publish(fake, stage_completed='BUILD')
-        self.assertEqual(result.run_issue, 481)
+        # publish_plan runs before ensure_run_issue in publish_run, and the
+        # class's setUp gives this run a real plan file — so the plan issue
+        # is the first 'issue create' this publish makes (481) and the run
+        # issue is the second (482).
+        self.assertEqual(result.run_issue, 482)
         self.assertEqual(result.warnings, [])
         self.assertTrue(fake.argv_for('label create'))
         self.assertTrue(fake.argv_for('issue create'))
@@ -1137,8 +1922,14 @@ class TestPublishRun(PublishTestCase):
         second = self.fake()
         self.run_publish(second, stage_completed='BUILD')
         self.assertTrue(second.argv_for('issue reopen'))
-        self.assertIn('attempt 2',
-                      ' '.join(second.argv_for('issue edit')[0]))
+        # Select by title, never by position: publish_plan edits the plan
+        # issue before ensure_run_issue edits the run issue, so 'the second
+        # issue edit call' is not a stable way to mean 'the run issue'.
+        titles = [argv[argv.index('--title') + 1]
+                  for argv in second.argv_for('issue edit')]
+        self.assertTrue(
+            any(t.startswith('run 440') and 'attempt 2' in t for t in titles),
+            titles)
         self.assertTrue(any('attempt-2-BUILD.log' in a
                             for a in second.argv_for('release upload')[0]))
 
@@ -1187,7 +1978,15 @@ class TestPublishRun(PublishTestCase):
         self.seed_items()
         fake = self.fake()
         self.run_publish(fake, terminal=True)
-        self.assertEqual(fake.argv_for('project item-add'), [])
+        # Scoped to the run issue's own URL, not a bare "no item-add at all":
+        # this class's plan file makes the plan issue a fresh create every
+        # run, and it correctly makes its own item-add — that is a different
+        # issue from the run issue this test is actually about (#514).
+        run_url = '/issues/%d' % factory_publish.load_publish_state(
+            440, self.reg)['run_issue']
+        self.assertEqual(
+            [a for a in fake.argv_for('project item-add') if run_url in a],
+            [])
         self.assertTrue(self.status_edits(fake))
 
     def test_the_spec_returns_to_todo_even_with_no_run_issue(self):
@@ -1210,7 +2009,7 @@ class TestPublishRun(PublishTestCase):
         self.seed_items()
         fake = self.fake(**{'project item-edit': (1, '', 'HTTP 403')})
         result = self.run_publish(fake, terminal=True)
-        self.assertEqual(result.run_issue, 481)
+        self.assertEqual(result.run_issue, 900)
         self.assertEqual(self.status_edits(fake), [('PVTI_run', 'O_done')])
         self.assertTrue(any('Status=Done' in w for w in result.warnings),
                         result.warnings)
@@ -1268,11 +2067,17 @@ class TestPublishRun(PublishTestCase):
         retry, and it must still resolve to a terminal ``Done`` write."""
         reg = factory_fixtures.build_shipped_run(self.tmp)
         publish = factory_publish.new_publish_state(440)
-        publish.update({'run_issue': 481, 'projected': True})
+        # 900, not 481: this reuses setUp's worktree (build_shipped_run is
+        # deterministic per tmpdir), so its plan file is on disk and this
+        # publish's own plan issue is a fresh create — the first one, since
+        # the run issue below is only cached, never actually created through
+        # the fake. A seeded 481 here would coincidentally collide with that
+        # genuinely distinct plan issue.
+        publish.update({'run_issue': 900, 'projected': True})
         factory_publish.save_publish_state(publish, reg)
         fake = self.fake()
         self.run_publish(fake, terminal=True, registry=reg)
-        run_url = factory_publish.issue_url(481)
+        run_url = factory_publish.issue_url(900)
         adds_for_run = [a for a in fake.argv_for('project item-add')
                        if run_url in a]
         self.assertEqual(len(adds_for_run), 1)
@@ -1400,6 +2205,71 @@ class OpenPrTest(unittest.TestCase):
         self.assertIsNone(url)
         self.assertEqual(calls, [])
         self.assertEqual(len(warnings), 1)
+
+
+class PrBodyWithPlanTest(PublishTestCase):
+    """R7: the Closes line is appended by the publisher, not the reporter."""
+
+    def setUp(self):
+        super().setUp()
+        self.reg = factory_fixtures.build_shipped_run(self.tmp)
+        self.body = os.path.join(self.tmp, 'pr-body.md')
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('## Summary\n\nbody\n\nCloses #440\n')
+
+    def with_plan(self, number=482, **kw):
+        if number is not None:
+            publish = factory_publish.new_publish_state(440)
+            publish['plan_issue'] = number
+            factory_publish.save_publish_state(publish, self.reg)
+        return factory_publish.pr_body_with_plan(
+            440, self.body, registry=self.reg, **kw)
+
+    def read(self, path):
+        with open(path, encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_body_ends_with_closes_the_plan_issue(self):
+        """AC6."""
+        self.assertTrue(self.read(self.with_plan()).endswith('Closes #482\n'))
+
+    def test_the_specs_own_closes_line_survives(self):
+        """factory_report's Closes #<spec> is what actually closes the spec."""
+        self.assertIn('Closes #440\n', self.read(self.with_plan()))
+
+    def test_no_plan_issue_returns_the_original_path_untouched(self):
+        self.assertEqual(self.with_plan(number=None), self.body)
+
+    def test_the_original_body_file_is_never_rewritten(self):
+        self.with_plan()
+        self.assertNotIn('482', self.read(self.body))
+
+    def test_a_second_call_does_not_append_twice(self):
+        first = self.read(self.with_plan())
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(first)
+        self.assertEqual(self.read(self.with_plan()).count('Closes #482'), 1)
+
+    def test_a_missing_body_file_warns_and_falls_back(self):
+        """R10: never terminal — --open-pr reports the real failure itself."""
+        warnings = []
+        missing = os.path.join(self.tmp, 'nope.md')
+        publish = factory_publish.new_publish_state(440)
+        publish['plan_issue'] = 482
+        factory_publish.save_publish_state(publish, self.reg)
+        path = factory_publish.pr_body_with_plan(440, missing,
+                                                 registry=self.reg,
+                                                 warnings=warnings)
+        self.assertEqual(path, missing)
+        self.assertEqual(len(warnings), 1)
+
+    def test_factory_report_still_closes_only_the_spec_issue(self):
+        """AC6: the ADR 0006 boundary is not widened."""
+        state = factory_run.load_state(440, self.reg)
+        rendered = factory_report.render(state)
+        self.assertIn('Closes #440', rendered)
+        self.assertNotIn('482', rendered)
+        self.assertNotIn('plan_issue', rendered)
 
 
 class OpenPrCliTest(unittest.TestCase):

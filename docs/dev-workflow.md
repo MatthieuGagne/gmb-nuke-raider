@@ -551,7 +551,7 @@ worktree, so a run stays explainable after its worktree is deleted.
 |------|------|
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** ([ADR 450](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/470)): tees stage command output into `logs/<STAGE>.log`. |
-| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, the spec-issue comment, and the Documents-board item fields on both the spec and run issues. Owns `publish.json`. |
+| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the plan issue, the release assets, the spec-issue comment, the Documents-board item fields on both the spec and run issues, and the pull request. Owns `publish.json`. |
 | `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` is validated against `factory_run.EVENT_KINDS`. |
 | `tools/factory_cache.py` | **Sole writer of `cache/`** (#437 R5): the `origin/master` reference ROM, keyed by commit SHA, filled lazily on the first smoketest failure. |
 | `.claude/skills/factory/` | The orchestrator. Writes nothing itself — it calls the tools above and `factory_publish` at every stage transition, gate result and terminal event. |
@@ -715,14 +715,21 @@ registry stays the authority.
 content, so #450's no-parsing boundary is untouched. Because local logs are append-only across
 attempts, attempt *k*'s asset is a superset of attempt *k−1*'s; that redundancy buys an
 immutable per-attempt history and is an accepted cost. Screenshots publish uncapped as
-`issue-<N>-attempt-<k>-<scenario>-<frame>.png` and render inline in the body.
+`issue-<N>-attempt-<k>-<scenario>-<frame>.png` and render inline in the body. The plan asset is
+the one deliberate exception to "never clobbered": it is a mirror of a file that keeps changing
+during BUILD, so `issue-<N>-plan.md` is re-uploaded with `--clobber` and a later attempt's plan
+replaces an earlier one in place, rather than accumulating per-attempt history like the other
+assets.
 
-**The withheld case.** Before upload every log is matched against a short denylist of credential
-shapes (`gh[pousr]_`, `github_pat_`, `xox[baprs]-`, `AKIA…`, long `Bearer` values). A hit
-**blocks that one asset** and the body's Stage logs row says so, naming the local path.
-Everything published stays byte-exact: redaction would make that invariant conditional and one
-false positive would silently corrupt a log. This is the only net there is — the repo is public
-and GitHub's push protection does not inspect release assets.
+**The withheld case.** Before upload every log **and the plan** is matched against a short
+denylist of credential shapes (`gh[pousr]_`, `github_pat_`, `xox[baprs]-`, `AKIA…`, long `Bearer`
+values). A hit on a stage log **blocks that one asset** and the body's Stage logs row says so,
+naming the local path. A hit on the plan additionally empties the plan issue's summary — the
+scan guards the indexed issue body, not just the asset — but the plan asset does **not** appear
+in the Stage logs row; its withheld state is reported only on the plan issue itself. Everything
+published stays byte-exact: redaction would make that invariant conditional and one false
+positive would silently corrupt a log. This is the only net there is — the repo is public and
+GitHub's push protection does not inspect release assets.
 
 **Bounds.** The body is rendered, measured and shed until it fits under 60,000 characters
 (GitHub's cap is ~65k): first the inline log tail, then permission events, then decisions

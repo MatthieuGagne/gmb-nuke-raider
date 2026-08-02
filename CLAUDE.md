@@ -178,7 +178,7 @@ force-pushes, never passes `--no-verify`, and never deletes a worktree or branch
 **Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_REPAIR`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
 **PRDs & design docs:** GitHub issues only — no local files. Use `/prd` skill, which labels the
 issue `prd`, adds it to the "Nuke Raider — Documents" project and sets `Type = PRD` as three
-explicit commands. `prd` joins `adr`, `log` and `epic` as the label set for document
+explicit commands. `prd` joins `adr`, `log`, `plan` and `epic` as the label set for document
 kinds; `bug:`, `fix:`, `docs:` and `chore:` issues are not labeled — their kind is expressed on
 the board via `Type`.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
@@ -222,6 +222,7 @@ bare second issue number.
 | `docs:` / `chore:` / `refactor:` / `test:` | Chore |
 | `ADR <work item#>:` | ADR |
 | `run …` | Log |
+| `plan: …` | Plan |
 | `review:` | Review |
 
 The `Epic` row is first: an epic is `feat:`-titled like any PRD, so the `epic` label — not the
@@ -229,8 +230,8 @@ title — is what distinguishes it. A master issue that owns a set of child spec
 `--label epic` **in addition to** `prd`, and `Type = Epic` rather than `PRD`. Do not remove
 `Epic` from the field.
 
-Provenance is not a `Type` — "this came out of run N" lives in the issue body. `Log` typing is
-owned end-to-end by `tools/factory_publish.py` ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)); `PRD` by the `/prd` skill;
+Provenance is not a `Type` — "this came out of run N" lives in the issue body. `Log` and `Plan`
+typing are both owned end-to-end by `tools/factory_publish.py` ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475); `Plan` added by #514); `PRD` by the `/prd` skill;
 `ADR` by the `grill-with-docs` overlay; `Epic` by hand.
 
 One documented exception to the table: #465 is `docs:`-titled but stays `PRD`.

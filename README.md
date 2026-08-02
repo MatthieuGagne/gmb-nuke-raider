@@ -162,3 +162,6 @@ gmb-nuke-raider/
 - [Tile system reference](docs/TILES.md) — hardware limits, per-state tile budgets, and pipeline workflow
 - [Developer workflow](docs/dev-workflow.md) — build gates, debugging, and contribution conventions
 - [Memory explained](docs/memory-explained.html) — interactive ROM-memory tour (banks, VRAM, per-scene OAM); its OAM scene model auto-syncs with `config.h` on every `make`
+- A `/factory` run publishes its execution plan as its own `plan`-labelled GitHub issue at PLAN
+  completion, with the full plan attached to the `factory-logs` release — so the plan can be read
+  and judged before the unattended BUILD stage runs.

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Publish a factory run to GitHub: run issue, stage-log and screenshot assets.
+"""Publish a factory run to GitHub: run issue, plan issue, stage-log and
+screenshot assets, spec-issue comment, and pull request.
 
-Sole writer of the GitHub surfaces — the run issue, the release assets, the
-spec-issue comment, and the Documents-board item fields on both the spec and
-run issues. ``factory_run`` stays the sole writer of run state and the
-journal; ``factory_log`` stays the sole writer of ``logs/``. This module's own
+Sole writer of the GitHub surfaces — the run issue, the plan issue, the
+release assets, the spec-issue comment, the Documents-board item fields on
+both the spec and run issues, and the pull request. ``factory_run`` stays
+the sole writer of run state and the journal; ``factory_log`` stays the sole
+writer of ``logs/``. This module's own
 durable memory is ``runs/issue-<N>/publish.json``, which nothing else writes:
 the same narrowing ADR 450 applied to the log subtree, extended to a
 third owner — ADR 472.
@@ -78,6 +80,7 @@ PROJECT_ID = "PVT_kwHOAv4a5M4BepB5"
 # set is edited (#513 R5).
 TYPE_FIELD = "Type"
 TYPE_LOG = "Log"
+TYPE_PLAN = "Plan"
 STATUS_FIELD = "Status"
 STATUS_TODO = "Todo"
 STATUS_IN_PROGRESS = "In Progress"
@@ -121,6 +124,10 @@ def new_publish_state(issue):
         "issue": int(issue),
         "run_issue": None,          # the GitHub issue this run renders into
         "projected": False,         # added to the Documents project, Type=Log
+        "plan_issue": None,         # the plan issue this run renders into
+        "plan_projected": False,    # added to the project, Type=Plan (#514)
+        "plan_item_id": None,       # Documents-project item for the plan issue
+        "plan_sha256": None,        # digest of the plan as last uploaded
         "spec_item_id": None,       # Documents-project item for the spec issue
         "run_item_id": None,        # Documents-project item for the run issue
         "commented_attempts": [],   # spec-issue comments already posted (R10)
@@ -438,13 +445,321 @@ def _stage_rank(stage):
     return stages.index(stage) if stage in stages else len(stages)
 
 
+# ── Plan publication (#514) ──────────────────────────────────────────────────
+#
+# A factory run's plan is 1800-3200 lines of markdown with inline code, and it
+# never reaches the branch: docs/plans/ is gitignored, so the worktree working
+# copy is the only copy that exists. The issue body is therefore a structural
+# summary and the release asset is the normal read path (R3/R4), not an
+# overflow fallback.
+
+PLAN_LABEL = "plan"
+PLAN_LABEL_COLOR = "1D76DB"
+PLAN_LABEL_DESC = "Factory execution plan for one run"
+
+PLAN_BODY_MARKER = ("<!-- factory-publish plan v1 — regenerated on every "
+                    "publish; manual edits are overwritten -->")
+PLAN_SUMMARY_LINK = ("_Structural summary — fenced code and task steps "
+                     "omitted. Full plan: %s_")
+PLAN_SUMMARY_WITHHELD = ("_Structural summary — fenced code and task steps "
+                         "omitted. Full plan withheld: %s_")
+PLAN_SHED_FILES = "_Task file lists omitted — see the full plan._"
+PLAN_SHED_PREAMBLE = "_Preamble omitted — see the full plan._"
+PLAN_UNTERMINATED = ("_The plan ends inside an unclosed code fence — the "
+                     "summary above stops there and may be incomplete. Read "
+                     "the full plan._")
+
+# A fence opens with three or more backticks or tildes, indented at most three
+# spaces (CommonMark). The closer must use the same character and be at least
+# as long, which is exactly how a ```` block holds a ``` one — and plans do
+# that constantly, because they quote markdown documents verbatim.
+_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+_TASK_HEADING = re.compile(r"^#{2,4}\s+Task\s+\d+\b")
+_BATCH_HEADING = re.compile(
+    r"^#{2,4}\s+(Batch\b|Parallel Execution Groups\b|Smoketest Checkpoint\b)")
+_ANY_HEADING = re.compile(r"^#{1,6}\s")
+_FILES_LINE = re.compile(r"^\*\*Files:\*\*")
+_DEPENDS_LINE = re.compile(r"^\*\*Depends on:\*\*")
+
+# The plan asset carries no attempt number, unlike every other asset here. R5
+# makes it a living mirror re-uploaded whenever the plan changes, so a
+# per-attempt immutable copy would contradict the re-sync it exists for.
+PLAN_ASSET_TEMPLATE = "issue-%d-plan.md"
+
+
+def plan_asset_name(issue):
+    """``issue-<N>-plan.md`` — one per spec issue, updated in place."""
+    return PLAN_ASSET_TEMPLATE % int(issue)
+
+
+def _fenced(lines):
+    """``(pairs, unterminated)`` — every line tagged with whether it sits
+    inside a fenced block, and whether the document ended still inside one.
+
+    Both the opening and the closing fence report True: they are part of the
+    block, not of the prose around it. An unterminated fence is reported
+    rather than swallowed — it makes every later line read as code, and the
+    tail of a 3000-line plan would otherwise disappear from the summary with
+    nothing to say it had.
+    """
+    out = []
+    fence = None
+    for line in lines:
+        match = _FENCE.match(line)
+        if fence is None:
+            if match:
+                fence = match.group(1)
+                out.append((line, True))
+            else:
+                out.append((line, False))
+        else:
+            closes = (match and match.group(1)[0] == fence[0]
+                      and len(match.group(1)) >= len(fence))
+            if closes:
+                fence = None
+            out.append((line, True))
+    return out, fence is not None
+
+
+def _collapse(lines):
+    """Trim trailing space, drop edge blanks, collapse blank runs to one.
+
+    Deleting a fenced block leaves the blank lines that surrounded it, and a
+    summary made mostly of vertical whitespace is what a reader has to scroll
+    past to reach the tasks.
+    """
+    out = []
+    for line in lines:
+        if line.strip():
+            out.append(line.rstrip())
+        elif out and out[-1] != "":
+            out.append("")
+    while out and out[-1] == "":
+        out.pop()
+    return out
+
+
+def summarize_plan(text):
+    """``(preamble_lines, task_blocks, unterminated)`` — R3's structural
+    summary, plus whether the document ended inside an unclosed fence.
+
+    The preamble is everything above the first task or batch heading, with
+    fenced blocks removed. Each task block is its ``## Task N:`` heading plus
+    its ``**Depends on:**`` line and its ``**Files:**`` line with the bullet
+    list that follows; the steps, and every fenced block, are dropped.
+
+    Fence tracking is load-bearing rather than defensive: real plans quote
+    whole markdown documents inside ```` blocks, so a line-oriented scan for
+    ``## Task`` finds headings that belong to a code sample.
+    """
+    marked, unterminated = _fenced(text.splitlines())
+    first = None
+    for index, (line, fence) in enumerate(marked):
+        if fence:
+            continue
+        if _TASK_HEADING.match(line) or _BATCH_HEADING.match(line):
+            first = index
+            break
+
+    head = marked if first is None else marked[:first]
+    preamble = _collapse([line for line, fence in head if not fence])
+    tasks = []
+    if first is None:
+        return preamble, tasks, unterminated
+
+    index = first
+    while index < len(marked):
+        line, fence = marked[index]
+        index += 1
+        if fence or not _TASK_HEADING.match(line):
+            continue
+        block = [line.rstrip()]
+        while index < len(marked):
+            line, fence = marked[index]
+            if not fence and _ANY_HEADING.match(line):
+                break
+            if fence:
+                index += 1
+                continue
+            if _DEPENDS_LINE.match(line):
+                block.append(line.rstrip())
+            elif _FILES_LINE.match(line):
+                block.append(line.rstrip())
+                index += 1
+                while index < len(marked):
+                    bullet, bullet_fence = marked[index]
+                    if bullet_fence or not bullet.lstrip().startswith("- "):
+                        break
+                    block.append(bullet.rstrip())
+                    index += 1
+                continue
+            index += 1
+        tasks.append(block)
+    return preamble, tasks, unterminated
+
+
+def plan_path(state):
+    """Absolute path to the run's plan file, or None when there is none.
+
+    Resolved against the worktree, never against git: ``docs/plans/`` is
+    gitignored, so the branch never carries the file and the working copy is
+    the only place it exists (R5).
+
+    Normalised, because ``state["plan"]`` is recorded with forward slashes
+    and ``os.path.join`` does not translate them on Windows — the mixed
+    separator opens fine but is not comparable, and this path is compared.
+    """
+    plan = state.get("plan")
+    if not plan:
+        return None
+    if os.path.isabs(plan):
+        return plan
+    worktree = state.get("worktree")
+    if not worktree:
+        return None
+    return os.path.normpath(os.path.join(worktree, plan))
+
+
+def read_plan(state):
+    """The plan's text, or None when it cannot be read.
+
+    ``errors="replace"`` for the same reason ``log_tail`` uses it: a plan a
+    publisher cannot decode must still publish, badly, rather than not at all.
+    """
+    path = plan_path(state)
+    if path is None:
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _plan_slug(state):
+    """The run's slug for the plan issue title.
+
+    ``state["slug"]`` is the intended source but nothing in the factory
+    currently emits it — ``stages.md`` step 3 records only worktree and
+    branch — so the plan filename is the fallback. PRD-3 fixes the filename
+    as ``YYYY-MM-DD-issue<N>-<slug>.md``, which makes the slug recoverable
+    without inventing a second naming convention.
+    """
+    slug = state.get("slug")
+    if slug:
+        return slug
+    plan = state.get("plan")
+    if plan:
+        stem = os.path.splitext(os.path.basename(plan))[0]
+        match = re.match(r"^\d{4}-\d{2}-\d{2}-issue\d+-(.+)$", stem)
+        if match:
+            return match.group(1)
+        if stem:
+            return stem
+    return "(no slug)"
+
+
+def render_plan_title(state):
+    """``plan: <slug> (#<N>)`` (R1). Pure."""
+    return "plan: %s (#%d)" % (_plan_slug(state), int(state["issue"]))
+
+
+# factory_report.ABSOLUTE_PATH with one change: a left boundary on the
+# drive-letter alternative. Without it the pattern matches the "s:/" inside
+# "https:/" and turns every citation into "http<path>" -- and plans cite
+# issue and PR URLs constantly. Anchoring beats holding URLs out of the
+# redaction: an exemption is unreachable by the redactor, so a path glued to
+# a URL (".../build?out=C:\Users\alice\log.txt") rode straight through it.
+# factory_report is out of scope for #514, so the variant lives here.
+_PROSE_PATH = re.compile(
+    r"(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s`|]*"
+    r"|\\\\[^\s`|]+"
+    r"|(?<![\w.~-])/(?:home|Users|opt|mnt|srv|var|tmp)/[^\s`|]*")
+
+
+def _redact_prose(text):
+    """``factory_report.redact`` for free-form plan prose.
+
+    Same substitution, same placeholder; only the drive-letter alternative
+    differs, and only by requiring that it not follow an alphanumeric. A
+    plain ``https://host/path`` is therefore untouched while
+    ``C:\\Users\\...`` still goes, wherever it appears -- including inside a
+    URL's query string.
+    """
+    return _PROSE_PATH.sub(factory_report.REDACTION, text)
+
+
+def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
+                     budget=BODY_BUDGET):
+    """The plan issue body, bounded at *budget* characters (R3).
+
+    Render, measure, then shed in a fixed order until it fits: the task file
+    lists first, then the preamble, each cut leaving an explicit marker.
+    Never shed: the header, the task headings, and the link to the full plan —
+    a summary that has lost its task list is not a summary of a plan. A hard
+    truncation is the backstop, exactly as in ``render_body``.
+
+    An empty *plan_text* is meaningful, not an error: it is what
+    ``publish_plan`` passes when ``scan_secrets`` refused the file, and it
+    renders a body with a header and a withheld marker and no plan text at
+    all. The scan guards the issue body as well as the asset — the body is
+    the more exposed of the two, because it is indexed.
+    """
+    issue = int(state["issue"])
+    name = plan_asset_name(issue)
+    withheld = (publish.get("withheld") or {}).get(name)
+    link = PLAN_SUMMARY_WITHHELD % withheld if withheld else \
+        PLAN_SUMMARY_LINK % asset_url(name, repo)
+
+    # redact() for the same reason display_worktree() uses it: state["plan"]
+    # may be absolute, and this body is a public issue.
+    header = ["**Spec** #%d · **Plan** `%s` · **Branch** `%s`"
+              % (issue, factory_report.redact(state.get("plan") or "-"),
+                 state.get("branch") or "-")]
+    run_issue = publish.get("run_issue")
+    if run_issue:
+        header += ["", "Run dashboard: #%d" % run_issue]
+
+    preamble, tasks, unterminated = summarize_plan(plan_text)
+    # Every line below is lifted verbatim from a local file and published to
+    # a public, indexed issue. Plans routinely name machine-specific
+    # toolchain paths in their preamble and absolute paths in a Files
+    # bullet, and this text needs exactly the redaction display_worktree()
+    # already gives a worktree path.
+    preamble = [_redact_prose(line) for line in preamble]
+    tasks = [[_redact_prose(line) for line in block] for block in tasks]
+
+    def build(drop_files, drop_preamble):
+        out = list(header)
+        if drop_preamble:
+            out += ["", PLAN_SHED_PREAMBLE]
+        elif preamble:
+            out += [""] + preamble
+        for block in tasks:
+            out += [""] + ([block[0]] if drop_files else block)
+        if drop_files and tasks:
+            out += ["", PLAN_SHED_FILES]
+        if unterminated:
+            out += ["", PLAN_UNTERMINATED]
+        out += ["", link, "", PLAN_BODY_MARKER]
+        return "\n".join(out) + "\n"
+
+    for shed in ((False, False), (True, False), (True, True)):
+        body = build(*shed)
+        if len(body) <= budget:
+            return body
+    return body[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER
+
+
 def _render(ctx):
     state = ctx["state"]
-    out = ["**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
-           % (int(state["issue"]), state.get("branch") or "-",
-              int(state.get("attempt") or 1), state.get("updated") or "-"),
-           "",
-           stage_strip(state, ctx["now"])]
+    header = ("**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
+              % (int(state["issue"]), state.get("branch") or "-",
+                 int(state.get("attempt") or 1), state.get("updated") or "-"))
+    plan_issue = (ctx["publish"] or {}).get("plan_issue")
+    if plan_issue:
+        header += " · **Plan** #%d" % plan_issue
+    out = [header, "", stage_strip(state, ctx["now"])]
     for title, render in ctx["sections"]:
         lines = render(ctx)
         if lines is None:
@@ -631,13 +946,14 @@ def _already(proc, *needles):
     return any(n in text for n in needles)
 
 
-def ensure_label(warnings, runner=subprocess.run):
-    """Create the ``log`` label if it is missing. Idempotent, fail-open."""
-    proc = gh(["label", "create", RUN_LABEL, "--color", "5319E7",
-               "--description", "Factory run dashboard issue"], runner=runner)
+def ensure_label(warnings, runner=subprocess.run, label=RUN_LABEL,
+                 color="5319E7", description="Factory run dashboard issue"):
+    """Create *label* if it is missing. Idempotent, fail-open."""
+    proc = gh(["label", "create", label, "--color", color,
+               "--description", description], runner=runner)
     if proc.returncode == 0 or _already(proc, "already exists"):
         return True
-    _warn(warnings, "label %r not ensured: %s" % (RUN_LABEL, _tail(proc.stderr)))
+    _warn(warnings, "label %r not ensured: %s" % (label, _tail(proc.stderr)))
     return False
 
 
@@ -836,6 +1152,34 @@ def ensure_project_type_log(publish, issue_url, warnings,
     return True
 
 
+def ensure_project_type_plan(publish, issue_url, warnings,
+                             runner=subprocess.run):
+    """Add the plan issue to "Nuke Raider — Documents", ``Type = Plan``.
+
+    Mirrors ``ensure_project_type_log`` and deliberately writes no ``Status``:
+    a plan is a document, not a run. It has no lifecycle on the board — it is
+    created once and closed by the merge of the run's PR (#514 R9), so there
+    is no state for a Status column to track.
+
+    ``Plan`` must exist as an option on the board's ``Type`` field before this
+    can succeed; it is a one-time manual prerequisite. Until it does, the plan
+    issue is still created and labelled and the run is unaffected — one
+    warning per publish.
+    """
+    if publish.get("plan_projected"):
+        return True
+    item_id = publish.get("plan_item_id") or \
+        project_item_add(issue_url, warnings, runner=runner)
+    if not item_id:
+        return False
+    publish["plan_item_id"] = item_id
+    if not set_single_select(item_id, TYPE_FIELD, TYPE_PLAN, warnings,
+                             runner=runner):
+        return False
+    publish["plan_projected"] = True
+    return True
+
+
 def finish_project_status(state, publish, run_url, warnings,
                           runner=subprocess.run):
     """The terminal board writes (#513 R4).
@@ -885,15 +1229,26 @@ def stage_dir(issue, registry=None):
     return path
 
 
-def upload_asset(path, name, publish, warnings, runner=subprocess.run):
-    """Upload one staged asset. Never clobbers an existing one (R7)."""
-    if name in (publish.get("uploaded") or []):
+def upload_asset(path, name, publish, warnings, runner=subprocess.run,
+                 clobber=False):
+    """Upload one staged asset. Never clobbers an existing one (R7).
+
+    The single exception is the plan asset, which R5 (#514) makes a living
+    mirror of the plan file: it is re-uploaded with ``--clobber`` whenever the
+    plan's sha256 moves, and its ledger entry stays one name.
+    """
+    uploaded = publish.setdefault("uploaded", [])
+    if name in uploaded and not clobber:
         return True
-    proc = gh(["release", "upload", RELEASE_TAG, path], runner=runner)
+    argv = ["release", "upload", RELEASE_TAG, path]
+    if clobber:
+        argv.append("--clobber")
+    proc = gh(argv, runner=runner)
     if proc.returncode != 0:
         _warn(warnings, "asset %s not uploaded: %s" % (name, _tail(proc.stderr)))
         return False
-    publish.setdefault("uploaded", []).append(name)
+    if name not in uploaded:
+        uploaded.append(name)
     return True
 
 
@@ -961,6 +1316,131 @@ def publish_screenshots(state, publish, warnings, registry=None,
         if upload_asset(dest, name, publish, warnings, runner=runner):
             published.append(name)
     return published
+
+
+def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
+                       runner=subprocess.run):
+    """Upload the byte-exact plan, re-uploading only when it changed (R4/R5).
+
+    The plan is the one asset that is a mirror rather than a record: real
+    plans are 1800-3200 lines and the issue body is only a summary, so this
+    file is the normal read path and it has to track edits made during BUILD.
+
+    *reason* is ``scan_secrets(path)``, computed once by the caller because
+    the same verdict also decides whether the issue **body** may carry the
+    plan text. Scanning here and rendering there independently is how a
+    credential ends up withheld from the asset and published in the issue.
+    """
+    issue = int(state["issue"])
+    name = plan_asset_name(issue)
+    if reason:
+        # redact BOTH halves: scan_secrets' "unreadable, not scanned: <exc>"
+        # variant carries str(OSError), which embeds the absolute path it
+        # failed to open. Redacting only the neighbouring value on this line
+        # is the mistake 81808b7 and c901676 already fixed twice.
+        safe = factory_report.redact(reason)
+        publish.setdefault("withheld", {})[name] = "%s — local copy: %s" % (
+            safe,
+            factory_report.redact(state.get("plan") or "the run's worktree"))
+        _warn(warnings, "plan asset withheld: %s (the run is unaffected)"
+              % safe)
+        return False
+    # A mirror clears as well as sets: once the author removes the offending
+    # string, a stale entry here would keep the body rendering the withheld
+    # marker forever and make R5's re-sync one-way.
+    publish.setdefault("withheld", {}).pop(name, None)
+
+    try:
+        digest = factory_run.sha256_file(path)
+    except OSError as exc:
+        _warn(warnings, "plan asset %s not hashed: %s" % (name, exc))
+        return False
+    if digest == publish.get("plan_sha256"):
+        return True
+
+    dest = os.path.join(stage_dir(issue, registry), name)
+    try:
+        shutil.copyfile(path, dest)
+    except OSError as exc:
+        _warn(warnings, "plan asset %s not staged: %s" % (name, exc))
+        return False
+    if not upload_asset(dest, name, publish, warnings, runner=runner,
+                        clobber=True):
+        return False
+    publish["plan_sha256"] = digest
+    return True
+
+
+def ensure_plan_issue(state, publish, title, body, warnings, registry=None,
+                      runner=subprocess.run):
+    """Create the plan issue, or edit the one this run already owns (R6).
+
+    Never closed by this module: a plan issue is closed by the merge of the PR
+    that carries ``Closes #<plan issue>`` (R7), and a run that never ships
+    leaves it open on purpose, as standing evidence (R9).
+    """
+    issue = int(state["issue"])
+    path = write_body_file(issue, body, registry, name="publish-plan-body.md")
+    number = publish.get("plan_issue")
+    if number:
+        proc = gh(["issue", "edit", str(number), "--title", title,
+                   "--body-file", path], runner=runner)
+        if proc.returncode != 0:
+            _warn(warnings, "plan issue #%d not updated: %s"
+                  % (number, _tail(proc.stderr)))
+        return number
+
+    ensure_label(warnings, runner=runner, label=PLAN_LABEL,
+                 color=PLAN_LABEL_COLOR, description=PLAN_LABEL_DESC)
+    proc = gh(["issue", "create", "--title", title, "--body-file", path,
+               "--label", PLAN_LABEL], runner=runner)
+    if proc.returncode != 0:
+        _warn(warnings, "plan issue not created: %s" % _tail(proc.stderr))
+        return None
+    match = _ISSUE_NUMBER.search((proc.stdout or "").strip())
+    if not match:
+        _warn(warnings, "plan issue number not parseable from: %s"
+              % _tail(proc.stdout))
+        return None
+    publish["plan_issue"] = int(match.group(1))
+    publish["plan_issue_url"] = (proc.stdout or "").strip().splitlines()[-1]
+    return publish["plan_issue"]
+
+
+def publish_plan(state, publish, warnings, registry=None,
+                 runner=subprocess.run, repo=DEFAULT_REPO):
+    """Create or re-sync this run's plan issue and its release asset (#514).
+
+    Fail-open in exactly one place: the plan is read once, and a plan that
+    cannot be read costs one warning and skips both surfaces (R10). A run with
+    no plan recorded — every publish before PLAN step 4 — is silent rather
+    than degraded, because there is nothing wrong with it yet.
+    """
+    if not state.get("plan"):
+        return None
+    text = read_plan(state)
+    if text is None:
+        _warn(warnings, "plan not published: cannot read %s"
+              % factory_report.redact(state.get("plan")
+                                      or "the recorded path"))
+        return publish.get("plan_issue")
+
+    # One scan, two surfaces. A credential-shaped string withholds the asset
+    # *and* empties the summary: the issue body is the more exposed of the
+    # two, because GitHub indexes it and a release asset is a download.
+    path = plan_path(state)
+    reason = scan_secrets(path)
+    publish_plan_asset(state, publish, path, reason, warnings,
+                       registry=registry, runner=runner)
+    number = ensure_plan_issue(
+        state, publish, render_plan_title(state),
+        render_plan_body(state, publish, "" if reason else text, repo=repo),
+        warnings, registry=registry, runner=runner)
+    if number:
+        url = publish.get("plan_issue_url") or \
+            "https://github.com/%s/issues/%d" % (repo, number)
+        ensure_project_type_plan(publish, url, warnings, runner=runner)
+    return number
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────
@@ -1046,6 +1526,49 @@ def open_pr(issue, branch, title, body_path, publish=None, warnings=None,
     return url, True
 
 
+CLOSES_LINE = "Closes #%d"
+
+
+def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
+    """The PR body path, with ``Closes #<plan issue>`` appended (R7).
+
+    Returns the original path when there is no plan issue or the body already
+    closes it, and a staged copy otherwise — the file handed in is never
+    rewritten, because it is ``factory_report``'s deterministic output and the
+    SHIP stage may re-render it.
+
+    ``factory_report`` is deliberately not taught about this: the plan issue
+    number lives in ``publish.json``, which only this module owns, and
+    widening that boundary is what ADR 0006 (#475) exists to prevent.
+
+    Fail-open like the rest of this file, and specifically *not* covered by
+    the ``--open-pr`` exception: a PR that ships without the plan link is a
+    degradation, while a PR that does not ship at all is a run failure (R10).
+
+    ``TypeError`` is in the caught set because ``plan_issue`` is read back
+    from a JSON file: a non-numeric value survives the ``if not number``
+    guard and reaches ``int()``, and this is the one call site with no
+    enclosing handler.
+    """
+    warnings = warnings if warnings is not None else []
+    try:
+        number = load_publish_state(issue, registry).get("plan_issue")
+        if not number:
+            return body_path
+        with open(body_path, encoding="utf-8") as fh:
+            body = fh.read()
+        line = CLOSES_LINE % int(number)
+        if re.search(r"(?m)^%s\s*$" % re.escape(line), body):
+            return body_path
+        if body and not body.endswith("\n"):
+            body += "\n"
+        return write_body_file(issue, body + line + "\n", registry,
+                               name="publish-pr-body.md")
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        _warn(warnings, "plan issue not linked from the PR body: %s" % exc)
+        return body_path
+
+
 def run_start(issue, registry=None, runner=subprocess.run):
     """Mark the spec issue In Progress on the Documents board (#513 R1).
 
@@ -1108,6 +1631,10 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
                           registry=registry, runner=runner)
     publish_screenshots(state, publish, warnings, registry=registry,
                         runner=runner)
+    # Before the run issue renders, so its header can cross-link a plan issue
+    # number that is already known (R11). By PLAN the run issue exists — GATE
+    # published first — so the plan body's own back-link is never empty.
+    publish_plan(state, publish, warnings, registry=registry, runner=runner)
 
     known = publish.get("run_issue")
     if known and not terminal:
@@ -1221,10 +1748,11 @@ def main(argv=None):
                              % ", ".join(missing))
             return EXIT_MISUSE
         warnings = []
-        url, _ = open_pr(args.issue, args.branch, args.title, args.body_file,
+        body_file = pr_body_with_plan(args.issue, args.body_file,
+                                      registry=args.registry,
+                                      warnings=warnings)
+        url, _ = open_pr(args.issue, args.branch, args.title, body_file,
                          warnings=warnings)
-        for message in warnings:
-            sys.stderr.write("factory-publish: WARNING: %s\n" % message)
         if url:
             sys.stdout.write(url + "\n")
             return 0

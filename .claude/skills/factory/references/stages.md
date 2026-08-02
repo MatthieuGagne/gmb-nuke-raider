@@ -63,6 +63,12 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 4. Write the plan with the `writing-plans` skill in **factory mode** (its overlay's
    `### Factory mode` subsection removes the handoff HARD-GATE). The plan filename and header
    follow PRD-3 exactly: `docs/plans/YYYY-MM-DD-issue<N>-<slug>.md` containing `**Issue:** #<N>`.
+   Then record it on the run, so the publisher can find it:
+   ```
+   python tools/factory_event.py --issue <N> --kind start --field plan=docs/plans/YYYY-MM-DD-issue<N>-<slug>.md
+   ```
+   The path is **repo-relative** — the publisher resolves it against the run's worktree, which is
+   the only place it exists: `docs/plans/` is gitignored, so the plan never reaches the branch.
 5. **Adversarial plan self-review** — dispatch a subagent whose charter is to attack the plan,
    not to approve it. It must check, at minimum:
    - Does every spec requirement map to a task?
@@ -76,6 +82,17 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 6. `LOG PLAN -- python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` line
    naming this plan. Record as a gate.
 7. `python tools/factory_publish.py --issue <N> --stage-completed PLAN`
+   This is where the **plan issue** appears (#514): title `plan: <slug> (#<N>)`, label `plan`,
+   `Type = Plan` on the Documents project, a structural summary in the body and the byte-exact
+   plan as the `factory-logs` release asset `issue-<N>-plan.md`. `Type = Plan` requires a
+   one-time manual prerequisite: a human must add a `Plan` option to the `Type` field of project
+   3 ("Nuke Raider — Documents"). Until that option exists, the issue is still created and
+   labelled, only untyped, with one warning per publish. It is created once and re-synced
+   on every later publish, so plan edits made during BUILD show up without another command. The
+   plan asset is re-uploaded in place, not appended: a later attempt's plan replaces an earlier
+   one, unlike stage logs, which keep per-attempt history. The run's PR closes it automatically.
+   A plan that cannot be read is one `factory-publish: WARNING:` line and exit 1 — reportable,
+   never a run failure.
 8. **`--dry-run` stops here**, with the run state recording the PLAN stage.
 
 ## BUILD
