@@ -72,10 +72,14 @@ brainstorming skill
 ### Document issues: label at creation, index at creation
 
 `/prd` creates the issue with `--label prd`, then adds it to the "Nuke Raider — Documents"
-project (number `3`, owner `MatthieuGagne`, id `PVT_kwHOAv4a5M4BepB5`) and sets `Type = PRD` —
-`gh issue create --label prd` → `gh project item-add` → `gh project item-edit`. Resolve the
-`Type` field id and the option id by name at runtime; option ids change when the option set is
-edited. `tools/factory_publish.py` performs the identical sequence for `log`-labeled run issues.
+project (number `3`, owner `MatthieuGagne`, id `PVT_kwHOAv4a5M4BepB5`) and sets `Type = PRD` and
+`Status = Todo` — `gh issue create --label prd` → `gh project item-add` → `gh project field-list`
+→ `gh project item-edit` (Type) → `gh project item-edit` (Status): four commands after issue
+creation. Resolve every field id and option id by name at runtime; option ids change when the
+option set is edited. `tools/factory_publish.py` writes the same two board fields for
+`log`-labeled run issues, but not the identical sequence: it sets `Type = Log` once and re-issues
+`Status` writes across the run's lifecycle (`In Progress` at start, `Done` at terminal) rather
+than setting both once at creation.
 
 `Type` records **kind only**:
 
@@ -547,7 +551,7 @@ worktree, so a run stays explainable after its worktree is deleted.
 |------|------|
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** ([ADR 450](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/470)): tees stage command output into `logs/<STAGE>.log`. |
-| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, and the spec-issue comment. Owns `publish.json`. |
+| `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the release assets, the spec-issue comment, and the Documents-board item fields on both the spec and run issues. Owns `publish.json`. |
 | `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` is validated against `factory_run.EVENT_KINDS`. |
 | `tools/factory_cache.py` | **Sole writer of `cache/`** (#437 R5): the `origin/master` reference ROM, keyed by commit SHA, filled lazily on the first smoketest failure. |
 | `.claude/skills/factory/` | The orchestrator. Writes nothing itself — it calls the tools above and `factory_publish` at every stage transition, gate result and terminal event. |
@@ -654,6 +658,7 @@ python tools/factory_report.py --issue 436              # PR body to stdout
 python tools/factory_report.py --issue 436 --out body.md
 python tools/factory_log.py --stage BUILD --issue 450 -- make clean
 python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Command "make clean; make"
+python tools/factory_publish.py --issue 437 --run-start
 python tools/factory_publish.py --issue 437 --stage-completed BUILD
 python tools/factory_publish.py --issue 437 --terminal
 python tools/factory_publish.py --issue 437 --dry-run
@@ -683,7 +688,8 @@ A run's durable, shareable rendering is a **run issue** on GitHub, written only 
 One run issue per **spec** issue — created on the first publish,
 reused forever after, reopened when a later attempt starts, closed at terminal. Its number
 lives in `publish.json`, so it is never recreated. It carries the `log` label and sits in the
-"Nuke Raider — Documents" project with **Type = Log**, which is what the
+"Nuke Raider — Documents" project with **Type = Log** and `Status = In Progress`, moving to
+`Done` at terminal, which is what the
 [Logs view](https://github.com/users/MatthieuGagne/projects/3/views/4) filters on (sorted by
 *Updated*, not *Created*: a run issue is long-lived, so most-recently-active first is what a
 dashboard wants).

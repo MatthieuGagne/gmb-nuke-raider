@@ -39,6 +39,12 @@ at the PR and nowhere else.
      terminal (`failed`/`complete`), append a `retry` event with the next `attempt` and continue
      from the recorded stage. Otherwise stop and say which run is already in flight.
 3. **Never delete or overwrite an existing worktree or branch**, whatever the state says.
+4. Announce the run on the Documents board, before GATE:
+   ```
+   python tools/factory_publish.py --issue <N> --run-start
+   ```
+   Exit `1` is a degradation, never a run failure — note the `factory-publish: WARNING:` line
+   and continue into GATE.
 
 ## The five stages
 
@@ -91,12 +97,23 @@ running `gh`.** If a step would create, edit, or comment on any GitHub object, i
 configuration and writes nothing.
 
 ```
+python tools/factory_publish.py --issue <N> --run-start
 python tools/factory_publish.py --issue <N> --stage-completed <STAGE>
 python tools/factory_publish.py --issue <N> --terminal
 ```
 
-Call it at **every stage transition, every gate result, and at terminal** (SHIP success and
-terminal failure alike) — roughly 15-25 edits per run.
+`--run-start` is the first publisher call of a run, made in *Session setup* **before GATE**. It
+does exactly one thing: put the spec issue on the Documents board and set its
+`Status = In Progress`, so the board shows what the factory is working on while it works on it.
+It creates no run issue and never sets `Type` — classification stays with the human and with
+`/prd`. At terminal the run issue goes to `Status = Done`, and a **failed** run puts the spec
+back to `Todo`; a successful one leaves it `In Progress`, because the PR is open and the merge
+is what finishes the spec. Known limitation: a retried run's dashboard issue is reopened but
+keeps `Status = Done` while it is live — the `In Progress` write happens only when the run issue
+first joins the board, not on every reopen.
+
+Call `--stage-completed` and `--terminal` at **every stage transition, every gate result, and at
+terminal** (SHIP success and terminal failure alike) — roughly 15-25 edits per run.
 
 **Exit code 1 means "published with degradation". It is reportable, never a run failure.**
 Note the `factory-publish: WARNING:` lines and carry on. Exit 2 is misuse — fix the call.
