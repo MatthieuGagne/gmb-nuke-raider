@@ -122,6 +122,19 @@ loads none of the above.
 Also note the deny gate and bank check must exit **2** to block; under pi-hooks any other
 non-zero exit is reported as a hook error and the tool call proceeds anyway.
 
+**The two harnesses anchor their hook commands differently, and the Pi anchor is the weaker of
+the two.** `.claude/settings.json` uses Claude Code's `${CLAUDE_PROJECT_DIR}` placeholder;
+`.pi/settings.json` uses the bash-evaluated
+`$(git rev-parse --show-toplevel 2>/dev/null || echo .)`. That is not a stylistic difference:
+pi-hooks (0.0.2) substitutes no placeholders and runs every hook command under `bash -c`, so
+`${CLAUDE_PROJECT_DIR}` in `.pi/settings.json` would be expanded by bash as an undefined
+variable and every Pi hook would resolve to `python "/tools/<name>.py"` — broken from every
+directory, repository root included. The coverage is not equal either: the Claude placeholder
+resolves from any working directory, while the Pi expression resolves only from a working
+directory inside the repository. Outside one, `git rev-parse` fails and the `|| echo .` fallback
+degrades the command to the pre-existing relative path rather than to `/tools/<name>.py`.
+**Do not copy either form into the other file.**
+
 Pi shell setup is **machine-local**, deliberately not committed: the build needs PowerShell,
 `GBDK_HOME`, and Git's `bin`/`usr\bin` on `PATH`, and pointing Pi's `shellPath` at them takes
 absolute paths. Configure that in `~/.pi/agent/settings.json`, not here.
