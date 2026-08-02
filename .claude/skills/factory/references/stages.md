@@ -3,11 +3,21 @@
 Every command below is wrapped by the stage-log helper. Written out once in full:
 
 ```
-python tools/factory_log.py --stage GATE --issue <N> -- python tools/spec_lint.py --issue <N> --json
+python tools/factory_log.py --stage GATE --issue <N> --stream -- python tools/spec_lint.py --issue <N> --json
 ```
 
 Below, `LOG <STAGE> -- <cmd>` is shorthand for exactly that wrapper. `<N>` is the spec issue
 number. Pass `--attempt <k>` on every retry.
+
+`LOG <STAGE> --stream -- <cmd>` is the same wrapper with `--stream` added before the `--`.
+
+Seven invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
+quiet on success without it (#529). They are GATE's `spec_lint --json`, PLAN's
+`trace.py --check --plans-only`, both `smoketest_headless --json` runs, `factory_cache.py`,
+VERIFY's evidence scenario, and SHIP's `factory_publish --open-pr`. VERIFY's is stated as a rule
+rather than a literal command line because step 6's scenario is composed ad hoc — there is no
+fixed command to tag. Every other wrapped command is gated on its exit code alone, so the summary
+line is enough.
 
 ---
 
@@ -29,7 +39,7 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 
 ## GATE
 
-1. `LOG GATE -- python tools/spec_lint.py --issue <N> --json`
+1. `LOG GATE --stream -- python tools/spec_lint.py --issue <N> --json`
 2. Record the gate result:
    `python tools/factory_event.py --issue <N> --kind gate --field stage=GATE --field gate=spec-lint --field result=<pass|fail>`
 3. **Exit 1 (invalid spec) → terminal, before any worktree exists.** Do **not** comment on the
@@ -81,7 +91,7 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    - Are the types, names and signatures consistent between tasks?
 
    Every unresolved judgment call it raises becomes a `decision` event.
-6. `LOG PLAN -- python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` line
+6. `LOG PLAN --stream -- python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` line
    naming this plan. Record as a gate.
 7. `python tools/factory_publish.py --issue <N> --stage-completed PLAN`
    This is where the **plan issue** appears (#514): title `plan: <slug> (#<N>)`, label `plan`,
@@ -127,15 +137,15 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    no retry, no diagnostic.
 5. Blocking generic smoketest:
    ```
-   LOG VERIFY -- python tools/smoketest_headless.py --scenario generic-smoke --json
+   LOG VERIFY --stream -- python tools/smoketest_headless.py --scenario generic-smoke --json
    ```
    Record a `scenario` event with `blocking=true`.
    - Exit 0 → continue.
    - Exit 1 → **one** differential-guided attempt:
-     a. `LOG VERIFY -- python tools/factory_cache.py` → prints the reference ROM path. Exit 1 is
+     a. `LOG VERIFY --stream -- python tools/factory_cache.py` → prints the reference ROM path. Exit 1 is
         a reference-build failure; exit 2 means it could not run. Either way, say so and treat
         the smoketest failure as undiagnosed.
-     b. `LOG VERIFY -- python tools/smoketest_headless.py --scenario generic-smoke --ref-rom <path> --json`
+     b. `LOG VERIFY --stream -- python tools/smoketest_headless.py --scenario generic-smoke --ref-rom <path> --json`
      c. Read `divergence` from the JSON — `step`, `frame`, `symbol`, `main`, `ref`. **That first
         WRAM divergence is where the diagnosis starts.** Never diagnose from code inspection.
      d. If `verdict` is `scenario-invalid`, both ROMs failed: the scenario is wrong, not the
@@ -147,6 +157,8 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    `"blocking": false`, and run it. Record a `scenario` event with `blocking=false`.
    **Evidence, not a gate.** One fix attempt; still failing → the PR ships with a prominent
    FAILED section (the reporter emits it).
+
+   Wrap it with `--stream`: its JSON verdict is read, not just its exit code.
 7. `python tools/factory_publish.py --issue <N> --stage-completed VERIFY`
 
 ## SHIP
@@ -162,7 +174,7 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    `gh auth setup-git`.
 4. Open the PR through the publisher — never `gh pr create` directly (#481):
    ```
-   LOG SHIP -- python tools/factory_publish.py --issue <N> --open-pr --branch factory-issue-<N> --title "<type>: <summary> (#<N>)" --body-file .factory/runs/issue-<N>/pr-body.md
+   LOG SHIP --stream -- python tools/factory_publish.py --issue <N> --open-pr --branch factory-issue-<N> --title "<type>: <summary> (#<N>)" --body-file .factory/runs/issue-<N>/pr-body.md
    ```
    It prints the PR URL on stdout. **Exit 1 here is terminal, not a degradation** — this is the
    one `factory_publish` call where that is true, because the PR is the run's deliverable and

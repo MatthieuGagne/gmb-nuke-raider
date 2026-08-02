@@ -644,9 +644,9 @@ exists to preserve.
 
 ### Stage logs
 
-`tools/factory_log.py` runs a stage command and tees its merged stdout+stderr both to the
-console and to `runs/issue-<N>/logs/<STAGE>.log` — binary end-to-end, byte-identical to what
-the console saw. Logs are append-only within a stage: retries accumulate, each invocation
+`tools/factory_log.py` runs a stage command, appends its merged stdout+stderr to
+`runs/issue-<N>/logs/<STAGE>.log` — binary end-to-end, the child's bytes verbatim — and reports
+on the console. Logs are append-only within a stage: retries accumulate, each invocation
 wrapped in a single-line header and trailer, so `grep '^===== factory-log'` reconstructs the
 invocation list with no parser:
 
@@ -664,7 +664,18 @@ otherwise indistinguishable from a command that failed silently.
 
 The child's stdout is a **pipe, not a pty**, so `isatty()` is false and TTY-conditional color
 and progress rendering are suppressed. That is the documented cost of capture; nothing forces
-color back on, which keeps the logs greppable and the log byte-identical to the console.
+color back on, which keeps the logs greppable.
+
+The **console** copy is asymmetric (#529). A failing command prints its full output,
+byte-identical to the logged body. A passing command prints one summary line —
+`factory-log: ok stage=VERIFY exit=0 bytes=12043 lines=118 log=<path> cmd: make` — because the
+bytes are already on disk and a passing gate conveys one bit. The log file is unaffected either
+way, so the autopsy tail and the published log assets see no difference. `--stream`
+(`run_logged(..., stream=True)`) restores the live tee for one invocation; use it when the caller
+reads the command's stdout rather than only its exit code. The summary is suppressed whenever the
+log sink failed, so the console never goes quiet in favour of a file that was never written.
+Buffering also means the console stays silent *while* a command runs: one that hangs or is killed
+prints nothing, and the stage log is where to look.
 
 Logging is **fail-open**: the child's exit code is always returned, and each logging failure
 (unresolvable registry root, no issue number, unwritable destination, mid-stream write error)
@@ -683,6 +694,7 @@ python tools/factory_report.py --issue 436              # PR body to stdout
 python tools/factory_report.py --issue 436 --out body.md
 python tools/factory_log.py --stage BUILD --issue 450 -- make clean
 python tools/factory_log.py --stage BUILD --attempt 2 -- pwsh -NoProfile -Command "make clean; make"
+python tools/factory_log.py --stage GATE --issue 529 --stream -- python tools/spec_lint.py --issue 529 --json
 python tools/factory_publish.py --issue 437 --run-start
 python tools/factory_publish.py --issue 437 --stage-completed BUILD
 python tools/factory_publish.py --issue 437 --terminal
@@ -697,7 +709,8 @@ python tools/factory_cache.py --print-only              # cache path, never buil
 failure; neither ever exits `1` from run content — an unhealthy run is a thing to report, not
 a tool error. `factory_log` passes the child's exit code through verbatim, returns `127` when
 the command cannot be spawned, and `2` on misuse (unknown `--stage`, bad `--now`, no command
-after `--`). Commands are argv lists — never `shell=True`; a compound command names its shell
+after `--`). On success it prints only a summary line; `--stream` restores the full output.
+Commands are argv lists — never `shell=True`; a compound command names its shell
 explicitly, as in the `pwsh -NoProfile -Command` example above.
 
 `factory_event` exits `0` when the event is appended and `2` on misuse (unknown kind, malformed
