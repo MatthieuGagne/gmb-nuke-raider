@@ -59,6 +59,13 @@ directories under `.claude/skills/`.
 (`.claude/skills/factory/references/stages.md`) — the overlays' shared references live under
 `.claude/skill-overlays/references/` and are a separate tree.
 
+One overlay section is a charter rather than a workflow rule: **the adversarial charter for the
+final whole-branch review** (`.claude/skill-overlays/subagent-driven-development.md`). The
+baseline dispatches that review by prompt-file path rather than by invoking a skill, so an
+overlay written against `requesting-code-review` would never be injected — the charter lives in
+the overlay of the skill that performs the dispatch, and therefore reaches factory runs and
+manual sessions alike (#533).
+
 ---
 
 ## 2. Branch & Worktree Policy
