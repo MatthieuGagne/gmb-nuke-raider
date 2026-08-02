@@ -658,6 +658,22 @@ class TestRenderPlanBody(PublishTestCase):
         body = self.body(text=text)
         self.assertNotIn('someone', body)
 
+    def test_a_path_inside_a_url_query_string_is_redacted(self):
+        """The hole the URL-holdout approach had: text inside a URL match
+        was copied out verbatim, so a path glued to one rode through."""
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- log: https://ci.example.com/b?out=C:\\Users\\alice\\log.txt')
+        body = self.body(text=text)
+        self.assertNotIn('alice', body)
+
+    def test_a_posix_home_path_inside_a_url_is_redacted(self):
+        text = big_plan().replace(
+            '- Python 3 stdlib only.',
+            '- log: https://ci.example.com/b?p=/home/alice/z')
+        body = self.body(text=text)
+        self.assertNotIn('alice', body)
+
     def test_an_unterminated_fence_says_so_in_the_body(self):
         body = self.body(text='# T\n\np\n\n## Task 1: a\n\n```\nunclosed\n')
         self.assertIn(factory_publish.PLAN_UNTERMINATED, body)

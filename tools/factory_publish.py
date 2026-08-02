@@ -649,27 +649,29 @@ def render_plan_title(state):
     return "plan: %s (#%d)" % (_plan_slug(state), int(state["issue"]))
 
 
-_URL = re.compile(r"https?://[^\s)>\]]+")
+# factory_report.ABSOLUTE_PATH with one change: a left boundary on the
+# drive-letter alternative. Without it the pattern matches the "s:/" inside
+# "https:/" and turns every citation into "http<path>" -- and plans cite
+# issue and PR URLs constantly. Anchoring beats holding URLs out of the
+# redaction: an exemption is unreachable by the redactor, so a path glued to
+# a URL (".../build?out=C:\Users\alice\log.txt") rode straight through it.
+# factory_report is out of scope for #514, so the variant lives here.
+_PROSE_PATH = re.compile(
+    r"(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s`|]*"
+    r"|\\\\[^\s`|]+"
+    r"|(?<![\w.~-])/(?:home|Users|opt|mnt|srv|var|tmp)/[^\s`|]*")
 
 
 def _redact_prose(text):
-    """``factory_report.redact`` for free-form plan prose, sparing URLs.
+    """``factory_report.redact`` for free-form plan prose.
 
-    ABSOLUTE_PATH's drive-letter alternative has no left boundary, so it
-    matches the ``s://host/path`` tail of every https URL and turns a
-    citation into ``http<path>``. Plan preambles cite issue and PR URLs
-    constantly and this body exists to be read, so http(s) URLs are held out
-    and everything around them is redacted normally. Only http and https are
-    spared: a ``file:///C:/Users/...`` URL is a path and must still go.
+    Same substitution, same placeholder; only the drive-letter alternative
+    differs, and only by requiring that it not follow an alphanumeric. A
+    plain ``https://host/path`` is therefore untouched while
+    ``C:\\Users\\...`` still goes, wherever it appears -- including inside a
+    URL's query string.
     """
-    out = []
-    last = 0
-    for match in _URL.finditer(text):
-        out.append(factory_report.redact(text[last:match.start()]))
-        out.append(match.group(0))
-        last = match.end()
-    out.append(factory_report.redact(text[last:]))
-    return "".join(out)
+    return _PROSE_PATH.sub(factory_report.REDACTION, text)
 
 
 def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
