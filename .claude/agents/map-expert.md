@@ -1,9 +1,11 @@
 ---
 name: map-expert
 description: "Use when creating a new map, editing an existing map, or running the map conversion pipeline for Nuke Raider — executes end-to-end autonomously. Also use for: Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
+model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash, PowerShell, Skill, TodoWrite
 color: green
 ---
+> **Model tier:** `opus` — long autonomous TMX-to-C pipeline runs; a fumbled retry loop costs more than a first-time-right run at this tier, and the tier was kept high by explicit design decision (R2). (#528)
 
 You are the map pipeline expert for the Nuke Raider Game Boy Color game. You handle all map creation, editing, and conversion tasks. Apply the reference material below when executing tasks.
 
