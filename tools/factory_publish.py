@@ -109,6 +109,9 @@ def new_publish_state(issue):
         "issue": int(issue),
         "run_issue": None,          # the GitHub issue this run renders into
         "projected": False,         # added to the Documents project, Type=Log
+        "plan_issue": None,         # the plan issue this run renders into
+        "plan_projected": False,    # added to the project, Type=Plan (#514)
+        "plan_sha256": None,        # digest of the plan as last uploaded
         "commented_attempts": [],   # spec-issue comments already posted (R10)
         "uploaded": [],             # asset names already on the release (R7)
         "withheld": {},             # asset name -> reason the scan refused it
@@ -679,8 +682,8 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
     # Every line below is lifted verbatim from a local file and published to
     # a public, indexed issue. Plans routinely name machine-specific
     # toolchain paths in their preamble and absolute paths in a Files
-    # bullet, so the redaction display_worktree() applies to a worktree path
-    # applies to all of it.
+    # bullet, so the same redaction display_worktree() gives a worktree path
+    # is what this text needs too.
     preamble = [factory_report.redact(line) for line in preamble]
     tasks = [[factory_report.redact(line) for line in block]
              for block in tasks]
@@ -709,11 +712,13 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
 
 def _render(ctx):
     state = ctx["state"]
-    out = ["**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
-           % (int(state["issue"]), state.get("branch") or "-",
-              int(state.get("attempt") or 1), state.get("updated") or "-"),
-           "",
-           stage_strip(state, ctx["now"])]
+    header = ("**Spec** #%d · **Branch** `%s` · **Attempt** %d · **Updated** %s"
+              % (int(state["issue"]), state.get("branch") or "-",
+                 int(state.get("attempt") or 1), state.get("updated") or "-"))
+    plan_issue = (ctx["publish"] or {}).get("plan_issue")
+    if plan_issue:
+        header += " · **Plan** #%d" % plan_issue
+    out = [header, "", stage_strip(state, ctx["now"])]
     for title, render in ctx["sections"]:
         lines = render(ctx)
         if lines is None:
@@ -900,13 +905,14 @@ def _already(proc, *needles):
     return any(n in text for n in needles)
 
 
-def ensure_label(warnings, runner=subprocess.run):
-    """Create the ``log`` label if it is missing. Idempotent, fail-open."""
-    proc = gh(["label", "create", RUN_LABEL, "--color", "5319E7",
-               "--description", "Factory run dashboard issue"], runner=runner)
+def ensure_label(warnings, runner=subprocess.run, label=RUN_LABEL,
+                 color="5319E7", description="Factory run dashboard issue"):
+    """Create *label* if it is missing. Idempotent, fail-open."""
+    proc = gh(["label", "create", label, "--color", color,
+               "--description", description], runner=runner)
     if proc.returncode == 0 or _already(proc, "already exists"):
         return True
-    _warn(warnings, "label %r not ensured: %s" % (RUN_LABEL, _tail(proc.stderr)))
+    _warn(warnings, "label %r not ensured: %s" % (label, _tail(proc.stderr)))
     return False
 
 
@@ -994,21 +1000,23 @@ def set_issue_state(number, want_open, warnings, runner=subprocess.run):
     return False
 
 
-def ensure_project_type_log(publish, issue_url, warnings,
-                            runner=subprocess.run):
-    """Add the run issue to "Nuke Raider — Documents" with Type = Log.
+def ensure_project_type(publish, issue_url, warnings, option, flag,
+                        runner=subprocess.run):
+    """Add an issue to "Nuke Raider — Documents" with ``Type = <option>``.
 
-    Once per run, not once per publish: this is four API calls and the Logs
-    view only needs the item to exist. Projects views have no API, so the view
-    itself was built by hand (R13) and this only feeds it.
+    Once per issue, tracked by *flag* in publish.json: this is four API calls
+    and the project views only need the item to exist. Projects views have no
+    API, so the views themselves were built by hand (R13) and this only feeds
+    them. The option is resolved by name, so a regenerated option id is a
+    non-issue.
     """
-    if publish.get("projected"):
+    if publish.get(flag):
         return True
     add = gh(["project", "item-add", str(PROJECT_NUMBER), "--owner",
               PROJECT_OWNER, "--url", issue_url, "--format", "json"],
              runner=runner)
     if add.returncode != 0:
-        _warn(warnings, "run issue not added to the Documents project: %s"
+        _warn(warnings, "issue not added to the Documents project: %s"
               % _tail(add.stderr))
         return False
     try:
@@ -1025,24 +1033,32 @@ def ensure_project_type_log(publish, issue_url, warnings,
             if field.get("name") != "Type":
                 continue
             field_id = field.get("id")
-            for option in field.get("options") or []:
-                if option.get("name") == "Log":
-                    option_id = option.get("id")
+            for candidate in field.get("options") or []:
+                if candidate.get("name") == option:
+                    option_id = candidate.get("id")
     except (ValueError, AttributeError):
         pass
     if not field_id or not option_id:
-        _warn(warnings, "project Type=Log not set: no Type field with a Log "
-                        "option in project %d" % PROJECT_NUMBER)
+        _warn(warnings, "project Type=%s not set: no Type field with a %s "
+                        "option in project %d" % (option, option, PROJECT_NUMBER))
         return False
 
     edit = gh(["project", "item-edit", "--id", item_id, "--project-id",
                PROJECT_ID, "--field-id", field_id,
                "--single-select-option-id", option_id], runner=runner)
     if edit.returncode != 0:
-        _warn(warnings, "project Type=Log not set: %s" % _tail(edit.stderr))
+        _warn(warnings, "project Type=%s not set: %s"
+              % (option, _tail(edit.stderr)))
         return False
-    publish["projected"] = True
+    publish[flag] = True
     return True
+
+
+def ensure_project_type_log(publish, issue_url, warnings,
+                            runner=subprocess.run):
+    """``Type = Log`` for the run issue — the #472 surface, unchanged."""
+    return ensure_project_type(publish, issue_url, warnings, "Log",
+                               "projected", runner=runner)
 
 
 # ── Assets ───────────────────────────────────────────────────────────────────
@@ -1059,15 +1075,26 @@ def stage_dir(issue, registry=None):
     return path
 
 
-def upload_asset(path, name, publish, warnings, runner=subprocess.run):
-    """Upload one staged asset. Never clobbers an existing one (R7)."""
-    if name in (publish.get("uploaded") or []):
+def upload_asset(path, name, publish, warnings, runner=subprocess.run,
+                 clobber=False):
+    """Upload one staged asset. Never clobbers an existing one (R7).
+
+    The single exception is the plan asset, which R5 (#514) makes a living
+    mirror of the plan file: it is re-uploaded with ``--clobber`` whenever the
+    plan's sha256 moves, and its ledger entry stays one name.
+    """
+    uploaded = publish.setdefault("uploaded", [])
+    if name in uploaded and not clobber:
         return True
-    proc = gh(["release", "upload", RELEASE_TAG, path], runner=runner)
+    argv = ["release", "upload", RELEASE_TAG, path]
+    if clobber:
+        argv.append("--clobber")
+    proc = gh(argv, runner=runner)
     if proc.returncode != 0:
         _warn(warnings, "asset %s not uploaded: %s" % (name, _tail(proc.stderr)))
         return False
-    publish.setdefault("uploaded", []).append(name)
+    if name not in uploaded:
+        uploaded.append(name)
     return True
 
 
@@ -1135,6 +1162,125 @@ def publish_screenshots(state, publish, warnings, registry=None,
         if upload_asset(dest, name, publish, warnings, runner=runner):
             published.append(name)
     return published
+
+
+def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
+                       runner=subprocess.run):
+    """Upload the byte-exact plan, re-uploading only when it changed (R4/R5).
+
+    The plan is the one asset that is a mirror rather than a record: real
+    plans are 1800-3200 lines and the issue body is only a summary, so this
+    file is the normal read path and it has to track edits made during BUILD.
+
+    *reason* is ``scan_secrets(path)``, computed once by the caller because
+    the same verdict also decides whether the issue **body** may carry the
+    plan text. Scanning here and rendering there independently is how a
+    credential ends up withheld from the asset and published in the issue.
+    """
+    issue = int(state["issue"])
+    name = plan_asset_name(issue)
+    if reason:
+        publish.setdefault("withheld", {})[name] = "%s — local copy: %s" % (
+            reason, state.get("plan") or "the run's worktree")
+        _warn(warnings, "plan asset withheld: %s (the run is unaffected)"
+              % reason)
+        return False
+    # A mirror clears as well as sets: once the author removes the offending
+    # string, a stale entry here would keep the body rendering the withheld
+    # marker forever and make R5's re-sync one-way.
+    (publish.get("withheld") or {}).pop(name, None)
+
+    try:
+        digest = factory_run.sha256_file(path)
+    except OSError as exc:
+        _warn(warnings, "plan asset %s not hashed: %s" % (name, exc))
+        return False
+    if digest == publish.get("plan_sha256"):
+        return True
+
+    dest = os.path.join(stage_dir(issue, registry), name)
+    try:
+        shutil.copyfile(path, dest)
+    except OSError as exc:
+        _warn(warnings, "plan asset %s not staged: %s" % (name, exc))
+        return False
+    if not upload_asset(dest, name, publish, warnings, runner=runner,
+                        clobber=True):
+        return False
+    publish["plan_sha256"] = digest
+    return True
+
+
+def ensure_plan_issue(state, publish, title, body, warnings, registry=None,
+                      runner=subprocess.run):
+    """Create the plan issue, or edit the one this run already owns (R6).
+
+    Never closed by this module: a plan issue is closed by the merge of the PR
+    that carries ``Closes #<plan issue>`` (R7), and a run that never ships
+    leaves it open on purpose, as standing evidence (R9).
+    """
+    issue = int(state["issue"])
+    path = write_body_file(issue, body, registry, name="publish-plan-body.md")
+    number = publish.get("plan_issue")
+    if number:
+        proc = gh(["issue", "edit", str(number), "--title", title,
+                   "--body-file", path], runner=runner)
+        if proc.returncode != 0:
+            _warn(warnings, "plan issue #%d not updated: %s"
+                  % (number, _tail(proc.stderr)))
+        return number
+
+    ensure_label(warnings, runner=runner, label=PLAN_LABEL,
+                 color=PLAN_LABEL_COLOR, description=PLAN_LABEL_DESC)
+    proc = gh(["issue", "create", "--title", title, "--body-file", path,
+               "--label", PLAN_LABEL], runner=runner)
+    if proc.returncode != 0:
+        _warn(warnings, "plan issue not created: %s" % _tail(proc.stderr))
+        return None
+    match = _ISSUE_NUMBER.search((proc.stdout or "").strip())
+    if not match:
+        _warn(warnings, "plan issue number not parseable from: %s"
+              % _tail(proc.stdout))
+        return None
+    publish["plan_issue"] = int(match.group(1))
+    publish["plan_issue_url"] = (proc.stdout or "").strip().splitlines()[-1]
+    return publish["plan_issue"]
+
+
+def publish_plan(state, publish, warnings, registry=None,
+                 runner=subprocess.run, repo=DEFAULT_REPO):
+    """Create or re-sync this run's plan issue and its release asset (#514).
+
+    Fail-open in exactly one place: the plan is read once, and a plan that
+    cannot be read costs one warning and skips both surfaces (R10). A run with
+    no plan recorded — every publish before PLAN step 4 — is silent rather
+    than degraded, because there is nothing wrong with it yet.
+    """
+    if not state.get("plan"):
+        return None
+    text = read_plan(state)
+    if text is None:
+        _warn(warnings, "plan not published: cannot read %s"
+              % (state.get("plan") or "the recorded path"))
+        return publish.get("plan_issue")
+
+    # One scan, two surfaces. A credential-shaped string withholds the asset
+    # *and* empties the summary: the issue body is the more exposed of the
+    # two, because GitHub indexes it and a release asset is a download.
+    path = plan_path(state)
+    reason = scan_secrets(path)
+    publish_plan_asset(state, publish, path, reason, warnings,
+                       registry=registry, runner=runner)
+    number = ensure_plan_issue(
+        state, publish, render_plan_title(state),
+        render_plan_body(state, publish, "" if reason else text, repo=repo),
+        warnings, registry=registry, runner=runner)
+    if number:
+        url = publish.get("plan_issue_url") or \
+            "https://github.com/%s/issues/%d" % (repo, number)
+        ensure_project_type(publish, url, warnings, PLAN_TYPE_OPTION,
+                            "plan_projected", runner=runner)
+    return number
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────
@@ -1247,6 +1393,10 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
                           registry=registry, runner=runner)
     publish_screenshots(state, publish, warnings, registry=registry,
                         runner=runner)
+    # Before the run issue renders, so its header can cross-link a plan issue
+    # number that is already known (R11). By PLAN the run issue exists — GATE
+    # published first — so the plan body's own back-link is never empty.
+    publish_plan(state, publish, warnings, registry=registry, runner=runner)
 
     known = publish.get("run_issue")
     if known and not terminal:
