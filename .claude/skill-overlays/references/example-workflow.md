@@ -45,7 +45,8 @@ Task reviewer 4: Spec ✅ compliant. Task quality: Approved.
 ...
 
 [After all tasks]
-[Run review-package PLAN_FILE MERGE_BASE HEAD; dispatch final code-reviewer on the most capable model]
+[Run review-package PLAN_FILE MERGE_BASE HEAD; dispatch final code-reviewer on the most capable model,
+ with the overlay's adversarial charter appended to the dispatch]
 Final reviewer: All requirements met
 
 [Check the bank-post-build and memory-check hook output from the last build — any FAIL stops here]
