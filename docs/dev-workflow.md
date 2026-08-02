@@ -38,6 +38,19 @@ fail-open: a missing overlay, malformed input, or any internal error produces no
 exit 0, so it can never block a session. Shared reference material for the overlays lives in
 `.claude/skill-overlays/references/`.
 
+**"The overlay wins" is conditional, and the pin does not enforce it** (#527). The canary
+compares *versions*, never *content*, so an overlay that still matches its pin can contradict
+that pin's text with no warning — which is how a local file came to revert several upstream
+improvements silently. Two rules close that gap:
+
+- **Every surviving override states what the baseline cannot know**, on a `**Why:**` line
+  directly under the section (or under the bullet, in overlays that use bullets). Platform
+  facts, project-specific agent routing, and repo policy qualify. "The baseline used to work
+  differently" does not — an override that cannot state a reason is removed, not kept.
+- **Every overlay records a `**Baseline audit:**` line** naming the baseline whose *content* it
+  was last read against, and the date. Re-run that audit when the drift warning fires, and when
+  an overlay is edited for any other reason.
+
 Only skills with **no** upstream baseline (`prd`, `bank-pre-write`, `doc-review`,
 `design-an-interface`, `triage-issue`, `factory`, the asset-pipeline skills, …) remain as real
 directories under `.claude/skills/`.

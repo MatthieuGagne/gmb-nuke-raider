@@ -3,15 +3,26 @@ name: executing-plans
 baseline: superpowers@6.2.0
 ---
 
-Project (Nuke Raider) additions and overrides for the baseline executing-plans skill. On conflict, this overlay wins.
+Project (Nuke Raider) additions and overrides for the baseline executing-plans skill. On
+conflict, this overlay wins — but an override earns that only by stating what the baseline
+cannot know (#527 R7).
+
+**Baseline audit:** content of `superpowers@6.2.0` read and compared on 2026-08-02 (#527 R6).
 
 ## Overrides (do NOT follow the baseline here)
 
 - **The baseline's advice to prefer subagent-driven-development does not auto-apply.** In this project the choice between SDD and executing-plans belongs to the user at plan handoff. Use this skill when the user chose "Parallel Session" execution; do not redirect to SDD on your own initiative.
+  **Why:** the baseline's note ("if subagents are available, use subagent-driven-development
+  instead") is written for a reader who has not already been asked. Here the `writing-plans`
+  overlay's Handoff has already put the choice to the user, and silently overriding their answer
+  is worse than the cost it saves.
 
 ## Project additions
 
 ### Worktree discipline
+
+**Why:** the baseline delegates workspace setup to `using-git-worktrees` and stops there; the
+stale-`build/` and stale-`make test` traps below are this project's, and both have bitten.
 
 - **Hard gate before reading the plan or touching any file:** confirm you are in a git worktree, not the main repo.
   ```bash
@@ -26,17 +37,28 @@ Project (Nuke Raider) additions and overrides for the baseline executing-plans s
 
 ### Per-task gate obligations
 
-- **The plan's embedded hard-gate steps are mandatory, not advisory.** For any task touching `src/*.c` or `src/*.h`, every gate the plan lists must actually execute: `bank-pre-write`, `gbdk-expert`, `bank-post-build`, `gb-memory-validator`, `gb-c-optimizer`.
+**Why:** the baseline says "follow each step exactly" and "don't skip verifications" but has no
+concept of a gate that must have *reported*, no agent roster, and no warning that a subagent's
+report can be false.
+
+- **The plan's embedded hard-gate steps are mandatory, not advisory.** For any task touching `src/*.c` or `src/*.h`, every gate the plan lists must have **fired and reported** before the task is complete. `bank-pre-write`, `bank-post-build` and `gb-memory-validator` fire automatically as hooks (PreToolUse on `src/*` writes, PostToolUse after a build) — do not invoke them by hand; **read their output** and treat any FAIL as blocking. `gbdk-expert` and `gb-c-optimizer` are agent dispatches and must actually be dispatched.
 - A gate step phrased as "HARD GATE — <agent>: confirm X" is not complete until that agent has **run and returned findings**. Reading the plan's description of the consultation is not sufficient.
 - **C tasks:** dispatch the `gbdk-expert` agent with `"implement this task: <full task text>"` — it owns the TDD cycle, bank gates, build, `gb-c-optimizer` review and fix, and the commit. **Music C tasks** (`src/music_data.c`, `src/music_data.h`, or any new song `.c`) go to `music-expert` the same way.
 - **After every implementer dispatch, verify the commit landed:** run `git log --oneline -1`. Never treat the agent's return message as proof of a commit — agents often return only their final step's output. If the commit is missing, re-dispatch the task from scratch.
+- **Review range.** Record BASE with `git rev-parse HEAD` **before** dispatching an implementer, and review from that BASE — never `HEAD~1`, which silently truncates a multi-commit task to its last commit. Hand the reviewer its diff as a file path, not as pasted text, so the diff never enters this session's context.
 - **Batch atomicity:** if any implementer in a parallel group fails, halt the whole batch. Passing implementers discard in-progress work — do not stage or commit partial results. Fix, then re-dispatch the entire group.
 
 ### `make test` early-exit behavior
 
+**Why:** the baseline says "don't skip verifications" and assumes a green run means a full run.
+This Makefile's `|| exit 1` breaks that assumption, and nothing upstream could know it.
+
 The Makefile uses `|| exit 1`, so it **stops at the first failing test binary** (alphabetical order). Test binaries after the first failure do NOT run. Fix failures starting from the earliest binary and re-run `make test` after each fix to reveal the next hidden failure. A single green run is the only proof the suite passes.
 
 ### Batch execution with Smoketest Checkpoints
+
+**Why:** the baseline has no checkpoint concept at all — it executes every task then finishes.
+A ROM that compiles can still fail to boot, so batches end where a human can see it run.
 
 Stop at each checkpoint the plan defines and run the full sequence:
 
@@ -52,6 +74,9 @@ Stop at each checkpoint the plan defines and run the full sequence:
 Between batches: report what was implemented plus verification output, then wait. Do not roll into the next batch unprompted.
 
 ### Factory mode
+
+**Why:** the factory runs unattended; every baseline instruction to stop and ask a human needs a
+headless replacement or an explicit waiver, and the baseline has no notion of such a run.
 
 Active when `NUKE_FACTORY_RUN` is set. It **overrides `### Batch execution with Smoketest
 Checkpoints`, `### Lessons Learned — HARD GATE` and `### Shipping` above.**
@@ -74,6 +99,9 @@ Outside a factory run every pause and every gate above fires exactly as written.
 
 ### Lessons Learned — HARD GATE
 
+**Why:** the baseline ends at `finishing-a-development-branch` and captures nothing; this project
+feeds surprises back into CLAUDE.md, skills and memory, which only the human can authorize.
+
 After the smoketest passes and **before pushing or creating the PR**, explicitly ask:
 
 > "Any important lessons learned from this implementation? (e.g. surprises, sharp edges, things that should update CLAUDE.md / skills / agents / memory)"
@@ -81,5 +109,9 @@ After the smoketest passes and **before pushing or creating the PR**, explicitly
 This is mandatory even when the implementation felt smooth. If the user provides lessons, invoke the `prd` skill to capture the documentation updates as a GitHub issue, and save anything session-relevant to memory. If they explicitly say there are none, note that and proceed. Do not push or open the PR before receiving an explicit answer.
 
 ### Shipping
+
+**Why:** the baseline delegates shipping wholesale to `finishing-a-development-branch`. The
+smoketest gate, the README rule and the allowlist-promotion rule ([ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)) are
+project policy that skill's baseline does not carry.
 
 Never push or create a PR before the Emulicious smoketest passes with user confirmation. Only after confirmation: update `README.md` if user-visible behavior changed, promote any newly approved tool permission into the tracked `.claude/settings.json` as a generalized rule (never commit `.claude/settings.local.json` — it is gitignored scratch; see [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466)), then push and open the PR with `Closes #N` in the body.
