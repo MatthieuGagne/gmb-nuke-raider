@@ -846,13 +846,19 @@ def finish_project_status(state, publish, run_url, warnings,
     created is exactly when a spec pinned at In Progress would mislead longest.
 
     ``run_url`` is the caller's to resolve, not this function's: ``publish_run``
-    passes it only when ``ensure_project_type_log`` already succeeded (the item
-    id is cached, so ``project_item_add`` below is never called again) or
-    short-circuited on an already-``projected`` record (the add below is then
-    the *first* attempt this publish, not a retry). It passes ``None`` exactly
-    when ``ensure_project_type_log`` already attempted the add this publish and
-    failed — recomputing the same URL and calling ``project_item_add`` again
-    here would just repeat that failed call and double the warning for it.
+    passes it when the run item is cached (``project_item_add`` below then
+    makes no network call at all — it only needs the URL to pass to
+    ``project_item_add`` if the cache is empty) or when the record was
+    already ``projected`` before this publish with no cached id (the add
+    below is then the *first* attempt this publish, not a retry). It passes
+    ``None`` exactly when neither is true: the run issue has no resolvable
+    board item this publish, because the only add attempt made for it this
+    publish — inside ``ensure_project_type_log`` — failed. Retrying that
+    same failed add here would just repeat the call and double the warning
+    for it; gating on ``ensure_project_type_log``'s overall return value
+    instead of on this narrower condition would also (wrongly) skip the
+    Done write whenever the add succeeds but a later step in that function,
+    such as the ``Type`` write, fails — the id is still perfectly usable.
     """
     if run_url:
         run_item = publish.get("run_item_id") or project_item_add(
@@ -1118,16 +1124,21 @@ def publish_run(issue, registry=None, stage_completed=None, terminal=False,
     number = ensure_run_issue(state, publish, title, body, warnings,
                               registry=registry, runner=runner)
 
-    joined = False
+    was_projected = bool(publish.get("projected"))
     run_url = None
     if number:
         run_url = publish.get("run_issue_url") or issue_url(number)
-        joined = ensure_project_type_log(publish, run_url, warnings,
-                                         runner=runner)
+        ensure_project_type_log(publish, run_url, warnings, runner=runner)
     if terminal:
         if number:
             set_issue_state(number, False, warnings, runner=runner)
-        finish_project_status(state, publish, run_url if joined else None,
+        # A resolvable board item is one already cached (the add succeeded,
+        # even if the later Type write did not) or one never attempted this
+        # publish at all (an already-projected record with no cached id).
+        # Neither case should retry a failed add — see
+        # finish_project_status()'s docstring.
+        resolved = bool(publish.get("run_item_id")) or was_projected
+        finish_project_status(state, publish, run_url if resolved else None,
                               warnings, runner=runner)
         comment_once(state, publish, number, warnings, registry=registry,
                      runner=runner)

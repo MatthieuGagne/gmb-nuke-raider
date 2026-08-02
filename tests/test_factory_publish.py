@@ -1209,6 +1209,49 @@ class TestPublishRun(PublishTestCase):
         self.assertEqual(result.warnings.count(run_warning), 1)
         self.assertIn(spec_warning, result.warnings)
 
+    def test_a_cached_run_item_still_gets_its_done_write_when_type_fails(self):
+        """Regression for the re-reviewer's "new breakage" finding: a fresh
+        run where ``project item-add`` succeeds (the id gets cached) but the
+        immediately-following ``Type`` write fails must still resolve the
+        run item and issue its terminal ``Done`` write — the id is perfectly
+        usable, only the unrelated ``Type`` edit failed. Uses a field list
+        that carries ``Status`` but not ``Type`` (rather than the empty
+        ``{"fields": []}`` from test_missing_type_option_warns_once) so the
+        Status writes this test asserts on can still resolve their field and
+        option ids."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        status_only = json.dumps({'fields': [
+            {'id': 'F_status', 'name': 'Status',
+             'options': [{'id': 'O_todo', 'name': 'Todo'},
+                         {'id': 'O_inprogress', 'name': 'In Progress'},
+                         {'id': 'O_done', 'name': 'Done'}]}]})
+        fake = self.fake(**{'project field-list': (0, status_only, '')})
+        result = factory_publish.publish_run(441, registry=reg, terminal=True,
+                                             runner=fake,
+                                             now=factory_fixtures.FIXED_NOW)
+        run_url = factory_publish.issue_url(result.run_issue)
+        adds_for_run = [a for a in fake.argv_for('project item-add')
+                       if run_url in a]
+        self.assertEqual(len(adds_for_run), 1)
+        self.assertIn(('PVTI_x', 'O_done'), self.status_edits(fake))
+
+    def test_a_previously_projected_record_with_no_cached_id_still_adds_and_marks_done(self):
+        """Case 4: a publish.json written before ``run_item_id`` existed —
+        ``projected`` True, no cached id. The add inside
+        ``finish_project_status`` is the first attempt this publish, not a
+        retry, and it must still resolve to a terminal ``Done`` write."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish.update({'run_issue': 481, 'projected': True})
+        factory_publish.save_publish_state(publish, reg)
+        fake = self.fake()
+        self.run_publish(fake, terminal=True, registry=reg)
+        run_url = factory_publish.issue_url(481)
+        adds_for_run = [a for a in fake.argv_for('project item-add')
+                       if run_url in a]
+        self.assertEqual(len(adds_for_run), 1)
+        self.assertEqual(self.status_edits(fake), [('PVTI_x', 'O_done')])
+
 
 class TestCli(PublishTestCase):
     def test_unknown_stage_is_misuse(self):
