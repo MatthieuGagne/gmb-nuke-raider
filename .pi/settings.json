@@ -4,7 +4,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "bash",
+        "matcher": "bash|powershell",
         "hooks": [
           {
             "type": "command",
@@ -24,7 +24,7 @@
         ]
       },
       {
-        "matcher": "bash",
+        "matcher": "bash|powershell",
         "hooks": [
           {
             "type": "command",
@@ -36,7 +36,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "bash",
+        "matcher": "bash|powershell",
         "hooks": [
           {
             "type": "command",
