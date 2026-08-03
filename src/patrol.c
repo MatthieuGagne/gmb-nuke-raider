@@ -11,6 +11,7 @@
 #include "damage.h"
 #include "enemy_common.h"    /* enemy_aim_dir, enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
 #include "vehicle_physics.h" /* vehicle_apply_physics, vehicle_step_axis_x/y */
+#include "beam.h"            /* beam_hit_damage() — LASER hitscan poll (#430) */
 
 extern int16_t cam_x;
 extern int16_t cam_y;
@@ -320,6 +321,19 @@ void patrol_update(int16_t px, int16_t py) BANKED {
                 } else {
                     patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
                 }
+            }
+        }
+
+        /* #430: hitscan beam — pierces, so this never consumes anything.
+         * Placed AFTER the on_screen block closes, still inside the per-patrol
+         * loop, so all three enemy modules poll in world space; the beam clips
+         * itself to the screen already. */
+        {
+            uint8_t bdmg = beam_hit_damage(patrol_px[i], patrol_py[i], 16u);
+            if (bdmg) {
+                patrol_hp[i] = enemy_apply_damage(patrol_hp[i], bdmg);
+                patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                if (patrol_hp[i] == 0u) { patrol_kill(i); continue; }
             }
         }
     }

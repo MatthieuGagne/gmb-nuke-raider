@@ -8,6 +8,7 @@
 #include "projectile.h"
 #include "../src/racer.h"
 #include "../src/sprite_pool.h"
+#include "../src/beam.h"
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
@@ -593,6 +594,73 @@ void test_px_py_exported_as_global(void) {
     TEST_ASSERT_EQUAL_INT16(99, py);
 }
 
+/* ===== LASER fire branch (issue #430) ====================================
+ * These run on the DEFAULT track map (track_map, 20x100, road = cols 4-15):
+ * (64,64) is road, and a DIR_R lane along world row 9 stays on road until
+ * col 16 (x=128). They MUST run before the racer tests below, which call
+ * track_test_set_map() and leave the map pointer aimed at a 12x8 array while
+ * setUp restores active_map_w/h to 20/100 — reads past that array otherwise. */
+
+void test_laser_loadout_fires_a_beam_not_a_bullet(void) {
+    /* R1/R7: with LASER equipped and a cardinal facing, A spawns no projectile
+     * and damage is available on the same frame. */
+    projectile_init(0u);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    player_set_pos(64, 64);
+    player_set_dir(DIR_R);
+    input = J_A;
+    player_update();
+    TEST_ASSERT_EQUAL_UINT8(0, projectile_count_active());
+    TEST_ASSERT_EQUAL_UINT8(WEAPON1_LASER_DAMAGE, beam_hit_damage(96, 64, 16u));
+}
+
+void test_laser_on_a_diagonal_fires_nothing_at_all(void) {
+    /* AC3: no beam AND no bullet — the press is fully silent. */
+    projectile_init(0u);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    player_set_pos(64, 64);
+    player_set_dir(DIR_RT);
+    input = J_A;
+    player_update();
+    TEST_ASSERT_EQUAL_UINT8(0, projectile_count_active());
+    TEST_ASSERT_EQUAL_UINT8(0, beam_hit_damage(96, 48, 16u));
+}
+
+void test_cannon_loadout_still_fires_a_bullet(void) {
+    /* R7/AC6: CANNON is untouched, including on diagonals. */
+    projectile_init(0u);
+    beam_init(0x40u);
+    beam_set_equipped(0u);
+    player_set_pos(64, 64);
+    player_set_dir(DIR_RT);
+    input = J_A;
+    player_update();
+    TEST_ASSERT_EQUAL_UINT8(1, projectile_count_active());
+}
+
+void test_held_a_auto_pulses_at_the_laser_cadence(void) {
+    /* R5/AC4: KEY_PRESSED is level-triggered, so holding A must re-fire once the
+     * cooldown expires. An edge-triggered fire site would pass every direct
+     * beam_fire() test and still fire only once per press here. */
+    uint8_t i;
+    uint8_t windows = 0u;
+    projectile_init(0u);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    player_set_pos(64, 64);
+    player_set_dir(DIR_R);
+    input = J_A;
+    for (i = 0u; i < (uint8_t)(LASER_FIRE_COOLDOWN + 2u); i++) {
+        player_set_pos(64, 64);          /* pin the car so the lane is stable */
+        player_update();
+        if (beam_hit_damage(96, 64, 16u)) windows++;
+        beam_update();
+    }
+    TEST_ASSERT_EQUAL_UINT8(2, windows);
+}
+
 /* ---- racer blocking player movement (issue #364) ---- */
 
 static const uint8_t s_road_12x8[8u * 12u] = {
@@ -719,6 +787,12 @@ int main(void) {
     RUN_TEST(test_player_set_dir_north);
     RUN_TEST(test_player_set_dir_south);
     RUN_TEST(test_px_py_exported_as_global);
+    /* AC: LASER fire branch (issue #430) — must stay ABOVE the racer group,
+     * which swaps in a 12x8 test map that setUp never restores. */
+    RUN_TEST(test_laser_loadout_fires_a_beam_not_a_bullet);
+    RUN_TEST(test_laser_on_a_diagonal_fires_nothing_at_all);
+    RUN_TEST(test_cannon_loadout_still_fires_a_bullet);
+    RUN_TEST(test_held_a_auto_pulses_at_the_laser_cadence);
     RUN_TEST(test_player_blocked_by_racer);
     RUN_TEST(test_player_takes_racer_ram_damage);
     RUN_TEST(test_player_not_blocked_when_racer_inactive);

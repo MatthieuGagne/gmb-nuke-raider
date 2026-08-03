@@ -15,6 +15,7 @@
 #include "racer.h"
 #include "vehicle_physics.h"
 #include "explosion.h"
+#include "beam.h"
 
 int16_t px;
 int16_t py;
@@ -181,13 +182,18 @@ void player_update(void) BANKED {
     terrain = track_tile_type((int16_t)(px + 8), (int16_t)(py + 8));
     player_apply_physics(input, terrain);
 
-    /* Fire machine gun on A (held + cooldown managed inside projectile module).
-     * sfx_play(SFX_SHOOT) is called inside projectile_fire() — only fires when a
-     * projectile actually spawns (every PROJ_FIRE_COOLDOWN frames), not every frame. */
+    /* Fire on A. CANNON spawns a traveling bullet (cooldown inside projectile.c);
+     * LASER fires an instantaneous cardinal-only beam (cooldown inside beam.c).
+     * KEY_PRESSED is level-triggered, so both auto-repeat while A is held (R5).
+     * Both play SFX_SHOOT only on an actual shot, not every held frame. */
     if (KEY_PRESSED(J_A)) {
-        uint8_t scr_x = (uint8_t)(px + 12 + DIR_DX[player_dir] * 8 - (int16_t)cam_x);
-        uint8_t scr_y = (uint8_t)(py - cam_y + 20 + DIR_DY[player_dir] * 8);
-        projectile_fire(scr_x, scr_y, player_dir, PROJ_OWNER_PLAYER);
+        if (beam_is_equipped()) {
+            (void)beam_fire(px, py, (uint8_t)player_dir);   /* refused on a diagonal (#430 R2) */
+        } else {
+            uint8_t scr_x = (uint8_t)(px + 12 + DIR_DX[player_dir] * 8 - (int16_t)cam_x);
+            uint8_t scr_y = (uint8_t)(py - cam_y + 20 + DIR_DY[player_dir] * 8);
+            projectile_fire(scr_x, scr_y, player_dir, PROJ_OWNER_PLAYER);
+        }
     }
 
     /* Apply X velocity — zero on wall/edge collision.

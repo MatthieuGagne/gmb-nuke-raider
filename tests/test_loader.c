@@ -113,7 +113,7 @@ void test_get_asset_slot_returns_sentinel_initially(void) {
 }
 
 void test_tile_asset_count_is_correct(void) {
-    TEST_ASSERT_EQUAL_UINT8(13u, (uint8_t)TILE_ASSET_COUNT);
+    TEST_ASSERT_EQUAL_UINT8(14u, (uint8_t)TILE_ASSET_COUNT);
 }
 
 /* ---- Registry tests ---- */
@@ -303,7 +303,7 @@ void test_load_racer_waypoints_track0_returns_zero(void) {
 }
 
 void test_playing_manifest_count_is_correct(void) {
-    TEST_ASSERT_EQUAL_UINT8(5u, k_playing_assets_count);
+    TEST_ASSERT_EQUAL_UINT8(6u, k_playing_assets_count);
 }
 
 void test_overmap_manifest_count_is_correct(void) {
@@ -312,6 +312,30 @@ void test_overmap_manifest_count_is_correct(void) {
 
 void test_hub_manifest_count_is_correct(void) {
     TEST_ASSERT_EQUAL_UINT8(5u, k_hub_assets_count);
+}
+
+void test_beam_asset_is_a_bg_asset(void) {
+    /* The beam paints the BG tilemap, so it must allocate from the BG region
+     * (slots 64-254), not the sprite region — the OAM pool has no room. */
+    const tile_registry_entry_t *e = loader_get_registry(TILE_ASSET_BEAM);
+    TEST_ASSERT_NOT_NULL(e);
+    TEST_ASSERT_NOT_NULL(e->data);
+    TEST_ASSERT_EQUAL_UINT8(0, e->is_sprite);
+}
+
+void test_beam_asset_is_in_the_playing_manifest(void) {
+    /* state_playing.enter() calls loader_get_slot(TILE_ASSET_BEAM), which halts
+     * if the asset was not part of the loaded manifest. */
+    uint8_t i;
+    uint8_t found = 0u;
+    for (i = 0u; i < k_playing_assets_count; i++) {
+        if (k_playing_assets[i] == (uint8_t)TILE_ASSET_BEAM) found = 1u;
+    }
+    TEST_ASSERT_EQUAL_UINT8(1, found);
+}
+
+void test_tile_asset_count_covers_beam(void) {
+    TEST_ASSERT_LESS_THAN(TILE_ASSET_COUNT, TILE_ASSET_BEAM);
 }
 
 void test_playing_manifest_load_unload_cycle(void) {
@@ -371,5 +395,8 @@ int main(void) {
     RUN_TEST(test_overmap_manifest_count_is_correct);
     RUN_TEST(test_hub_manifest_count_is_correct);
     RUN_TEST(test_playing_manifest_load_unload_cycle);
+    RUN_TEST(test_beam_asset_is_a_bg_asset);
+    RUN_TEST(test_beam_asset_is_in_the_playing_manifest);
+    RUN_TEST(test_tile_asset_count_covers_beam);
     return UNITY_END();
 }

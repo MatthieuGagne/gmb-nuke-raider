@@ -278,6 +278,30 @@ void test_camera_apply_scroll_sets_cam_scx_shadow(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)cam_x, cam_scx_shadow);
 }
 
+/* ---- camera_invalidate_col / queue-acceptance return codes ------------ */
+
+void test_invalidate_col_streams_that_column(void) {
+    /* A vertical beam must be able to repair the column it painted over. */
+    camera_init(0, 0);
+    camera_flush_vram();          /* drain whatever init queued */
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_UINT8(1, camera_invalidate_col(3u));
+    camera_flush_vram();
+    /* stream_col writes one column: width 1, height VIS_ROWS, at vram x = 3. */
+    TEST_ASSERT_EQUAL_UINT8(1,  mock_bkg_last_w);
+    TEST_ASSERT_EQUAL_UINT8(3,  mock_bkg_last_x);
+    TEST_ASSERT_EQUAL_UINT8(19, mock_bkg_last_h);
+}
+
+void test_invalidate_row_reports_acceptance(void) {
+    /* The beam retries a dropped restore, so the queue must say whether it took it. */
+    camera_init(0, 0);
+    camera_flush_vram();                                    /* drain: len == 0 */
+    TEST_ASSERT_EQUAL_UINT8(1, camera_invalidate_row(2u));  /* len 0 -> 1 */
+    TEST_ASSERT_EQUAL_UINT8(1, camera_invalidate_row(3u));  /* len 1 -> 2 == STREAM_BUF_SIZE */
+    TEST_ASSERT_EQUAL_UINT8(0, camera_invalidate_row(4u));  /* full -> refused */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -307,5 +331,7 @@ int main(void) {
     RUN_TEST(test_camera_update_snapshots_cam_tile_x);
     RUN_TEST(test_camera_apply_scroll_sets_cam_scx_shadow);
     RUN_TEST(test_camera_invalidate_row_queues_a_row_for_flush);
+    RUN_TEST(test_invalidate_col_streams_that_column);
+    RUN_TEST(test_invalidate_row_reports_acceptance);
     return UNITY_END();
 }

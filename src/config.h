@@ -35,6 +35,7 @@
 #define ENEMY_BULLET_DAMAGE        10u  /* HP damage dealt by an enemy bullet projectile */
 #define WEAPON1_CANNON_DAMAGE      1u   /* player CANNON (tier 0): HP removed per bullet hit */
 #define WEAPON1_LASER_DAMAGE       2u   /* player LASER  (tier 1): kills RACER_HP=5 in 3 hits (#424) */
+#define LOADOUT_WEAPON1_LASER      1u   /* WEAPON1 option index of LASER — matches LOADOUT_WEAPON1_NAMES[1] (#430) */
 
 /* Powerup system */
 #define MAX_POWERUPS               4u   /* powerup pool ceiling — max per track */
@@ -163,6 +164,17 @@
 #define PROJ_SPEED            4u    /* px/frame magnitude — used in PROJ_VEL_DX/DY tables in projectile.c */
 #define PROJ_MAX_TTL          60u   /* max frames alive; safety cap (~full-screen diagonal at PROJ_SPEED=4) */
 #define PROJ_FIRE_COOLDOWN    8u    /* frames between shots (held Select = 60/8 = ~7.5 shots/sec) */
+
+/* LASER beam (#430) — instantaneous cardinal-only hitscan.
+ * Rendered as BG tiles, never sprites: the Playing OAM pool peaks at 32/32. */
+#define LASER_FIRE_COOLDOWN   20u   /* frames between beam pulses while A is held; independent of PROJ_FIRE_COOLDOWN */
+#define BEAM_VISIBLE_FRAMES    6u   /* frames the lane stays drawn before the tiles are restored */
+#define BEAM_LANE_HALF         4u   /* px half-thickness of the damage band — matches the single 8px tile drawn */
+#define BEAM_MAX_CELLS        22u   /* max BG cells one lane can cover — matches camera.c VIS_COLS */
+#define BEAM_AXIS_H            0u   /* lane runs along X (DIR_L / DIR_R) */
+#define BEAM_AXIS_V            1u   /* lane runs along Y (DIR_T / DIR_B) */
+#define BEAM_TILE_OFS_H        0u   /* horizontal segment = loader slot + 0 */
+#define BEAM_TILE_OFS_V        1u   /* vertical segment   = loader slot + 1 */
 
 /* Music catch-up cap: max music_tick() calls music_service() runs in one frame to
  * resync tempo after a frame overrun. Bounds the catch-up so a multi-frame stall

@@ -5,6 +5,7 @@
 #include "enemy_common.h"
 #include "projectile.h"
 #include "explosion.h"
+#include "beam.h"     /* beam_init/beam_fire — LASER hitscan (#430) */
 
 void setUp(void) {
     turret_init_empty();
@@ -191,6 +192,47 @@ void test_turret_death_spawns_explosion(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, explosion_active_count());
 }
 
+/* ---- LASER beam vs turrets (#430 Task 7) ----
+ *
+ * TURRET_HP is 1 and WEAPON1_LASER_DAMAGE is 2, so a single pulse must destroy
+ * a turret. This is also the #424 underflow guard: routing the damage through
+ * enemy_apply_damage() floors at 0, whereas a raw `hp - dmg` would wrap to 255
+ * and leave the turret alive and active.
+ *
+ * test_turret.c never calls track_test_set_map(), so the default track_map
+ * (20x100, road = cols 4..15) is active. setUp() does NOT reset cam_x/cam_y and
+ * a neighbouring visibility test leaves cam_y = 100, so both are pinned here.
+ *
+ * Geometry: beam_fire(64, 64, DIR_R) -> lane rect x in [80,128), y in (68,76).
+ * A turret is 8x8 at its tile origin, so tile (12,9) is world (96,72) — inside
+ * on both axes. Tile (12,16) is world (96,128) — on screen, but outside the y
+ * band. Turrets never move, so no physics step can drift them out of the lane. */
+
+void test_beam_pulse_destroys_turret_in_the_lane(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    turret_set_explosion_base(10u);
+    turret_spawn(12u, 9u);                  /* world (96,72) — inside the lane */
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_count_active());
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, beam_fire(64, 64, DIR_R));
+    turret_update(64, 64);
+    TEST_ASSERT_EQUAL_UINT8(0u, turret_count_active());
+}
+
+void test_turret_outside_the_lane_survives_the_pulse(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    turret_set_explosion_base(10u);
+    turret_spawn(12u, 16u);                 /* world (96,128) — outside the y band */
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, beam_fire(64, 64, DIR_R));
+    turret_update(64, 64);
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_count_active());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_npc_type_constants_defined);
@@ -223,5 +265,7 @@ int main(void) {
     RUN_TEST(test_turret_dir_enum_has_16_values);
     RUN_TEST(test_turret_constants_values);
     RUN_TEST(test_turret_death_spawns_explosion);
+    RUN_TEST(test_beam_pulse_destroys_turret_in_the_lane);
+    RUN_TEST(test_turret_outside_the_lane_survives_the_pulse);
     return UNITY_END();
 }

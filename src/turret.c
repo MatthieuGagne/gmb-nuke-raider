@@ -10,6 +10,7 @@
 #include "camera.h"    /* cam_y — needed for OAM y coordinate calculations */
 #include "enemy_common.h"  /* enemy_aim_dir — shared aim math */
 #include "explosion.h" /* explosion_spawn() — OAM hand-off on turret death */
+#include "beam.h"      /* beam_hit_damage() — LASER hitscan poll (#430) */
 
 static uint8_t s_turret_tile_base;  /* OBJ tile index set by turret_init() */
 static uint8_t s_explosion_base;    /* OBJ tile index set by turret_set_explosion_base() */
@@ -90,6 +91,22 @@ uint8_t turret_spawn(uint8_t tx, uint8_t ty) BANKED {
     return 0u;
 }
 
+/* Deactivate turret i and hand its OAM slot to the explosion pool.
+ * Shared by the bullet and beam damage paths (#430). The caller must `continue`
+ * afterwards — this helper does not touch hp and does not skip the fire timer.
+ * static, so NOT BANKED (same-bank call from turret_update). */
+static void turret_destroy(uint8_t i) {
+    turret_active[i] = 0u;
+    if (turret_oam[i] != SPRITE_POOL_INVALID) {
+        /* Do NOT clear_sprite here — explosion now owns this slot and will
+         * call clear_sprite when the animation finishes. */
+        explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u,
+                        turret_oam_x[i],   /* world pixel x = tx*8+8 */
+                        turret_ty[i]);     /* world tile y */
+        turret_oam[i] = SPRITE_POOL_INVALID;
+    }
+}
+
 void turret_update(int16_t player_px, int16_t player_py) BANKED {
     uint8_t i;
     /* Player OAM-space position — must match projectile coordinate space.
@@ -99,12 +116,18 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
 
     for (i = 0u; i < MAX_ENEMIES; i++) {
         int16_t vis_x, vis_y;
+        uint16_t world_y;
         uint8_t scr_x, scr_y;
         if (!turret_active[i]) continue;
 
+        /* World pixel y = ty*8. Hoisted: the visibility test and the beam poll
+         * both need it, and an 8x8->16 multiply per turret per frame is not
+         * free on z80. ty <= 255 so ty*8 <= 2040 — always positive in int16_t. */
+        world_y = (uint16_t)turret_ty[i] * 8u;
+
         /* OAM-space position — adjusted for both scroll axes */
         vis_x = (int16_t)turret_oam_x[i] - (int16_t)cam_x;
-        vis_y = (int16_t)((uint16_t)turret_ty[i] * 8u) - (int16_t)cam_y + 16;
+        vis_y = (int16_t)world_y - (int16_t)cam_y + 16;
 
         /* Skip hit detection, timer, and fire for off-screen turrets */
         if (vis_x < 0 || vis_x >= 168 || vis_y < 0 || vis_y >= 160) continue;
@@ -118,18 +141,25 @@ void turret_update(int16_t player_px, int16_t player_py) BANKED {
             if (dmg) {
                 turret_hp[i] = enemy_apply_damage(turret_hp[i], dmg);
                 if (turret_hp[i] == 0u) {
-                    turret_active[i] = 0u;
-                    if (turret_oam[i] != SPRITE_POOL_INVALID) {
-                        /* Hand the OAM slot to the explosion pool.
-                         * Do NOT clear_sprite here — explosion now owns this slot
-                         * and will call clear_sprite when the animation finishes. */
-                        explosion_spawn(turret_oam[i], s_explosion_base, 0u, 0u,
-                                        turret_oam_x[i],        /* world pixel x = tx*8+8 */
-                                        turret_ty[i]);           /* world tile y */
-                        turret_oam[i] = SPRITE_POOL_INVALID;
-                    }
+                    turret_destroy(i);
                     continue;
                 }
+            }
+        }
+
+        /* #430: turrets are 8x8 at the tile origin; world x = tx*8.
+         * This poll deliberately STAYS INSIDE the visibility guard at :110 —
+         * every statement past it is already gated and there is no "outside"
+         * without restructuring the loop. Harmless: vis_x correctly subtracts
+         * cam_x and the beam is itself screen-clipped. The bullet branch above
+         * `continue`s when it destroys a turret, so a bullet kill never reaches
+         * this poll. */
+        {
+            uint8_t bdmg = beam_hit_damage((int16_t)((uint16_t)turret_tx[i] * 8u),
+                                           (int16_t)world_y, 8u);
+            if (bdmg) {
+                turret_hp[i] = enemy_apply_damage(turret_hp[i], bdmg);
+                if (turret_hp[i] == 0u) { turret_destroy(i); continue; }
             }
         }
 

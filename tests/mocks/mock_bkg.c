@@ -16,6 +16,12 @@ uint8_t mock_move_bkg_last_y     = 0;
 uint8_t mock_set_bkg_tile_xy_max_row    = 0u;
 int     mock_set_bkg_tile_xy_call_count = 0;
 
+/* Records the arguments of the most recent set_bkg_tiles() call — lets
+ * tests distinguish a row stream (w=VIS_COLS, h=1) from a column stream
+ * (w=1, h=VIS_ROWS) without decoding tile content. */
+uint8_t mock_bkg_last_x = 0u, mock_bkg_last_y = 0u;
+uint8_t mock_bkg_last_w = 0u, mock_bkg_last_h = 0u;
+
 void mock_set_bkg_tile_xy_reset(void) {
     mock_set_bkg_tile_xy_max_row    = 0u;
     mock_set_bkg_tile_xy_call_count = 0;
@@ -28,6 +34,10 @@ void mock_vram_clear(void) {
     mock_move_bkg_call_count      = 0;
     mock_move_bkg_last_y          = 0;
     mock_set_bkg_tile_xy_reset();
+    mock_bkg_last_x = 0u;
+    mock_bkg_last_y = 0u;
+    mock_bkg_last_w = 0u;
+    mock_bkg_last_h = 0u;
     for (i = 0u; i < 32u * 32u; i++) mock_vram[i] = 0u;
 }
 
@@ -51,6 +61,10 @@ void move_bkg(uint8_t x, uint8_t y) {
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles) {
     uint8_t dy, dx;
+    mock_bkg_last_x = x;
+    mock_bkg_last_y = y;
+    mock_bkg_last_w = w;
+    mock_bkg_last_h = h;
     mock_set_bkg_tiles_call_count++;
     for (dy = 0u; dy < h; dy++) {
         for (dx = 0u; dx < w; dx++) {

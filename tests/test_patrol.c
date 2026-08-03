@@ -4,6 +4,7 @@
 #include "player.h"   /* player_dir_t, DIR_* */
 #include "damage.h"   /* damage_init, damage_get_hp */
 #include "config.h"
+#include "beam.h"     /* beam_init/beam_fire — LASER hitscan (#430) */
 
 /* cam_x/cam_y defined in camera.c — declared here as int16_t (host pattern,
  * matches racer.c); do NOT include camera.h (volatile uint16_t) to avoid a
@@ -260,6 +261,48 @@ void test_patrol_bullet_hit_sets_hit_flash(void) {
     TEST_ASSERT_EQUAL_UINT8(RACER_HIT_FLASH_FRAMES, patrol_get_hit_flash(0u));
 }
 
+/* ---- LASER beam vs the patrol (#430 Task 7) ----
+ *
+ * MAX_PATROLS == 1, so there is no pierce case here — the single-patrol
+ * equivalent of the racer pair test.
+ *
+ * test_patrol.c never calls track_test_set_map(), so the default track_map
+ * (20x100, road = cols 4..15) is active for every test and these two are
+ * order-independent. setUp() already pins cam_x = cam_y = 0.
+ *
+ * Geometry: beam_fire(64, 64, DIR_R) -> lane rect x in [80,128), y in (68,76).
+ * The patrol spawns at (96,64), CHASEs the player at (64,64) and steps 5 px west
+ * to x 91 before the poll runs — still inside the lane on both axes, and 27 px
+ * from the player so enemy_ram_overlap() cannot confound the HP assertion. */
+
+void test_beam_pulse_damages_patrol_in_the_lane(void) {
+    static uint8_t wtx[1] = {12u};
+    static uint8_t wty[1] = {8u};
+    damage_init();
+    patrol_spawn_for_test(96, 64, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, beam_fire(64, 64, DIR_R));
+    patrol_update(64, 64);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(PATROL_HP - WEAPON1_LASER_DAMAGE),
+                            patrol_get_hp(0u));
+}
+
+void test_patrol_outside_the_lane_is_untouched_by_the_pulse(void) {
+    /* Same pulse, patrol 64 px further south: outside the y band, HP unchanged. */
+    static uint8_t wtx[1] = {12u};
+    static uint8_t wty[1] = {16u};
+    damage_init();
+    patrol_spawn_for_test(96, 128, wtx, wty, 1u);
+    patrol_set_hp_for_test(0u, PATROL_HP);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, beam_fire(64, 64, DIR_R));
+    patrol_update(64, 64);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)PATROL_HP, patrol_get_hp(0u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_fsm_enters_chase_when_inside_detect);
@@ -283,5 +326,7 @@ int main(void) {
     RUN_TEST(test_patrol_ram_nonlethal_sets_hit_flash);
     RUN_TEST(test_patrol_ram_to_kill_destroys);
     RUN_TEST(test_patrol_bullet_hit_sets_hit_flash);
+    RUN_TEST(test_beam_pulse_damages_patrol_in_the_lane);
+    RUN_TEST(test_patrol_outside_the_lane_is_untouched_by_the_pulse);
     return UNITY_END();
 }
