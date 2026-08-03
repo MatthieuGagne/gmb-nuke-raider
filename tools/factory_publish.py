@@ -1596,10 +1596,11 @@ CLOSES_LINE = "Closes #%d"
 def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
     """The PR body path, with ``Closes #<plan issue>`` appended (R7).
 
-    Returns the original path when there is no plan issue or the body already
-    closes it, and a staged copy otherwise — the file handed in is never
-    rewritten, because it is ``factory_report``'s deterministic output and the
-    SHIP stage may re-render it.
+    The line is appended to the file itself. The rendered body is produced
+    once and no second full copy is written: an 18 KB file used to be
+    rewritten in full to add one trailing line (#530 R4, AC5). The append is
+    idempotent, so a SHIP that re-renders and calls again gets one line, not
+    two.
 
     ``factory_report`` is deliberately not taught about this: the plan issue
     number lives in ``publish.json``, which only this module owns, and
@@ -1624,10 +1625,11 @@ def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
         line = CLOSES_LINE % int(number)
         if re.search(r"(?m)^%s\s*$" % re.escape(line), body):
             return body_path
-        if body and not body.endswith("\n"):
-            body += "\n"
-        return write_body_file(issue, body + line + "\n", registry,
-                               name="publish-pr-body.md")
+        with open(body_path, "a", encoding="utf-8", newline="\n") as fh:
+            if body and not body.endswith("\n"):
+                fh.write("\n")
+            fh.write(line + "\n")
+        return body_path
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         _warn(warnings, "plan issue not linked from the PR body: %s" % exc)
         return body_path

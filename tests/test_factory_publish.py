@@ -2256,14 +2256,34 @@ class PrBodyWithPlanTest(PublishTestCase):
     def test_no_plan_issue_returns_the_original_path_untouched(self):
         self.assertEqual(self.with_plan(number=None), self.body)
 
-    def test_the_original_body_file_is_never_rewritten(self):
+    def test_the_closing_reference_is_appended_in_place(self):
+        """AC5: one rendered body, and the plan link is in it."""
+        path = self.with_plan()
+        self.assertEqual(path, self.body)
+        self.assertTrue(self.read(self.body).endswith('Closes #482\n'))
+
+    def test_both_closing_references_are_present(self):
+        """AC5: the spec's own Closes line survives the append."""
+        body = self.read(self.with_plan())
+        self.assertIn('Closes #440\n', body)
+        self.assertIn('Closes #482\n', body)
+
+    def test_no_second_copy_of_the_body_is_written(self):
+        """AC5, AC4."""
         self.with_plan()
-        self.assertNotIn('482', self.read(self.body))
+        root = factory_run.run_dir(440, self.reg)
+        for dirpath, _dirs, names in os.walk(root):
+            for name in names:
+                self.assertNotIn('pr-body', name)
+
+    def test_a_body_without_a_trailing_newline_still_gets_one(self):
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('## Summary\n\nbody\n\nCloses #440')
+        self.assertTrue(self.read(self.with_plan()).endswith(
+            'Closes #440\nCloses #482\n'))
 
     def test_a_second_call_does_not_append_twice(self):
-        first = self.read(self.with_plan())
-        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
-            fh.write(first)
+        self.with_plan()
         self.assertEqual(self.read(self.with_plan()).count('Closes #482'), 1)
 
     def test_a_missing_body_file_warns_and_falls_back(self):
