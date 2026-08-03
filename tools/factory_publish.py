@@ -96,6 +96,10 @@ PUBLISH_DIRNAME = "publish"          # staged assets, publisher-owned
 BODY_MARKER = ("<!-- factory-publish v1 — regenerated on every publish; "
                "manual edits are overwritten -->")
 
+# One surface per run (#530 R1). The other one links here, so neither is a
+# dead end (R2).
+DECISIONS_IN_PR = "_The decisions are in the [pull request](%s)._"
+
 GLYPH_DONE = "✅"
 GLYPH_CURRENT = "🔵"
 GLYPH_FAILED = "❌"
@@ -274,7 +278,14 @@ def _section_gates(ctx):
 
 
 def _section_decisions(ctx):
-    _findings, decisions = factory_report.partition_decisions(ctx["state"])
+    findings, decisions = factory_report.partition_decisions(ctx["state"])
+    if ctx["pr"]:
+        # A shipped run puts the record where the human reviews the code, and
+        # this section becomes the link to it (#530 R1, R2). The link shows
+        # for a finding too: a run whose rulings are all findings would
+        # otherwise leave both surfaces pointing nowhere.
+        return [DECISIONS_IN_PR % ctx["pr"]] if (decisions or findings) \
+            else None
     dropped = ctx["drop_decisions"]
     kept = decisions[dropped:] if dropped else decisions
     if not kept and not dropped:
@@ -809,6 +820,7 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
     """
     ctx = {"state": state, "publish": publish, "registry": registry,
            "now": now, "repo": repo, "sections": SECTIONS,
+           "pr": state.get("pr") or (publish or {}).get("pr_url"),
            "shed_tail": False, "shed_permissions": False,
            "drop_findings": 0, "drop_decisions": 0}
 
@@ -840,13 +852,15 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
         if body is not None:
             return body
 
-    # Oldest first: the most recent decisions are the ones that explain where
-    # the run is now. Linear because decisions are human-authored and few.
-    for drop in range(1, len(decisions) + 1):
-        ctx["drop_decisions"] = drop
-        body = attempt()
-        if body is not None:
-            return body
+    if not ctx["pr"]:
+        # Oldest first: the most recent decisions are the ones that explain
+        # where the run is now. Linear because decisions are human-authored
+        # and few. Skipped when the section is already just a link.
+        for drop in range(1, len(decisions) + 1):
+            ctx["drop_decisions"] = drop
+            body = attempt()
+            if body is not None:
+                return body
 
     return _render(ctx)[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER
 
@@ -1608,6 +1622,32 @@ def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
         return body_path
 
 
+def open_pr_cli(issue, branch, title, body_file, registry=None,
+                runner=subprocess.run):
+    """The ``--open-pr`` command. Returns ``(url_or_None, warnings)``.
+
+    Persists ``pr_url`` in publish.json, which is what lets the run issue link
+    to the pull request instead of repeating the decision record (#530 R1).
+    The URL has to outlive this process for that to work, and the ``finish``
+    event does not carry it into the projection.
+
+    Nothing is saved when no URL comes back: a failed ``gh pr create`` must
+    not leave a URL behind for the next publish to link to.
+    """
+    warnings = []
+    publish = load_publish_state(issue, registry)
+    body_file = pr_body_with_plan(issue, body_file, registry=registry,
+                                  warnings=warnings)
+    url, _created = open_pr(issue, branch, title, body_file, publish=publish,
+                            warnings=warnings, runner=runner)
+    if url:
+        try:
+            save_publish_state(publish, registry)
+        except OSError as exc:
+            _warn(warnings, "publish state not saved: %s" % exc)
+    return url, warnings
+
+
 def run_start(issue, registry=None, runner=subprocess.run):
     """Mark the spec issue In Progress on the Documents board (#513 R1).
 
@@ -1786,12 +1826,8 @@ def main(argv=None):
             sys.stderr.write("factory-publish: --open-pr requires %s\n"
                              % ", ".join(missing))
             return EXIT_MISUSE
-        warnings = []
-        body_file = pr_body_with_plan(args.issue, args.body_file,
-                                      registry=args.registry,
-                                      warnings=warnings)
-        url, _ = open_pr(args.issue, args.branch, args.title, body_file,
-                         warnings=warnings)
+        url, _warnings = open_pr_cli(args.issue, args.branch, args.title,
+                                     args.body_file, registry=args.registry)
         if url:
             sys.stdout.write(url + "\n")
             return 0

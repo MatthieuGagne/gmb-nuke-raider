@@ -2383,3 +2383,118 @@ class RunDashboardRemovalTests(unittest.TestCase):
                     path = os.path.join(dirpath, name)
                     with open(path, encoding='utf-8') as fh:
                         self.assertNotIn(banned, fh.read(), path)
+
+
+PR_URL = 'https://github.com/MatthieuGagne/gmb-nuke-raider/pull/579'
+
+
+class DecisionSurfaceTests(PublishTestCase):
+    """#530 R1, R2 — AC1, AC2."""
+
+    def shipped_body(self, publish=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = publish or factory_publish.new_publish_state(440)
+        return factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def with_pr(self):
+        publish = factory_publish.new_publish_state(440)
+        publish['pr_url'] = PR_URL
+        return publish
+
+    def test_a_known_pr_replaces_the_decisions_with_a_link(self):
+        """AC1."""
+        body = self.shipped_body(self.with_pr())
+        self.assertIn(PR_URL, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
+    def test_the_recorded_pr_on_the_state_is_enough(self):
+        """AC1: publish.json is not the only source."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        factory_run.append_event(440, 'start', registry=reg, pr=PR_URL)
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg),
+            factory_publish.new_publish_state(440), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
+    def test_findings_stay_in_the_run_record_even_with_a_pr(self):
+        """AC3: only the decisions move."""
+        body = self.shipped_body(self.with_pr())
+        self.assertIn('### Plan review findings', body)
+        self.assertIn('Screenshots become data URIs.', body)
+
+    def test_a_run_whose_rulings_are_all_findings_still_links(self):
+        """R2: neither surface may become a dead end."""
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(700, 'start', registry=reg, stage='PLAN',
+                                 pr=PR_URL)
+        factory_run.append_event(700, 'decision', registry=reg,
+                                 text='Only a finding.', finding=True)
+        body = factory_publish.render_body(
+            factory_run.load_state(700, reg),
+            factory_publish.new_publish_state(700), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn('### Decisions made', body)
+        self.assertIn(PR_URL, body)
+
+    def test_a_run_with_no_rulings_at_all_shows_no_link(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(701, 'start', registry=reg, stage='SHIP',
+                                 pr=PR_URL)
+        body = factory_publish.render_body(
+            factory_run.load_state(701, reg),
+            factory_publish.new_publish_state(701), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn('### Decisions made', body)
+
+    def test_a_failed_run_keeps_its_decisions(self):
+        """AC2: no pull request exists, so nothing may be moved."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        body = factory_publish.render_body(
+            factory_run.load_state(441, reg),
+            factory_publish.new_publish_state(441), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn('Autopsy assembly is best-effort', body)
+        self.assertNotIn('pull request', body)
+
+    def test_an_unknown_pr_url_keeps_the_decisions(self):
+        """AC2: a degraded --open-pr must not silently drop the record."""
+        self.assertIn('Journal is the source of truth', self.shipped_body())
+
+    def test_the_linked_body_matches_its_golden(self):
+        """AC1."""
+        publish = self.with_pr()
+        publish['uploaded'].append('issue-440-attempt-1-BUILD.log')
+        self.assertEqual(self.shipped_body(publish),
+                         golden('expected_run_issue_body_shipped_pr.md'))
+
+    def test_open_pr_persists_the_url_for_the_run_record(self):
+        """AC1: the run record can only link to a URL that outlives SHIP."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (0, PR_URL + '\n', '')}))
+        self.assertEqual(url, PR_URL)
+        self.assertEqual(warnings, [])
+        self.assertEqual(
+            factory_publish.load_publish_state(440, reg)['pr_url'], PR_URL)
+
+    def test_a_pr_that_cannot_be_opened_persists_nothing(self):
+        """AC7: the terminal step stays terminal and writes no false URL."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (1, '', 'HTTP 500')}))
+        self.assertIsNone(url)
+        self.assertEqual(len(warnings), 1)
+        self.assertIsNone(
+            factory_publish.load_publish_state(440, reg).get('pr_url'))

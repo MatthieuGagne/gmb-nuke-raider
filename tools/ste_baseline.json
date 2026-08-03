@@ -3608,6 +3608,16 @@
       "noun-cluster:5e7446b54aa3": 1,
       "noun-cluster:8b4eb7e6c1f8": 1,
       "noun-cluster:9441ed4ca375": 1
+    },
+    "tests/fixtures/factory/expected_run_issue_body_shipped_pr.md": {
+      "banned-synonym:3c5b49277674": 4,
+      "banned-synonym:80754af91bfb": 5,
+      "banned-synonym:9d4e1e23bd5b": 5,
+      "noun-cluster:28c2c695baf7": 1,
+      "noun-cluster:5e7446b54aa3": 1,
+      "noun-cluster:89042c1a30d5": 1,
+      "noun-cluster:9d9c1ae27803": 1,
+      "passive-voice:befff80f46ac": 1
     }
   },
   "note": "Pre-existing findings (#517 R11). Forward-only: this file records what the tree already said, it does not excuse new prose.",
