@@ -253,9 +253,9 @@ class TestQuietOnSuccess(LogTestCase):
     def test_spawn_failure_still_returns_127_and_says_so(self):
         """AC4: distinct codes survive buffering.
 
-        The console is asserted empty, not merely summary-free: ``popen`` is the
-        first thing ``run_logged`` attempts, so no chunk has been read and the
-        buffer is provably empty on this path (#570).
+        The console is asserted empty, not merely summary-free: ``popen`` is
+        attempted before any chunk is read, and nothing before it writes to
+        *console*, so the buffer is provably empty on this path (#570).
         """
         code, console, err = self.run_logged(['definitely-not-a-real-command-529'])
         self.assertEqual(code, 127)
