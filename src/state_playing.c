@@ -25,6 +25,7 @@ BANKREF_EXTERN(state_playing)
 #include "music.h"
 #include "powerup.h"
 #include "explosion.h"
+#include "beam.h"
 #include "config.h"
 
 static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
@@ -94,6 +95,8 @@ static void enter(void) {
     damage_set_armor_tier(loadout_get_armor());  /* HEAVY armor reduces incoming damage for this race (#423) */
     projectile_init(loader_get_slot(TILE_ASSET_BULLET));
     projectile_set_weapon1_damage(WEAPON1_DAMAGE_TABLE[loadout_get_weapon1()]);  /* LASER deals more per hit (#424) */
+    beam_init(loader_get_slot(TILE_ASSET_BEAM));
+    beam_set_equipped(loadout_get_weapon1() == LOADOUT_WEAPON1_LASER);  /* #430 */
     turret_init(loader_get_slot(TILE_ASSET_TURRET));
     race_state_init(track_get_lap_count());
     racer_init(loader_get_slot(TILE_ASSET_PLAYER));
@@ -167,6 +170,7 @@ static void update(void) {
     explosion_render();
     hud_render();
     camera_flush_vram();
+    beam_render();            /* after the streamer, so a scrolled row cannot erase the lane */
     camera_apply_scroll();   /* SCY applied AFTER VRAM is ready */
     /* Game logic phase: runs during active display */
     player_update();
@@ -205,6 +209,7 @@ static void update(void) {
         explosion_update();
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
+        beam_update();            /* AFTER camera_update: queueing first makes the camera drop its own row stream */
         hud_update();
         /* Death: keep the world live (D6); play the car blast, then game-over (D7). */
         if (damage_is_dead()) {
