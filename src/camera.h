@@ -41,11 +41,19 @@ void camera_flush_vram(void) BANKED;
  * hardware SCY register at the guaranteed-safe VBlank start. */
 void camera_apply_scroll(void) BANKED;
 
-/* Force a specific world tile row to be re-streamed on the next
- * camera_flush_vram() call. Appends world_tile_row to stream_row_buf
- * only if stream_row_buf_len < STREAM_BUF_SIZE (same cap as camera_update).
- * Use when BG tiles in a visible row are changed at runtime (e.g. countdown
- * overlays, repair-pad state changes) and the BG tilemap must be refreshed. */
-void camera_invalidate_row(uint8_t world_tile_row) BANKED;
+/* Force a specific world tile row (or column) to be re-streamed on the next
+ * camera_flush_vram() call. Returns 1 if the event was queued, 0 if the buffer
+ * was full and the caller must retry on a later frame.
+ *
+ * The cap is NOT the same as camera_update()'s. camera_update() appends only
+ * while the buffer is empty (< 1); these append while it is below
+ * STREAM_BUF_SIZE (< 2). That second slot is what lets a runtime overlay queue
+ * a repair in the same frame the camera queues a scroll stream.
+ *
+ * Call AFTER camera_update() in the frame: queueing first makes camera_update()
+ * drop its own stream event and leaves an unpainted row while scrolling.
+ * Used by the countdown overlay, repair-pad state changes, and the #430 beam. */
+uint8_t camera_invalidate_row(uint8_t world_tile_row) BANKED;
+uint8_t camera_invalidate_col(uint8_t world_tile_col) BANKED;
 
 #endif /* CAMERA_H */

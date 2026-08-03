@@ -210,9 +210,20 @@ void camera_apply_scroll(void) BANKED {
     cam_scx_shadow = (uint8_t)cam_x;
 }
 
-void camera_invalidate_row(uint8_t world_tile_row) BANKED {
+uint8_t camera_invalidate_row(uint8_t world_tile_row) BANKED {
     if (stream_row_buf_len < STREAM_BUF_SIZE) {
         stream_row_buf[stream_row_buf_len] = world_tile_row;
         stream_row_buf_len++;
+        return 1u;
     }
+    return 0u;
+}
+
+uint8_t camera_invalidate_col(uint8_t world_tile_col) BANKED {
+    if (stream_col_buf_len < STREAM_BUF_SIZE) {
+        stream_col_buf[stream_col_buf_len] = world_tile_col;
+        stream_col_buf_len++;
+        return 1u;
+    }
+    return 0u;
 }
