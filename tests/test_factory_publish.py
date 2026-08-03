@@ -893,6 +893,30 @@ class FakeGh:
         return [argv for argv, _ in self.calls if self.key(argv) == key]
 
 
+class CapturingGh(FakeGh):
+    """FakeGh that reads each uploaded file while the upload is in flight.
+
+    The staged copy lives in a temp directory that is removed as soon as the
+    upload returns (#530 R4), so a test that resolves the path afterwards
+    reads nothing. `uploads` maps asset name to the exact bytes sent.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.uploads = {}
+
+    def __call__(self, argv, **kwargs):
+        if self.key(argv) == 'release upload':
+            # argv is ['gh', 'release', 'upload', <tag>, <path>, ...]
+            path = argv[4]
+            try:
+                with open(path, 'rb') as fh:
+                    self.uploads[os.path.basename(path)] = fh.read()
+            except OSError:
+                pass
+        return super().__call__(argv, **kwargs)
+
+
 class TestGhSeam(PublishTestCase):
     def test_every_call_is_prefixed_with_gh_and_a_scrubbed_env(self):
         """Global constraint: GIT_DIR leakage broke factory_run before (#462)."""
@@ -1322,14 +1346,14 @@ class TestAssetUpload(PublishTestCase):
             warnings if warnings is not None else [], registry=self.reg,
             runner=fake)
 
-    def test_staged_asset_is_a_byte_exact_copy(self):
+    def test_uploaded_asset_is_a_byte_exact_copy(self):
         """AC5: the published asset equals the local log, byte for byte."""
-        src = self.write_log('BUILD', b'\x00\x01binary\xff\n' * 40)
-        fake = FakeGh()
+        payload = b'\x00\x01binary\xff\n' * 40
+        self.write_log('BUILD', payload)
+        fake = CapturingGh()
         self.assertTrue(self.publish_log('BUILD', fake))
-        staged = fake.argv_for('release upload')[0][-1]
-        with open(src, 'rb') as a, open(staged, 'rb') as b:
-            self.assertEqual(a.read(), b.read())
+        self.assertEqual(fake.uploads['issue-436-attempt-2-BUILD.log'],
+                         payload)
 
     def test_asset_is_named_by_issue_attempt_and_stage(self):
         """AC4: attempt 2's asset does not disturb attempt 1's."""
@@ -1602,23 +1626,15 @@ class TestPlanResync(PlanRunTestCase):
 
 
 class TestPlanAsset(PlanRunTestCase):
-    def staged(self, fake):
-        """The staged file `gh release upload` was pointed at.
-
-        Not a fixed index: FakeGh records the argv `gh()` builds, which is
-        ['gh', 'release', 'upload', 'factory-logs', <path>, '--clobber'] for
-        this asset. The existing tests use [-1], which is '--clobber' here.
-        """
-        argv = fake.argv_for('release upload')[0]
-        return [a for a in argv
-                if a.endswith(factory_publish.plan_asset_name(440))][0]
-
     def test_uploaded_asset_is_byte_identical_to_the_plan(self):
-        """AC4: sha256, not 'an upload was attempted'."""
+        """AC4: bytes, not 'an upload was attempted'."""
         fake = self.fake()
-        self.publish_plan(fake)
-        self.assertEqual(factory_run.sha256_file(self.staged(fake)),
-                         factory_run.sha256_file(self.plan_file))
+        capture = CapturingGh(fake.results)
+        self.publish_plan(capture)
+        with open(self.plan_file, 'rb') as fh:
+            self.assertEqual(
+                capture.uploads[factory_publish.plan_asset_name(440)],
+                fh.read())
 
     def test_the_ledger_records_the_asset(self):
         """R4."""
@@ -2498,3 +2514,61 @@ class DecisionSurfaceTests(PublishTestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIsNone(
             factory_publish.load_publish_state(440, reg).get('pr_url'))
+
+
+class NoStagedDuplicatesTests(PublishTestCase):
+    """#530 R4 — AC4."""
+
+    def published_run_dir(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        log = factory_run.log_path(440, 'BUILD', reg)
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, 'wb') as fh:
+            fh.write(b'make: ok\n' * 200)
+        factory_publish.publish_run(440, registry=reg,
+                                    stage_completed='BUILD', runner=FakeGh())
+        return factory_run.run_dir(440, reg)
+
+    def test_no_file_duplicates_another_file_in_the_run_registry(self):
+        """AC4. The autopsy bundle is excluded on purpose: it is a frozen
+        snapshot of evidence, not a staged copy. R4 names three staged
+        copies and the autopsy is none of them."""
+        root = self.published_run_dir()
+        seen = {}
+        for dirpath, _dirs, names in os.walk(root):
+            if 'autopsy' in os.path.relpath(dirpath, root).split(os.sep):
+                continue
+            for name in names:
+                path = os.path.join(dirpath, name)
+                digest = factory_run.sha256_file(path)
+                self.assertNotIn(
+                    digest, seen,
+                    '%s duplicates %s' % (path, seen.get(digest)))
+                seen[digest] = path
+
+    def test_the_stage_log_is_not_copied_into_the_run_registry(self):
+        """AC4: the exact duplicate the spec measured."""
+        root = self.published_run_dir()
+        self.assertFalse(os.path.exists(
+            os.path.join(root, 'publish', 'issue-440-attempt-1-BUILD.log')))
+
+    def test_the_temporary_copy_is_removed_after_the_upload(self):
+        """R4: transient, not resident."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = factory_publish.new_publish_state(440)
+        log = factory_run.log_path(440, 'BUILD', reg)
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, 'wb') as fh:
+            fh.write(b'make: ok\n')
+        seen = {}
+
+        class PathGh(FakeGh):
+            def __call__(self, argv, **kwargs):
+                if self.key(argv) == 'release upload':
+                    seen['path'] = argv[4]
+                return super().__call__(argv, **kwargs)
+
+        self.assertTrue(factory_publish.publish_stage_log(
+            state, publish, 'BUILD', [], registry=reg, runner=PathGh()))
+        self.assertFalse(os.path.exists(seen['path']))

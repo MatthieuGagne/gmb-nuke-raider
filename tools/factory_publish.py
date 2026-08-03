@@ -35,12 +35,14 @@ Exit codes:
 """
 import argparse
 import collections
+import contextlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 _TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _TOOLS_DIR)
@@ -91,7 +93,7 @@ STATUS_DONE = "Done"
 
 PUBLISH_FILE = "publish.json"
 PUBLISH_SCHEMA_VERSION = 1
-PUBLISH_DIRNAME = "publish"          # staged assets, publisher-owned
+PUBLISH_DIRNAME = "publish"          # rendered bodies, publisher-owned
 
 BODY_MARKER = ("<!-- factory-publish v1 — regenerated on every publish; "
                "manual edits are overwritten -->")
@@ -1270,16 +1272,26 @@ def finish_project_status(state, publish, run_url, warnings,
 
 # ── Assets ───────────────────────────────────────────────────────────────────
 
-def stage_dir(issue, registry=None):
-    """Where assets are staged under their published names, publisher-owned.
+@contextlib.contextmanager
+def staged(path, name):
+    """A short-lived copy of *path* under its published name (#530 R4).
 
-    ``gh release upload`` names the asset after the file's basename, so the
-    copy is what carries ``issue-<N>-attempt-<k>-<stage>.log``. The copy is
-    also what makes AC5 provable: bytes in, bytes out, no read of the content.
+    ``gh release upload`` names an asset after the file's basename, so the
+    rename is what carries ``issue-<N>-attempt-<k>-<stage>.log``. The copy is
+    also what keeps the upload byte-exact: bytes in, bytes out, no read of the
+    content.
+
+    It lives in a temporary directory and is removed when the upload returns.
+    A byte-identical second copy inside the run registry costs disk for the
+    life of the run and proves nothing that the upload does not prove already.
     """
-    path = os.path.join(factory_run.run_dir(issue, registry), PUBLISH_DIRNAME)
-    os.makedirs(path, exist_ok=True)
-    return path
+    directory = tempfile.mkdtemp(prefix="factory-publish-")
+    try:
+        dest = os.path.join(directory, name)
+        shutil.copyfile(path, dest)
+        yield dest
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def upload_asset(path, name, publish, warnings, runner=subprocess.run,
@@ -1334,13 +1346,12 @@ def publish_stage_log(state, publish, stage, warnings, registry=None,
               % (stage, reason))
         return False
 
-    dest = os.path.join(stage_dir(issue, registry), name)
     try:
-        shutil.copyfile(src, dest)
+        with staged(src, name) as dest:
+            return upload_asset(dest, name, publish, warnings, runner=runner)
     except OSError as exc:
         _warn(warnings, "asset %s not staged: %s" % (name, exc))
         return False
-    return upload_asset(dest, name, publish, warnings, runner=runner)
 
 
 def publish_screenshots(state, publish, warnings, registry=None,
@@ -1360,13 +1371,14 @@ def publish_screenshots(state, publish, warnings, registry=None,
         if name in (publish.get("uploaded") or []):
             published.append(name)
             continue
-        dest = os.path.join(stage_dir(issue, registry), name)
         try:
-            shutil.copyfile(path, dest)
+            with staged(path, name) as dest:
+                sent = upload_asset(dest, name, publish, warnings,
+                                    runner=runner)
         except OSError as exc:
             _warn(warnings, "screenshot %s not staged: %s" % (name, exc))
             continue
-        if upload_asset(dest, name, publish, warnings, runner=runner):
+        if sent:
             published.append(name)
     return published
 
@@ -1411,14 +1423,13 @@ def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
     if digest == publish.get("plan_sha256"):
         return True
 
-    dest = os.path.join(stage_dir(issue, registry), name)
     try:
-        shutil.copyfile(path, dest)
+        with staged(path, name) as dest:
+            if not upload_asset(dest, name, publish, warnings, runner=runner,
+                                clobber=True):
+                return False
     except OSError as exc:
         _warn(warnings, "plan asset %s not staged: %s" % (name, exc))
-        return False
-    if not upload_asset(dest, name, publish, warnings, runner=runner,
-                        clobber=True):
         return False
     publish["plan_sha256"] = digest
     return True
