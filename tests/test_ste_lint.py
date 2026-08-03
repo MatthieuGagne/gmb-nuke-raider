@@ -396,14 +396,21 @@ class SkillWiringTests(unittest.TestCase):
     def test_prd_skill_runs_the_pass_before_spec_lint(self):
         text = self.read('.claude', 'skills', 'prd', 'SKILL.md')
         self.assertIn('ASD-STE100', text)
-        self.assertLess(text.index('ASD-STE100'), text.index('spec_lint.py'))
+        # The pass must precede BOTH issue creation and the lint step. Assert
+        # against anchors that do not travel with the new paragraph — two
+        # strings inside the same sentence order themselves regardless of
+        # where that sentence sits in the document.
+        self.assertLess(text.index('Run an ASD-STE100 pass'),
+                        text.index('Create a GitHub issue'))
 
     def test_dev_workflow_documents_the_standard_the_linter_and_the_fields(self):
         text = self.read('docs', 'dev-workflow.md')
         self.assertIn('ASD-STE100', text)
         self.assertIn('tools/ste_lint.py', text)
         self.assertIn('ste_baseline.json', text)
-        self.assertIn('rationale', text)
+        # `rationale` alone already occurs pre-task (ADR cross-reference
+        # prose), so anchor on the heading unique to the new section.
+        self.assertIn('### Decision fields', text)
 
     def test_context_defines_the_two_new_terms(self):
         text = self.read('CONTEXT.md')
