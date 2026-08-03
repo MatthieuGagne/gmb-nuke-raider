@@ -829,3 +829,89 @@ against** — until deleted by hand, and GitHub release assets grow with it: one
 accumulates per-attempt assets indefinitely. Deleting old assets is always safe because the
 local registry is the source of truth (#450 R5), and deleting `cache/` is always safe because it
 refills lazily. No automatic policy is specified. Accepted cost for a solo project.
+
+## 10. Writing standard
+
+### ASD-STE100
+
+This repository writes ASD-STE100 (Simplified Technical English). The skill lives at
+`.claude/skills/simplified-technical-english/`, vendored from
+[danyuchn/asd-ste100-skill](https://github.com/danyuchn/asd-ste100-skill) under MIT. Its
+`## Project scope` section is the authority on what the standard binds.
+
+It binds factory-authored GitHub text (the run issue, the spec-issue comment, the pull request
+body), PRD issue bodies, factory plan documents, and repository documentation. Game text is
+exempt; `docs/STORY_BIBLE.md` keeps that authority. Verbatim tool output is exempt, because
+simplifying a quoted `make` error falsifies it.
+
+`CONTEXT.md` outranks the standard on word choice. An `_Avoid_` ban wins even when the banned word
+is the plainer word.
+
+The standard applies **forward only**. It binds a document when an author creates it or edits it
+substantially. Nothing in the repository was rewritten to satisfy it.
+
+### `tools/ste_lint.py`
+
+```bash
+python tools/ste_lint.py docs/dev-workflow.md   # one or more files
+python tools/ste_lint.py --all                  # the tracked documentation set
+python tools/ste_lint.py --all --write-baseline # re-record the pre-existing findings
+python tools/ste_lint.py --issue 517            # a GitHub issue body, via gh
+```
+
+Two finding classes, two outcomes:
+
+| Class | Rules | Exit code |
+|---|---|---|
+| ASD-STE100 rule | long instruction (over 20 words), long description (over 25 words), perfect tense, passive voice, noun cluster of 4 or more, more than one instruction per sentence, paragraph over 6 sentences | 0 — reports only |
+| Banned synonym | a literal word from a `CONTEXT.md` `_Avoid_` list | 1 in the file-path and `--issue` forms; **0 in `--all`** |
+
+The detectors are approximations and they produce false positives. That is why a rule finding
+never fails the linter: a finding a reader dismisses costs less than a gate a reader learns to
+bypass.
+
+`--all` is the one form that never fails. Baseline suppression is keyed on the offending text, and
+the glossary bans ordinary words — `step`, `build`, `gate`, `check` and `pass` already occur 750,
+431, 276, 206 and 181 times across the scanned set. One more of any of them in a new sentence is a
+finding the baseline cannot have recorded, so a failing `--all` would turn the next documentation
+change red for a word nobody can avoid. Lint the file you are writing, or the issue body you are
+filing, and the exit code bites where you can act on it.
+
+`make test-tools` runs `--all`. It never runs `--issue`, because the pre-commit hook must not make
+a network call. The factory `GATE` stage does not run the linter either, so a PRD filed before
+this standard stays runnable by `/factory`.
+
+`--all` scans the R12 file set intersected with `git ls-files`: root `*.md`, `docs/**/*.md`,
+`.claude/skills/**/*.md`, `.claude/agents/**/*.md` and `tests/fixtures/factory/expected_*.md`,
+minus `docs/STORY_BIBLE.md`, `docs/game/**`, `CLAUDE.local.md`, `.claude/skill-overlays/**` and the
+vendored skill. The `git ls-files` intersection is what keeps the run reproducible: `docs/plans/`
+is gitignored but carries two tracked legacy plans, so a bare glob would also sweep whatever local
+plans a machine happens to hold.
+
+`tools/ste_baseline.json` records the findings the tree already carried. A finding is reported only
+when it is absent from the baseline, keyed by rule plus a hash of the offending text — not by line
+number, so editing the top of a file does not resurface everything below it. Regenerate it with
+`--write-baseline` after a deliberate documentation change, and read the diff before committing it.
+
+### Decision fields
+
+A factory `decision` event carries two fields:
+
+| Field | Holds | Length |
+|---|---|---|
+| `text` | The ruling | One sentence, 20 words or fewer |
+| `rationale` | The reasoning | As long as it needs to be |
+
+```bash
+python tools/factory_event.py --issue 517 --kind decision \
+  --field "text=Keep the smaller change." \
+  --field "rationale=The alternative moves four files and two golden fixtures."
+```
+
+`rationale` is optional. The run issue and the pull request body render a decision that has one as
+a bold summary plus a collapsed `<details>` block, and a decision that has none as a plain bullet —
+so a journal written before the split still renders. `SCHEMA_VERSION` stays at 1 and no journal is
+migrated.
+
+`factory_event.py` never rejects an over-length summary. An unrecorded decision is a worse outcome
+than a long one.

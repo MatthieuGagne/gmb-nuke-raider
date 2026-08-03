@@ -90,7 +90,16 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
      written for.
    - Are the types, names and signatures consistent between tasks?
 
-   Every unresolved judgment call it raises becomes a `decision` event.
+   Every unresolved judgment call it raises becomes a `decision` event, written as **two
+   fields**: `text` holds the ruling in one sentence of 20 words or fewer, and `rationale` holds
+   the reasoning. The run issue and the pull request body render `text` as a bold line and put
+   `rationale` in a collapsed block, so a reader skims the rulings and opens only the ones that
+   matter (#517 R15, R17).
+
+   ```
+   python tools/factory_event.py --issue <N> --kind decision \
+     --field "text=<the ruling>" --field "rationale=<the reasoning>"
+   ```
 6. `LOG PLAN --stream -- python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` line
    naming this plan. Record as a gate.
 7. `python tools/factory_publish.py --issue <N> --stage-completed PLAN`

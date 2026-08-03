@@ -331,5 +331,88 @@ class RunAllTests(unittest.TestCase):
         self.assertIn('the dashboard', buf.getvalue())
 
 
+VENDORED = os.path.join(ROOT, '.claude', 'skills', 'simplified-technical-english')
+
+
+class VendoredSkillTests(unittest.TestCase):
+    """AC1 and AC2."""
+
+    def read(self, *parts):
+        with open(os.path.join(VENDORED, *parts), encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_every_vendored_file_exists(self):
+        for rel in ('SKILL.md', 'LICENSE',
+                    os.path.join('references', 'writing-rules.md'),
+                    os.path.join('examples', 'before-after.md')):
+            self.assertTrue(os.path.isfile(os.path.join(VENDORED, rel)), rel)
+
+    def test_skill_carries_attribution_and_source_url(self):
+        """AC1."""
+        text = self.read('SKILL.md')
+        self.assertIn('danyuchn/asd-ste100-skill', text)
+        self.assertIn('https://github.com/danyuchn/asd-ste100-skill', text)
+
+    def test_skill_frontmatter_names_the_directory(self):
+        self.assertTrue(self.read('SKILL.md').startswith('---\n'))
+        self.assertIn('name: simplified-technical-english', self.read('SKILL.md'))
+
+    def test_project_scope_names_all_three_deltas(self):
+        """AC1 — bound surfaces, the game-text exemption, forward-only."""
+        text = self.read('SKILL.md')
+        self.assertIn('## Project scope', text)
+        self.assertIn('pull request body', text)
+        self.assertIn('docs/STORY_BIBLE.md', text)
+        self.assertIn('Forward only', text)
+        self.assertIn('CONTEXT.md', text)
+
+    def test_license_is_the_upstream_mit_text(self):
+        """AC2."""
+        text = self.read('LICENSE')
+        self.assertTrue(text.startswith('MIT License'))
+        self.assertIn('Dustin Yuchen Teng', text)
+        self.assertIn('WITHOUT WARRANTY OF ANY KIND', text)
+
+
+class SkillWiringTests(unittest.TestCase):
+    """AC16 and AC17."""
+
+    def read(self, *parts):
+        with open(os.path.join(ROOT, *parts), encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_factory_skill_carries_the_writing_rules_block(self):
+        text = self.read('.claude', 'skills', 'factory', 'SKILL.md')
+        self.assertIn('20 words or fewer', text)
+        self.assertIn('rationale', text)
+        self.assertIn('never invokes', text)
+
+    def test_stages_names_two_decision_fields(self):
+        text = self.read('.claude', 'skills', 'factory', 'references',
+                         'stages.md')
+        self.assertIn('--field "text=', text)
+        self.assertIn('--field "rationale=', text)
+
+    def test_prd_skill_runs_the_pass_before_spec_lint(self):
+        text = self.read('.claude', 'skills', 'prd', 'SKILL.md')
+        self.assertIn('ASD-STE100', text)
+        self.assertLess(text.index('ASD-STE100'), text.index('spec_lint.py'))
+
+    def test_dev_workflow_documents_the_standard_the_linter_and_the_fields(self):
+        text = self.read('docs', 'dev-workflow.md')
+        self.assertIn('ASD-STE100', text)
+        self.assertIn('tools/ste_lint.py', text)
+        self.assertIn('ste_baseline.json', text)
+        self.assertIn('rationale', text)
+
+    def test_context_defines_the_two_new_terms(self):
+        text = self.read('CONTEXT.md')
+        self.assertIn('**Decision summary**:', text)
+        self.assertIn('**Rationale**:', text)
+        pairs = dict(ste_lint.parse_glossary(text))
+        self.assertEqual(pairs.get('the decision text'), 'Decision summary')
+        self.assertEqual(pairs.get('the decision body'), 'Rationale')
+
+
 if __name__ == '__main__':
     unittest.main()

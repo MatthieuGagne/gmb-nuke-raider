@@ -152,3 +152,13 @@ _Avoid_: dead run, orphaned run, abandoned run
 A run that has emitted nothing recently and is, as far as anything can tell,
 still alive.
 _Avoid_: hung run, stalled run, stale run
+
+**Decision summary**:
+The one-sentence ruling on a **Decision**, held in the `text` field and read
+without opening anything.
+_Avoid_: the decision text, the ruling line
+
+**Rationale**:
+The reasoning behind a **Decision summary**, held in the `rationale` field and
+rendered inside a collapsed block.
+_Avoid_: the decision body, the reasoning block
