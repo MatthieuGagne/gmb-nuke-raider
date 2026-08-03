@@ -402,7 +402,7 @@ class TestBodyBudget(PublishTestCase):
     def test_tail_survives_when_the_body_fits(self):
         reg = self.huge_run(decisions=1, permissions=1)
         body = self.body(reg)
-        self.assertIn('<details>', body)
+        self.assertIn('log tail —', body)
         self.assertNotIn('tail omitted', body)
 
     def test_hard_truncation_is_the_backstop(self):
@@ -564,7 +564,7 @@ class TestRenderPlanBody(PublishTestCase):
         """R11."""
         publish = factory_publish.new_publish_state(440)
         publish['run_issue'] = 481
-        self.assertIn('Run dashboard: #481', self.body(publish=publish))
+        self.assertIn('Run issue: #481', self.body(publish=publish))
 
     def test_body_names_the_spec_issue(self):
         """R11: either surface is reachable from the other."""
@@ -2279,3 +2279,56 @@ class OpenPrCliTest(unittest.TestCase):
                 ['--issue', '461', '--open-pr', '--title', 't',
                  '--body-file', 'x.md'])
         self.assertEqual(code, 2)
+
+
+class DecisionShapeTests(unittest.TestCase):
+    """#517 R17 — AC11, AC12."""
+
+    def test_a_decision_without_a_rationale_is_a_plain_bullet(self):
+        """AC12 — an existing journal still renders."""
+        lines = factory_publish.decision_lines({'text': 'Keep it.'})
+        self.assertEqual(lines, ['- Keep it.'])
+
+    def test_a_decision_with_a_rationale_is_bold_plus_details(self):
+        """AC11."""
+        lines = factory_publish.decision_lines(
+            {'text': 'Keep it.', 'rationale': 'Because the other way is worse.'})
+        self.assertEqual(lines, [
+            '- **Keep it.**',
+            '  <details><summary>Rationale</summary>',
+            '',
+            '  Because the other way is worse.',
+            '',
+            '  </details>',
+        ])
+
+    def test_a_multiline_rationale_is_indented_line_by_line(self):
+        lines = factory_publish.decision_lines(
+            {'text': 'Keep it.', 'rationale': 'First.\n\nSecond.'})
+        self.assertIn('  First.', lines)
+        self.assertIn('  Second.', lines)
+        for line in lines:
+            self.assertEqual(line, line.rstrip())
+
+    def test_an_empty_rationale_falls_back_to_a_plain_bullet(self):
+        self.assertEqual(factory_publish.decision_lines(
+            {'text': 'Keep it.', 'rationale': ''}), ['- Keep it.'])
+
+    def test_a_missing_text_keeps_the_existing_placeholder(self):
+        self.assertEqual(factory_publish.decision_lines({}), ['- -'])
+
+
+class RunDashboardRemovalTests(unittest.TestCase):
+    """#517 R21 — AC15."""
+
+    def test_no_source_file_emits_the_banned_string(self):
+        banned = 'Run ' + 'dashboard'
+        for folder in ('tools', 'tests'):
+            root = os.path.join(os.path.dirname(__file__), '..', folder)
+            for dirpath, _dirs, names in os.walk(root):
+                for name in names:
+                    if not name.endswith('.py'):
+                        continue
+                    path = os.path.join(dirpath, name)
+                    with open(path, encoding='utf-8') as fh:
+                        self.assertNotIn(banned, fh.read(), path)

@@ -50,6 +50,9 @@ import factory_status
 import install_hooks
 sys.path.remove(_TOOLS_DIR)
 
+# One renderer for both bodies (#517 R17).
+decision_lines = factory_report.decision_lines
+
 EXIT_OK = 0
 EXIT_DEGRADED = 1
 EXIT_MISUSE = 2
@@ -280,7 +283,8 @@ def _section_decisions(ctx):
     if dropped:
         out.append("_%d earlier decisions omitted_" % dropped)
         out.append("")
-    out += ["- %s" % (d.get("text") or "-") for d in kept]
+    for decision in kept:
+        out += decision_lines(decision)
     return out
 
 
@@ -718,7 +722,7 @@ def render_plan_body(state, publish, plan_text, repo=DEFAULT_REPO,
                  state.get("branch") or "-")]
     run_issue = publish.get("run_issue")
     if run_issue:
-        header += ["", "Run dashboard: #%d" % run_issue]
+        header += ["", "Run issue: #%d" % run_issue]
 
     preamble, tasks, unterminated = summarize_plan(plan_text)
     # Every line below is lifted verbatim from a local file and published to
@@ -1470,7 +1474,7 @@ def comment_once(state, publish, run_issue, warnings, registry=None,
     lines = ["Factory attempt %d **%s**." % (attempt, _outcome(state))]
     if run_issue:
         lines.append("")
-        lines.append("Run dashboard: #%d" % run_issue)
+        lines.append("Run issue: #%d" % run_issue)
     if state.get("pr"):
         lines.append("Pull request: %s" % state["pr"])
     if state.get("failure"):

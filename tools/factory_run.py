@@ -211,7 +211,14 @@ def apply_event(state, event):
                                "gate": event.get("gate"),
                                "result": event.get("result"), "ts": ts})
     elif kind == "decision":
-        state["decisions"].append({"text": event.get("text"), "ts": ts})
+        # `text` is the one-sentence ruling, `rationale` the reasoning behind
+        # it (#517 R15). `rationale` is optional and the key is left out when
+        # it is absent, so a journal written before this field replays to the
+        # same bytes and SCHEMA_VERSION stays at 1 (R16).
+        record = {"text": event.get("text"), "ts": ts}
+        if event.get("rationale") is not None:
+            record["rationale"] = event["rationale"]
+        state["decisions"].append(record)
     elif kind == "scenario":
         state["scenarios"].append({"scenario": event.get("scenario"),
                                    "result": event.get("result"),

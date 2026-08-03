@@ -68,6 +68,29 @@ def _autopsy_rel(state):
         state['issue'], int(state.get('attempt') or 1))
 
 
+def decision_lines(decision, bullet="- "):
+    """The Markdown for one decision, as a list of lines (#517 R17).
+
+    A decision that carries a rationale renders as a bold one-line ruling plus
+    a collapsed block; one that does not renders as the plain bullet it always
+    was, so a journal written before the field split still renders. The two
+    renderers share this function so the run issue and the pull request body
+    cannot drift apart.
+    """
+    text = decision.get("text") or "-"
+    rationale = decision.get("rationale")
+    if not rationale:
+        return ["%s%s" % (bullet, text)]
+    indent = " " * len(bullet)
+    out = ["%s**%s**" % (bullet, text),
+           "%s<details><summary>Rationale</summary>" % indent,
+           ""]
+    for line in str(rationale).split("\n"):
+        out.append((indent + line).rstrip() if line.strip() else "")
+    out += ["", "%s</details>" % indent]
+    return out
+
+
 def render(state):
     """The full PR body for *state*, ending in exactly one newline."""
     issue = state['issue']
@@ -95,7 +118,8 @@ def render(state):
     out += ['', '## Decisions made', '']
     decisions = state.get('decisions') or []
     if decisions:
-        out += ['- %s' % (d.get('text') or '') for d in decisions]
+        for decision in decisions:
+            out += decision_lines(decision)
     else:
         out.append('_None recorded._')
     out.append('')

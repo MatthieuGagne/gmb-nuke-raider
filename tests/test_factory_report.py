@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
+import factory_publish
 import factory_report
 import factory_run
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -133,6 +134,20 @@ class TestCli(ReportTestCase):
                                     os.path.join(self.tmp, 'empty'))
         self.assertEqual(code, 2)
         self.assertIn('no registry entry', err)
+
+
+class DecisionShapeTests(ReportTestCase):
+    """#517 R17 — AC13."""
+
+    def test_uses_the_shared_renderer(self):
+        self.assertIs(factory_report.decision_lines,
+                      factory_publish.decision_lines)
+
+    def test_a_rationale_renders_as_details_in_the_pr_body(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        body = factory_report.render(factory_run.load_state(440, reg))
+        self.assertIn('<details><summary>Rationale</summary>', body)
+        self.assertIn('- **', body)
 
 
 if __name__ == '__main__':
