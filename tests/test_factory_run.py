@@ -444,5 +444,37 @@ class DecisionRationaleTests(unittest.TestCase):
         self.assertEqual(state['decisions'][-1]['text'], long_text)
 
 
+class DecisionFindingTests(unittest.TestCase):
+    """#530 R3 — a decision can declare itself a plan-review finding."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def decision(self, **fields):
+        factory_run.append_event(530, 'decision', registry=self.tmp, **fields)
+        return factory_run.load_state(530, self.tmp)['decisions'][-1]
+
+    def test_a_marked_decision_carries_the_flag(self):
+        self.assertIs(self.decision(text='Fix the test.', finding=True)
+                      ['finding'], True)
+
+    def test_an_unmarked_decision_has_no_flag(self):
+        self.assertNotIn('finding', self.decision(text='Fix the test.'))
+
+    def test_an_explicit_false_is_not_a_finding(self):
+        """`--field finding=false` parses as a JSON boolean, not a string."""
+        self.assertNotIn('finding',
+                         self.decision(text='Fix the test.', finding=False))
+
+    def test_the_marker_does_not_disturb_the_other_fields(self):
+        record = self.decision(text='Fix the test.', rationale='Because.',
+                               finding=True)
+        self.assertEqual(record['text'], 'Fix the test.')
+        self.assertEqual(record['rationale'], 'Because.')
+
+
 if __name__ == '__main__':
     unittest.main()
