@@ -2592,3 +2592,45 @@ class NoStagedDuplicatesTests(PublishTestCase):
         self.assertTrue(factory_publish.publish_stage_log(
             state, publish, 'BUILD', [], registry=reg, runner=PathGh()))
         self.assertFalse(os.path.exists(seen['path']))
+
+
+class PublicationIsOtherwiseUnchangedTests(PlanRunTestCase):
+    """#530 R5 — AC6, AC7."""
+
+    def run_publish(self, **overrides):
+        fake = self.fake(**overrides)
+        result = factory_publish.publish_run(
+            440, registry=self.reg, stage_completed='BUILD', runner=fake)
+        return result, fake
+
+    def test_the_uploaded_asset_names_are_unchanged(self):
+        """AC6 (#530)."""
+        result, _fake = self.run_publish()
+        self.assertEqual(sorted(result.uploaded),
+                         ['issue-440-attempt-1-BUILD.log',
+                          'issue-440-plan.md'])
+
+    def test_the_same_gh_verbs_are_called(self):
+        """AC6 (#530): same objects, same board writes."""
+        _result, fake = self.run_publish(
+            **{'release view': (1, '', 'release not found')})
+        keys = {fake.key(argv) for argv, _ in fake.calls}
+        for expected in ('label create', 'release create', 'release upload',
+                         'issue create', 'project item-add',
+                         'project field-list'):
+            self.assertIn(expected, keys)
+
+    def test_a_clean_publish_reports_nothing_and_exits_zero(self):
+        """AC7 (#530)."""
+        result, _fake = self.run_publish()
+        self.assertEqual(result.warnings, [])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_OK)
+
+    def test_a_failed_upload_is_reported_and_is_not_a_run_failure(self):
+        """AC7 (#530)."""
+        result, _fake = self.run_publish(
+            **{'release upload': (1, '', 'HTTP 502')})
+        self.assertTrue([w for w in result.warnings if 'not uploaded' in w])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)
