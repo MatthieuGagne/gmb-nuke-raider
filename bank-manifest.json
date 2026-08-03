@@ -1,4 +1,5 @@
 {
+  "src/beam.c":                  {"bank": 255, "reason": "autobank — LASER hitscan beam; beam_update/render called from state_playing.c"},
   "src/camera.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog.c":                {"bank": 255, "reason": "autobank"},
   "src/dialog_arrow_sprite.c":   {"bank": 255, "reason": "autobank"},
