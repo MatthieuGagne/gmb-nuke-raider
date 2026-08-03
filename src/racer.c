@@ -15,6 +15,7 @@
 #include "vehicle_physics.h"  /* shared terrain physics + slide collision */
 #include "explosion.h"        /* car-blast spawn on death (#411) */
 #include "damage.h"           /* damage_apply on racer->player contact (#412) */
+#include "beam.h"             /* beam_hit_damage() — LASER hitscan poll (#430) */
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
@@ -445,6 +446,20 @@ uint8_t racer_update(void) BANKED {
                         racer_kill(i);
                     }
                 }
+            }
+        }
+
+        /* #430: hitscan beam — pierces, so this never consumes anything.
+         * Deliberately OUTSIDE the scr_cx/scr_cy on-screen guard above: that
+         * guard computes scr_cx WITHOUT subtracting cam_x (a latent bug on
+         * horizontally scrolling tracks). The beam works in world space and
+         * clips itself to the screen, so it must not inherit that. */
+        {
+            uint8_t bdmg = beam_hit_damage(racer_px[i], racer_py[i], 16u);
+            if (bdmg) {
+                racer_hp[i] = enemy_apply_damage(racer_hp[i], bdmg);
+                racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                if (racer_hp[i] == 0u) { racer_kill(i); }
             }
         }
     }

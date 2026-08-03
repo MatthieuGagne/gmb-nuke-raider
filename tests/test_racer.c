@@ -9,8 +9,11 @@
 #include "sprite_pool.h"
 #include "explosion.h"
 #include "damage.h"     /* damage_init, damage_apply, damage_get_hp (#412) */
+#include "beam.h"       /* beam_init/beam_fire/beam_hit_damage — LASER hitscan (#430) */
 
 extern int16_t cam_y;
+/* Declared with camera.c's real type; cam_y above keeps racer.c's int16_t view. */
+extern volatile uint16_t cam_x;
 
 void setUp(void) {
     cam_y = 0;
@@ -21,6 +24,55 @@ void tearDown(void) {}
 
 void test_racer_inactive_after_init_empty(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
+}
+
+/* ---- LASER beam vs racers (#430 Task 7) ----
+ *
+ * ORDER IS LOAD-BEARING: these two tests MUST stay above every test that calls
+ * track_test_set_map(). setUp() restores active_map_w/h but NOT the active map
+ * POINTER, so once a small injected map has been installed, track_passable()
+ * indexes far past its end and the beam raycast breaks on garbage. Run first,
+ * and the default track_map (20x100, road = cols 4..15) is still active.
+ *
+ * Geometry with the default map, cam_x = cam_y = 0:
+ *   beam_fire(64, 64, DIR_R) -> car centre (72,72), raycast starts at world x 80
+ *   (tile x 10) and stops at tile x 16 (map col 16 is void) -> lane rect is
+ *   x in [80,128), y in (68,76). A 16x16 racer whose top-left is 96 or 112 is
+ *   inside on both axes; one at y 128 is outside on Y.
+ *
+ * DEVIATION from the plan text: the second racer sits at world x 112, not 128.
+ * The lane's exclusive right edge IS exactly 128 (6 road cells x 8 px from 80),
+ * so `ex < s_x1` is false at 128 and the pulse would legitimately miss. 112 is
+ * the last 16-wide slot that is unambiguously inside and does not overlap the
+ * racer at 96. */
+
+void test_beam_pulse_damages_every_racer_in_the_lane(void) {
+    /* R3/R4/AC2: one pulse, two racers, both lose WEAPON1_LASER_DAMAGE. */
+    cam_x = 0u;
+    racer_init_empty();
+    racer_spawn_for_test(96, 64, NULL, NULL, 0u, CHECKPOINT_DIR_N, 1u);
+    racer_active[2] = 1u;                       /* public: src/racer.h:7 */
+    racer_set_pos_for_test(2u, 112, 64);
+    racer_set_hp_for_test(1u, RACER_HP);
+    racer_set_hp_for_test(2u, RACER_HP);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));
+    (void)racer_update();
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP - WEAPON1_LASER_DAMAGE, racer_get_hp_for_test(1u));
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP - WEAPON1_LASER_DAMAGE, racer_get_hp_for_test(2u));
+}
+
+void test_racer_outside_the_lane_is_untouched_by_the_pulse(void) {
+    cam_x = 0u;
+    racer_init_empty();
+    racer_spawn_for_test(96, 128, NULL, NULL, 0u, CHECKPOINT_DIR_N, 1u);
+    racer_set_hp_for_test(1u, RACER_HP);
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));
+    (void)racer_update();
+    TEST_ASSERT_EQUAL_UINT8(RACER_HP, racer_get_hp_for_test(1u));
 }
 
 void test_racer_advances_waypoint_when_close(void) {
@@ -957,6 +1009,10 @@ void test_racer_rank_with_two_enemies_player_last(void) {
 
 int main(void) {
     UNITY_BEGIN();
+    /* The two beam tests MUST run before ANY test that calls track_test_set_map()
+     * — see the comment above their bodies. Do not move them down. */
+    RUN_TEST(test_beam_pulse_damages_every_racer_in_the_lane);
+    RUN_TEST(test_racer_outside_the_lane_is_untouched_by_the_pulse);
     RUN_TEST(test_racer_inactive_after_init_empty);
     RUN_TEST(test_racer_advances_waypoint_when_close);
     RUN_TEST(test_racer_finish_triggers_game_over);
