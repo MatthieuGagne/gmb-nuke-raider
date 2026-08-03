@@ -2318,6 +2318,57 @@ class DecisionShapeTests(unittest.TestCase):
         self.assertEqual(factory_publish.decision_lines({}), ['- -'])
 
 
+class PlanReviewFindingsSectionTests(PublishTestCase):
+    """#530 R3 — AC3."""
+
+    def body(self, publish=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = publish or factory_publish.new_publish_state(440)
+        return factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def test_findings_have_their_own_section(self):
+        body = self.body()
+        self.assertIn('### Plan review findings', body)
+        self.assertIn('Screenshots become data URIs.', body)
+
+    def test_a_finding_is_not_repeated_in_the_decisions_section(self):
+        body = self.body()
+        decisions = body.split('### Decisions made')[1] \
+                        .split('### Plan review findings')[0]
+        self.assertNotIn('Screenshots become data URIs.', decisions)
+        self.assertIn('Journal is the source of truth', decisions)
+
+    def test_the_section_is_absent_when_there_are_no_findings(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'start', registry=reg, stage='GATE')
+        factory_run.append_event(500, 'decision', registry=reg, text='Keep it.')
+        body = factory_publish.render_body(
+            factory_run.load_state(500, reg),
+            factory_publish.new_publish_state(500), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn('### Plan review findings', body)
+        self.assertIn('Keep it.', body)
+
+    def test_findings_are_shed_before_decisions_when_the_body_is_too_big(self):
+        """R5: the budget ladder drops the least load-bearing section first."""
+        factory_fixtures.pinned_clock()
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(600, 'start', registry=reg, stage='PLAN')
+        factory_run.append_event(600, 'decision', registry=reg,
+                                 text='F' * 400, finding=True)
+        factory_run.append_event(600, 'decision', registry=reg,
+                                 text='D' * 400)
+        body = factory_publish.render_body(
+            factory_run.load_state(600, reg),
+            factory_publish.new_publish_state(600), registry=reg,
+            now=factory_fixtures.FIXED_NOW, budget=900)
+        self.assertIn('D' * 400, body)
+        self.assertNotIn('F' * 400, body)
+        self.assertIn('1 earlier findings omitted', body)
+
+
 class RunDashboardRemovalTests(unittest.TestCase):
     """#517 R21 — AC15."""
 

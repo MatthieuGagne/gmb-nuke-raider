@@ -274,7 +274,7 @@ def _section_gates(ctx):
 
 
 def _section_decisions(ctx):
-    decisions = ctx["state"].get("decisions") or []
+    _findings, decisions = factory_report.partition_decisions(ctx["state"])
     dropped = ctx["drop_decisions"]
     kept = decisions[dropped:] if dropped else decisions
     if not kept and not dropped:
@@ -285,6 +285,28 @@ def _section_decisions(ctx):
         out.append("")
     for decision in kept:
         out += decision_lines(decision)
+    return out
+
+
+def _section_findings(ctx):
+    """Plan-review findings, this record's alone (#530 R3).
+
+    A finding names a defect in a draft plan that was corrected before any
+    code was written. It shows that plan review works, so it belongs here. It
+    is not a fact about the code in the pull request, so it stays out of the
+    pull request body.
+    """
+    findings, _decisions = factory_report.partition_decisions(ctx["state"])
+    dropped = ctx["drop_findings"]
+    kept = findings[dropped:] if dropped else findings
+    if not kept and not dropped:
+        return None
+    out = []
+    if dropped:
+        out.append("_%d earlier findings omitted_" % dropped)
+        out.append("")
+    for finding in kept:
+        out += decision_lines(finding)
     return out
 
 
@@ -428,6 +450,7 @@ SECTIONS = (
     ("Failure", _section_failure),
     ("Gate results", _section_gates),
     ("Decisions made", _section_decisions),
+    ("Plan review findings", _section_findings),
     ("Scenario evidence", _section_scenarios),
     ("Stage logs", _section_stage_logs),
     ("Permission events", _section_permissions),
@@ -779,13 +802,15 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
 
     Render, measure, then shed in a fixed order until it fits, each cut leaving
     an explicit marker rather than vanishing: the inline log tail, then
-    permission events, then decisions oldest-first. Never shed: the status
-    header, the stage strip, the failure fields, the gate table, the stage-log
-    asset table. A hard truncation is the backstop (R5).
+    permission events, then plan-review findings oldest-first, then decisions
+    oldest-first. Never shed: the status header, the stage strip, the failure
+    fields, the gate table, the stage-log asset table. A hard truncation is
+    the backstop (R5).
     """
     ctx = {"state": state, "publish": publish, "registry": registry,
            "now": now, "repo": repo, "sections": SECTIONS,
-           "shed_tail": False, "shed_permissions": False, "drop_decisions": 0}
+           "shed_tail": False, "shed_permissions": False,
+           "drop_findings": 0, "drop_decisions": 0}
 
     def attempt():
         body = _render(ctx)
@@ -805,9 +830,19 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
     if body is not None:
         return body
 
+    findings, decisions = factory_report.partition_decisions(state)
+
+    # Findings before decisions: a finding describes a draft that no longer
+    # exists, while a decision explains the code that shipped.
+    for drop in range(1, len(findings) + 1):
+        ctx["drop_findings"] = drop
+        body = attempt()
+        if body is not None:
+            return body
+
     # Oldest first: the most recent decisions are the ones that explain where
     # the run is now. Linear because decisions are human-authored and few.
-    for drop in range(1, len(state.get("decisions") or []) + 1):
+    for drop in range(1, len(decisions) + 1):
         ctx["drop_decisions"] = drop
         body = attempt()
         if body is not None:
