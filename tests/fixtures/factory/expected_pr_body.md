@@ -18,10 +18,10 @@ Factory run for issue #440 — observability.
 ## Decisions made
 
 - Journal is the source of truth; state.json is a projection.
-- **Screenshots become data URIs.**
+- **The publisher deletes the temporary copy after each upload.**
   <details><summary>Rationale</summary>
 
-  A worktree is deleted after the run, and a file path into it stops resolving. A data URI keeps the evidence inside the page.
+  A second copy in the run registry costs disk for the life of the run. The upload already proves the bytes are identical.
 
   </details>
 

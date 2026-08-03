@@ -164,13 +164,18 @@ def build_shipped_run(tmpdir):
            text='Journal is the source of truth; state.json is a projection.')
         ev('stage', stage='PLAN')
         ev('gate', stage='PLAN', gate='plan self-review', result='pass')
-        ev('decision',
+        ev('decision', finding=True,
            text='Screenshots become data URIs.',
            rationale='A worktree is deleted after the run, and a file path '
                      'into it stops resolving. A data URI keeps the evidence '
                      'inside the page.')
         ev('stage', stage='BUILD')
         ev('gate', stage='BUILD', gate='make test-tools', result='pass')
+        ev('decision',
+           text='The publisher deletes the temporary copy after each upload.',
+           rationale='A second copy in the run registry costs disk for the '
+                     'life of the run. The upload already proves the bytes '
+                     'are identical.')
         ev('stage', stage='VERIFY')
         ev('scenario', scenario='reach-race', result='pass')
         ev('stage', stage='SHIP')
