@@ -279,9 +279,11 @@ class BaselineTests(unittest.TestCase):
 
     def test_the_baseline_file_is_deterministic_json(self):
         ste_lint.write_baseline(self.baseline, self.scan())
-        first = open(self.baseline, encoding='utf-8', newline='').read()
+        with open(self.baseline, encoding='utf-8', newline='') as f:
+            first = f.read()
         ste_lint.write_baseline(self.baseline, self.scan())
-        second = open(self.baseline, encoding='utf-8', newline='').read()
+        with open(self.baseline, encoding='utf-8', newline='') as f:
+            second = f.read()
         self.assertEqual(first, second)
         self.assertTrue(first.endswith('\n'))
         json.loads(first)
@@ -294,10 +296,14 @@ class RunAllTests(unittest.TestCase):
         buf = io.StringIO()
         with redirect_stdout(buf):
             code = ste_lint.main(['--all', '--root', ROOT])
-        self.assertEqual(code, 0, buf.getvalue())
+        remedy = ('\n\nThe documentation set has findings the baseline does not '
+                  'record. This is expected after any documentation change.\n'
+                  'Regenerate it, read the diff, and commit it:\n'
+                  '    python tools/ste_lint.py --all --write-baseline\n')
+        self.assertEqual(code, 0, buf.getvalue() + remedy)
         for rule in ste_lint.RULES:
-            self.assertNotIn(rule, buf.getvalue())
-        self.assertNotIn(ste_lint.RULE_BANNED, buf.getvalue())
+            self.assertNotIn(rule, buf.getvalue(), remedy)
+        self.assertNotIn(ste_lint.RULE_BANNED, buf.getvalue(), remedy)
 
     def test_the_real_set_is_the_documented_one(self):
         """R12 — a bare `*.md` glob would sweep the whole tree."""

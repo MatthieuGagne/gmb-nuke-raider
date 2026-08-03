@@ -394,8 +394,10 @@ def suppress(findings, baseline):
 def run_all(root, banned, write=False, baseline_path=None, tracked=None):
     """Lint the tracked documentation set. Always exits 0 (P7).
 
-    `--all` runs inside `make test-tools`, which the pre-commit hook and CI both
-    gate on. Baseline suppression is keyed on the offending text, so one more
+    `--all` runs inside `make test-tools`, which CI gates on; the pre-commit
+    hook runs the unittest suite directly and reaches `--all` through the
+    `RunAllTests` test rather than through `make`. Baseline suppression is
+    keyed on the offending text, so one more
     ``step`` or ``build`` in any scanned document is a non-baselined
     banned-synonym hit — 750 and 431 of those words already sit in the tree.
     Failing here would turn the next ordinary documentation change red for a
