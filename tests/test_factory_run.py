@@ -409,5 +409,40 @@ class TestLogPath(unittest.TestCase):
             os.path.join('REG', 'runs', 'issue-450', 'logs', 'SHIP.log'))
 
 
+class DecisionRationaleTests(unittest.TestCase):
+    """#517 R15, R16 — AC9, AC10."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def state_after(self, **fields):
+        factory_run.append_event(517, 'start', registry=self.tmp, stage='PLAN')
+        factory_run.append_event(517, 'decision', registry=self.tmp, **fields)
+        return factory_run.load_state(517, self.tmp)
+
+    def test_stores_both_fields(self):
+        """AC9."""
+        state = self.state_after(text='Keep the smaller change.',
+                                 rationale='The alternative moves four files.')
+        decision = state['decisions'][-1]
+        self.assertEqual(decision['text'], 'Keep the smaller change.')
+        self.assertEqual(decision['rationale'],
+                         'The alternative moves four files.')
+
+    def test_omits_the_key_when_no_rationale_is_given(self):
+        state = self.state_after(text='Keep the smaller change.')
+        self.assertNotIn('rationale', state['decisions'][-1])
+
+    def test_schema_version_stays_one(self):
+        """AC10."""
+        self.assertEqual(factory_run.SCHEMA_VERSION, 1)
+
+    def test_a_long_summary_is_accepted(self):
+        """AC14 — R18: an unrecorded decision is worse than a long one."""
+        long_text = ' '.join('word%d' % i for i in range(60))
+        state = self.state_after(text=long_text)
+        self.assertEqual(state['decisions'][-1]['text'], long_text)
+
+
 if __name__ == '__main__':
     unittest.main()
