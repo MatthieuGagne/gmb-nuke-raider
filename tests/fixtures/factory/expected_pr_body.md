@@ -18,7 +18,12 @@ Factory run for issue #440 — observability.
 ## Decisions made
 
 - Journal is the source of truth; state.json is a projection.
-- Screenshots are embedded as data URIs so the page survives worktree deletion.
+- **Screenshots become data URIs.**
+  <details><summary>Rationale</summary>
+
+  A worktree is deleted after the run, and a file path into it stops resolving. A data URI keeps the evidence inside the page.
+
+  </details>
 
 ## Scenario evidence
 

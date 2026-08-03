@@ -164,8 +164,11 @@ def build_shipped_run(tmpdir):
            text='Journal is the source of truth; state.json is a projection.')
         ev('stage', stage='PLAN')
         ev('gate', stage='PLAN', gate='plan self-review', result='pass')
-        ev('decision', text='Screenshots are embedded as data URIs so the '
-                            'page survives worktree deletion.')
+        ev('decision',
+           text='Screenshots become data URIs.',
+           rationale='A worktree is deleted after the run, and a file path '
+                     'into it stops resolving. A data URI keeps the evidence '
+                     'inside the page.')
         ev('stage', stage='BUILD')
         ev('gate', stage='BUILD', gate='make test-tools', result='pass')
         ev('stage', stage='VERIFY')
