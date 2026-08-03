@@ -259,12 +259,19 @@ class TestQuietOnSuccess(LogTestCase):
         self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
 
     def test_success_with_a_dead_log_sink_falls_back_to_full_output(self):
-        """AC4 fail-open: never point at a log that was never written."""
+        """AC4 fail-open: never point at a log that was never written.
+
+        The child splits its payload the same way ``TestQuietOnSuccess.NOISY``
+        does: the summary line ends with ``cmd: <argv joined>``, so an intact
+        ``kept`` in the child's source would satisfy the assertion below on its
+        own (#570).
+        """
         blocker = os.path.join(self.tmp, 'blocker')
         open(blocker, 'w').close()
         bad = os.path.join(blocker, 'sub', 'BUILD.log')
         code, console, err = self.run_logged(
-            child("import sys; sys.stdout.buffer.write(b'kept\\n')"),
+            child("import sys; m = 'ke' + 'pt';"
+                  " sys.stdout.buffer.write((m + '\\n').encode())"),
             log_path=bad)
         self.assertEqual(code, 0)
         self.assertIn(b'kept', console)
