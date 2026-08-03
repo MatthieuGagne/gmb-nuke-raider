@@ -12,7 +12,21 @@ Usage:
 import glob
 import json
 import os
+import re
 import sys
+
+
+def _strip_comments(text):
+    """Remove // and /* */ comments so a bare mention of SET_BANK/SWITCH_ROM
+    in prose (e.g. "safe to call SWITCH_ROM") does not read as a real macro
+    call. Real calls are always source, never comment text — this does not
+    weaken detection of actual SET_BANK(...)/SWITCH_ROM(...) invocations."""
+    return re.sub(r'//.*?$|/\*.*?\*/', '', text, flags=re.MULTILINE | re.DOTALL)
+
+
+def _has_bank_switch_call(content):
+    code = _strip_comments(content)
+    return 'SET_BANK' in code or 'SWITCH_ROM' in code
 
 
 def check(repo_root='.'):
@@ -59,7 +73,7 @@ def check(repo_root='.'):
             # Check 2b: no SET_BANK/SWITCH_ROM in banked files
             with open(abs_path) as f:
                 content = f.read()
-            if 'SET_BANK' in content or 'SWITCH_ROM' in content:
+            if _has_bank_switch_call(content):
                 errors.append(
                     f"ERROR: {rel_path} contains SET_BANK or SWITCH_ROM but is not bank 0 "
                     f"(bank {expected_bank}). Only bank-0 files may call these. "
@@ -90,7 +104,7 @@ def check_file(file_path, repo_root='.'):
         if os.path.exists(abs_file):
             with open(abs_file) as f:
                 content = f.read()
-            if 'SET_BANK' in content or 'SWITCH_ROM' in content:
+            if _has_bank_switch_call(content):
                 errors.append(
                     f"ERROR: {rel_path} contains SET_BANK or SWITCH_ROM "
                     f"(not allowed in header files)"
@@ -137,7 +151,7 @@ def check_file(file_path, repo_root='.'):
             )
         with open(abs_file) as f:
             content = f.read()
-        if 'SET_BANK' in content or 'SWITCH_ROM' in content:
+        if _has_bank_switch_call(content):
             errors.append(
                 f"ERROR: {rel_path} contains SET_BANK or SWITCH_ROM but is not bank 0 "
                 f"(bank {expected_bank}). Only bank-0 files may call these. "

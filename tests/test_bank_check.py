@@ -120,6 +120,23 @@ class TestBankCheck(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn('SWITCH_ROM', errors[0])
 
+    def test_switch_rom_mentioned_only_in_comment_is_not_error(self):
+        """A banked .c file whose comment merely mentions SWITCH_ROM (prose,
+        no macro call) must not be flagged — only real calls are violations."""
+        with tempfile.TemporaryDirectory() as d:
+            manifest = {'src/foo.c': {'bank': 255, 'reason': 'autobank'}}
+            self._write_manifest(d, manifest)
+            self._write_c(d, 'foo.c', [
+                '#pragma bank 255',
+                '/* This module is safe to call from any bank via SWITCH_ROM',
+                ' * elsewhere — see loader.c for the real SET_BANK usage. */',
+                'void foo(void) BANKED {',
+                '    do_thing();',
+                '}',
+            ])
+            errors = bank_check.check(d)
+        self.assertEqual(errors, [])
+
     def test_set_bank_in_bank0_file_is_ok(self):
         """A bank-0 file may freely call SET_BANK."""
         with tempfile.TemporaryDirectory() as d:
@@ -212,6 +229,39 @@ class TestCheckFile(unittest.TestCase):
             errors = bank_check.check_file(
                 os.path.join(d, 'src', 'foo.h'), repo_root=d)
         self.assertEqual(errors, [])
+
+    def test_check_file_header_comment_mentioning_switch_rom_passes(self):
+        """A header whose doc comment mentions SWITCH_ROM in prose (loader.h's
+        real-world shape: "bank-0 code, safe to call SWITCH_ROM.") must not
+        be flagged — regression guard for the false positive fixed in #430."""
+        with tempfile.TemporaryDirectory() as d:
+            self._write_manifest(d, {})
+            path = self._write_c(d, 'foo.h', [
+                '#ifndef FOO_H',
+                '#define FOO_H',
+                '/* NONBANKED VRAM loaders — bank-0 code, safe to call SWITCH_ROM.',
+                ' * Call these from any bank to load asset data into VRAM. */',
+                'void load_foo(void);',
+                '#endif',
+            ])
+            errors = bank_check.check_file(path, repo_root=d)
+        self.assertEqual(errors, [])
+
+    def test_check_file_header_with_real_switch_rom_call_is_error(self):
+        """A header containing an actual SWITCH_ROM(...) call (not just prose)
+        must still be flagged — the comment-stripping fix must not weaken
+        detection of a genuine violation."""
+        with tempfile.TemporaryDirectory() as d:
+            self._write_manifest(d, {})
+            path = self._write_c(d, 'foo.h', [
+                '#ifndef FOO_H',
+                '#define FOO_H',
+                'static inline void bad(void) { SWITCH_ROM(2); }',
+                '#endif',
+            ])
+            errors = bank_check.check_file(path, repo_root=d)
+        self.assertEqual(len(errors), 1)
+        self.assertIn('SWITCH_ROM', errors[0])
 
     def test_check_file_cli_single_file_mode(self):
         """CLI: python3 tools/bank_check.py src/foo.c exits 1 when not in manifest."""
