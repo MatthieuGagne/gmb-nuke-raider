@@ -251,12 +251,17 @@ class TestQuietOnSuccess(LogTestCase):
                       + ended.encode(), body)
 
     def test_spawn_failure_still_returns_127_and_says_so(self):
-        """AC4: distinct codes survive buffering."""
+        """AC4: distinct codes survive buffering.
+
+        The console is asserted empty, not merely summary-free: ``popen`` is the
+        first thing ``run_logged`` attempts, so no chunk has been read and the
+        buffer is provably empty on this path (#570).
+        """
         code, console, err = self.run_logged(['definitely-not-a-real-command-529'])
         self.assertEqual(code, 127)
         self.assertIn('factory-log: cannot spawn', err)
         self.assertIn(b'exit=127', self.log_bytes())
-        self.assertNotIn(factory_log.SUMMARY_PREFIX.encode(), console)
+        self.assertEqual(console, b'')
 
     def test_success_with_a_dead_log_sink_falls_back_to_full_output(self):
         """AC4 fail-open: never point at a log that was never written.
