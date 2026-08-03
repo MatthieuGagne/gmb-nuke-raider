@@ -252,6 +252,10 @@ the invoking repository instead of the one you named. Both hooks `unset` them be
 anything, and `install_hooks.clean_env()` is the one definition for Python callers; use it in
 tools *and* in tests.
 
+Any gate intended to catch a human has to be proven from a real terminal, not only from agent tools — agent tools share one environment and therefore share one blind spot. This rule originates from [#441 AC5](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/441): the environment-dependent test shape, where a check passes when run directly and fails under the hook it was written for.
+
+`.claude/settings.json` hook registrations do not hot-reload, so renaming or deleting a hook script breaks every later tool call matching that matcher for the rest of the session. The workaround is to use the other shell tool (Bash ↔ PowerShell), or start a new session. This hazard was observed in [#460](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/460): `git mv tools/precommit_build_hook.py tools/prepush_build.py` made every subsequent Bash tool call fail because the running session still held the old registration.
+
 This is not theoretical. The tool suite runs inside `pre-commit`, and `tests/test_factory_run.py`
 builds a scratch repo with `git init` / `git add` / `git commit`. Unscrubbed, those calls ran
 against the real repository using the very index being committed — producing a merge commit
