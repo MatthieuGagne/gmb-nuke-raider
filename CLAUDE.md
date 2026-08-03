@@ -104,7 +104,7 @@ Two things not obvious from frontmatter alone:
 `.pi/settings.json` exposes the same project skills and agents to the Pi coding agent
 (`pi`), so a session started there is not flying blind. It wires `skills: ["../.claude/skills"]`
 (all 18 project skills), the `pi-subagents` and `@hsingjui/pi-hooks` packages, and the four
-portable hooks with Pi's lowercase tool matchers (`bash`, `write|edit`). `.pi/agents/*.md` are
+portable hooks with Pi's lowercase tool matchers (`bash|powershell`, `write|edit`). `.pi/agents/*.md` are
 thin wrappers: each carries Pi-native frontmatter and tells the child to read the matching
 `.claude/agents/<name>.md` and follow it, so persona text lives in exactly one place.
 
@@ -118,9 +118,19 @@ loads none of the above.
   project delta in `.claude/skill-overlays/` is silently missing — read it yourself.
 - `tools/factory_permission_hook.py` — not ported. It is a `Notification` hook and pi-hooks
   exposes no `Notification` event, so factory's permission-escalation path is unguarded.
+- **The `pwsh-*` background-job tools are ungated** (#572). `@marcfargas/pi-powershell` registers
+  `pwsh-start-job` and friends alongside the shell tools; those names match no hook matcher, so
+  a command run through a job bypasses the deny gate, the Emulicious window hook and the
+  post-build memory check. Widening the matchers is not enough for the deny gate: it filters
+  again internally on `SHELL_TOOLS` in `tools/deny_gate_hook.py`, which admits only `bash` /
+  `powershell` (either case). Run builds and pushes through the shell tool, not a job.
 
 Also note the deny gate and bank check must exit **2** to block; under pi-hooks any other
 non-zero exit is reported as a hook error and the tool call proceeds anyway.
+
+The matchers are regex, not exact strings — pi-hooks does `new RegExp(matcher).test(toolName)`
+(`@hsingjui/pi-hooks`, `src/config.ts` `matcherMatches`) — which is what lets one matcher name
+both shell tools.
 
 **The two harnesses anchor their hook commands differently, and the Pi anchor is the weaker of
 the two.** `.claude/settings.json` uses Claude Code's `${CLAUDE_PROJECT_DIR}` placeholder;
