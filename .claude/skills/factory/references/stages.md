@@ -179,6 +179,8 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    It already contains the gate table, *Decisions made*, scenario evidence or the FAILED
    section, and `Closes #<N>`. At `--open-pr` the publisher appends `Closes #<plan issue>` to
    this same file and writes no second copy (#530 AC5).
+   Re-run this render if you record a decision before step 4. Otherwise the pull request body
+   omits that decision. The run issue then treats it as already covered (#530 finding 1).
 3. `LOG SHIP -- git push -u origin factory-issue-<N>`. Budget a full clean build, not a push: the
    `pre-push` repository hook runs `make clean && make`. **Never `--no-verify`.** If push fails on
    credentials:
@@ -192,8 +194,9 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    there is nothing to review without it. An already-open PR for the branch exits 0 and prints
    nothing new, so `--resume` is safe.
 5. `python tools/factory_event.py --issue <N> --kind finish --field result=shipped`
-   plus a `--kind start --field pr=<url>` style update is **not** needed — record the PR with
-   `--kind finish --field result=shipped --field pr=<url>`.
+   This records the run's result. Do not add a `pr` field. The `finish` event ignores it.
+   Step 4 already saved the PR URL in `publish.json`, through `--open-pr`. The run issue
+   reads the URL from there, not from the `finish` event.
 6. `python tools/factory_publish.py --issue <N> --terminal`
 7. **Stop.** Never merge. Never delete the worktree.
 
