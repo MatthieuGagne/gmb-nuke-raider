@@ -54,7 +54,11 @@ static uint8_t s_cell_buf[BEAM_MAX_CELLS];
  * three repeat — car and camera both idle along the beam axis, e.g. the "start
  * never moves backwards" case in beam_update() — the scan is skipped and the
  * previous result is reused verbatim; this is memoizing a pure function on
- * identical inputs, so it cannot change what gets drawn (#582). */
+ * identical inputs, so it cannot change what gets drawn (#582).
+ * The map and the collision masks are const ROM for the whole race —
+ * track_select() runs only from state_overmap.c, never inside STATE_PLAYING —
+ * so they are race-fixed and deliberately outside the key. A runtime-mutable
+ * map invalidates this memo. */
 static uint8_t beam_cast(int16_t nose, uint8_t *lo) {
     int16_t vis_lo, vis_hi, p, x, y;
     uint8_t n = 0u;

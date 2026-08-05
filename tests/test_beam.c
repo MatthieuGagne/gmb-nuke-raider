@@ -357,6 +357,24 @@ void test_a_long_jump_defers_to_the_whole_lane_repair(void) {
     TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(9u * 32u) + 10u]);
 }
 
+/* The beam_cast() memo is keyed on (nose, vis_lo, vis_hi) and deliberately not
+ * on s_step, so a new pulse MUST invalidate it. These two pulses share a key
+ * and run in opposite directions: without the reset in beam_fire(), the second
+ * one reuses the first one's span. beam_reset() would also clear the memo and
+ * would hide the bug, so the cooldown is drained with beam_update() instead. */
+void test_a_new_pulse_recasts_when_only_the_direction_flips(void) {
+    uint8_t i;
+    map_wall_at(4u, 9u);                                     /* stops the leftward beam */
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));    /* cells 10..19 */
+    for (i = 0u; i < (uint8_t)LASER_FIRE_COOLDOWN; i++) beam_update(64, 64);
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(80, 64, DIR_L));    /* cells 5..10 */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 5u]);
+    TEST_ASSERT_NOT_EQUAL(0x40u,   mock_vram[(9u * 32u) + 4u]);   /* the wall */
+    TEST_ASSERT_NOT_EQUAL(0x40u,   mock_vram[(9u * 32u) + 11u]);  /* no stale R span */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_diagonal_press_does_not_fire);
@@ -391,5 +409,6 @@ int main(void) {
     RUN_TEST(test_a_vertical_beam_repairs_the_cell_it_leaves);
     RUN_TEST(test_a_zero_cell_frame_clears_the_whole_painted_span);
     RUN_TEST(test_a_long_jump_defers_to_the_whole_lane_repair);
+    RUN_TEST(test_a_new_pulse_recasts_when_only_the_direction_flips);
     return UNITY_END();
 }
