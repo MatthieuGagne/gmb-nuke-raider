@@ -150,10 +150,10 @@ for _ in range(manifest["controls"]["prerace"]["cursor_to_start"]):
 press(pyboy, confirm, delay=4, settle=30)
 ```
 
-**Wait for race running** (use `_racer_active == 1`, not `_current_race_id`):
+**Wait for race running** (use `_hp > 0`, not `_current_race_id`):
 ```python
 for _ in range(900):
-    if pyboy.memory[syms["_racer_active"]] == 1:
+    if pyboy.memory[syms["_hp"]] > 0:
         break
     pyboy.tick(1, render=False)
 else:
@@ -293,7 +293,6 @@ Fields that cannot be determined **must emit `null`** — do not omit the field,
     "_py": 50,
     "_hp": 3,
     "_current_race_id": 2,
-    "_racer_active": 1,
     "_cam_scx_shadow": 0,
     "_cam_scy_shadow": 48
   },

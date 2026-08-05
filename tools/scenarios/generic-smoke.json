@@ -1,7 +1,7 @@
 {
   "name": "generic-smoke",
   "blocking": true,
-  "watch": ["_hp", "_px", "_py", "_racer_active"],
+  "watch": ["_hp", "_px", "_py"],
   "steps": [
     {"action": "include", "name": "reach-race"},
     {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},

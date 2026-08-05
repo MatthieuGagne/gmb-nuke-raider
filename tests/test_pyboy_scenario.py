@@ -242,16 +242,16 @@ class TestAdvanceAndWait(unittest.TestCase):
 
     def test_wait_memory_returns_when_value_matches(self):
         emu = FakeEmu(memory={0xC199: 1})
-        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
-        ps.run(emu, [{"action": "wait_memory", "address": "_racer_active",
+        ctx = ps.RunContext(symbols={'_hp': 0xC199})
+        ps.run(emu, [{"action": "wait_memory", "address": "_hp",
                       "value": 1, "max_frames": 50}], ctx)
         self.assertLess(emu.ticks, 50)
 
     def test_wait_memory_timeout_raises_step_failure(self):
         emu = FakeEmu(memory={0xC199: 0})
-        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        ctx = ps.RunContext(symbols={'_hp': 0xC199})
         with self.assertRaises(ps.StepFailure) as cm:
-            ps.run(emu, [{"action": "wait_memory", "address": "_racer_active",
+            ps.run(emu, [{"action": "wait_memory", "address": "_hp",
                           "value": 1, "max_frames": 8}], ctx)
         self.assertEqual(cm.exception.kind, 'timeout')
         self.assertEqual(cm.exception.step, 0)
@@ -324,15 +324,15 @@ class TestAssertMemory(unittest.TestCase):
 
     def test_passes_on_equal(self):
         emu = FakeEmu(memory={0xC199: 1})
-        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
-        ps.run(emu, [{"action": "assert_memory", "address": "_racer_active", "value": 1}], ctx)
+        ctx = ps.RunContext(symbols={'_hp': 0xC199})
+        ps.run(emu, [{"action": "assert_memory", "address": "_hp", "value": 1}], ctx)
 
     def test_fails_on_mismatch_with_step_index(self):
         emu = FakeEmu(memory={0xC199: 0})
-        ctx = ps.RunContext(symbols={'_racer_active': 0xC199})
+        ctx = ps.RunContext(symbols={'_hp': 0xC199})
         with self.assertRaises(ps.StepFailure) as cm:
             ps.run(emu, [{"action": "advance", "frames": 1},
-                         {"action": "assert_memory", "address": "_racer_active", "value": 1}], ctx)
+                         {"action": "assert_memory", "address": "_hp", "value": 1}], ctx)
         self.assertEqual(cm.exception.step, 1)
         self.assertEqual(cm.exception.kind, 'assert')
 
