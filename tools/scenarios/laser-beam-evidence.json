@@ -31,6 +31,25 @@
 
     {"action": "press", "buttons": ["down", "a"], "delay": 240},
     {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
-    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/end.png"}
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/end.png"},
+
+    {"action": "press", "buttons": ["down", "a"], "delay": 60},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-1.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-2.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-3.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-4.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-5.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-6.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-7.png"},
+    {"action": "press", "buttons": ["down", "a"], "delay": 2},
+    {"action": "screenshot", "out": "build/smoketest/laser-beam-evidence/nose-at-speed-8.png"},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"}
   ]
 }
