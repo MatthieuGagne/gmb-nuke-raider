@@ -16,24 +16,25 @@
 #include "vehicle_physics.h"
 #include "explosion.h"
 #include "beam.h"
+#include "debug.h"
 
 int16_t px;
 int16_t py;
-static int8_t  vx;
-static int8_t  vy;
+DBG_STATIC int8_t  vx;
+DBG_STATIC int8_t  vy;
 
 /* Gear system state (Issue #252) */
-static uint8_t current_gear;    /* 0=gear1, 1=gear2, 2=gear3 */
-static uint8_t downshift_timer; /* hysteresis counter for downshift */
+DBG_STATIC uint8_t current_gear;    /* 0=gear1, 1=gear2, 2=gear3 */
+DBG_STATIC uint8_t downshift_timer; /* hysteresis counter for downshift */
 
 static const uint8_t GEAR_MAX_SPEED[3] = {GEAR1_MAX_SPEED, GEAR2_MAX_SPEED, GEAR3_MAX_SPEED};
 static const uint8_t GEAR_ACCEL[3]     = {GEAR1_ACCEL, GEAR2_ACCEL, GEAR3_ACCEL};
 
-static uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
-static uint8_t player_flicker_tick;
-static player_dir_t player_dir = DIR_T;
-static uint8_t s_player_tile_base;
-static uint8_t s_player_dead;
+DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
+DBG_STATIC uint8_t player_flicker_tick;
+DBG_STATIC player_dir_t player_dir = DIR_T;
+DBG_STATIC uint8_t s_player_tile_base;
+DBG_STATIC uint8_t s_player_dead;
 
 /* Direction → velocity delta tables. Indexed by player_dir_t (0=T..7=LT). */
 static const int8_t DIR_DX[8] = {  0,  1,  1,  1,  0, -1, -1, -1 };

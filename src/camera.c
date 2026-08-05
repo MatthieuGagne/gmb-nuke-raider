@@ -3,13 +3,14 @@
 #include "camera.h"
 #include "track.h"
 #include "config.h"
+#include "debug.h"
 
 volatile uint16_t cam_y;
 volatile uint8_t  cam_scy_shadow;
 volatile uint16_t cam_x;
 volatile uint8_t  cam_scx_shadow;
 
-static uint8_t s_track_tile_base;
+DBG_STATIC uint8_t s_track_tile_base;
 
 /* Clamp signed v to [0, max]. */
 static uint16_t clamp_cam(int16_t v, uint16_t max) {
@@ -26,11 +27,11 @@ static uint16_t clamp_cam(int16_t v, uint16_t max) {
 #define VIS_COLS 22u   /* visible tile columns: ceil(160/8) + 1 for partial */
 #define VIS_ROWS 19u   /* visible tile rows:    ceil(144/8) + 1 for partial */
 
-static uint8_t row_buf[VIS_COLS];
+DBG_STATIC uint8_t row_buf[VIS_COLS];
 
 /* Snapshot of cam_tile_x captured at camera_update() time.
  * camera_flush_vram() uses this — never the live cam_x — to avoid stale writes. */
-static uint8_t cam_tile_x_snap;
+DBG_STATIC uint8_t cam_tile_x_snap;
 
 static void stream_row(uint8_t world_ty) {
     uint8_t vram_y = world_ty & 31u;
@@ -53,7 +54,7 @@ static void stream_row(uint8_t world_ty) {
 
 /* --- Column streaming ---------------------------------------------------- */
 
-static uint8_t col_buf[VIS_ROWS];
+DBG_STATIC uint8_t col_buf[VIS_ROWS];
 
 static void stream_col(uint8_t world_tx) {
     uint8_t cam_tile_y = (uint8_t)(cam_y >> 3u);
@@ -79,11 +80,11 @@ static void stream_col(uint8_t world_tx) {
  * one tile boundary per axis per frame at max speed (8px/frame = 1 tile). */
 #define STREAM_BUF_SIZE 2u
 
-static uint8_t stream_row_buf[STREAM_BUF_SIZE];
-static uint8_t stream_row_buf_len = 0u;
+DBG_STATIC uint8_t stream_row_buf[STREAM_BUF_SIZE];
+DBG_STATIC uint8_t stream_row_buf_len = 0u;
 
-static uint8_t stream_col_buf[STREAM_BUF_SIZE];
-static uint8_t stream_col_buf_len = 0u;
+DBG_STATIC uint8_t stream_col_buf[STREAM_BUF_SIZE];
+DBG_STATIC uint8_t stream_col_buf_len = 0u;
 
 /* stream_row_direct — display-OFF path only.
  * Writes one tile row directly to VRAM (no VBlank wait).
@@ -228,7 +229,7 @@ uint8_t camera_invalidate_col(uint8_t world_tile_col) BANKED {
     return 0u;
 }
 
-static uint8_t repair_buf[CAMERA_REPAIR_MAX_CELLS];
+DBG_STATIC uint8_t repair_buf[CAMERA_REPAIR_MAX_CELLS];
 
 void camera_repair_cells(uint8_t tx, uint8_t ty, uint8_t count, uint8_t vertical) BANKED {
     uint8_t i;

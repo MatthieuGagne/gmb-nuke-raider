@@ -34,6 +34,6 @@
     {"action": "assert_memory", "address": "_py", "value": 300, "op": "ge"},
     {"action": "assert_memory", "address": "_rs_laps", "value": 1, "op": "ge"},
     {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
-    {"action": "screenshot", "out": "build/smoketest/deep-race/lap-complete.png"}
+    {"action": "screenshot", "out": "lap-complete.png"}
   ]
 }

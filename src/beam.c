@@ -6,41 +6,42 @@
 #include "player.h"
 #include "sfx.h"
 #include "config.h"
+#include "debug.h"
 
 BANKREF(beam)
 
 /* Single instance, not a pool: one player, one beam. Same shape as
  * proj_cooldown_tick in projectile.c. */
-static uint8_t s_tile_base;
-static uint8_t s_equipped;
-static uint8_t s_cooldown;        /* frames until the next pulse may fire */
-static uint8_t s_dmg_window;      /* 1 only on the fire frame */
-static uint8_t s_vis_frames;      /* frames the lane stays painted */
-static uint8_t s_dirty;           /* BG cells painted, restore still owed */
+DBG_STATIC uint8_t beam_tile_base;
+DBG_STATIC uint8_t s_equipped;
+DBG_STATIC uint8_t s_cooldown;        /* frames until the next pulse may fire */
+DBG_STATIC uint8_t s_dmg_window;      /* 1 only on the fire frame */
+DBG_STATIC uint8_t s_vis_frames;      /* frames the lane stays painted */
+DBG_STATIC uint8_t s_dirty;           /* BG cells painted, restore still owed */
 
-static uint8_t s_axis;            /* BEAM_AXIS_H or BEAM_AXIS_V — fixed at fire */
-static int16_t s_x0, s_x1;        /* world-pixel damage rect: [x0,x1) x [y0,y1) */
-static int16_t s_y0, s_y1;
-static int16_t s_lane_px;         /* cross-axis world pixel of the lane — fixed at fire */
-static int16_t s_step;            /* +8 or -8 along the lane — fixed at fire */
-static int16_t s_nose;            /* along-axis world pixel of the first cell; forward only */
-static uint8_t s_lo_tile;         /* LOWEST world tile of the span to draw now */
-static uint8_t s_count;           /* cells to draw now, <= BEAM_MAX_CELLS */
-static uint8_t s_drawn_lo;        /* LOWEST world tile currently painted */
-static uint8_t s_drawn_count;     /* cells currently painted */
-static uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
-static uint8_t s_lane_repair;     /* 1 = the whole lane needs a restream; queued in beam_update() */
+DBG_STATIC uint8_t s_axis;            /* BEAM_AXIS_H or BEAM_AXIS_V — fixed at fire */
+DBG_STATIC int16_t s_x0, s_x1;        /* world-pixel damage rect: [x0,x1) x [y0,y1) */
+DBG_STATIC int16_t s_y0, s_y1;
+DBG_STATIC int16_t s_lane_px;         /* cross-axis world pixel of the lane — fixed at fire */
+DBG_STATIC int16_t s_step;            /* +8 or -8 along the lane — fixed at fire */
+DBG_STATIC int16_t s_nose;            /* along-axis world pixel of the first cell; forward only */
+DBG_STATIC uint8_t s_lo_tile;         /* LOWEST world tile of the span to draw now */
+DBG_STATIC uint8_t s_count;           /* cells to draw now, <= BEAM_MAX_CELLS */
+DBG_STATIC uint8_t s_drawn_lo;        /* LOWEST world tile currently painted */
+DBG_STATIC uint8_t s_drawn_count;     /* cells currently painted */
+DBG_STATIC uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
+DBG_STATIC uint8_t s_lane_repair;     /* 1 = the whole lane needs a restream; queued in beam_update() */
 
 /* beam_cast() memo — see the comment inside beam_cast() for the invariant.
  * Reset (s_cast_memo_ok = 0) at the start of every new pulse in beam_fire(). */
-static uint8_t s_cast_memo_ok;
-static int16_t s_cast_nose;
-static int16_t s_cast_vis_lo;
-static int16_t s_cast_vis_hi;
-static uint8_t s_cast_n;
-static uint8_t s_cast_lo;
+DBG_STATIC uint8_t s_cast_memo_ok;
+DBG_STATIC int16_t s_cast_nose;
+DBG_STATIC int16_t s_cast_vis_lo;
+DBG_STATIC int16_t s_cast_vis_hi;
+DBG_STATIC uint8_t s_cast_n;
+DBG_STATIC uint8_t s_cast_lo;
 
-static uint8_t s_cell_buf[BEAM_MAX_CELLS];
+DBG_STATIC uint8_t s_cell_buf[BEAM_MAX_CELLS];
 
 /* Raycast from world pixel `nose` along s_step on the fixed lane. Returns the
  * cell count and writes the LOWEST world tile of the span to *lo. One tile per
@@ -148,7 +149,7 @@ void beam_reset(void) BANKED {
 }
 
 void beam_init(uint8_t tile_base) BANKED {
-    s_tile_base = tile_base;
+    beam_tile_base = tile_base;
     s_equipped  = 0u;
     beam_reset();
 }
@@ -186,13 +187,13 @@ uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED {
         s_step    = step_x;
         s_lane_px = cy;
         s_nose    = (int16_t)(cx + step_x);
-        seg_tile  = (uint8_t)(s_tile_base + (uint8_t)BEAM_TILE_OFS_H);
+        seg_tile  = (uint8_t)(beam_tile_base + (uint8_t)BEAM_TILE_OFS_H);
     } else {
         s_axis    = (uint8_t)BEAM_AXIS_V;
         s_step    = step_y;
         s_lane_px = cx;
         s_nose    = (int16_t)(cy + step_y);
-        seg_tile  = (uint8_t)(s_tile_base + (uint8_t)BEAM_TILE_OFS_V);
+        seg_tile  = (uint8_t)(beam_tile_base + (uint8_t)BEAM_TILE_OFS_V);
     }
     s_lane_tile = (uint8_t)((uint16_t)s_lane_px >> 3u);
 

@@ -12,6 +12,7 @@
 #include "npc_drifter_portrait.h"
 #include "npc_mechanic_portrait.h"
 #include "npc_trader_portrait.h"
+#include "debug.h"
 
 extern const uint8_t player_tile_data[];
 extern const uint8_t player_tile_data_count;
@@ -55,15 +56,15 @@ extern uint8_t active_map_h;
 /* Active-track ROM data bank and pointer — set by load_track_header().
  * Defaults to track 0 (same bank as track_map, offset past 2-byte header)
  * so tile reads work before track_select() is first called. */
-static uint8_t         loader_active_data_bank = 1u;  /* default: track 0/1 bank */
-static const uint8_t  *loader_active_map_ptr = track_map + 2u;
+DBG_STATIC uint8_t         loader_active_data_bank = 1u;  /* default: track 0/1 bank */
+DBG_STATIC const uint8_t  *loader_active_map_ptr = track_map + 2u;
 
 /* Active track index (0-2) — set by loader_set_track().
  * Used by loader_get_registry() to select the per-track BG tile registry entry. */
-static uint8_t loader_active_track = 0u;
+DBG_STATIC uint8_t loader_active_track = 0u;
 
 /* 1 when a state's assets are loaded via loader_load_state(); 0 otherwise. */
-static uint8_t loader_state_active = 0u;
+DBG_STATIC uint8_t loader_state_active = 0u;
 
 /* track3 scalars — extern'd here for use in load_track_scalars() */
 extern const int16_t track3_start_x;
@@ -208,11 +209,11 @@ void loader_map_fill_col(uint8_t tx, uint8_t w, uint8_t h, uint8_t ty_start, uin
  * Slots 128-142: HUD custom font loaded by hud_init() (DO NOT allocate here).
  * Slots 143-254: BG region (pool allocated by loader).
  * Slot 255 is permanently reserved as the 0xFF failure sentinel — never allocated. */
-static uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
+DBG_STATIC uint8_t loader_vram_bitmap[32];  /* zero-initialized (static storage) */
 
 /* Asset-to-slot table: first allocated VRAM slot per tile_asset_t.
  * 0xFF = not yet allocated. Updated by Increment 2 (loader_load_asset). */
-static uint8_t loader_asset_slot[TILE_ASSET_COUNT];
+DBG_STATIC uint8_t loader_asset_slot[TILE_ASSET_COUNT];
 
 
 void loader_set_track(uint8_t track_id) NONBANKED {

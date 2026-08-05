@@ -9,13 +9,14 @@
 #include "loadout.h"
 #include "config.h"
 #include "input.h"
+#include "debug.h"
 
 BANKREF(state_prerace)
 
 #define PR_ROWS        6u
 #define PR_CONFIG_ROWS 4u   /* rows 0-3 are config; rows 4-5 are START/CANCEL */
 
-static uint8_t pr_cursor;
+DBG_STATIC uint8_t pr_cursor;
 
 /* Render only the dynamic content (cursor + values) — no BG clear.
  * Safe to call from update() because it completes well within one frame.

@@ -12,6 +12,7 @@
 #include "player.h"
 #include "track.h"
 #include "camera.h"
+#include "debug.h"
 
 /* Tile and map data are generated from Aseprite/Tiled sources.
  * Edit assets/maps/overmap_tiles.aseprite in Aseprite or assets/maps/overmap.tmx
@@ -20,23 +21,23 @@
 BANKREF(state_overmap)
 
 /* ── State ─────────────────────────────────────────────────────────────────── */
-static uint8_t car_tx;
-static uint8_t car_ty;
-static uint8_t s_car_tile_base;
+DBG_STATIC uint8_t car_tx;
+DBG_STATIC uint8_t car_ty;
+DBG_STATIC uint8_t s_car_tile_base;
 uint8_t current_race_id = 0u;
 uint8_t current_hub_id  = 0u;
 
-static uint8_t spawn_tx;   /* cached from ROM overmap_hub_spawn_tx in enter() */
-static uint8_t spawn_ty;
+DBG_STATIC uint8_t spawn_tx;   /* cached from ROM overmap_hub_spawn_tx in enter() */
+DBG_STATIC uint8_t spawn_ty;
 
 #define TRAVEL_FRAMES_PER_TILE 4u   /* file-local tuning — not in config.h */
 
-static uint8_t om_returning;        /* 1=returning from prerace — preserve car position */
-static uint8_t traveling;           /* 0=idle, 1=animating */
-static uint8_t travel_dir;          /* J_LEFT/J_RIGHT/J_UP/J_DOWN bitmask */
-static uint8_t travel_frame_count;  /* counts down to 0 before each tile step */
-static uint8_t dest_tx;
-static uint8_t dest_ty;
+DBG_STATIC uint8_t om_returning;        /* 1=returning from prerace — preserve car position */
+DBG_STATIC uint8_t traveling;           /* 0=idle, 1=animating */
+DBG_STATIC uint8_t travel_dir;          /* J_LEFT/J_RIGHT/J_UP/J_DOWN bitmask */
+DBG_STATIC uint8_t travel_frame_count;  /* counts down to 0 before each tile step */
+DBG_STATIC uint8_t dest_tx;
+DBG_STATIC uint8_t dest_ty;
 
 uint8_t overmap_get_car_tx(void) { return car_tx; }
 uint8_t overmap_get_car_ty(void) { return car_ty; }

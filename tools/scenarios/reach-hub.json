@@ -9,6 +9,6 @@
     {"action": "advance", "frames": 120},
     {"action": "nav", "to": "hub", "id": 1, "settle": 8},
     {"action": "advance", "frames": 120},
-    {"action": "screenshot", "out": "build/smoketest/reach-hub/hub.png"}
+    {"action": "screenshot", "out": "hub.png"}
   ]
 }

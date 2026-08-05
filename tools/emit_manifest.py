@@ -7,6 +7,7 @@ Usage:
         --overmap assets/maps/overmap.tmx \
         --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
         --tsx     assets/maps/track.tsx \
+        --config  src/config.h \
         --state-overmap src/state_overmap.c \
         --state-prerace src/state_prerace.c \
         > build/game-manifest.json
@@ -32,6 +33,25 @@ CURATED_SYMBOLS = [
     '_px', '_py', '_hp', '_active_lap_count',
     '_rs_laps', '_rs_cp_next'
 ]
+
+TILE_PX = 8            # a Game Boy background tile is 8x8 pixels
+CAR_SIZE_PX = 16       # the car is 16x16; vehicle_step_axis_* clamps to map - 16
+
+# One character per tile type, for the text grid of R12. The names are the
+# `type` properties the TSX already carries and the manifest already emits in
+# its `tiles` block — this adds no second source of truth.
+TILE_TYPE_CHARS = {
+    'TILE_WALL':   '#',
+    'TILE_ROAD':   '.',
+    'TILE_SAND':   's',
+    'TILE_OIL':    'o',
+    'TILE_BOOST':  'b',
+    'TILE_FINISH': 'F',
+}
+# A tile id the TSX gives no `type` property. The game resolves it through the
+# generated rotation LUT, which the TSX does not describe.
+UNKNOWN_TILE_CHAR = '?'
+SOLID_TILE_TYPES = ['TILE_WALL']
 
 
 def bfs(grid, w, h, start_tx, start_ty, end_tx, end_ty):
@@ -155,6 +175,78 @@ def parse_track(tmx_path):
     return {'spawn': spawn, 'racer_waypoints': waypoints, 'checkpoints': checkpoints}
 
 
+def parse_track_grid(tmx_path, tile_types):
+    """Return (w, h, rows) for one track TMX.
+
+    rows[ty] is a string of w characters, one per tile, from TILE_TYPE_CHARS.
+    GID rotation flags are stripped, so a rotated tile reads as its base type.
+    """
+    root = ET.parse(tmx_path).getroot()
+    w = int(root.get('width'))
+    h = int(root.get('height'))
+    firstgid = int(root.find('tileset').get('firstgid'))
+    data = root.find('layer/data')
+    if (data.get('encoding') or '') != 'csv':
+        raise ValueError('%s: layer encoding %r is not csv'
+                         % (tmx_path, data.get('encoding')))
+    gids = [int(v) for v in data.text.replace('\n', '').split(',') if v.strip()]
+    if len(gids) != w * h:
+        raise ValueError('%s: %d cells for a %dx%d map'
+                         % (tmx_path, len(gids), w, h))
+    rows = []
+    for ty in range(h):
+        chars = []
+        for tx in range(w):
+            tile_id = (gids[ty * w + tx] & GID_FLAGS) - firstgid
+            name = tile_types.get(tile_id)
+            chars.append(TILE_TYPE_CHARS.get(name, UNKNOWN_TILE_CHAR))
+        rows.append(''.join(chars))
+    return w, h, rows
+
+
+def parse_map_property(tmx_path, name):
+    """Value of a <map><properties> property, or None."""
+    root = ET.parse(tmx_path).getroot()
+    for prop in root.findall('./properties/property'):
+        if prop.get('name') == name:
+            return prop.get('value')
+    return None
+
+
+def finish_line_from_grid(rows):
+    """Bounding box of the TILE_FINISH cells, or None when a track has none."""
+    mark = TILE_TYPE_CHARS['TILE_FINISH']
+    cells = [(tx, ty) for ty, row in enumerate(rows)
+             for tx, c in enumerate(row) if c == mark]
+    if not cells:
+        return None
+    return {
+        'tx_min': min(c[0] for c in cells), 'tx_max': max(c[0] for c in cells),
+        'ty_min': min(c[1] for c in cells), 'ty_max': max(c[1] for c in cells),
+        'tiles': [{'tx': tx, 'ty': ty} for tx, ty in cells],
+    }
+
+
+def describe_track(tmx_path, tile_types, hud_scanline):
+    """The R10 description of one track: size, limits, grid, finish, laps."""
+    w, h, rows = parse_track_grid(tmx_path, tile_types)
+    laps = parse_map_property(tmx_path, 'lap_count')
+    return {
+        'size_tiles': {'w': w, 'h': h},
+        'size_px':    {'w': w * TILE_PX, 'h': h * TILE_PX},
+        # Same rule as vehicle_step_axis_x / vehicle_step_axis_y: the car is
+        # 16 px wide and 16 px tall, so it stops 16 px short of the far edge.
+        'drive_limits': {
+            'x_min': 0, 'x_max': w * TILE_PX - CAR_SIZE_PX,
+            'y_min': 0, 'y_max': h * TILE_PX - CAR_SIZE_PX,
+        },
+        'hud_scanline': hud_scanline,
+        'lap_target':   int(laps) if laps is not None else None,
+        'finish_line':  finish_line_from_grid(rows),
+        'solid_grid':   rows,
+    }
+
+
 def parse_define(path, name):
     """Extract integer value from `#define NAME <int>[u]` in a C source file."""
     pat = re.compile(r'#define\s+' + re.escape(name) + r'\s+(\d+)')
@@ -176,6 +268,8 @@ def main():
     ap.add_argument('--tracks',        nargs='+', required=True,
                     help='Track TMX files in order: track.tmx track2.tmx track3.tmx')
     ap.add_argument('--tsx',           required=True)
+    ap.add_argument('--config', default='src/config.h',
+                    help='src/config.h — read for HUD_SCANLINE')
     ap.add_argument('--state-overmap', required=True, dest='state_overmap')
     ap.add_argument('--state-prerace', required=True, dest='state_prerace')
     args = ap.parse_args()
@@ -223,7 +317,14 @@ def main():
     }
 
     # Tiles (string keys for JSON compatibility)
-    tiles = {str(k): v for k, v in parse_tsx_tile_types(args.tsx).items()}
+    tile_types = parse_tsx_tile_types(args.tsx)
+    tiles = {str(k): v for k, v in tile_types.items()}
+
+    # Track description (#588 R10-R12) — size, drive limits, HUD scan line, a
+    # text grid of tile types, the finish line and the lap target.
+    hud_scanline = parse_define(args.config, 'HUD_SCANLINE')
+    for i, tmx in enumerate(args.tracks, start=1):
+        tracks[str(i)].update(describe_track(tmx, tile_types, hud_scanline))
 
     # Symbols — curated WRAM addresses from .noi (None if static or not yet promoted)
     curated = CURATED_SYMBOLS
@@ -240,6 +341,8 @@ def main():
         'tracks':   tracks,
         'overmap':  overmap_sec,
         'tiles':    tiles,
+        'tile_legend': TILE_TYPE_CHARS,
+        'solid_tile_types': SOLID_TILE_TYPES,
         'symbols':  symbols
     }
 

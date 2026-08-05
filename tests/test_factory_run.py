@@ -476,5 +476,51 @@ class DecisionFindingTests(unittest.TestCase):
         self.assertEqual(record['rationale'], 'Because.')
 
 
+class TestSmoketestDir(unittest.TestCase):
+    """#588 R14 moved the artifacts out of the worktree; both places work."""
+
+    def test_the_worktree_wins_when_it_holds_artifacts(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt = os.path.join(d, 'factory-issue-1')
+            main = os.path.join(d, 'main')
+            os.makedirs(os.path.join(wt, 'build', 'smoketest'))
+            os.makedirs(os.path.join(main, 'build', 'smoketest',
+                                     'factory-issue-1'))
+            self.assertEqual(factory_run.smoketest_dir(wt, main_root=main),
+                             os.path.join(wt, 'build', 'smoketest'))
+
+    def test_the_main_tree_is_the_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt = os.path.join(d, 'factory-issue-1')
+            main = os.path.join(d, 'main')
+            os.makedirs(wt)
+            os.makedirs(os.path.join(main, 'build', 'smoketest',
+                                     'factory-issue-1'))
+            self.assertEqual(factory_run.smoketest_dir(wt, main_root=main),
+                             os.path.join(main, 'build', 'smoketest',
+                                          'factory-issue-1'))
+
+    def test_another_run_s_artifacts_are_not_returned(self):
+        """Decision 11: the lookup is per checkout, so runs cannot cross."""
+        with tempfile.TemporaryDirectory() as d:
+            wt = os.path.join(d, 'factory-issue-1')
+            main = os.path.join(d, 'main')
+            os.makedirs(wt)
+            os.makedirs(os.path.join(main, 'build', 'smoketest',
+                                     'factory-issue-2'))
+            self.assertIsNone(factory_run.smoketest_dir(wt, main_root=main))
+
+    def test_neither_place_returns_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(factory_run.smoketest_dir(
+                os.path.join(d, 'factory-issue-1'),
+                main_root=os.path.join(d, 'main')))
+
+    def test_main_root_of_strips_the_registry_directory(self):
+        self.assertEqual(
+            factory_run.main_root_of(os.path.join('R', '.factory')), 'R')
+        self.assertIsNone(factory_run.main_root_of(None))
+
+
 if __name__ == '__main__':
     unittest.main()

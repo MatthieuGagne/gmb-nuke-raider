@@ -1,7 +1,8 @@
 #pragma bank 255
 #include "economy.h"
+#include "debug.h"
 
-static uint16_t player_scrap = 0u;
+DBG_STATIC uint16_t player_scrap = 0u;
 
 void economy_init(void) BANKED {
     player_scrap = 0u;

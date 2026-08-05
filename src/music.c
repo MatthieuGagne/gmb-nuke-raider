@@ -17,8 +17,8 @@
 #include "music.h"
 #include "debug.h"
 
-static uint8_t current_song_bank = 0;
-static volatile uint8_t music_ticks_owed = 0u;
+DBG_STATIC uint8_t current_song_bank = 0;
+DBG_STATIC volatile uint8_t music_ticks_owed = 0u;
 
 void music_init(void) {
     NR52_REG = 0x80;  /* enable APU */

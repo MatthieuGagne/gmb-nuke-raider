@@ -17,6 +17,18 @@ GBDK_HOME=~/gbdk make
 
 Output: `build/nuke-raider.gb`
 
+A second, debug ROM is built by a separate target and lands in its own directory, so the two
+never overwrite each other:
+
+```sh
+make build-debug        # build/debug/nuke-raider.gb, .map, .noi, game-manifest.json
+```
+
+The two ROMs hold the same bytes. `DEBUG=1` changes linkage only: `DBG_STATIC` stops hiding
+module data, so every mutable file-scope variable reaches `build/debug/nuke-raider.noi` and a
+headless scenario can watch it. Add `DEBUG_TRACE=1` to turn the emitting diagnostics
+(`EMU_printf`, the WRAM ring buffer) back on — those do add code.
+
 The first build also points git at this repo's tracked hooks (`git config core.hooksPath
 .githooks`), so a `pre-commit` tool-suite gate and a `pre-push` clean-build gate apply from then
 on — no setup step. Later builds change nothing. Undo with `git config --unset core.hooksPath`;
@@ -47,8 +59,13 @@ no interaction:
 make smoketest
 ```
 
-Exit codes: `0` pass, `1` run failure, `2` tool/usage error. Each run writes
-`build/smoketest/<scenario>/` with `results.json`, a WRAM `trace.jsonl`, and screenshots.
+Exit codes: `0` pass, `1` run failure, `2` tool/usage error, `3` scenario invalid — the scenario
+is wrong, not the game. Each run writes
+`<main work tree>/build/smoketest/<checkout name>/<scenario>/` with `results.json`, a WRAM
+`trace.jsonl`, and screenshots; `--all` also writes one `all-results.json` beside them. The
+output goes to the main work tree, not to the checkout the run started from, so the evidence
+survives a worktree removal, and is namespaced by checkout so two concurrent runs never
+overwrite each other's evidence. `--out-dir` overrides it.
 See [`docs/dev-workflow.md`](docs/dev-workflow.md) for the scenario format and differential mode.
 
 ## Running
@@ -91,7 +108,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |
 | Economy | `src/economy.c/.h` | Scrap balance tracker: add/spend/query; initialized once at boot |
 | Config | `src/config.h` | Capacity constants (`MAX_NPCS`, etc.) |
-| Debug | `src/debug.h` | `EMU_printf` and debug macros |
+| Debug | `src/debug.h` | `DBG_STATIC` visibility macro; `EMU_printf` macros behind `DEBUG_TRACE` |
 
 ### Game States
 
@@ -134,7 +151,7 @@ gmb-nuke-raider/
 │   ├── overmap_tiles.c     # Generated overmap tile pixel data
 │   ├── npc_*_portrait.c/.h # NPC portrait tile data
 │   ├── loader.c/.h         # Bank-0 NONBANKED VRAM asset loaders
-│   ├── debug.h             # Debug macros (EMU_printf etc.)
+│   ├── debug.h             # DBG_STATIC + debug macros (EMU_printf etc.)
 │   ├── input.h             # Key tick/press/release helpers
 │   └── config.h            # Capacity constants (MAX_NPCS, etc.)
 ├── assets/
