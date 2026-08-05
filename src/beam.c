@@ -29,6 +29,7 @@ static uint8_t s_count;           /* cells to draw now, <= BEAM_MAX_CELLS */
 static uint8_t s_drawn_lo;        /* LOWEST world tile currently painted */
 static uint8_t s_drawn_count;     /* cells currently painted */
 static uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
+static uint8_t s_lane_repair;     /* 1 = the whole lane needs a restream; queued in beam_update() */
 
 static uint8_t s_cell_buf[BEAM_MAX_CELLS];
 
@@ -101,6 +102,7 @@ void beam_reset(void) BANKED {
     s_dirty       = 0u;
     s_count       = 0u;
     s_drawn_count = 0u;
+    s_lane_repair = 0u;
     s_x0 = s_x1 = s_y0 = s_y1 = 0;
 }
 
@@ -171,6 +173,7 @@ uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED {
         s_vis_frames  = 0u;
         s_dirty       = 0u;
         s_drawn_count = 0u;
+        s_lane_repair = 0u;
         return 1u;
     }
 
@@ -190,6 +193,7 @@ uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED {
     s_vis_frames  = (uint8_t)BEAM_VISIBLE_FRAMES;
     s_dirty       = 1u;
     s_drawn_count = 0u;                         /* nothing painted yet */
+    s_lane_repair = 0u;
     return 1u;
 }
 
@@ -218,6 +222,20 @@ void beam_update(int16_t px, int16_t py) BANKED {
          * beam back (R2). */
         int16_t nose;
         uint8_t lo;
+
+        if (s_lane_repair) {
+            /* This runs after camera_update(), which is what makes queueing
+             * legal here (src/camera.h:53). if/else, NOT a ternary: both arms
+             * are BANKED calls. */
+            uint8_t queued;
+            if (s_axis == (uint8_t)BEAM_AXIS_H) {
+                queued = camera_invalidate_row(s_lane_tile);
+            } else {
+                queued = camera_invalidate_col(s_lane_tile);
+            }
+            if (queued) s_lane_repair = 0u;
+        }
+
         if (s_axis == (uint8_t)BEAM_AXIS_H) {
             nose = (int16_t)(px + 8 + s_step);
         } else {
@@ -246,7 +264,64 @@ void beam_update(int16_t px, int16_t py) BANKED {
         } else {
             queued = camera_invalidate_col(s_lane_tile);
         }
-        if (queued) s_dirty = 0u;
+        if (queued) {
+            s_dirty       = 0u;
+            s_lane_repair = 0u;
+        }
+    }
+}
+
+/* Repaint the cells that left the span since the last painted frame (R5, R6).
+ * At top speed the car crosses at most one tile boundary per frame, and the
+ * screen edge moves at most one tile per frame, so each run is one cell. A run
+ * longer than CAMERA_REPAIR_MAX_CELLS cannot happen while the car drives; if
+ * one appears, fall back to the whole lane rather than write 22 cells in one
+ * VBlank. */
+static void beam_repair_leaving(void) {
+    uint8_t a  = s_drawn_lo;
+    uint8_t pc = s_drawn_count;
+    uint8_t b  = s_lo_tile;
+    uint8_t nc = s_count;
+    uint8_t lo_n     = 0u;
+    uint8_t hi_n     = 0u;
+    uint8_t hi_start = 0u;
+
+    if (nc == 0u) {
+        lo_n = pc;                                  /* the whole span left (R9) */
+    } else {
+        if (b > a) {
+            lo_n = (uint8_t)(b - a);                /* the near end moved forward */
+            if (lo_n > pc) lo_n = pc;
+        }
+        if ((uint8_t)(b + nc) < (uint8_t)(a + pc)) {
+            if ((uint8_t)(b + nc) > a) hi_start = (uint8_t)(b + nc);
+            else                       hi_start = a;
+            hi_n = (uint8_t)((uint8_t)(a + pc) - hi_start);
+        }
+    }
+
+    if (lo_n > (uint8_t)CAMERA_REPAIR_MAX_CELLS ||
+        hi_n > (uint8_t)CAMERA_REPAIR_MAX_CELLS) {
+        /* Raise the flag only. camera_invalidate_row/col must not run in the
+         * render phase: queueing before camera_update() makes the camera drop
+         * its own scroll stream (src/camera.h:53). beam_update() drains this. */
+        s_lane_repair = 1u;
+        return;
+    }
+
+    if (lo_n > 0u) {
+        if (s_axis == (uint8_t)BEAM_AXIS_H) {
+            camera_repair_cells(a, s_lane_tile, lo_n, 0u);
+        } else {
+            camera_repair_cells(s_lane_tile, a, lo_n, 1u);
+        }
+    }
+    if (hi_n > 0u) {
+        if (s_axis == (uint8_t)BEAM_AXIS_H) {
+            camera_repair_cells(hi_start, s_lane_tile, hi_n, 0u);
+        } else {
+            camera_repair_cells(s_lane_tile, hi_start, hi_n, 1u);
+        }
     }
 }
 
@@ -257,7 +332,8 @@ void beam_render(void) BANKED {
         s_drawn_count = 0u;
         return;
     }
-    if (s_count > 0u) beam_paint();
+    if (s_drawn_count > 0u) beam_repair_leaving();
+    if (s_count > 0u)       beam_paint();
     s_drawn_lo    = s_lo_tile;
     s_drawn_count = s_count;
 }

@@ -306,6 +306,57 @@ void test_the_flash_lasts_the_same_number_of_frames(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(BEAM_VISIBLE_FRAMES - 1u), painted);
 }
 
+/* ---- incremental repair (#582) ---------------------------------------- */
+
+/* The test map is all road, tile 1, and the camera tile base is 0, so a
+ * repaired cell reads back as 1 while a beam cell reads 0x40 or 0x41. */
+
+void test_a_cell_the_beam_leaves_shows_its_track_tile_again(void) {
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));   /* cells 10..19 */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 10u]);
+    beam_update(72, 64);                                    /* cells 11..19 */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(9u * 32u) + 10u]);
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 11u]);
+}
+
+void test_a_vertical_beam_repairs_the_cell_it_leaves(void) {
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 32, DIR_B));   /* column 9, rows 6..15 */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x41u, mock_vram[(6u * 32u) + 9u]);
+    beam_update(64, 40);                                    /* the car advanced one tile */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(6u * 32u) + 9u]);
+    TEST_ASSERT_EQUAL_UINT8(0x41u, mock_vram[(7u * 32u) + 9u]);
+}
+
+void test_a_zero_cell_frame_clears_the_whole_painted_span(void) {
+    map_wall_at(14u, 9u);
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));   /* cells 10..13 */
+    beam_render();
+    beam_update(96, 64);              /* the nose pixel is 112 — inside the wall tile */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(1u, mock_vram[(9u * 32u) + 10u]);
+    TEST_ASSERT_EQUAL_UINT8(1u, mock_vram[(9u * 32u) + 13u]);
+}
+
+void test_a_long_jump_defers_to_the_whole_lane_repair(void) {
+    /* Seven cells leave in one frame — more than CAMERA_REPAIR_MAX_CELLS. The
+     * car cannot do this at 6 px per frame; the fallback exists so no cell is
+     * left stale for the rest of the pulse. beam_render() only raises the flag:
+     * the queueing itself must happen in beam_update(), after camera_update(),
+     * or the camera drops its own scroll stream (src/camera.h:53). */
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));   /* cells 10..19 */
+    beam_render();
+    beam_update(120, 64);                                   /* cells 17..19 */
+    beam_render();                                          /* raises the flag */
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 10u]);   /* still stale */
+    beam_update(120, 64);                                   /* queues the lane */
+    camera_flush_vram();                                    /* drains it */
+    TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(9u * 32u) + 10u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_diagonal_press_does_not_fire);
@@ -336,5 +387,9 @@ int main(void) {
     RUN_TEST(test_no_free_cell_in_front_draws_nothing);
     RUN_TEST(test_each_pulse_damages_once_while_the_car_moves);
     RUN_TEST(test_the_flash_lasts_the_same_number_of_frames);
+    RUN_TEST(test_a_cell_the_beam_leaves_shows_its_track_tile_again);
+    RUN_TEST(test_a_vertical_beam_repairs_the_cell_it_leaves);
+    RUN_TEST(test_a_zero_cell_frame_clears_the_whole_painted_span);
+    RUN_TEST(test_a_long_jump_defers_to_the_whole_lane_repair);
     return UNITY_END();
 }
