@@ -150,5 +150,39 @@ class DecisionShapeTests(ReportTestCase):
         self.assertIn('- **', body)
 
 
+class PlanReviewFindingsTests(ReportTestCase):
+    """#530 R3 — AC3."""
+
+    def test_a_marked_decision_is_a_finding(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        findings, decisions = factory_report.partition_decisions(state)
+        self.assertEqual([f['text'] for f in findings],
+                         ['Screenshots become data URIs.'])
+        self.assertNotIn('Screenshots become data URIs.',
+                         [d['text'] for d in decisions])
+
+    def test_an_unmarked_record_counts_as_a_decision(self):
+        findings, decisions = factory_report.partition_decisions(
+            {'decisions': [{'text': 'Old journal.'}]})
+        self.assertEqual(findings, [])
+        self.assertEqual([d['text'] for d in decisions], ['Old journal.'])
+
+    def test_findings_never_reach_the_pull_request_body(self):
+        """AC3."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        body = factory_report.render(factory_run.load_state(440, reg))
+        self.assertNotIn('Screenshots become data URIs.', body)
+        self.assertNotIn('data URI', body)
+
+    def test_the_decisions_section_keeps_the_other_decisions(self):
+        """AC1: nothing is lost, only moved."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        body = factory_report.render(factory_run.load_state(440, reg))
+        self.assertIn('Journal is the source of truth', body)
+        self.assertIn('The publisher deletes the temporary copy after each '
+                      'upload.', body)
+
+
 if __name__ == '__main__':
     unittest.main()

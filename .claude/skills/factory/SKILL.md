@@ -136,6 +136,9 @@ until then the plan issue is still created and labelled, only untyped, with one 
 publish. The plan issue is never closed by the publisher;
 the PR body closes it on merge. A dry run and a terminal failure both leave it open on purpose.
 
+The run issue and the PR body do not repeat each other (#530). The decision record sits on one
+of them and the other links to it. Plan-review findings sit on the run issue alone.
+
 Call `--stage-completed` and `--terminal` at **every stage transition, every gate result, and at
 terminal** (SHIP success and terminal failure alike) — roughly 15-25 edits per run.
 
@@ -149,8 +152,15 @@ means: prefer the interpretation that changes least, keeps existing behaviour, a
 the spec's stated scope. When the spec itself asks you to choose (e.g. "decide which side is
 wrong"), pick the option with the smaller blast radius, record the reasoning, and move on.
 
-Every such call becomes a `decision` event immediately — not at the end. They render into the
-PR body's *Decisions made* section, which is the human's entry point at review.
+Every such call becomes a `decision` event immediately — not at the end. The record goes to one
+surface per run. A run that opens a pull request puts it in the PR body's *Decisions made*
+section, which is the human's entry point at review, and the run issue links to the PR. A run
+that fails opens no pull request, so the run issue keeps the record.
+
+Add `--field finding=true` when the ruling names a defect in the draft plan that you corrected
+before writing code. The run issue then renders it under *Plan review findings* and the PR body
+omits it. A finding shows that plan review works. It is not a fact about the code under review.
+An unmarked ruling stays a decision, so a forgotten marker costs nothing.
 
 ## How to write a decision, a failure, and a PR summary
 

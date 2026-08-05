@@ -893,6 +893,30 @@ class FakeGh:
         return [argv for argv, _ in self.calls if self.key(argv) == key]
 
 
+class CapturingGh(FakeGh):
+    """FakeGh that reads each uploaded file while the upload is in flight.
+
+    The staged copy lives in a temp directory that is removed as soon as the
+    upload returns (#530 R4), so a test that resolves the path afterwards
+    reads nothing. `uploads` maps asset name to the exact bytes sent.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.uploads = {}
+
+    def __call__(self, argv, **kwargs):
+        if self.key(argv) == 'release upload':
+            # argv is ['gh', 'release', 'upload', <tag>, <path>, ...]
+            path = argv[4]
+            try:
+                with open(path, 'rb') as fh:
+                    self.uploads[os.path.basename(path)] = fh.read()
+            except OSError:
+                pass
+        return super().__call__(argv, **kwargs)
+
+
 class TestGhSeam(PublishTestCase):
     def test_every_call_is_prefixed_with_gh_and_a_scrubbed_env(self):
         """Global constraint: GIT_DIR leakage broke factory_run before (#462)."""
@@ -1322,14 +1346,14 @@ class TestAssetUpload(PublishTestCase):
             warnings if warnings is not None else [], registry=self.reg,
             runner=fake)
 
-    def test_staged_asset_is_a_byte_exact_copy(self):
+    def test_uploaded_asset_is_a_byte_exact_copy(self):
         """AC5: the published asset equals the local log, byte for byte."""
-        src = self.write_log('BUILD', b'\x00\x01binary\xff\n' * 40)
-        fake = FakeGh()
+        payload = b'\x00\x01binary\xff\n' * 40
+        self.write_log('BUILD', payload)
+        fake = CapturingGh()
         self.assertTrue(self.publish_log('BUILD', fake))
-        staged = fake.argv_for('release upload')[0][-1]
-        with open(src, 'rb') as a, open(staged, 'rb') as b:
-            self.assertEqual(a.read(), b.read())
+        self.assertEqual(fake.uploads['issue-436-attempt-2-BUILD.log'],
+                         payload)
 
     def test_asset_is_named_by_issue_attempt_and_stage(self):
         """AC4: attempt 2's asset does not disturb attempt 1's."""
@@ -1602,23 +1626,15 @@ class TestPlanResync(PlanRunTestCase):
 
 
 class TestPlanAsset(PlanRunTestCase):
-    def staged(self, fake):
-        """The staged file `gh release upload` was pointed at.
-
-        Not a fixed index: FakeGh records the argv `gh()` builds, which is
-        ['gh', 'release', 'upload', 'factory-logs', <path>, '--clobber'] for
-        this asset. The existing tests use [-1], which is '--clobber' here.
-        """
-        argv = fake.argv_for('release upload')[0]
-        return [a for a in argv
-                if a.endswith(factory_publish.plan_asset_name(440))][0]
-
     def test_uploaded_asset_is_byte_identical_to_the_plan(self):
-        """AC4: sha256, not 'an upload was attempted'."""
+        """AC4: bytes, not 'an upload was attempted'."""
         fake = self.fake()
-        self.publish_plan(fake)
-        self.assertEqual(factory_run.sha256_file(self.staged(fake)),
-                         factory_run.sha256_file(self.plan_file))
+        capture = CapturingGh(fake.results)
+        self.publish_plan(capture)
+        with open(self.plan_file, 'rb') as fh:
+            self.assertEqual(
+                capture.uploads[factory_publish.plan_asset_name(440)],
+                fh.read())
 
     def test_the_ledger_records_the_asset(self):
         """R4."""
@@ -2240,14 +2256,34 @@ class PrBodyWithPlanTest(PublishTestCase):
     def test_no_plan_issue_returns_the_original_path_untouched(self):
         self.assertEqual(self.with_plan(number=None), self.body)
 
-    def test_the_original_body_file_is_never_rewritten(self):
+    def test_the_closing_reference_is_appended_in_place(self):
+        """AC5: one rendered body, and the plan link is in it."""
+        path = self.with_plan()
+        self.assertEqual(path, self.body)
+        self.assertTrue(self.read(self.body).endswith('Closes #482\n'))
+
+    def test_both_closing_references_are_present(self):
+        """AC5: the spec's own Closes line survives the append."""
+        body = self.read(self.with_plan())
+        self.assertIn('Closes #440\n', body)
+        self.assertIn('Closes #482\n', body)
+
+    def test_no_second_copy_of_the_body_is_written(self):
+        """AC5, AC4."""
         self.with_plan()
-        self.assertNotIn('482', self.read(self.body))
+        root = factory_run.run_dir(440, self.reg)
+        for dirpath, _dirs, names in os.walk(root):
+            for name in names:
+                self.assertNotIn('pr-body', name)
+
+    def test_a_body_without_a_trailing_newline_still_gets_one(self):
+        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('## Summary\n\nbody\n\nCloses #440')
+        self.assertTrue(self.read(self.with_plan()).endswith(
+            'Closes #440\nCloses #482\n'))
 
     def test_a_second_call_does_not_append_twice(self):
-        first = self.read(self.with_plan())
-        with open(self.body, 'w', encoding='utf-8', newline='\n') as fh:
-            fh.write(first)
+        self.with_plan()
         self.assertEqual(self.read(self.with_plan()).count('Closes #482'), 1)
 
     def test_a_missing_body_file_warns_and_falls_back(self):
@@ -2318,6 +2354,57 @@ class DecisionShapeTests(unittest.TestCase):
         self.assertEqual(factory_publish.decision_lines({}), ['- -'])
 
 
+class PlanReviewFindingsSectionTests(PublishTestCase):
+    """#530 R3 — AC3."""
+
+    def body(self, publish=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = publish or factory_publish.new_publish_state(440)
+        return factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def test_findings_have_their_own_section(self):
+        body = self.body()
+        self.assertIn('### Plan review findings', body)
+        self.assertIn('Screenshots become data URIs.', body)
+
+    def test_a_finding_is_not_repeated_in_the_decisions_section(self):
+        body = self.body()
+        decisions = body.split('### Decisions made')[1] \
+                        .split('### Plan review findings')[0]
+        self.assertNotIn('Screenshots become data URIs.', decisions)
+        self.assertIn('Journal is the source of truth', decisions)
+
+    def test_the_section_is_absent_when_there_are_no_findings(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(500, 'start', registry=reg, stage='GATE')
+        factory_run.append_event(500, 'decision', registry=reg, text='Keep it.')
+        body = factory_publish.render_body(
+            factory_run.load_state(500, reg),
+            factory_publish.new_publish_state(500), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn('### Plan review findings', body)
+        self.assertIn('Keep it.', body)
+
+    def test_findings_are_shed_before_decisions_when_the_body_is_too_big(self):
+        """R5: the budget ladder drops the least load-bearing section first."""
+        factory_fixtures.pinned_clock()
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(600, 'start', registry=reg, stage='PLAN')
+        factory_run.append_event(600, 'decision', registry=reg,
+                                 text='F' * 400, finding=True)
+        factory_run.append_event(600, 'decision', registry=reg,
+                                 text='D' * 400)
+        body = factory_publish.render_body(
+            factory_run.load_state(600, reg),
+            factory_publish.new_publish_state(600), registry=reg,
+            now=factory_fixtures.FIXED_NOW, budget=900)
+        self.assertIn('D' * 400, body)
+        self.assertNotIn('F' * 400, body)
+        self.assertIn('1 earlier findings omitted', body)
+
+
 class RunDashboardRemovalTests(unittest.TestCase):
     """#517 R21 — AC15."""
 
@@ -2332,3 +2419,288 @@ class RunDashboardRemovalTests(unittest.TestCase):
                     path = os.path.join(dirpath, name)
                     with open(path, encoding='utf-8') as fh:
                         self.assertNotIn(banned, fh.read(), path)
+
+
+PR_URL = 'https://github.com/MatthieuGagne/gmb-nuke-raider/pull/579'
+
+
+class DecisionSurfaceTests(PublishTestCase):
+    """#530 R1, R2 — AC1, AC2."""
+
+    def shipped_body(self, publish=None):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = publish or factory_publish.new_publish_state(440)
+        return factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+
+    def with_pr(self):
+        publish = factory_publish.new_publish_state(440)
+        publish['pr_url'] = PR_URL
+        return publish
+
+    def test_a_known_pr_replaces_the_decisions_with_a_link(self):
+        """AC1."""
+        body = self.shipped_body(self.with_pr())
+        self.assertIn(PR_URL, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
+    def test_the_recorded_pr_on_the_state_is_enough(self):
+        """AC1: publish.json is not the only source."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        factory_run.append_event(440, 'start', registry=reg, pr=PR_URL)
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg),
+            factory_publish.new_publish_state(440), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
+    def test_findings_stay_in_the_run_record_even_with_a_pr(self):
+        """AC3: only the decisions move."""
+        body = self.shipped_body(self.with_pr())
+        self.assertIn('### Plan review findings', body)
+        self.assertIn('Screenshots become data URIs.', body)
+
+    def test_a_run_whose_rulings_are_all_findings_still_links(self):
+        """R2: neither surface may become a dead end."""
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(700, 'start', registry=reg, stage='PLAN',
+                                 pr=PR_URL)
+        factory_run.append_event(700, 'decision', registry=reg,
+                                 text='Only a finding.', finding=True)
+        body = factory_publish.render_body(
+            factory_run.load_state(700, reg),
+            factory_publish.new_publish_state(700), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn('### Decisions made', body)
+        self.assertIn(PR_URL, body)
+
+    def test_a_run_with_no_rulings_at_all_shows_no_link(self):
+        reg = os.path.join(self.tmp, 'reg')
+        factory_run.append_event(701, 'start', registry=reg, stage='SHIP',
+                                 pr=PR_URL)
+        body = factory_publish.render_body(
+            factory_run.load_state(701, reg),
+            factory_publish.new_publish_state(701), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertNotIn('### Decisions made', body)
+
+    def test_a_failed_run_keeps_its_decisions(self):
+        """AC2: no pull request exists, so nothing may be moved."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        body = factory_publish.render_body(
+            factory_run.load_state(441, reg),
+            factory_publish.new_publish_state(441), registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn('Autopsy assembly is best-effort', body)
+        self.assertNotIn('pull request', body)
+
+    def test_an_unknown_pr_url_keeps_the_decisions(self):
+        """AC2: a degraded --open-pr must not silently drop the record."""
+        self.assertIn('Journal is the source of truth', self.shipped_body())
+
+    def test_the_linked_body_matches_its_golden(self):
+        """AC1."""
+        publish = self.with_pr()
+        publish['uploaded'].append('issue-440-attempt-1-BUILD.log')
+        self.assertEqual(self.shipped_body(publish),
+                         golden('expected_run_issue_body_shipped_pr.md'))
+
+    def test_open_pr_persists_the_url_for_the_run_record(self):
+        """AC1: the run record can only link to a URL that outlives SHIP."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (0, PR_URL + '\n', '')}))
+        self.assertEqual(url, PR_URL)
+        self.assertEqual(warnings, [])
+        self.assertEqual(
+            factory_publish.load_publish_state(440, reg)['pr_url'], PR_URL)
+
+    def test_a_pr_that_cannot_be_opened_persists_nothing(self):
+        """AC7: the terminal step stays terminal and writes no false URL."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (1, '', 'HTTP 500')}))
+        self.assertIsNone(url)
+        self.assertEqual(len(warnings), 1)
+        self.assertIsNone(
+            factory_publish.load_publish_state(440, reg).get('pr_url'))
+
+    def test_open_pr_records_the_decision_count_at_that_moment(self):
+        """Finding 1: pr_decisions is captured only on a successful open."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)  # 2 decisions, 1 finding
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (0, PR_URL + '\n', '')}))
+        self.assertEqual(url, PR_URL)
+        state = factory_run.load_state(440, reg)
+        self.assertEqual(
+            factory_publish.load_publish_state(440, reg)['pr_decisions'],
+            len(state['decisions']))
+
+    def test_a_pr_that_cannot_be_opened_records_no_decision_count(self):
+        """Finding 1: a failed open must not leave a stale count behind."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (1, '', 'HTTP 500')}))
+        self.assertIsNone(url)
+        self.assertIsNone(
+            factory_publish.load_publish_state(440, reg).get('pr_decisions'))
+
+    def test_a_decision_recorded_after_the_pr_count_renders_in_full(self):
+        """Finding 1: the data-loss path — a late decision must reach the
+        run issue, since the PR body was already rendered without it."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = self.with_pr()
+        publish['pr_decisions'] = len(state['decisions'])
+        factory_run.append_event(
+            440, 'decision', registry=reg,
+            text='A late decision made after the PR body was rendered.')
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertIn(
+            'A late decision made after the PR body was rendered.', body)
+
+    def test_a_decision_recorded_before_the_pr_count_stays_link_only(self):
+        """Finding 1: nothing already reflected on the PR is repeated."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = self.with_pr()
+        publish['pr_decisions'] = len(state['decisions'])
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertNotIn('Journal is the source of truth', body)
+        self.assertNotIn('The publisher deletes the temporary copy', body)
+
+    def test_pr_decisions_absent_renders_the_link_alone(self):
+        """Finding 1: the backward-compatible path for an older publish.json
+        or a run whose pr came from state rather than --open-pr."""
+        publish = self.with_pr()
+        self.assertIsNone(publish['pr_decisions'])
+        body = self.shipped_body(publish)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
+
+class NoStagedDuplicatesTests(PublishTestCase):
+    """#530 R4 — AC4."""
+
+    def published_run_dir(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        log = factory_run.log_path(440, 'BUILD', reg)
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, 'wb') as fh:
+            fh.write(b'make: ok\n' * 200)
+        factory_publish.publish_run(440, registry=reg,
+                                    stage_completed='BUILD', runner=FakeGh())
+        return factory_run.run_dir(440, reg)
+
+    def test_no_file_duplicates_another_file_in_the_run_registry(self):
+        """AC4. The autopsy bundle is excluded on purpose: it is a frozen
+        snapshot of evidence, not a staged copy. R4 names three staged
+        copies and the autopsy is none of them."""
+        root = self.published_run_dir()
+        seen = {}
+        for dirpath, _dirs, names in os.walk(root):
+            if 'autopsy' in os.path.relpath(dirpath, root).split(os.sep):
+                continue
+            for name in names:
+                path = os.path.join(dirpath, name)
+                digest = factory_run.sha256_file(path)
+                self.assertNotIn(
+                    digest, seen,
+                    '%s duplicates %s' % (path, seen.get(digest)))
+                seen[digest] = path
+
+    def test_the_stage_log_is_not_copied_into_the_run_registry(self):
+        """AC4: the exact duplicate the spec measured."""
+        root = self.published_run_dir()
+        self.assertFalse(os.path.exists(
+            os.path.join(root, 'publish', 'issue-440-attempt-1-BUILD.log')))
+
+    def test_the_temporary_copy_is_removed_after_the_upload(self):
+        """R4: transient, not resident."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = factory_publish.new_publish_state(440)
+        log = factory_run.log_path(440, 'BUILD', reg)
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, 'wb') as fh:
+            fh.write(b'make: ok\n')
+        seen = {}
+
+        class PathGh(FakeGh):
+            def __call__(self, argv, **kwargs):
+                if self.key(argv) == 'release upload':
+                    seen['path'] = argv[4]
+                return super().__call__(argv, **kwargs)
+
+        self.assertTrue(factory_publish.publish_stage_log(
+            state, publish, 'BUILD', [], registry=reg, runner=PathGh()))
+        self.assertFalse(os.path.exists(seen['path']))
+
+
+class PublicationIsOtherwiseUnchangedTests(PlanRunTestCase):
+    """#530 R5 — AC6, AC7."""
+
+    def run_publish(self, **overrides):
+        fake = self.fake(**overrides)
+        result = factory_publish.publish_run(
+            440, registry=self.reg, stage_completed='BUILD', runner=fake)
+        return result, fake
+
+    def test_the_uploaded_asset_names_are_unchanged(self):
+        """AC6 (#530)."""
+        result, _fake = self.run_publish()
+        self.assertEqual(sorted(result.uploaded),
+                         ['issue-440-attempt-1-BUILD.log',
+                          'issue-440-plan.md'])
+
+    def test_the_same_gh_verbs_are_called(self):
+        """AC6 (#530): same objects, same board writes."""
+        _result, fake = self.run_publish(
+            **{'release view': (1, '', 'release not found')})
+        keys = {fake.key(argv) for argv, _ in fake.calls}
+        for expected in ('label create', 'release create', 'release upload',
+                         'issue create', 'project item-add',
+                         'project field-list'):
+            self.assertIn(expected, keys)
+
+    def test_a_clean_publish_reports_nothing_and_exits_zero(self):
+        """AC7 (#530)."""
+        result, _fake = self.run_publish()
+        self.assertEqual(result.warnings, [])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_OK)
+
+    def test_a_failed_upload_is_reported_and_is_not_a_run_failure(self):
+        """AC7 (#530)."""
+        result, _fake = self.run_publish(
+            **{'release upload': (1, '', 'HTTP 502')})
+        self.assertTrue([w for w in result.warnings if 'not uploaded' in w])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)

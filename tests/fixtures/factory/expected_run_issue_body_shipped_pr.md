@@ -13,13 +13,7 @@
 
 ### Decisions made
 
-- Journal is the source of truth; state.json is a projection.
-- **The publisher deletes the temporary copy after each upload.**
-  <details><summary>Rationale</summary>
-
-  A second copy in the run registry costs disk for the life of the run. The upload already proves the bytes are identical.
-
-  </details>
+_The decisions are in the [pull request](https://github.com/MatthieuGagne/gmb-nuke-raider/pull/579)._
 
 ### Plan review findings
 
