@@ -15,7 +15,7 @@ Checks:
 Exits 0 on PASS/WARN, 1 on FAIL.
 
 Usage:
-    python3 tools/memory_check.py [repo_root]
+    python3 tools/memory_check.py [--map PATH] [repo_root]
     python3 tools/memory_check.py --scenes-json [repo_root]   # emit the scene model
     or imported: memory_check.check(repo_root) -> dict
 """
@@ -84,9 +84,14 @@ def _worst(*statuses):
     return max(statuses, key=lambda s: _SEVERITY.get(s, 0))
 
 
-def _check_wram(repo_root):
-    """Parse build/nuke-raider.map for s__HEAP_E. Returns (used_bytes, status)."""
-    map_path = os.path.join(repo_root, 'build', 'nuke-raider.map')
+def _check_wram(repo_root, map_path=None):
+    """Parse the link map for s__HEAP_E. Returns (used_bytes, status).
+
+    map_path names the map file to read. The default is the release ROM's;
+    the debug ROM's lives beside it in its own directory (#588 R1, AC4).
+    """
+    if map_path is None:
+        map_path = os.path.join(repo_root, 'build', 'nuke-raider.map')
     try:
         with open(map_path) as f:
             content = f.read()
@@ -242,9 +247,9 @@ def _format_report(result):
     return '\n'.join(lines)
 
 
-def check(repo_root='.'):
+def check(repo_root='.', map_path=None):
     """Run all three checks. Returns dict with 'wram', 'vram', 'oam' entries."""
-    wram_used, wram_status = _check_wram(repo_root)
+    wram_used, wram_status = _check_wram(repo_root, map_path)
     vram_used, vram_status = _check_vram(repo_root)
     oam = _check_oam(repo_root)
     return {
@@ -260,8 +265,15 @@ def main():
         repo_root = args[1] if len(args) > 1 else '.'
         print(json.dumps(scenes_json(repo_root), indent=2))
         sys.exit(0)
+    map_path = None
+    if args and args[0] == '--map':
+        if len(args) < 2:
+            print('usage: memory_check.py [--map PATH] [repo_root]', file=sys.stderr)
+            sys.exit(2)
+        map_path = args[1]
+        args = args[2:]
     repo_root = args[0] if args else '.'
-    result = check(repo_root)
+    result = check(repo_root, map_path)
     print(_format_report(result))
     sys.exit(1 if overall_status(result) == 'FAIL' else 0)
 
