@@ -8,13 +8,14 @@
 #include "sprite_pool.h"
 #include "loader.h"    /* load_powerup_positions() NONBANKED */
 #include "camera.h"    /* cam_y — needed for OAM y coordinate calculations */
+#include "debug.h"
 
 /* SoA powerup pool — tile coordinates + OAM slot + type */
-static uint8_t powerup_tx[MAX_POWERUPS];
-static uint8_t powerup_ty[MAX_POWERUPS];
-static uint8_t powerup_type[MAX_POWERUPS];
-static uint8_t powerup_active[MAX_POWERUPS];
-static uint8_t powerup_oam[MAX_POWERUPS];
+DBG_STATIC uint8_t powerup_tx[MAX_POWERUPS];
+DBG_STATIC uint8_t powerup_ty[MAX_POWERUPS];
+DBG_STATIC uint8_t powerup_type[MAX_POWERUPS];
+DBG_STATIC uint8_t powerup_active[MAX_POWERUPS];
+DBG_STATIC uint8_t powerup_oam[MAX_POWERUPS];
 
 /* ---- public API ---- */
 

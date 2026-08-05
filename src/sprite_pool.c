@@ -2,8 +2,9 @@
 #include <gb/gb.h>
 #include "sprite_pool.h"
 #include "config.h"
+#include "debug.h"
 
-static uint8_t spr_act[MAX_SPRITES];
+DBG_STATIC uint8_t spr_act[MAX_SPRITES];
 
 void sprite_pool_init(void) BANKED {
     uint8_t i;

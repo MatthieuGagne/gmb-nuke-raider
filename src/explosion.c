@@ -4,18 +4,19 @@
 #include "config.h"
 #include "sprite_pool.h"
 #include "camera.h"
+#include "debug.h"
 
-static uint8_t exp_active[MAX_EXPLOSIONS];
-static uint8_t exp_frame[MAX_EXPLOSIONS];
-static uint8_t exp_timer[MAX_EXPLOSIONS];
-static uint8_t exp_oam[MAX_EXPLOSIONS];
-static uint8_t exp_tile[MAX_EXPLOSIONS];
-static uint8_t exp_flip[MAX_EXPLOSIONS];
-static uint8_t exp_car[MAX_EXPLOSIONS];
-static uint8_t exp_wx[MAX_EXPLOSIONS];   /* world pixel x */
-static uint8_t exp_wty[MAX_EXPLOSIONS];  /* world tile y */
-static uint8_t s_car_active;
-static uint8_t s_car_base;
+DBG_STATIC uint8_t exp_active[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_frame[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_timer[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_oam[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_tile[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_flip[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_car[MAX_EXPLOSIONS];
+DBG_STATIC uint8_t exp_wx[MAX_EXPLOSIONS];   /* world pixel x */
+DBG_STATIC uint8_t exp_wty[MAX_EXPLOSIONS];  /* world tile y */
+DBG_STATIC uint8_t s_car_active;
+DBG_STATIC uint8_t s_car_base;
 
 void explosion_init(uint8_t turret_base, uint8_t car_base) BANKED {
     uint8_t i;

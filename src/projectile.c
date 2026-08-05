@@ -8,6 +8,7 @@
 #include "track.h"
 #include "config.h"
 #include "sfx.h"  /* sfx_play is NONBANKED (bank 0) — safe to call from any bank */
+#include "debug.h"
 BANKREF(projectile)
 
 /* ── Direction velocity tables ──────────────────────────────────────────── */
@@ -52,18 +53,18 @@ static const int8_t PROJ_VEL_DY[16] = {
 };
 
 /* ── SoA bullet pool ───────────────────────────────────────────────────── */
-static uint8_t proj_x[MAX_PROJECTILES];
-static uint8_t proj_y[MAX_PROJECTILES];
-static int8_t  proj_dx[MAX_PROJECTILES];   /* px/frame, signed */
-static int8_t  proj_dy[MAX_PROJECTILES];
-static uint8_t proj_active[MAX_PROJECTILES];
-static uint8_t proj_owner[MAX_PROJECTILES];
-static uint8_t proj_ttl[MAX_PROJECTILES];
-static uint8_t proj_oam[MAX_PROJECTILES];  /* OAM slot assigned to each bullet */
+DBG_STATIC uint8_t proj_x[MAX_PROJECTILES];
+DBG_STATIC uint8_t proj_y[MAX_PROJECTILES];
+DBG_STATIC int8_t  proj_dx[MAX_PROJECTILES];   /* px/frame, signed */
+DBG_STATIC int8_t  proj_dy[MAX_PROJECTILES];
+DBG_STATIC uint8_t proj_active[MAX_PROJECTILES];
+DBG_STATIC uint8_t proj_owner[MAX_PROJECTILES];
+DBG_STATIC uint8_t proj_ttl[MAX_PROJECTILES];
+DBG_STATIC uint8_t proj_oam[MAX_PROJECTILES];  /* OAM slot assigned to each bullet */
 
-static uint8_t proj_cooldown_tick = 0u;    /* frames until next fire is allowed */
-static uint8_t s_proj_tile_base   = 0u;    /* VRAM sprite tile slot, set by projectile_init() */
-static uint8_t s_weapon1_damage   = WEAPON1_CANNON_DAMAGE;  /* HP a player bullet removes per hit; re-seeded at race start (#424) */
+DBG_STATIC uint8_t proj_cooldown_tick = 0u;    /* frames until next fire is allowed */
+DBG_STATIC uint8_t s_proj_tile_base   = 0u;    /* VRAM sprite tile slot, set by projectile_init() */
+DBG_STATIC uint8_t s_weapon1_damage   = WEAPON1_CANNON_DAMAGE;  /* HP a player bullet removes per hit; re-seeded at race start (#424) */
 
 /* ── init ──────────────────────────────────────────────────────────────── */
 

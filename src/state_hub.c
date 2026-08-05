@@ -15,6 +15,7 @@
 #include "sfx.h"
 #include "economy.h"
 #include "loadout.h"
+#include "debug.h"
 
 BANKREF(state_hub)
 
@@ -37,33 +38,33 @@ static void clear_visible_rows(void) {
 
 uint8_t overmap_hub_entered = 0u;
 
-static uint8_t           sub_state;
-static uint8_t           s_shop_field;   /* loadout field of the active vendor */
+DBG_STATIC uint8_t           sub_state;
+DBG_STATIC uint8_t           s_shop_field;   /* loadout field of the active vendor */
 
 /* Price per loadout field (CAR slot unused). */
 static const uint8_t SHOP_PRICE[LOADOUT_NUM_FIELDS] = {
     0u, UPGRADE_COST_ARMOR, UPGRADE_COST_WEAPON1, UPGRADE_COST_WEAPON2
 };
 
-static uint8_t           cursor;
-static uint8_t           active_npc;
-static uint8_t           dialog_cursor;
-static const HubDef     *hub;
-static uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
-static uint8_t           dialog_page_start;   /* char offset of currently-shown page (0 = beginning) */
-static uint8_t           dialog_next_offset;  /* return of last render_wrapped; 0 = no overflow */
+DBG_STATIC uint8_t           cursor;
+DBG_STATIC uint8_t           active_npc;
+DBG_STATIC uint8_t           dialog_cursor;
+DBG_STATIC const HubDef     *hub;
+DBG_STATIC uint8_t           dialog_prev_cursor;  /* last drawn cursor position for dirty update */
+DBG_STATIC uint8_t           dialog_page_start;   /* char offset of currently-shown page (0 = beginning) */
+DBG_STATIC uint8_t           dialog_next_offset;  /* return of last render_wrapped; 0 = no overflow */
 
-static uint8_t           s_portrait_slot;     /* VRAM slot of active NPC portrait (16 tiles) */
-static uint8_t           s_border_slot;       /* VRAM slot of dialog border tileset (8 tiles) */
+DBG_STATIC uint8_t           s_portrait_slot;     /* VRAM slot of active NPC portrait (16 tiles) */
+DBG_STATIC uint8_t           s_border_slot;       /* VRAM slot of dialog border tileset (8 tiles) */
 
 /* portrait tile map and border tile rows — rebuilt at runtime via hub_rebuild_tile_maps() */
-static uint8_t portrait_map[16];
-static uint8_t portrait_top[HUB_PORTRAIT_BOX_W];
-static uint8_t portrait_side[HUB_PORTRAIT_BOX_W];
-static uint8_t portrait_bot[HUB_PORTRAIT_BOX_W];
-static uint8_t dialog_top[HUB_DIALOG_BOX_W];
-static uint8_t dialog_side[HUB_DIALOG_BOX_W];
-static uint8_t dialog_bot[HUB_DIALOG_BOX_W];
+DBG_STATIC uint8_t portrait_map[16];
+DBG_STATIC uint8_t portrait_top[HUB_PORTRAIT_BOX_W];
+DBG_STATIC uint8_t portrait_side[HUB_PORTRAIT_BOX_W];
+DBG_STATIC uint8_t portrait_bot[HUB_PORTRAIT_BOX_W];
+DBG_STATIC uint8_t dialog_top[HUB_DIALOG_BOX_W];
+DBG_STATIC uint8_t dialog_side[HUB_DIALOG_BOX_W];
+DBG_STATIC uint8_t dialog_bot[HUB_DIALOG_BOX_W];
 
 static const uint8_t portrait_offsets[16] = {
     0u,4u,8u,12u, 1u,5u,9u,13u, 2u,6u,10u,14u, 3u,7u,11u,15u

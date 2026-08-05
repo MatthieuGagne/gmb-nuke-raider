@@ -10,6 +10,7 @@
 #include "hUGEDriver.h"
 #include <gb/hardware.h>
 #include <stdint.h>
+#include "debug.h"
 
 /* SFX definition: per-channel APU register snapshot + release duration in frames.
  *
@@ -52,10 +53,10 @@ static const sfx_def_t sfx_defs[SFX_COUNT] = {
 
 /* R9: SoA state — one timer+id pair per channel.
  * timer==0 means the channel is inactive (returned to hUGEDriver). */
-static uint8_t ch1_sfx_id;
-static uint8_t ch1_timer;
-static uint8_t ch4_sfx_id;
-static uint8_t ch4_timer;
+DBG_STATIC uint8_t ch1_sfx_id;
+DBG_STATIC uint8_t ch1_timer;
+DBG_STATIC uint8_t ch4_sfx_id;
+DBG_STATIC uint8_t ch4_timer;
 
 void sfx_init(void) {
     ch1_sfx_id = SFX_COUNT;  /* SFX_COUNT = out-of-range sentinel = inactive */

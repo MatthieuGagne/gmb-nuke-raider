@@ -27,17 +27,18 @@ BANKREF_EXTERN(state_playing)
 #include "explosion.h"
 #include "beam.h"
 #include "config.h"
+#include "debug.h"
 
-static uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
-static uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
-static uint8_t finish_dir_cache;    /* cached at enter(); CHECKPOINT_DIR_N/S/E/W */
+DBG_STATIC uint8_t finish_armed;        /* 1 = ready to detect finish; 0 = debounced */
+DBG_STATIC uint8_t active_map_type_cache; /* cached at enter(); TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
+DBG_STATIC uint8_t finish_dir_cache;    /* cached at enter(); CHECKPOINT_DIR_N/S/E/W */
 
 /* Countdown pre-start phase state */
-static uint8_t cd_phase;     /* 0='03', 1='02', 2='01', 3='GO', 4=done */
-static uint8_t cd_frames;    /* frame counter within current phase */
-static uint8_t cd_bg_col;    /* BG map col of the 2 countdown tiles */
-static uint8_t cd_bg_row;    /* BG map row of the 2 countdown tiles */
-static uint8_t cd_world_row; /* world tile row — passed to camera_invalidate_row() */
+DBG_STATIC uint8_t cd_phase;     /* 0='03', 1='02', 2='01', 3='GO', 4=done */
+DBG_STATIC uint8_t cd_frames;    /* frame counter within current phase */
+DBG_STATIC uint8_t cd_bg_col;    /* BG map col of the 2 countdown tiles */
+DBG_STATIC uint8_t cd_bg_row;    /* BG map row of the 2 countdown tiles */
+DBG_STATIC uint8_t cd_world_row; /* world tile row — passed to camera_invalidate_row() */
 
 /* Countdown digit pairs: lo=left tile, hi=right tile.
  * Phases: 0='03', 1='02', 2='01', 3='GO'
