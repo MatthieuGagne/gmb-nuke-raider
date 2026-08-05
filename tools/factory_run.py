@@ -218,6 +218,13 @@ def apply_event(state, event):
         record = {"text": event.get("text"), "ts": ts}
         if event.get("rationale") is not None:
             record["rationale"] = event["rationale"]
+        # A plan-review finding names a defect in a draft plan that was
+        # corrected before any code was written (#530 R3). The marker is
+        # explicit, never inferred from the stage: an unmarked ruling stays a
+        # decision, so a run that forgets the field keeps the ruling on the
+        # reviewer's surface instead of hiding it there.
+        if event.get("finding"):
+            record["finding"] = True
         state["decisions"].append(record)
     elif kind == "scenario":
         state["scenarios"].append({"scenario": event.get("scenario"),

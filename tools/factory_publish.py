@@ -35,12 +35,14 @@ Exit codes:
 """
 import argparse
 import collections
+import contextlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 _TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _TOOLS_DIR)
@@ -91,10 +93,20 @@ STATUS_DONE = "Done"
 
 PUBLISH_FILE = "publish.json"
 PUBLISH_SCHEMA_VERSION = 1
-PUBLISH_DIRNAME = "publish"          # staged assets, publisher-owned
+PUBLISH_DIRNAME = "publish"          # rendered bodies, publisher-owned
 
 BODY_MARKER = ("<!-- factory-publish v1 — regenerated on every publish; "
                "manual edits are overwritten -->")
+
+# One surface per run (#530 R1). The other one links here, so neither is a
+# dead end (R2).
+DECISIONS_IN_PR = "_The decisions are in the [pull request](%s)._"
+
+# A decision recorded after the PR body was rendered reaches neither surface
+# unless it is shown here too (#530 finding 1). ``pr_decisions`` marks where
+# the PR body's decision list stopped, so anything past it is late.
+DECISIONS_AFTER_PR = ("_Recorded after the pull request body was rendered — "
+                      "not reflected there. Shown here instead._")
 
 GLYPH_DONE = "✅"
 GLYPH_CURRENT = "🔵"
@@ -136,6 +148,11 @@ def new_publish_state(issue):
         "commented_attempts": [],   # spec-issue comments already posted (R10)
         "uploaded": [],             # asset names already on the release (R7)
         "withheld": {},             # asset name -> reason the scan refused it
+        "pr_url": None,             # written by open_pr() once the PR exists
+        "pr_decisions": None,       # decision count when the PR body was
+                                     # rendered (#530 finding 1); None means
+                                     # unknown — an older publish.json, or a
+                                     # ``pr`` sourced from state, not --open-pr
     }
 
 
@@ -274,7 +291,29 @@ def _section_gates(ctx):
 
 
 def _section_decisions(ctx):
-    decisions = ctx["state"].get("decisions") or []
+    findings, decisions = factory_report.partition_decisions(ctx["state"])
+    if ctx["pr"]:
+        # A shipped run puts the record where the human reviews the code, and
+        # this section becomes the link to it (#530 R1, R2). The link shows
+        # for a finding too: a run whose rulings are all findings would
+        # otherwise leave both surfaces pointing nowhere.
+        if not (decisions or findings):
+            return None
+        out = [DECISIONS_IN_PR % ctx["pr"]]
+        # A decision recorded between the PR-open count and now reached no
+        # surface (#530 finding 1): the PR body was rendered once, earlier,
+        # and never again. Index into the raw journal-ordered list, not the
+        # partitioned one — pr_decisions counts every decision event,
+        # findings included, exactly as open_pr_cli did when it captured it.
+        pr_decisions = (ctx["publish"] or {}).get("pr_decisions")
+        if pr_decisions is not None:
+            raw = ctx["state"].get("decisions") or []
+            late = [d for d in raw[pr_decisions:] if not d.get("finding")]
+            if late:
+                out += ["", DECISIONS_AFTER_PR]
+                for decision in late:
+                    out += decision_lines(decision)
+        return out
     dropped = ctx["drop_decisions"]
     kept = decisions[dropped:] if dropped else decisions
     if not kept and not dropped:
@@ -285,6 +324,28 @@ def _section_decisions(ctx):
         out.append("")
     for decision in kept:
         out += decision_lines(decision)
+    return out
+
+
+def _section_findings(ctx):
+    """Plan-review findings, this record's alone (#530 R3).
+
+    A finding names a defect in a draft plan that was corrected before any
+    code was written. It shows that plan review works, so it belongs here. It
+    is not a fact about the code in the pull request, so it stays out of the
+    pull request body.
+    """
+    findings, _decisions = factory_report.partition_decisions(ctx["state"])
+    dropped = ctx["drop_findings"]
+    kept = findings[dropped:] if dropped else findings
+    if not kept and not dropped:
+        return None
+    out = []
+    if dropped:
+        out.append("_%d earlier findings omitted_" % dropped)
+        out.append("")
+    for finding in kept:
+        out += decision_lines(finding)
     return out
 
 
@@ -422,12 +483,14 @@ def _section_failure(ctx):
     return out
 
 
-# Order is fixed and the list is data, not inlined markup: PRD-11 adds its
-# "Review findings" section by appending one entry here (R4).
+# Order is fixed and the list is data, not inlined markup: "Plan review
+# findings" (#530) was added this way, by appending one entry here, and any
+# future section is added the same way (R4).
 SECTIONS = (
     ("Failure", _section_failure),
     ("Gate results", _section_gates),
     ("Decisions made", _section_decisions),
+    ("Plan review findings", _section_findings),
     ("Scenario evidence", _section_scenarios),
     ("Stage logs", _section_stage_logs),
     ("Permission events", _section_permissions),
@@ -779,13 +842,16 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
 
     Render, measure, then shed in a fixed order until it fits, each cut leaving
     an explicit marker rather than vanishing: the inline log tail, then
-    permission events, then decisions oldest-first. Never shed: the status
-    header, the stage strip, the failure fields, the gate table, the stage-log
-    asset table. A hard truncation is the backstop (R5).
+    permission events, then plan-review findings oldest-first, then decisions
+    oldest-first. Never shed: the status header, the stage strip, the failure
+    fields, the gate table, the stage-log asset table. A hard truncation is
+    the backstop (R5).
     """
     ctx = {"state": state, "publish": publish, "registry": registry,
            "now": now, "repo": repo, "sections": SECTIONS,
-           "shed_tail": False, "shed_permissions": False, "drop_decisions": 0}
+           "pr": state.get("pr") or (publish or {}).get("pr_url"),
+           "shed_tail": False, "shed_permissions": False,
+           "drop_findings": 0, "drop_decisions": 0}
 
     def attempt():
         body = _render(ctx)
@@ -805,13 +871,25 @@ def render_body(state, publish, registry=None, now=None, repo=DEFAULT_REPO,
     if body is not None:
         return body
 
-    # Oldest first: the most recent decisions are the ones that explain where
-    # the run is now. Linear because decisions are human-authored and few.
-    for drop in range(1, len(state.get("decisions") or []) + 1):
-        ctx["drop_decisions"] = drop
+    findings, decisions = factory_report.partition_decisions(state)
+
+    # Findings before decisions: a finding describes a draft that no longer
+    # exists, while a decision explains the code that shipped.
+    for drop in range(1, len(findings) + 1):
+        ctx["drop_findings"] = drop
         body = attempt()
         if body is not None:
             return body
+
+    if not ctx["pr"]:
+        # Oldest first: the most recent decisions are the ones that explain
+        # where the run is now. Linear because decisions are human-authored
+        # and few. Skipped when the section is already just a link.
+        for drop in range(1, len(decisions) + 1):
+            ctx["drop_decisions"] = drop
+            body = attempt()
+            if body is not None:
+                return body
 
     return _render(ctx)[:budget - len(TRUNCATION_MARKER)] + TRUNCATION_MARKER
 
@@ -1221,16 +1299,26 @@ def finish_project_status(state, publish, run_url, warnings,
 
 # ── Assets ───────────────────────────────────────────────────────────────────
 
-def stage_dir(issue, registry=None):
-    """Where assets are staged under their published names, publisher-owned.
+@contextlib.contextmanager
+def staged(path, name):
+    """A short-lived copy of *path* under its published name (#530 R4).
 
-    ``gh release upload`` names the asset after the file's basename, so the
-    copy is what carries ``issue-<N>-attempt-<k>-<stage>.log``. The copy is
-    also what makes AC5 provable: bytes in, bytes out, no read of the content.
+    ``gh release upload`` names an asset after the file's basename, so the
+    rename is what carries ``issue-<N>-attempt-<k>-<stage>.log``. The copy is
+    also what keeps the upload byte-exact: bytes in, bytes out, no read of the
+    content.
+
+    It lives in a temporary directory and is removed when the upload returns.
+    A byte-identical second copy inside the run registry costs disk for the
+    life of the run and proves nothing that the upload does not prove already.
     """
-    path = os.path.join(factory_run.run_dir(issue, registry), PUBLISH_DIRNAME)
-    os.makedirs(path, exist_ok=True)
-    return path
+    directory = tempfile.mkdtemp(prefix="factory-publish-")
+    try:
+        dest = os.path.join(directory, name)
+        shutil.copyfile(path, dest)
+        yield dest
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def upload_asset(path, name, publish, warnings, runner=subprocess.run,
@@ -1285,13 +1373,12 @@ def publish_stage_log(state, publish, stage, warnings, registry=None,
               % (stage, reason))
         return False
 
-    dest = os.path.join(stage_dir(issue, registry), name)
     try:
-        shutil.copyfile(src, dest)
+        with staged(src, name) as dest:
+            return upload_asset(dest, name, publish, warnings, runner=runner)
     except OSError as exc:
         _warn(warnings, "asset %s not staged: %s" % (name, exc))
         return False
-    return upload_asset(dest, name, publish, warnings, runner=runner)
 
 
 def publish_screenshots(state, publish, warnings, registry=None,
@@ -1311,13 +1398,14 @@ def publish_screenshots(state, publish, warnings, registry=None,
         if name in (publish.get("uploaded") or []):
             published.append(name)
             continue
-        dest = os.path.join(stage_dir(issue, registry), name)
         try:
-            shutil.copyfile(path, dest)
+            with staged(path, name) as dest:
+                sent = upload_asset(dest, name, publish, warnings,
+                                    runner=runner)
         except OSError as exc:
             _warn(warnings, "screenshot %s not staged: %s" % (name, exc))
             continue
-        if upload_asset(dest, name, publish, warnings, runner=runner):
+        if sent:
             published.append(name)
     return published
 
@@ -1362,14 +1450,13 @@ def publish_plan_asset(state, publish, path, reason, warnings, registry=None,
     if digest == publish.get("plan_sha256"):
         return True
 
-    dest = os.path.join(stage_dir(issue, registry), name)
     try:
-        shutil.copyfile(path, dest)
+        with staged(path, name) as dest:
+            if not upload_asset(dest, name, publish, warnings, runner=runner,
+                                clobber=True):
+                return False
     except OSError as exc:
         _warn(warnings, "plan asset %s not staged: %s" % (name, exc))
-        return False
-    if not upload_asset(dest, name, publish, warnings, runner=runner,
-                        clobber=True):
         return False
     publish["plan_sha256"] = digest
     return True
@@ -1536,10 +1623,11 @@ CLOSES_LINE = "Closes #%d"
 def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
     """The PR body path, with ``Closes #<plan issue>`` appended (R7).
 
-    Returns the original path when there is no plan issue or the body already
-    closes it, and a staged copy otherwise — the file handed in is never
-    rewritten, because it is ``factory_report``'s deterministic output and the
-    SHIP stage may re-render it.
+    The line is appended to the file itself. The rendered body is produced
+    once and no second full copy is written: an 18 KB file used to be
+    rewritten in full to add one trailing line (#530 R4, AC5). The append is
+    idempotent, so a SHIP that re-renders and calls again gets one line, not
+    two.
 
     ``factory_report`` is deliberately not taught about this: the plan issue
     number lives in ``publish.json``, which only this module owns, and
@@ -1564,13 +1652,51 @@ def pr_body_with_plan(issue, body_path, registry=None, warnings=None):
         line = CLOSES_LINE % int(number)
         if re.search(r"(?m)^%s\s*$" % re.escape(line), body):
             return body_path
-        if body and not body.endswith("\n"):
-            body += "\n"
-        return write_body_file(issue, body + line + "\n", registry,
-                               name="publish-pr-body.md")
+        with open(body_path, "a", encoding="utf-8", newline="\n") as fh:
+            if body and not body.endswith("\n"):
+                fh.write("\n")
+            fh.write(line + "\n")
+        return body_path
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         _warn(warnings, "plan issue not linked from the PR body: %s" % exc)
         return body_path
+
+
+def open_pr_cli(issue, branch, title, body_file, registry=None,
+                runner=subprocess.run):
+    """The ``--open-pr`` command. Returns ``(url_or_None, warnings)``.
+
+    Persists ``pr_url`` in publish.json, which is what lets the run issue link
+    to the pull request instead of repeating the decision record (#530 R1).
+    The URL has to outlive this process for that to work, and the ``finish``
+    event does not carry it into the projection.
+
+    Nothing is saved when no URL comes back: a failed ``gh pr create`` must
+    not leave a URL behind for the next publish to link to.
+
+    Also records ``pr_decisions`` — how many decisions existed at this
+    moment — so the run issue can later tell which ones the rendered PR body
+    already carried and which arrived after (#530 finding 1). A run whose
+    own state cannot be read still gets its pull request opened; the count
+    just comes back as 0 rather than blocking the write.
+    """
+    warnings = []
+    publish = load_publish_state(issue, registry)
+    body_file = pr_body_with_plan(issue, body_file, registry=registry,
+                                  warnings=warnings)
+    url, _created = open_pr(issue, branch, title, body_file, publish=publish,
+                            warnings=warnings, runner=runner)
+    if url:
+        try:
+            prior = factory_run.load_state(issue, registry) or {}
+        except (OSError, ValueError, RuntimeError):
+            prior = {}
+        publish["pr_decisions"] = len(prior.get("decisions") or [])
+        try:
+            save_publish_state(publish, registry)
+        except OSError as exc:
+            _warn(warnings, "publish state not saved: %s" % exc)
+    return url, warnings
 
 
 def run_start(issue, registry=None, runner=subprocess.run):
@@ -1705,7 +1831,8 @@ def build_parser():
     parser.add_argument("--title", default=None,
                         help="PR title for --open-pr")
     parser.add_argument("--body-file", default=None, dest="body_file",
-                        help="PR body file for --open-pr")
+                        help="PR body file for --open-pr; mutated in place "
+                             "(a Closes-plan line may be appended)")
     return parser
 
 
@@ -1751,12 +1878,8 @@ def main(argv=None):
             sys.stderr.write("factory-publish: --open-pr requires %s\n"
                              % ", ".join(missing))
             return EXIT_MISUSE
-        warnings = []
-        body_file = pr_body_with_plan(args.issue, args.body_file,
-                                      registry=args.registry,
-                                      warnings=warnings)
-        url, _ = open_pr(args.issue, args.branch, args.title, body_file,
-                         warnings=warnings)
+        url, _warnings = open_pr_cli(args.issue, args.branch, args.title,
+                                     args.body_file, registry=args.registry)
         if url:
             sys.stdout.write(url + "\n")
             return 0

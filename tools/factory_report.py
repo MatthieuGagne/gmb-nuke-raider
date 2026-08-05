@@ -91,6 +91,26 @@ def decision_lines(decision, bullet="- "):
     return out
 
 
+# A plan-review finding names a defect in a draft plan that was corrected
+# before any code was written (#530 R3). It shows that plan review works. It
+# is not a fact about the code under review, so it stays in the run record.
+PLAN_REVIEW_MARKER = "finding"
+
+
+def partition_decisions(state):
+    """``(findings, decisions)`` for *state*, each in journal order (#530 R3).
+
+    The marker is explicit. A record without it is a decision, so a journal
+    written before the field, or a run that forgot to set it, keeps its
+    rulings where the reviewer already looks for them.
+    """
+    findings, decisions = [], []
+    for record in state.get("decisions") or []:
+        target = findings if record.get(PLAN_REVIEW_MARKER) else decisions
+        target.append(record)
+    return findings, decisions
+
+
 def render(state):
     """The full PR body for *state*, ending in exactly one newline."""
     issue = state['issue']
@@ -116,7 +136,8 @@ def render(state):
         out.append('| - | _no gates recorded_ | - |')
 
     out += ['', '## Decisions made', '']
-    decisions = state.get('decisions') or []
+    # Findings stay in the run record (#530 R3, AC3).
+    _findings, decisions = partition_decisions(state)
     if decisions:
         for decision in decisions:
             out += decision_lines(decision)
