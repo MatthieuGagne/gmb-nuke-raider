@@ -439,9 +439,9 @@ Two facts about the game that scenarios must respect:
 
 - **The D-pad is the accelerator**, not `A` (`player.c`: `gas` is gated on
   `J_UP|J_DOWN|J_LEFT|J_RIGHT`); `A` fires. A scenario that "holds A to drive" sits still.
-- **"Race is live" is `_hp > 0`**, not `racer_active[0]`. Only `damage_init()` in
-  `state_playing` writes to `hp`, so it is 0 through boot and menus. Index 0 is the slot of the
-  player, and the loader of the enemy fills only the slots from 1 up. So `racer_active[0]`
+- **"Race is live" is `_hp > 0`**, not `racer_active[0]`. `hp` is 0 through boot and menus,
+  because `damage_init()` in `state_playing` sets it when a race starts. Index 0 is the slot of
+  the player, and the loader of the enemy fills only the slots from 1 up. So `racer_active[0]`
   reads 0 on every track, and not only on Track 1.
 
 `make test-tools` covers the engine itself host-side (no ROM, no PyBoy emulation — though it does
