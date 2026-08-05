@@ -215,5 +215,98 @@ class TestManifestSymbolEmission(unittest.TestCase):
         self.assertNotIn('_cp_next', symbols)
 
 
+class TestTrackDescription(unittest.TestCase):
+    """#588 R10-R12, AC7 — the per-track description the harness reasons about."""
+
+    _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+    def _repo(self, *parts):
+        return os.path.join(self._ROOT, *parts)
+
+    def _write_noi(self, content):
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.noi', delete=False)
+        f.write(content)
+        f.close()
+        return f.name
+
+    def _manifest(self):
+        import emit_manifest as em
+        noi = self._write_noi('DEF _px 0xC247\n')
+        argv = ['emit_manifest.py',
+                '--noi', noi,
+                '--overmap', self._repo('assets', 'maps', 'overmap.tmx'),
+                '--tracks', self._repo('assets', 'maps', 'track.tmx'),
+                self._repo('assets', 'maps', 'track2.tmx'),
+                self._repo('assets', 'maps', 'track3.tmx'),
+                '--tsx', self._repo('assets', 'maps', 'track.tsx'),
+                '--config', self._repo('src', 'config.h'),
+                '--state-overmap', self._repo('src', 'state_overmap.c'),
+                '--state-prerace', self._repo('src', 'state_prerace.c')]
+        buf = io.StringIO()
+        old = sys.argv
+        sys.argv = argv
+        try:
+            with contextlib.redirect_stdout(buf):
+                em.main()
+        finally:
+            sys.argv = old
+            os.unlink(noi)
+        return json.loads(buf.getvalue())
+
+    def test_track_one_and_two_are_twenty_by_one_hundred(self):
+        tracks = self._manifest()['tracks']
+        for key in ('1', '2'):
+            self.assertEqual(tracks[key]['size_tiles'], {'w': 20, 'h': 100})
+            self.assertEqual(tracks[key]['size_px'], {'w': 160, 'h': 800})
+            self.assertEqual(tracks[key]['drive_limits'],
+                             {'x_min': 0, 'x_max': 144, 'y_min': 0, 'y_max': 784})
+            self.assertEqual(len(tracks[key]['solid_grid']), 100)
+            self.assertTrue(all(len(r) == 20 for r in tracks[key]['solid_grid']))
+
+    def test_track_three_carries_its_own_true_size(self):
+        """assets/maps/track3.tmx is 20x26, not 20x100. The manifest says so."""
+        t3 = self._manifest()['tracks']['3']
+        self.assertEqual(t3['size_tiles'], {'w': 20, 'h': 26})
+        self.assertEqual(t3['size_px'], {'w': 160, 'h': 208})
+        self.assertEqual(t3['drive_limits']['y_max'], 192)
+        self.assertEqual(len(t3['solid_grid']), 26)
+
+    def test_lap_targets_come_from_the_tmx(self):
+        tracks = self._manifest()['tracks']
+        self.assertEqual(tracks['1']['lap_target'], 1)
+        self.assertEqual(tracks['2']['lap_target'], 3)
+        self.assertEqual(tracks['3']['lap_target'], 1)
+
+    def test_hud_scanline_comes_from_config_h(self):
+        tracks = self._manifest()['tracks']
+        for key in ('1', '2', '3'):
+            self.assertEqual(tracks[key]['hud_scanline'], 128)
+
+    def test_finish_line_rows_match_the_tile_data(self):
+        tracks = self._manifest()['tracks']
+        self.assertEqual(tracks['1']['finish_line']['ty_min'], 95)
+        self.assertEqual(tracks['1']['finish_line']['ty_max'], 95)
+        self.assertEqual(tracks['2']['finish_line']['ty_min'], 6)
+        self.assertEqual(tracks['2']['finish_line']['ty_max'], 7)
+        self.assertEqual(tracks['3']['finish_line']['ty_min'], 24)
+
+    def test_the_grid_marks_wall_tiles_solid(self):
+        manifest = self._manifest()
+        self.assertEqual(manifest['solid_tile_types'], ['TILE_WALL'])
+        wall = manifest['tile_legend']['TILE_WALL']
+        finish = manifest['tile_legend']['TILE_FINISH']
+        grid = manifest['tracks']['1']['solid_grid']
+        # Track 1's outer columns are wall; its finish row carries finish tiles.
+        self.assertEqual(grid[0][0], wall)
+        self.assertIn(finish, grid[95])
+
+    def test_the_grid_is_indexed_row_then_column(self):
+        """solid_grid[ty][tx] — the order every consumer will assume."""
+        manifest = self._manifest()
+        t1 = manifest['tracks']['1']
+        self.assertEqual(len(t1['solid_grid']), t1['size_tiles']['h'])
+        self.assertEqual(len(t1['solid_grid'][0]), t1['size_tiles']['w'])
+
+
 if __name__ == '__main__':
     unittest.main()

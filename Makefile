@@ -196,6 +196,7 @@ $(TARGET): $(OBJS) | $(BUILD_DIR) bank-check
 	    --overmap assets/maps/overmap.tmx \
 	    --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
 	    --tsx     assets/maps/track.tsx \
+	    --config  src/config.h \
 	    --state-overmap src/state_overmap.c \
 	    --state-prerace src/state_prerace.c \
 	    > $(BUILD_DIR)/game-manifest.json \
