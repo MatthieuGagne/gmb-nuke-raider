@@ -303,6 +303,16 @@ make
 make clean && make   # clean build (required before smoketest)
 ```
 
+### Two ROMs
+
+`make` builds `build/nuke-raider.gb`. `make build-debug` builds `build/debug/nuke-raider.gb`
+with its own `.map`, `.noi` and `game-manifest.json`. Neither writes over the other, and
+`make clean` removes both. `make memory-check` reports on the release ROM, `make
+memory-check-debug` on the debug one.
+
+The two ROMs hold the same bytes. `tests/test_rom_parity.py` checks it. `DEBUG=1` changes
+linkage only.
+
 ### Bank gates (C files only)
 
 | Gate | When | Skill |
@@ -373,7 +383,8 @@ For **runtime issues** (crashes, glitches, wrong values): follow CLAUDE.md's Deb
 diagnosis. Its GBC-specific diagnostic hints live in the agent file itself.
 
 Key tools in Emulicious:
-- **EMU_printf** (`src/debug.h`) — formatted print output visible in the Emulicious console
+- **EMU_printf** (`src/debug.h`) — formatted print output visible in the Emulicious console.
+  Build with `make build-debug DEBUG_TRACE=1`: `DEBUG=1` alone adds symbols, not code.
 - **Step-through debugger** — breakpoints, register inspection, memory viewer
 - **Tile/sprite viewers** — verify VRAM contents, OAM state, palette assignments
 - **Tracer + profiler** — identify hot paths and timing issues
@@ -419,21 +430,44 @@ blocking VERIFY gate for the agent factory.
 - `"blocking": false` marks an evidence scenario — it runs and reports, but never fails the gate.
 - Symbols resolve from `build/game-manifest.json` first, then `build/nuke-raider.noi`
   (full names), then `build/nuke-raider.map` (names truncated to 9 characters — last resort).
-  `static` variables appear in none of the three and cannot be watched or asserted.
-  When a scenario needs one, the fix is to drop `static` deliberately and say so in the
-  header — `rs_laps` / `rs_cp_next` (`src/race_state.c`) are exported for exactly this
-  reason (#448), which is why `deep-race` can assert `_rs_laps >= 1` directly, instead of
-  only inferring a lap from the car's geometry. `_rs_laps` is `rs_laps[PLAYER_SLOT]`, slot 0
-  — the array base is the player's byte only because `PLAYER_SLOT == 0` (`src/config.h`).
-  Exported-for-assertion variables stay accessor-only for game
-  code; a mirror variable is the wrong fix, because a desynced mirror makes the test lie.
-- Every run writes `build/smoketest/<scenario>/`: `results.json` (with a `verdict` field),
-  `trace.jsonl` (WRAM sentinels sampled every 30 frames), and checkpoint screenshots.
+  `static` variables appear in none of the three. Since #588 they do not have to be `static`:
+  `DBG_STATIC` (`src/debug.h`) is `static` in a release ROM and empty in a debug ROM, and every
+  mutable file-scope data declaration in `src/*.c` uses it. Build `make build-debug` and point
+  the harness at `build/debug/nuke-raider.noi` to watch any module variable by name.
+  `tools/dbg_static_lint.py`, which `make test-tools` runs, fails when a new declaration keeps
+  the bare `static` keyword. Static functions and `static const` data keep `static` — the first
+  because `enter` and `update` each occur 7 times, the second because it sits in ROM and the
+  symbol reader accepts WRAM addresses only. `rs_laps` / `rs_cp_next` (`src/race_state.c`) stay
+  plain globals (#448), which is why `deep-race` can assert `_rs_laps >= 1` directly. `_rs_laps`
+  is `rs_laps[PLAYER_SLOT]`, slot 0 — the array base is the player's byte only because
+  `PLAYER_SLOT == 0` (`src/config.h`). Exported-for-assertion variables stay accessor-only for
+  game code; a mirror variable is the wrong fix, because a desynced mirror makes the test lie.
+- Every run writes `<main work tree>/build/smoketest/<checkout name>/<scenario>/`: `results.json`
+  (with a `verdict` field), `trace.jsonl` (WRAM sentinels sampled every 30 frames), and
+  checkpoint screenshots. `--all` adds one `all-results.json` holding every scenario's outcome.
+  The location is the MAIN work tree, resolved with `git rev-parse --git-common-dir`, and
+  namespaced by the checkout directory name so two concurrent runs never overwrite each other's
+  evidence; the files survive removal of the worktree that produced them. `--out-dir` overrides
+  it.
 - Differential debugging: `--ref-rom PATH` re-runs the same scenario against a reference ROM and
   reports the first WRAM divergence by step. If the scenario fails on both ROMs it is reported
   `scenario-invalid` rather than blamed on the game.
 
-Exit codes: `0` pass, `1` run failure, `2` tool or usage error.
+Exit codes: `0` pass, `1` run failure, `2` tool or usage error, `3` scenario invalid. Code 3
+means the scenario is wrong, not the game, and it is returned for a blocking scenario and for a
+scenario that is not blocking. A non-blocking scenario that the GAME failed still exits 0 — read
+the `verdict` field, never the exit code, for evidence scenarios.
+
+The manifest each run reads (`build/game-manifest.json`) describes every track: its size in tiles
+and pixels, the drive limits (`0` to `map_h * 8 - 16`, the rule in `src/vehicle_physics.c`), the
+HUD scan line, the lap target, the finish line, and a text grid with one row per map row and one
+character per tile. `tile_legend` names the characters and `solid_tile_types` names which types
+block a car. A `?` marks a tile whose TSX entry carries no `type` property.
+
+The grid is tile-type granular, not the engine's real collision: `track_collision_mask`
+(`src/track_tileset_meta.h`) gives some `TILE_ROAD` diagonal corner tiles partial per-pixel
+collision that the grid cannot show. Do not read the grid as exact collision truth, and do not
+plan a route from it — that is out of scope for this work.
 
 Two facts about the game that scenarios must respect:
 
