@@ -316,11 +316,23 @@ void beam_update(int16_t px, int16_t py) BANKED {
 }
 
 /* Repaint the cells that left the span since the last painted frame (R5, R6).
- * At top speed the car crosses at most one tile boundary per frame, and the
- * screen edge moves at most one tile per frame, so each run is one cell. A run
- * longer than CAMERA_REPAIR_MAX_CELLS cannot happen while the car drives; if
- * one appears, fall back to the whole lane rather than write 22 cells in one
- * VBlank. */
+ * While the car drives, each end of the span loses at most one cell per
+ * frame, so the incremental runs computed below are short — that is the
+ * normal path, and the reason CAMERA_REPAIR_MAX_CELLS is small.
+ *
+ * The nc == 0 case is different: it fires when the nose lands on a wall or
+ * leaves the screen clip (R9), and in that frame the WHOLE painted span
+ * leaves at once, not one cell at a time. A span longer than
+ * CAMERA_REPAIR_MAX_CELLS therefore takes the fallback below instead of the
+ * synchronous per-cell repair.
+ *
+ * The fallback does not repaint on the same frame. This function only raises
+ * s_lane_repair; beam_update() queues the lane restream after
+ * camera_update() runs, and camera_flush_vram() drains that queue on the
+ * NEXT frame. So a long pulse that dies against a wall keeps its stale tiles
+ * for one extra displayed frame. That is a deliberate deviation from R5's
+ * "same frame" rule, bounded to one frame, traded so a single VBlank never
+ * writes 22 repair tiles on top of the camera's own stream. */
 static void beam_repair_leaving(void) {
     uint8_t a  = s_drawn_lo;
     uint8_t pc = s_drawn_count;

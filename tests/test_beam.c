@@ -375,6 +375,52 @@ void test_a_new_pulse_recasts_when_only_the_direction_flips(void) {
     TEST_ASSERT_NOT_EQUAL(0x40u,   mock_vram[(9u * 32u) + 11u]);  /* no stale R span */
 }
 
+/* The repair runs from the LOW tile of the span, so for DIR_L and DIR_T — where
+ * the car chases the beam toward a lower tile index — the cell the beam leaves
+ * is at the HIGH end of the span. That is a different arm of the run
+ * arithmetic than DIR_R and DIR_B use, and these two tests are what execute it. */
+
+void test_a_left_beam_repairs_the_cell_it_leaves(void) {
+    /* DIR_L from (64,64): centre 72, nose 64 -> cells 8..0 on row 9.
+     * The car moves one tile left: nose 56 -> cells 7..0, so tile 8 leaves. */
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_L));
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 8u]);
+    beam_update(56, 64);
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(9u * 32u) + 8u]);
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 7u]);
+}
+
+void test_an_up_beam_repairs_the_cell_it_leaves(void) {
+    /* DIR_T from (64,64): centre 72, nose 64 -> rows 8..0 on column 9.
+     * The car moves one tile up: nose 56 -> rows 7..0, so row 8 leaves. */
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_T));
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x41u, mock_vram[(8u * 32u) + 9u]);
+    beam_update(64, 56);
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(1u,    mock_vram[(8u * 32u) + 9u]);
+    TEST_ASSERT_EQUAL_UINT8(0x41u, mock_vram[(7u * 32u) + 9u]);
+}
+
+/* A pulse longer than CAMERA_REPAIR_MAX_CELLS that loses its last free cell
+ * takes the whole-lane fallback, which lands one frame later. This pins that
+ * lag so it stays deliberate: the existing zero-cell test uses a 4-cell span,
+ * which sits exactly on the cap and never reaches this path. */
+void test_a_long_pulse_that_dies_on_a_wall_repairs_one_frame_later(void) {
+    map_wall_at(16u, 9u);
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 64, DIR_R));   /* cells 10..15 */
+    beam_render();
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 10u]);
+    beam_update(112, 64);            /* the nose pixel is 128 — inside the wall tile */
+    beam_render();                   /* 6 cells leave at once: the fallback is raised */
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 10u]);   /* still stale */
+    beam_update(112, 64);            /* queues the lane, after camera_update() */
+    camera_flush_vram();             /* drains it */
+    TEST_ASSERT_EQUAL_UINT8(1u,     mock_vram[(9u * 32u) + 10u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_diagonal_press_does_not_fire);
@@ -410,5 +456,8 @@ int main(void) {
     RUN_TEST(test_a_zero_cell_frame_clears_the_whole_painted_span);
     RUN_TEST(test_a_long_jump_defers_to_the_whole_lane_repair);
     RUN_TEST(test_a_new_pulse_recasts_when_only_the_direction_flips);
+    RUN_TEST(test_a_left_beam_repairs_the_cell_it_leaves);
+    RUN_TEST(test_an_up_beam_repairs_the_cell_it_leaves);
+    RUN_TEST(test_a_long_pulse_that_dies_on_a_wall_repairs_one_frame_later);
     return UNITY_END();
 }
