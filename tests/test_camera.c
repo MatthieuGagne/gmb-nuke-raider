@@ -302,6 +302,55 @@ void test_invalidate_row_reports_acceptance(void) {
     TEST_ASSERT_EQUAL_UINT8(0, camera_invalidate_row(4u));  /* full -> refused */
 }
 
+/* ---- camera_repair_cells (#582) --------------------------------------- */
+
+/* A 20x16 map of road (tile 1) with one distinctive tile (7) at (11, 9).
+ * A repair that writes the wrong cell, or drops the tile base, cannot pass. */
+static uint8_t s_repair_map[20u * 16u];
+
+/* Leaves track.c pointing at s_repair_map and active_map_h at 16. setUp()
+ * restores active_map_h but not the map pointer, so any test added AFTER the
+ * repair tests must call track_test_set_map() itself before camera_init(). */
+static void repair_map_init(void) {
+    uint16_t i;
+    for (i = 0u; i < 20u * 16u; i++) s_repair_map[i] = 1u;
+    s_repair_map[(9u * 20u) + 11u] = 7u;
+    track_test_set_map(s_repair_map, 20u, 16u);
+    camera_init(0, 0);        /* 20x16 map -> cam_x = cam_y = 0, both clamped */
+    camera_flush_vram();      /* drain whatever init queued */
+    mock_vram_clear();
+}
+
+void test_repair_cells_repaints_the_track_row(void) {
+    repair_map_init();
+    camera_repair_cells(10u, 9u, 2u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, mock_vram[(9u * 32u) + 10u]);
+    TEST_ASSERT_EQUAL_UINT8(7u, mock_vram[(9u * 32u) + 11u]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(9u * 32u) + 12u]);   /* outside the run */
+}
+
+void test_repair_cells_adds_the_track_tile_base(void) {
+    repair_map_init();
+    camera_set_tile_base(0x20u);
+    camera_repair_cells(11u, 9u, 1u, 0u);
+    TEST_ASSERT_EQUAL_UINT8(0x27u, mock_vram[(9u * 32u) + 11u]);
+}
+
+void test_repair_cells_repaints_a_track_column(void) {
+    repair_map_init();
+    camera_repair_cells(11u, 8u, 2u, 1u);
+    TEST_ASSERT_EQUAL_UINT8(1u, mock_vram[(8u * 32u) + 11u]);
+    TEST_ASSERT_EQUAL_UINT8(7u, mock_vram[(9u * 32u) + 11u]);
+}
+
+void test_repair_cells_clamps_the_count(void) {
+    repair_map_init();
+    camera_repair_cells(0u, 9u, (uint8_t)(CAMERA_REPAIR_MAX_CELLS + 2u), 0u);
+    TEST_ASSERT_EQUAL_INT((int)CAMERA_REPAIR_MAX_CELLS, mock_set_bkg_tiles_call_count);
+    TEST_ASSERT_EQUAL_UINT8(1u, mock_vram[(9u * 32u) + (CAMERA_REPAIR_MAX_CELLS - 1u)]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(9u * 32u) + CAMERA_REPAIR_MAX_CELLS]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -333,5 +382,9 @@ int main(void) {
     RUN_TEST(test_camera_invalidate_row_queues_a_row_for_flush);
     RUN_TEST(test_invalidate_col_streams_that_column);
     RUN_TEST(test_invalidate_row_reports_acceptance);
+    RUN_TEST(test_repair_cells_repaints_the_track_row);
+    RUN_TEST(test_repair_cells_adds_the_track_tile_base);
+    RUN_TEST(test_repair_cells_repaints_a_track_column);
+    RUN_TEST(test_repair_cells_clamps_the_count);
     return UNITY_END();
 }

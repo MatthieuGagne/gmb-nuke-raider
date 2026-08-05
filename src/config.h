@@ -49,6 +49,12 @@
 
 #define HUD_SCANLINE 128u /* pixel row where HUD window begins; used for player movement bounds */
 
+/* Camera small-range BG repair (#582) — max cells one camera_repair_cells()
+ * call writes. The beam's incremental repair loses at most one cell per end
+ * per frame, so 4 is slack; the cap bounds VBlank tile traffic and sizes the
+ * repair buffer. */
+#define CAMERA_REPAIR_MAX_CELLS 4u
+
 /* Terrain physics modifiers */
 #define TERRAIN_SAND_FRICTION_MUL  2u   /* friction steps applied on sand (double) */
 #define TERRAIN_BOOST_DELTA        2u   /* vy kick per frame on boost pad */

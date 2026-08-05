@@ -56,4 +56,16 @@ void camera_apply_scroll(void) BANKED;
 uint8_t camera_invalidate_row(uint8_t world_tile_row) BANKED;
 uint8_t camera_invalidate_col(uint8_t world_tile_col) BANKED;
 
+/* Repaint a short run of BG cells with their current track tiles, tile base
+ * included. The run starts at world tile (tx, ty) and advances along +X when
+ * vertical is 0, along +Y when vertical is 1. count above
+ * CAMERA_REPAIR_MAX_CELLS is clamped, and count 0 is a no-op. Off-map cells
+ * are painted with the tile base alone.
+ *
+ * Writes VRAM immediately — VBlank phase only, unlike camera_invalidate_row(),
+ * which queues for the next flush and must not run before camera_update().
+ * Used by the #582 beam repair: a whole-lane restream is 22 tiles and cannot
+ * run on every frame of a pulse. */
+void camera_repair_cells(uint8_t tx, uint8_t ty, uint8_t count, uint8_t vertical) BANKED;
+
 #endif /* CAMERA_H */
