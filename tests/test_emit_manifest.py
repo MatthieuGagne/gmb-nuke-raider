@@ -165,6 +165,14 @@ class TestCuratedSymbols(unittest.TestCase):
         em = self._em()
         self.assertNotIn('_cp_next', em.CURATED_SYMBOLS)
 
+    def test_dead_racer_active_entry_is_retired(self):
+        # '_racer_active' resolved to a real address but was always 0: index 0
+        # is the player's slot (PLAYER_SLOT 0u, src/config.h) and the enemy
+        # loader activates slots 1 and up only (src/racer.c), so it reads 0 on
+        # every track (#508).
+        em = self._em()
+        self.assertNotIn('_racer_active', em.CURATED_SYMBOLS)
+
 
 class TestManifestSymbolEmission(unittest.TestCase):
     """Drives emit_manifest.main() for real, so a hoisted-but-unwired

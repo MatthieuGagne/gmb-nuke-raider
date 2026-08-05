@@ -29,7 +29,7 @@ sys.path.remove(_TOOLS_DIR)
 
 EXIT_PASS, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
 
-DEFAULT_WATCH = ["_racer_active", "_hp", "_px", "_py", "_active_lap_count"]
+DEFAULT_WATCH = ["_hp", "_px", "_py", "_active_lap_count"]
 
 # Sample the WRAM sentinels (and render, feeding the freeze watchdog) this often.
 DEFAULT_TRACE_EVERY = 30          # frames — twice per second at 60fps

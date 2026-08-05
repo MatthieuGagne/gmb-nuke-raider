@@ -24,10 +24,13 @@ GID_FLAGS = 0x0FFFFFFF
 # does not resolve). Module-level so tests/test_emit_manifest.py can assert it.
 # _rs_laps / _rs_cp_next are deliberately non-static in src/race_state.c so the
 # headless scenario engine can assert lap progress by name (#448).
+# _racer_active was retired here (#508): it is racer_active[0], the player's own
+# slot in the shared pool, and the enemy loader activates slots 1 and up only, so
+# it is 0 on every track. A constant byte cannot serve as a liveness sentinel.
 CURATED_SYMBOLS = [
     '_cam_scx_shadow', '_cam_scy_shadow', '_current_race_id',
     '_px', '_py', '_hp', '_active_lap_count',
-    '_rs_laps', '_rs_cp_next', '_racer_active'
+    '_rs_laps', '_rs_cp_next'
 ]
 
 
