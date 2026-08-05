@@ -31,12 +31,30 @@ static uint8_t s_drawn_count;     /* cells currently painted */
 static uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
 static uint8_t s_lane_repair;     /* 1 = the whole lane needs a restream; queued in beam_update() */
 
+/* beam_cast() memo — see the comment inside beam_cast() for the invariant.
+ * Reset (s_cast_memo_ok = 0) at the start of every new pulse in beam_fire(). */
+static uint8_t s_cast_memo_ok;
+static int16_t s_cast_nose;
+static int16_t s_cast_vis_lo;
+static int16_t s_cast_vis_hi;
+static uint8_t s_cast_n;
+static uint8_t s_cast_lo;
+
 static uint8_t s_cell_buf[BEAM_MAX_CELLS];
 
 /* Raycast from world pixel `nose` along s_step on the fixed lane. Returns the
  * cell count and writes the LOWEST world tile of the span to *lo. One tile per
  * step, so no cell is skipped. A nose outside the screen clip returns 0, which
- * is what keeps the *lo shift below out of negative coordinates. */
+ * is what keeps the *lo shift below out of negative coordinates.
+ *
+ * The scan is the hot cost: up to BEAM_MAX_CELLS calls to track_passable(),
+ * each paging the ROM bank twice via loader_map_read_byte(). s_axis, s_step and
+ * s_lane_px are fixed for the whole pulse (R3), so nose/vis_lo/vis_hi are the
+ * ONLY inputs that can change the result from one call to the next. When all
+ * three repeat — car and camera both idle along the beam axis, e.g. the "start
+ * never moves backwards" case in beam_update() — the scan is skipped and the
+ * previous result is reused verbatim; this is memoizing a pure function on
+ * identical inputs, so it cannot change what gets drawn (#582). */
 static uint8_t beam_cast(int16_t nose, uint8_t *lo) {
     int16_t vis_lo, vis_hi, p, x, y;
     uint8_t n = 0u;
@@ -50,6 +68,12 @@ static uint8_t beam_cast(int16_t nose, uint8_t *lo) {
         vis_hi = (int16_t)((int16_t)cam_y + (int16_t)HUD_SCANLINE - 1);
     }
 
+    if (s_cast_memo_ok && nose == s_cast_nose &&
+        vis_lo == s_cast_vis_lo && vis_hi == s_cast_vis_hi) {
+        *lo = s_cast_lo;
+        return s_cast_n;
+    }
+
     p = nose;
     while (n < (uint8_t)BEAM_MAX_CELLS) {
         if (p < vis_lo || p > vis_hi) break;
@@ -60,12 +84,24 @@ static uint8_t beam_cast(int16_t nose, uint8_t *lo) {
         p = (int16_t)(p + s_step);
     }
 
-    if (n == 0u) { *lo = 0u; return 0u; }
+    s_cast_memo_ok = 1u;
+    s_cast_nose    = nose;
+    s_cast_vis_lo  = vis_lo;
+    s_cast_vis_hi  = vis_hi;
+
+    if (n == 0u) {
+        *lo = 0u;
+        s_cast_n  = 0u;
+        s_cast_lo = 0u;
+        return 0u;
+    }
     if (s_step > 0) {
         *lo = (uint8_t)((uint16_t)nose >> 3u);
     } else {
         *lo = (uint8_t)((uint16_t)(int16_t)(nose + (int16_t)(s_step * (int16_t)(n - 1u))) >> 3u);
     }
+    s_cast_n  = n;
+    s_cast_lo = *lo;
     return n;
 }
 
@@ -103,6 +139,7 @@ void beam_reset(void) BANKED {
     s_count       = 0u;
     s_drawn_count = 0u;
     s_lane_repair = 0u;
+    s_cast_memo_ok = 0u;
     s_x0 = s_x1 = s_y0 = s_y1 = 0;
 }
 
@@ -159,6 +196,9 @@ uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED {
      * screen edge scrolls away from the car. */
     for (i = 0u; i < (uint8_t)BEAM_MAX_CELLS; i++) s_cell_buf[i] = seg_tile;
 
+    /* A new pulse can flip axis, lane and step, so a stale memo from the
+     * previous pulse must never be reused even if nose/vis happen to match. */
+    s_cast_memo_ok = 0u;
     n         = beam_cast(s_nose, &lo);
     s_count   = n;
     s_lo_tile = lo;
