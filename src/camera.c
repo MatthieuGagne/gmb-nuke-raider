@@ -228,3 +228,32 @@ uint8_t camera_invalidate_col(uint8_t world_tile_col) BANKED {
     }
     return 0u;
 }
+
+DBG_STATIC uint8_t repair_buf[CAMERA_REPAIR_MAX_CELLS];
+
+void camera_repair_cells(uint8_t tx, uint8_t ty, uint8_t count, uint8_t vertical) BANKED {
+    uint8_t i;
+    uint8_t t;
+
+    if (count == 0u) return;
+    /* Clamp BEFORE the fill: repair_buf is CAMERA_REPAIR_MAX_CELLS bytes and
+     * track_fill_* writes count of them. */
+    if (count > (uint8_t)CAMERA_REPAIR_MAX_CELLS) count = (uint8_t)CAMERA_REPAIR_MAX_CELLS;
+
+    if (vertical) {
+        track_fill_col(tx, ty, count, repair_buf);
+    } else {
+        track_fill_row_range(ty, tx, count, repair_buf);
+    }
+
+    /* One cell per set_bkg_tiles() call: count is at most 4, and a per-cell
+     * write needs no BG ring-wrap split. */
+    for (i = 0u; i < count; i++) {
+        t = (uint8_t)(repair_buf[i] + s_track_tile_base);
+        if (vertical) {
+            set_bkg_tiles((uint8_t)(tx & 31u), (uint8_t)((uint8_t)(ty + i) & 31u), 1u, 1u, &t);
+        } else {
+            set_bkg_tiles((uint8_t)((uint8_t)(tx + i) & 31u), (uint8_t)(ty & 31u), 1u, 1u, &t);
+        }
+    }
+}

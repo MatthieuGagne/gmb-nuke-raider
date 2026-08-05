@@ -656,7 +656,7 @@ void test_held_a_auto_pulses_at_the_laser_cadence(void) {
         player_set_pos(64, 64);          /* pin the car so the lane is stable */
         player_update();
         if (beam_hit_damage(96, 64, 16u)) windows++;
-        beam_update();
+        beam_update(64, 64);
     }
     TEST_ASSERT_EQUAL_UINT8(2, windows);
 }
