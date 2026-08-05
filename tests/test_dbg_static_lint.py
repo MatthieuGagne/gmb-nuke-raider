@@ -7,6 +7,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import dbg_static_lint
 
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def _violations(source):
     """Run the lint over one synthetic translation unit."""
@@ -128,3 +130,30 @@ class TestMain(unittest.TestCase):
                         'static const uint8_t T[] = {0};\n'
                         'static void f(void) { }\n')
             self.assertEqual(dbg_static_lint.main([d]), 0)
+
+
+class TestRepositorySources(unittest.TestCase):
+    """AC6: this is what fails when someone adds a bare `static` to src/."""
+
+    def test_every_src_c_file_uses_dbg_static(self):
+        messages = []
+        for path in dbg_static_lint.iter_sources([os.path.join(_REPO, 'src')]):
+            messages.extend(dbg_static_lint.check_file(path))
+        self.assertEqual(messages, [], '\n'.join(messages))
+
+    def test_a_new_bare_static_is_reported_by_the_same_code_path(self):
+        """The input flip that proves the check above can fail.
+
+        A probe module goes through iter_sources + check_file, exactly as the
+        repository check does. Without it the test above only states the tree's
+        current shape and would never catch a regression.
+        """
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, 'probe.c'), 'w') as f:
+                f.write('#include "config.h"\nstatic uint8_t probe_var;\n')
+            messages = []
+            for path in dbg_static_lint.iter_sources([d]):
+                messages.extend(dbg_static_lint.check_file(path))
+        self.assertEqual(len(messages), 1)
+        self.assertIn('probe_var', messages[0])
+        self.assertIn(':2', messages[0])
