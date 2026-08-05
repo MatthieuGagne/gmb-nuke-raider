@@ -5,6 +5,7 @@
 #include "track_tileset_meta.h"
 #include "banking.h"
 #include "loader.h"
+#include "debug.h"
 
 extern const int16_t track3_start_x;
 extern const int16_t track3_start_y;
@@ -20,8 +21,8 @@ static const TrackDesc track_table[] = {
  * track_tile_type_lut[TRACK_TILE_LUT_LEN] covers base + rotated tile variants. */
 
 /* --- Track dispatch state --- */
-static uint8_t active_track_id;
-static uint8_t active_map_type = 0u;
+DBG_STATIC uint8_t active_track_id;
+DBG_STATIC uint8_t active_map_type = 0u;
 
 /* Runtime track dimensions — set by load_track_header() at track_select() time.
  * Default to track 0 compile-time dimensions so calls work before track_select(). */
@@ -31,16 +32,16 @@ uint8_t active_map_h = 100u;  /* default: track 0 height — overwritten by load
 /* Active track parameters — copied from the selected track's descriptor
  * at track_select() time. Tile data is read via loader NONBANKED helpers
  * to avoid cross-bank dereference from BANKED code. */
-static int16_t        active_start_x;
-static int16_t        active_start_y;
+DBG_STATIC int16_t    active_start_x;
+DBG_STATIC int16_t    active_start_y;
 uint8_t        active_lap_count;
-static uint8_t        active_finish_direction;
-static uint8_t        active_start_dir;
+DBG_STATIC uint8_t    active_finish_direction;
+DBG_STATIC uint8_t    active_start_dir;
 
 /* WRAM checkpoint buffer — filled by load_checkpoints() (bank-0 loader) at track_select() time.
  * Always accessed from WRAM; never read directly from ROM in banked code. */
-static CheckpointDef wram_checkpoints[MAX_CHECKPOINTS];
-static uint8_t       active_checkpoint_count = 0u;
+DBG_STATIC CheckpointDef wram_checkpoints[MAX_CHECKPOINTS];
+DBG_STATIC uint8_t       active_checkpoint_count = 0u;
 
 void track_select(uint8_t id) BANKED {
     if (id >= NUM_TRACKS) id = 0u;

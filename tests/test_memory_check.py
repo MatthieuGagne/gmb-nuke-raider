@@ -83,6 +83,26 @@ class TestCheckWRAM(unittest.TestCase):
             self.assertIsNone(used)
             self.assertEqual(status, 'ERROR')
 
+    def test_explicit_map_path_overrides_the_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, map_content=_map_with_heap_e(0xC23D))
+            other = os.path.join(d, 'build', 'debug')
+            os.makedirs(other, exist_ok=True)
+            with open(os.path.join(other, 'nuke-raider.map'), 'w') as f:
+                f.write(_map_with_heap_e(0xC400))
+            used, status = memory_check._check_wram(
+                d, map_path=os.path.join(other, 'nuke-raider.map'))
+            self.assertEqual(used, 1024)
+            self.assertEqual(status, 'PASS')
+
+    def test_missing_explicit_map_path_is_an_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            make_repo(d, map_content=_map_with_heap_e(0xC23D))
+            used, status = memory_check._check_wram(
+                d, map_path=os.path.join(d, 'build', 'debug', 'nuke-raider.map'))
+            self.assertIsNone(used)
+            self.assertEqual(status, 'ERROR')
+
 
 # ── VRAM tests ─────────────────────────────────────────────────────────────────
 

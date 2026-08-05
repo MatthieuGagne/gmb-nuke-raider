@@ -10,7 +10,12 @@ Usage:
                                         [--rom PATH] [--ref-rom PATH]
                                         [--out-dir DIR] [--json]
 
-Exit codes: 0 = pass, 1 = run failure, 2 = tool/usage error.
+Exit codes: 0 = pass, 1 = run failure, 2 = tool/usage error,
+            3 = scenario invalid (the scenario is wrong, not the game).
+
+Output goes to the MAIN work tree by default, not to the checkout the run was
+started from: a worktree is deleted when its branch merges, and the evidence
+died with it (#588 R14). `--out-dir` still wins.
 """
 from __future__ import annotations
 
@@ -25,9 +30,10 @@ from pathlib import Path
 _TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _TOOLS_DIR)
 import pyboy_scenario as ps
+import factory_run
 sys.path.remove(_TOOLS_DIR)
 
-EXIT_PASS, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
+EXIT_PASS, EXIT_FAIL, EXIT_USAGE, EXIT_SCENARIO_INVALID = 0, 1, 2, 3
 
 DEFAULT_WATCH = ["_hp", "_px", "_py", "_active_lap_count"]
 
@@ -35,6 +41,69 @@ DEFAULT_WATCH = ["_hp", "_px", "_py", "_active_lap_count"]
 DEFAULT_TRACE_EVERY = 30          # frames — twice per second at 60fps
 # Deliberately loose: only a genuine hard hang holds the screen this long.
 DEFAULT_FREEZE_FRAMES = 600       # frames — ~10s. 0 disables the watchdog.
+
+
+def default_out_dir():
+    """``<main work tree>/build/smoketest/<checkout directory name>``.
+
+    factory_run.repo_root uses `git rev-parse --git-common-dir`, which is the
+    one form that resolves the MAIN tree from inside a linked worktree
+    (`--show-toplevel` returns the worktree). Outside a git tree the local
+    checkout is the fallback, so the tool still runs from a tarball.
+
+    The last element names the checkout the run started from. Two worktrees
+    running the same scenario would otherwise overwrite each other's
+    results.json, trace and screenshots, and factory_run.smoketest_dir would
+    hand one run the other run's evidence.
+    """
+    local = Path(__file__).parent.parent
+    leaf = os.path.basename(os.path.normpath(str(local)))
+    try:
+        main = factory_run.repo_root(str(local))
+    except Exception:
+        main = str(local)
+    return os.path.join(main, "build", "smoketest", leaf)
+
+
+def rebase_screenshots(steps, out_dir):
+    """Point every relative screenshot path at this run's output directory.
+
+    The library scenarios name a file, not a path. An older scenario that
+    still names `build/smoketest/<name>/<file>.png` would write inside the
+    checkout, which is what AC9 forbids, so only its file name is kept.
+    """
+    for step in steps:
+        if step.get("action") != "screenshot":
+            continue
+        out = step.get("out")
+        if not out or os.path.isabs(out):
+            continue
+        step["out"] = os.path.join(out_dir, os.path.basename(out))
+
+
+def resolve_exit_code(results):
+    """The process exit code for a whole run.
+
+    A blocking game failure outranks an invalid scenario: a broken game is the
+    more urgent report, and an invalid scenario is still visible in the JSON.
+    """
+    invalid = any(r["verdict"] == "scenario-invalid" for r in results)
+    failed = any(r["verdict"] == "fail" and r.get("blocking") for r in results)
+    if failed:
+        return EXIT_FAIL
+    if invalid:
+        return EXIT_SCENARIO_INVALID
+    return EXIT_PASS
+
+
+def write_combined_results(results, out_dir):
+    """One file holding every scenario outcome (R15). Returns its path."""
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "all-results.json")
+    with open(path, "w") as f:
+        json.dump({"verdicts": {r["scenario"]: r["verdict"] for r in results},
+                   "scenarios": results}, f, indent=2)
+    return path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--noi",           default=str(root / "build" / "nuke-raider.noi"))
     p.add_argument("--manifest",      default=str(root / "build" / "game-manifest.json"))
     p.add_argument("--library",       default=str(root / "tools" / "scenarios"))
-    p.add_argument("--out-dir",       default=str(root / "build" / "smoketest"),
+    p.add_argument("--out-dir",       default=default_out_dir(),
                    dest="out_dir")
     p.add_argument("--json",          action="store_true", dest="as_json")
     p.add_argument("--trace-every",   type=int, default=DEFAULT_TRACE_EVERY,
@@ -180,9 +249,11 @@ def main() -> int:
 
     symbols = ps.load_symbols(args.manifest, args.noi, args.map)
 
-    results, exit_code = [], EXIT_PASS
+    results = []
     for scenario in scenarios:
         out_dir = os.path.join(args.out_dir, scenario["name"])
+        os.makedirs(out_dir, exist_ok=True)
+        rebase_screenshots(scenario["steps"], out_dir)
         ctx, failure = run_one(args.rom, scenario, args, symbols, manifest, out_dir)
         divergence, verdict = None, None
 
@@ -201,15 +272,16 @@ def main() -> int:
                               blocking=scenario["blocking"])
         results.append(result)
         _report(result, args.as_json)
-        if failure is not None and scenario["blocking"]:
-            exit_code = EXIT_FAIL
-        elif failure is not None:
+        if failure is not None and not scenario["blocking"] \
+                and result["verdict"] != "scenario-invalid":
             print(f"    WARN: non-blocking scenario {scenario['name']} failed "
                   f"— reported as evidence, not gating.")
         with open(os.path.join(out_dir, "results.json"), "w") as f:
             json.dump(result, f, indent=2)
 
-    return exit_code
+    if args.all:
+        write_combined_results(results, args.out_dir)
+    return resolve_exit_code(results)
 
 
 if __name__ == "__main__":

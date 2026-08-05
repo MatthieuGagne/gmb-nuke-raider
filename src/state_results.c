@@ -8,9 +8,10 @@
 #include "state_results.h"
 #include "state_overmap.h"
 #include "economy.h"
+#include "debug.h"
 BANKREF(state_results)
 
-static uint16_t earned_this_race = 0u;
+DBG_STATIC uint16_t earned_this_race = 0u;
 
 void state_results_set_earned(uint16_t amount) BANKED {
     earned_this_race = amount;

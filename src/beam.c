@@ -6,27 +6,28 @@
 #include "player.h"
 #include "sfx.h"
 #include "config.h"
+#include "debug.h"
 
 BANKREF(beam)
 
 /* Single instance, not a pool: one player, one beam. Same shape as
  * proj_cooldown_tick in projectile.c. */
-static uint8_t s_tile_base;
-static uint8_t s_equipped;
-static uint8_t s_cooldown;        /* frames until the next pulse may fire */
-static uint8_t s_dmg_window;      /* 1 only on the fire frame */
-static uint8_t s_vis_frames;      /* frames the lane stays painted */
-static uint8_t s_dirty;           /* BG cells painted, restore still owed */
+DBG_STATIC uint8_t beam_tile_base;
+DBG_STATIC uint8_t s_equipped;
+DBG_STATIC uint8_t s_cooldown;        /* frames until the next pulse may fire */
+DBG_STATIC uint8_t s_dmg_window;      /* 1 only on the fire frame */
+DBG_STATIC uint8_t s_vis_frames;      /* frames the lane stays painted */
+DBG_STATIC uint8_t s_dirty;           /* BG cells painted, restore still owed */
 
-static uint8_t s_axis;            /* BEAM_AXIS_H or BEAM_AXIS_V */
-static int16_t s_x0, s_x1;        /* world-pixel damage rect: [x0,x1) x [y0,y1) */
-static int16_t s_y0, s_y1;
-static uint8_t s_cell_tx;         /* LOWEST world tile x of the painted span */
-static uint8_t s_cell_ty;         /* LOWEST world tile y of the painted span */
-static uint8_t s_cell_count;      /* BG cells painted, <= BEAM_MAX_CELLS */
-static uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
+DBG_STATIC uint8_t s_axis;            /* BEAM_AXIS_H or BEAM_AXIS_V */
+DBG_STATIC int16_t s_x0, s_x1;        /* world-pixel damage rect: [x0,x1) x [y0,y1) */
+DBG_STATIC int16_t s_y0, s_y1;
+DBG_STATIC uint8_t s_cell_tx;         /* LOWEST world tile x of the painted span */
+DBG_STATIC uint8_t s_cell_ty;         /* LOWEST world tile y of the painted span */
+DBG_STATIC uint8_t s_cell_count;      /* BG cells painted, <= BEAM_MAX_CELLS */
+DBG_STATIC uint8_t s_lane_tile;       /* world tile row (H) or column (V) to re-stream */
 
-static uint8_t s_cell_buf[BEAM_MAX_CELLS];
+DBG_STATIC uint8_t s_cell_buf[BEAM_MAX_CELLS];
 
 void beam_reset(void) BANKED {
     s_cooldown   = 0u;
@@ -38,7 +39,7 @@ void beam_reset(void) BANKED {
 }
 
 void beam_init(uint8_t tile_base) BANKED {
-    s_tile_base = tile_base;
+    beam_tile_base = tile_base;
     s_equipped  = 0u;
     beam_reset();
 }
@@ -78,7 +79,7 @@ uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED {
 
     is_h     = (step_y == 0) ? 1u : 0u;
     s_axis   = is_h ? (uint8_t)BEAM_AXIS_H : (uint8_t)BEAM_AXIS_V;
-    seg_tile = (uint8_t)(s_tile_base + (is_h ? (uint8_t)BEAM_TILE_OFS_H
+    seg_tile = (uint8_t)(beam_tile_base + (is_h ? (uint8_t)BEAM_TILE_OFS_H
                                              : (uint8_t)BEAM_TILE_OFS_V));
 
     /* Screen clip, in world coordinates. */

@@ -3,25 +3,37 @@ export PYTHONUTF8 := 1
 GBDK_HOME ?= /opt/gbdk
 LCC       := $(GBDK_HOME)/bin/lcc
 
+# BUILD_DIR is the only thing that separates the release ROM from the debug ROM
+# (#588 R1). `make` writes build/; `make build-debug` writes build/debug/.
+BUILD_DIR ?= build
+
 CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
+# DEBUG=1 changes linkage only: DBG_STATIC stops hiding module data, so every
+# variable reaches the .noi symbol file. It adds no code — see AC2.
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 endif
+# DEBUG_TRACE=1 turns the emitting diagnostics back on (EMU_printf, the WRAM
+# ring buffer, the music tick counter). It DOES add code, which is why it is a
+# separate flag from DEBUG.
+ifeq ($(DEBUG_TRACE),1)
+CFLAGS += -DDEBUG_TRACE
+endif
 ROMFLAGS  := -Wm-yc -Wm-yt25 -Wm-yn"NUKERAIDER"
 
-TARGET    := build/nuke-raider.gb
-OBJ_DIR   := build/obj
+TARGET    := $(BUILD_DIR)/nuke-raider.gb
+OBJ_DIR   := $(BUILD_DIR)/obj
 
 SRCS      := $(wildcard src/*.c)
 OBJS      := $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 UNITY_SRC    := tests/unity/src/unity.c
 TEST_SRCS    := $(wildcard tests/test_*.c)
-TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -Wall -Wextra
+TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -Wall -Wextra -DDEBUG_MAILBOX
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools hooks smoketest export-sprites bank-check bank-post-build memory-check tile-check dialog_data build-debug sync-docs
+.PHONY: all clean test test-tools hooks smoketest export-sprites bank-check bank-post-build memory-check memory-check-debug tile-check dialog_data build-debug sync-docs
 
 all: hooks $(TARGET) sync-docs
 
@@ -177,16 +189,17 @@ $(TARGET): src/dialog_data.c
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
-$(TARGET): $(OBJS) | build bank-check
+$(TARGET): $(OBJS) | $(BUILD_DIR) bank-check
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-klib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 	python tools/emit_manifest.py \
-	    --noi   build/nuke-raider.noi \
+	    --noi   $(BUILD_DIR)/nuke-raider.noi \
 	    --overmap assets/maps/overmap.tmx \
 	    --tracks  assets/maps/track.tmx assets/maps/track2.tmx assets/maps/track3.tmx \
 	    --tsx     assets/maps/track.tsx \
+	    --config  src/config.h \
 	    --state-overmap src/state_overmap.c \
 	    --state-prerace src/state_prerace.c \
-	    > build/game-manifest.json \
+	    > $(BUILD_DIR)/game-manifest.json \
 	    || echo "Warning: emit_manifest.py failed — game-manifest.json may be stale"
 
 $(OBJ_DIR):
@@ -194,6 +207,13 @@ $(OBJ_DIR):
 
 build:
 	mkdir -p build
+
+# When BUILD_DIR is build/, the rule above already covers it; naming it twice
+# would make GNU make override its own recipe.
+ifneq ($(BUILD_DIR),build)
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+endif
 
 test: $(TEST_SRCS) | build
 	@for f in $(TEST_SRCS); do \
@@ -264,8 +284,13 @@ sync-docs:
 tile-check: $(TARGET)
 	python tools/check_tile_budget.py .
 
+# Debug ROM: same code, more symbols, its own output directory. It never runs
+# `clean`, so the release ROM beside it survives (#588 R2).
 build-debug:
-	DEBUG=1 $(MAKE) clean all
+	$(MAKE) DEBUG=1 BUILD_DIR=build/debug all
+
+memory-check-debug:
+	python tools/memory_check.py --map build/debug/nuke-raider.map .
 
 clean:
 	rm -rf build/

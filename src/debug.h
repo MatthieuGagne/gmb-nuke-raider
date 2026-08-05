@@ -1,7 +1,35 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+/* DBG_STATIC — visibility, not behaviour (#588 R3).
+ *
+ * `static` in a release ROM, empty in a debug ROM. A file-scope variable that
+ * keeps the bare `static` keyword reaches neither the .noi symbol file nor the
+ * link map, so the headless smoketest cannot watch it or assert on it. Every
+ * MUTABLE file-scope data declaration in src/*.c uses this macro.
+ *
+ * It does NOT apply to:
+ *   - static functions. `update` and `enter` each occur 7 times in src/, so
+ *     stripping `static` from functions breaks the link (R4).
+ *   - `static const` data. It sits in ROM, and the symbol reader accepts WRAM
+ *     addresses only (R5). A mutable POINTER to const data is not const data.
+ *
+ * SDCC gives a file-scope variable the same area and the same address whether
+ * it is static or not, and the access code is identical, so the two ROMs hold
+ * the same bytes. tests/test_rom_parity.py checks that.
+ */
 #ifdef DEBUG
+  #define DBG_STATIC
+#else
+  #define DBG_STATIC static
+#endif
+
+/* The emitting diagnostics live behind DEBUG_TRACE, not behind DEBUG.
+ * DEBUG must not add one instruction to the ROM (AC2); these macros do add
+ * instructions, so they need their own flag. Build them with:
+ *     make build-debug DEBUG_TRACE=1
+ */
+#ifdef DEBUG_TRACE
   #include <gbdk/emu_debug.h>
   #include "config.h"
 

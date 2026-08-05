@@ -16,34 +16,35 @@
 #include "explosion.h"        /* car-blast spawn on death (#411) */
 #include "damage.h"           /* damage_apply on racer->player contact (#412) */
 #include "beam.h"             /* beam_hit_damage() — LASER hitscan poll (#430) */
+#include "debug.h"
 
 /* cam_y declared in camera.c — used for screen-space Y offset in racer_render */
 extern int16_t cam_y;
 
 /* ---- SoA pool ---- */
-static int16_t  racer_px[MAX_RACERS];
-static int16_t  racer_py[MAX_RACERS];
-static uint8_t  racer_dir[MAX_RACERS];
-static uint8_t  racer_wp_idx[MAX_RACERS];
+DBG_STATIC int16_t  racer_px[MAX_RACERS];
+DBG_STATIC int16_t  racer_py[MAX_RACERS];
+DBG_STATIC uint8_t  racer_dir[MAX_RACERS];
+DBG_STATIC uint8_t  racer_wp_idx[MAX_RACERS];
 uint8_t  racer_active[MAX_RACERS];
-static uint8_t  racer_oam[MAX_RACERS * 4u];
-static int8_t   racer_vx[MAX_RACERS];
-static int8_t   racer_vy[MAX_RACERS];
-static uint8_t  racer_gear[MAX_RACERS];
-static uint8_t  racer_downshift_timer[MAX_RACERS];
-static uint8_t  racer_hp[MAX_RACERS];
-static uint8_t  racer_hit_flash[MAX_RACERS];
-static uint8_t  racer_ram_cd[MAX_RACERS];      /* per-racer ram-damage cooldown (#417) */
-static uint8_t  racer_dying[MAX_RACERS];       /* 1 = playing death blast, frozen */
-static uint8_t  racer_death_timer[MAX_RACERS]; /* counts down RACER_DEATH_TICKS while dying */
-static uint8_t  racer_finish_armed[MAX_RACERS];
+DBG_STATIC uint8_t  racer_oam[MAX_RACERS * 4u];
+DBG_STATIC int8_t   racer_vx[MAX_RACERS];
+DBG_STATIC int8_t   racer_vy[MAX_RACERS];
+DBG_STATIC uint8_t  racer_gear[MAX_RACERS];
+DBG_STATIC uint8_t  racer_downshift_timer[MAX_RACERS];
+DBG_STATIC uint8_t  racer_hp[MAX_RACERS];
+DBG_STATIC uint8_t  racer_hit_flash[MAX_RACERS];
+DBG_STATIC uint8_t  racer_ram_cd[MAX_RACERS];      /* per-racer ram-damage cooldown (#417) */
+DBG_STATIC uint8_t  racer_dying[MAX_RACERS];       /* 1 = playing death blast, frozen */
+DBG_STATIC uint8_t  racer_death_timer[MAX_RACERS]; /* counts down RACER_DEATH_TICKS while dying */
+DBG_STATIC uint8_t  racer_finish_armed[MAX_RACERS];
 /* ---- Track-level data ---- */
 /* Per-enemy waypoint arrays: enemy slot i (i>=1) maps to index (i-1). */
-static uint8_t  s_wp_tx[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
-static uint8_t  s_wp_ty[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
-static uint8_t  s_wp_count[MAX_ENEMY_RACERS];
-static uint8_t  s_finish_dir;  /* shared track-level value */
-static uint8_t  s_tile_base;
+DBG_STATIC uint8_t  s_wp_tx[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
+DBG_STATIC uint8_t  s_wp_ty[MAX_ENEMY_RACERS][MAX_RACER_WAYPOINTS];
+DBG_STATIC uint8_t  s_wp_count[MAX_ENEMY_RACERS];
+DBG_STATIC uint8_t  s_finish_dir;  /* shared track-level value */
+DBG_STATIC uint8_t  racer_tile_base;
 
 /* ---- Direction tables — copied from player.c exact values ---- */
 
@@ -200,7 +201,7 @@ void racer_init(uint8_t tile_base) BANKED {
         racer_oam[i * 4u + 2u] = SPRITE_POOL_INVALID;
         racer_oam[i * 4u + 3u] = SPRITE_POOL_INVALID;
     }
-    s_tile_base  = tile_base;
+    racer_tile_base  = tile_base;
 
     track_id = track_get_id();
     s_finish_dir = track_get_finish_direction();
@@ -536,10 +537,10 @@ void racer_render(void) BANKED {
         hw_y = (uint8_t)scr_y;
         d    = racer_dir[i];
 
-        set_sprite_tile(racer_oam[i * 4u + 0u], s_tile_base + RACER_DIR_TILE_TL[d]);
-        set_sprite_tile(racer_oam[i * 4u + 1u], s_tile_base + RACER_DIR_TILE_BL[d]);
-        set_sprite_tile(racer_oam[i * 4u + 2u], s_tile_base + RACER_DIR_TILE_TR[d]);
-        set_sprite_tile(racer_oam[i * 4u + 3u], s_tile_base + RACER_DIR_TILE_BR[d]);
+        set_sprite_tile(racer_oam[i * 4u + 0u], racer_tile_base + RACER_DIR_TILE_TL[d]);
+        set_sprite_tile(racer_oam[i * 4u + 1u], racer_tile_base + RACER_DIR_TILE_BL[d]);
+        set_sprite_tile(racer_oam[i * 4u + 2u], racer_tile_base + RACER_DIR_TILE_TR[d]);
+        set_sprite_tile(racer_oam[i * 4u + 3u], racer_tile_base + RACER_DIR_TILE_BR[d]);
 
         flags = RACER_DIR_FLIP[d];
 

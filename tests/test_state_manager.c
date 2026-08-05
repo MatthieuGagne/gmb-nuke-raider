@@ -137,6 +137,12 @@ void test_push_beyond_capacity_is_safe(void) {
     TEST_ASSERT_EQUAL_INT(1, calls_b_update);
 }
 
+/* STACK_MAX moved from state_manager.c to state_manager.h (#588 R8), so a
+ * caller — and this test — can size a loop by it instead of hard-coding 2. */
+void test_stack_max_is_visible_to_callers(void) {
+    TEST_ASSERT_EQUAL_UINT8(2u, (uint8_t)STACK_MAX);
+}
+
 /* ── main ─────────────────────────────────────────────────────────── */
 int main(void) {
     UNITY_BEGIN();
@@ -148,5 +154,6 @@ int main(void) {
     RUN_TEST(test_replace_calls_exit_then_enter);
     RUN_TEST(test_replace_routes_update_to_new_state);
     RUN_TEST(test_push_beyond_capacity_is_safe);
+    RUN_TEST(test_stack_max_is_visible_to_callers);
     return UNITY_END();
 }

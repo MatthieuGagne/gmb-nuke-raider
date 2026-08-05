@@ -3,6 +3,7 @@
 #include "config.h"
 #include "track.h"
 #include "hud.h"
+#include "debug.h"
 
 /* --- Tile index constants --- */
 /* HUD_FONT_BASE and HUD_FONT_COUNT are defined in config.h */
@@ -57,16 +58,16 @@ static const uint8_t __code hud_font_tiles[] = {
 };
 
 /* --- Module state --- */
-static uint8_t  hud_hp;           /* current HP value */
-static uint8_t  hud_frame_tick;   /* 0-59, resets each second */
-static uint16_t hud_seconds;      /* total elapsed seconds */
-static uint8_t  hud_dirty;        /* 1 = timer tiles need rewrite */
-static uint8_t  hud_mm;           /* cached minutes for display */
-static uint8_t  hud_ss;           /* cached seconds-within-minute for display */
-static uint8_t  hud_lap_current;
-static uint8_t  hud_lap_total;
-static uint8_t  hud_map_type;     /* TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
-static uint8_t  hud_position;     /* 0=hidden, 1=first, 2=second */
+DBG_STATIC uint8_t  hud_hp;           /* current HP value */
+DBG_STATIC uint8_t  hud_frame_tick;   /* 0-59, resets each second */
+DBG_STATIC uint16_t hud_seconds;      /* total elapsed seconds */
+DBG_STATIC uint8_t  hud_dirty;        /* 1 = timer tiles need rewrite */
+DBG_STATIC uint8_t  hud_mm;           /* cached minutes for display */
+DBG_STATIC uint8_t  hud_ss;           /* cached seconds-within-minute for display */
+DBG_STATIC uint8_t  hud_lap_current;
+DBG_STATIC uint8_t  hud_lap_total;
+DBG_STATIC uint8_t  hud_map_type;     /* TRACK_TYPE_RACE or TRACK_TYPE_COMBAT */
+DBG_STATIC uint8_t  hud_position;     /* 0=hidden, 1=first, 2=second */
 
 /* --- Public API --- */
 

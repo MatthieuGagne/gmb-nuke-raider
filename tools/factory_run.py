@@ -103,6 +103,45 @@ def repo_root(cwd=None):
     return os.path.dirname(common)
 
 
+def smoketest_dir(worktree, main_root=None):
+    """Where ONE run's smoketest artifacts are, or None.
+
+    Before #588 the harness wrote into the worktree; since R14 it writes into
+    the main tree, under a directory named for the checkout that produced them.
+    Both places are checked, worktree first, so a run made before the change
+    still publishes its evidence.
+
+    The name-for-the-checkout part is what keeps this exact. A bare
+    ``<main>/build/smoketest`` would match ANY run's output, so a stale run
+    whose worktree is gone would be handed a live run's screenshots.
+
+    main_root defaults to this repository's main tree. A caller holding a
+    registry path passes that path's parent instead, which keeps the lookup
+    inside whatever tree the registry belongs to — that is what makes this
+    hermetic under a temporary registry in the tests.
+    """
+    candidates = []
+    if worktree:
+        candidates.append(os.path.join(worktree, "build", "smoketest"))
+    if main_root is None:
+        try:
+            main_root = repo_root()
+        except RuntimeError:
+            main_root = None
+    if main_root and worktree:
+        leaf = os.path.basename(os.path.normpath(worktree))
+        candidates.append(os.path.join(main_root, "build", "smoketest", leaf))
+    for candidate in candidates:
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def main_root_of(registry):
+    """The tree a registry path belongs to: ``<root>/.factory`` -> ``<root>``."""
+    return os.path.dirname(os.path.normpath(registry)) if registry else None
+
+
 def registry_root(cwd=None):
     """``<main repo root>/.factory``.
 
@@ -428,11 +467,11 @@ def write_autopsy(issue, registry=None, worktree=None, scenario=None,
         record("journal", os.path.join(run_dir(issue, registry), JOURNAL_FILE))
         record("scenario", scenario)
 
-        smoke = os.path.join(worktree, "build", "smoketest") if worktree else None
-        if not smoke or not os.path.isdir(smoke):
+        smoke = smoketest_dir(worktree, main_root=main_root_of(registry))
+        if not smoke:
             entries.append({"name": "smoketest", "present": False,
-                            "reason": "no smoketest directory: %s"
-                                      % (smoke or "<no worktree>")})
+                            "reason": "no smoketest directory in the worktree "
+                                      "or the main tree"})
         else:
             copied = 0
             for name in sorted(os.listdir(smoke)):

@@ -1,11 +1,12 @@
 #pragma bank 255
 #include "loadout.h"
+#include "debug.h"
 
-static uint8_t ld_car;
-static uint8_t ld_armor;
-static uint8_t ld_weapon1;
-static uint8_t ld_weapon2;
-static uint8_t ld_unlock_mask;   /* bit f set => field f tier-1 unlocked */
+DBG_STATIC uint8_t ld_car;
+DBG_STATIC uint8_t ld_armor;
+DBG_STATIC uint8_t ld_weapon1;
+DBG_STATIC uint8_t ld_weapon2;
+DBG_STATIC uint8_t ld_unlock_mask;   /* bit f set => field f tier-1 unlocked */
 
 void loadout_init(void) BANKED {
     ld_car     = LOADOUT_DEFAULT_CAR;

@@ -1,10 +1,11 @@
 #pragma bank 255
 #include "damage.h"
 #include "config.h"
+#include "debug.h"
 
 uint8_t hp;
-static uint8_t invincibility_cooldown;
-static uint8_t armor_tier;  /* 0 = LIGHT (no reduction), 1 = HEAVY (ARMOR_HEAVY_REDUCTION per hit) */
+DBG_STATIC uint8_t invincibility_cooldown;
+DBG_STATIC uint8_t armor_tier;  /* 0 = LIGHT (no reduction), 1 = HEAVY (ARMOR_HEAVY_REDUCTION per hit) */
 
 void damage_init(void) BANKED {
     hp                     = PLAYER_MAX_HP;

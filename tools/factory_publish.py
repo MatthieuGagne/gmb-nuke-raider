@@ -966,10 +966,10 @@ def screenshot_paths(state, registry=None):
     """
     worktree = state.get("worktree")
     base, source = None, "none"
-    if worktree:
-        candidate = os.path.join(worktree, "build", "smoketest")
-        if os.path.isdir(candidate):
-            base, source = candidate, "worktree"
+    candidate = factory_run.smoketest_dir(
+        worktree, main_root=factory_run.main_root_of(registry))
+    if candidate:
+        base, source = candidate, "worktree"
     if base is None:
         base = latest_autopsy(state["issue"], registry)
         source = "autopsy" if base else "none"

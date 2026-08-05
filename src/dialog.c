@@ -2,6 +2,7 @@
 #include <gb/gb.h>
 #include "dialog.h"
 #include "loader.h"
+#include "debug.h"
 
 /* Per-NPC WRAM state — 2 bytes × MAX_NPCS = 12 bytes total. */
 typedef struct {
@@ -9,10 +10,10 @@ typedef struct {
     uint8_t flags;
 } NpcState;
 
-static NpcState npc_states[MAX_NPCS];
+DBG_STATIC NpcState npc_states[MAX_NPCS];
 
 /* Active conversation cursor. */
-static uint8_t active_npc_id;
+DBG_STATIC uint8_t active_npc_id;
 
 /* WRAM cache buffers — written by loader_dialog_cache_node (NONBANKED, bank 0).
  * Non-static so loader.c can write them directly via the extern declarations in dialog.h. */

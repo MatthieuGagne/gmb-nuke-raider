@@ -11,20 +11,21 @@
 #include "enemy_common.h"  /* enemy_aim_dir — shared aim math */
 #include "explosion.h" /* explosion_spawn() — OAM hand-off on turret death */
 #include "beam.h"      /* beam_hit_damage() — LASER hitscan poll (#430) */
+#include "debug.h"
 
-static uint8_t s_turret_tile_base;  /* OBJ tile index set by turret_init() */
-static uint8_t s_explosion_base;    /* OBJ tile index set by turret_set_explosion_base() */
+DBG_STATIC uint8_t s_turret_tile_base;  /* OBJ tile index set by turret_init() */
+DBG_STATIC uint8_t s_explosion_base;    /* OBJ tile index set by turret_set_explosion_base() */
 
 /* SoA turret pool — tile coordinates + cached OAM x (never changes for turrets) */
-static uint8_t turret_tx[MAX_ENEMIES];
-static uint8_t turret_ty[MAX_ENEMIES];
-static uint8_t turret_type[MAX_ENEMIES];    /* NPC_TYPE_* value set at spawn */
-static uint8_t turret_dir[MAX_ENEMIES];     /* stored at spawn; ignored for turrets (fire toward player) */
-static uint8_t turret_hp[MAX_ENEMIES];
-static uint8_t turret_active[MAX_ENEMIES];
-static uint8_t turret_timer[MAX_ENEMIES];
-static uint8_t turret_oam[MAX_ENEMIES];
-static uint8_t turret_oam_x[MAX_ENEMIES];  /* cached OAM x = tx*8+8 — turrets never move */
+DBG_STATIC uint8_t turret_tx[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_ty[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_type[MAX_ENEMIES];    /* NPC_TYPE_* value set at spawn */
+DBG_STATIC uint8_t turret_dir[MAX_ENEMIES];     /* stored at spawn; ignored for turrets (fire toward player) */
+DBG_STATIC uint8_t turret_hp[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_active[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_timer[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_oam[MAX_ENEMIES];
+DBG_STATIC uint8_t turret_oam_x[MAX_ENEMIES];  /* cached OAM x = tx*8+8 — turrets never move */
 
 /* ---- internal helpers ---- */
 
