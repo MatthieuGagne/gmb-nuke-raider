@@ -102,6 +102,12 @@ BODY_MARKER = ("<!-- factory-publish v1 — regenerated on every publish; "
 # dead end (R2).
 DECISIONS_IN_PR = "_The decisions are in the [pull request](%s)._"
 
+# A decision recorded after the PR body was rendered reaches neither surface
+# unless it is shown here too (#530 finding 1). ``pr_decisions`` marks where
+# the PR body's decision list stopped, so anything past it is late.
+DECISIONS_AFTER_PR = ("_Recorded after the pull request body was rendered — "
+                      "not reflected there. Shown here instead._")
+
 GLYPH_DONE = "✅"
 GLYPH_CURRENT = "🔵"
 GLYPH_FAILED = "❌"
@@ -142,6 +148,11 @@ def new_publish_state(issue):
         "commented_attempts": [],   # spec-issue comments already posted (R10)
         "uploaded": [],             # asset names already on the release (R7)
         "withheld": {},             # asset name -> reason the scan refused it
+        "pr_url": None,             # written by open_pr() once the PR exists
+        "pr_decisions": None,       # decision count when the PR body was
+                                     # rendered (#530 finding 1); None means
+                                     # unknown — an older publish.json, or a
+                                     # ``pr`` sourced from state, not --open-pr
     }
 
 
@@ -286,8 +297,23 @@ def _section_decisions(ctx):
         # this section becomes the link to it (#530 R1, R2). The link shows
         # for a finding too: a run whose rulings are all findings would
         # otherwise leave both surfaces pointing nowhere.
-        return [DECISIONS_IN_PR % ctx["pr"]] if (decisions or findings) \
-            else None
+        if not (decisions or findings):
+            return None
+        out = [DECISIONS_IN_PR % ctx["pr"]]
+        # A decision recorded between the PR-open count and now reached no
+        # surface (#530 finding 1): the PR body was rendered once, earlier,
+        # and never again. Index into the raw journal-ordered list, not the
+        # partitioned one — pr_decisions counts every decision event,
+        # findings included, exactly as open_pr_cli did when it captured it.
+        pr_decisions = (ctx["publish"] or {}).get("pr_decisions")
+        if pr_decisions is not None:
+            raw = ctx["state"].get("decisions") or []
+            late = [d for d in raw[pr_decisions:] if not d.get("finding")]
+            if late:
+                out += ["", DECISIONS_AFTER_PR]
+                for decision in late:
+                    out += decision_lines(decision)
+        return out
     dropped = ctx["drop_decisions"]
     kept = decisions[dropped:] if dropped else decisions
     if not kept and not dropped:
@@ -457,8 +483,9 @@ def _section_failure(ctx):
     return out
 
 
-# Order is fixed and the list is data, not inlined markup: PRD-11 adds its
-# "Review findings" section by appending one entry here (R4).
+# Order is fixed and the list is data, not inlined markup: "Plan review
+# findings" (#530) was added this way, by appending one entry here, and any
+# future section is added the same way (R4).
 SECTIONS = (
     ("Failure", _section_failure),
     ("Gate results", _section_gates),
@@ -1646,6 +1673,12 @@ def open_pr_cli(issue, branch, title, body_file, registry=None,
 
     Nothing is saved when no URL comes back: a failed ``gh pr create`` must
     not leave a URL behind for the next publish to link to.
+
+    Also records ``pr_decisions`` — how many decisions existed at this
+    moment — so the run issue can later tell which ones the rendered PR body
+    already carried and which arrived after (#530 finding 1). A run whose
+    own state cannot be read still gets its pull request opened; the count
+    just comes back as 0 rather than blocking the write.
     """
     warnings = []
     publish = load_publish_state(issue, registry)
@@ -1654,6 +1687,11 @@ def open_pr_cli(issue, branch, title, body_file, registry=None,
     url, _created = open_pr(issue, branch, title, body_file, publish=publish,
                             warnings=warnings, runner=runner)
     if url:
+        try:
+            prior = factory_run.load_state(issue, registry) or {}
+        except (OSError, ValueError, RuntimeError):
+            prior = {}
+        publish["pr_decisions"] = len(prior.get("decisions") or [])
         try:
             save_publish_state(publish, registry)
         except OSError as exc:
@@ -1793,7 +1831,8 @@ def build_parser():
     parser.add_argument("--title", default=None,
                         help="PR title for --open-pr")
     parser.add_argument("--body-file", default=None, dest="body_file",
-                        help="PR body file for --open-pr")
+                        help="PR body file for --open-pr; mutated in place "
+                             "(a Closes-plan line may be appended)")
     return parser
 
 

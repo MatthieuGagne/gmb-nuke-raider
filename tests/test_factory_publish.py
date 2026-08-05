@@ -2535,6 +2535,76 @@ class DecisionSurfaceTests(PublishTestCase):
         self.assertIsNone(
             factory_publish.load_publish_state(440, reg).get('pr_url'))
 
+    def test_open_pr_records_the_decision_count_at_that_moment(self):
+        """Finding 1: pr_decisions is captured only on a successful open."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)  # 2 decisions, 1 finding
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (0, PR_URL + '\n', '')}))
+        self.assertEqual(url, PR_URL)
+        state = factory_run.load_state(440, reg)
+        self.assertEqual(
+            factory_publish.load_publish_state(440, reg)['pr_decisions'],
+            len(state['decisions']))
+
+    def test_a_pr_that_cannot_be_opened_records_no_decision_count(self):
+        """Finding 1: a failed open must not leave a stale count behind."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        path = os.path.join(self.tmp, 'body.md')
+        with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('body\n')
+        url, warnings = factory_publish.open_pr_cli(
+            440, 'factory-issue-440', 'feat: x (#440)', path, registry=reg,
+            runner=FakeGh({'pr create': (1, '', 'HTTP 500')}))
+        self.assertIsNone(url)
+        self.assertIsNone(
+            factory_publish.load_publish_state(440, reg).get('pr_decisions'))
+
+    def test_a_decision_recorded_after_the_pr_count_renders_in_full(self):
+        """Finding 1: the data-loss path — a late decision must reach the
+        run issue, since the PR body was already rendered without it."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = self.with_pr()
+        publish['pr_decisions'] = len(state['decisions'])
+        factory_run.append_event(
+            440, 'decision', registry=reg,
+            text='A late decision made after the PR body was rendered.')
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertIn(
+            'A late decision made after the PR body was rendered.', body)
+
+    def test_a_decision_recorded_before_the_pr_count_stays_link_only(self):
+        """Finding 1: nothing already reflected on the PR is repeated."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        publish = self.with_pr()
+        publish['pr_decisions'] = len(state['decisions'])
+        body = factory_publish.render_body(
+            factory_run.load_state(440, reg), publish, registry=reg,
+            now=factory_fixtures.FIXED_NOW)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertNotIn('Journal is the source of truth', body)
+        self.assertNotIn('The publisher deletes the temporary copy', body)
+
+    def test_pr_decisions_absent_renders_the_link_alone(self):
+        """Finding 1: the backward-compatible path for an older publish.json
+        or a run whose pr came from state rather than --open-pr."""
+        publish = self.with_pr()
+        self.assertIsNone(publish['pr_decisions'])
+        body = self.shipped_body(publish)
+        self.assertIn(PR_URL, body)
+        self.assertNotIn(factory_publish.DECISIONS_AFTER_PR, body)
+        self.assertNotIn('Journal is the source of truth', body)
+
 
 class NoStagedDuplicatesTests(PublishTestCase):
     """#530 R4 — AC4."""
