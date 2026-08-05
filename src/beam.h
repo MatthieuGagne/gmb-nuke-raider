@@ -28,10 +28,12 @@ uint8_t beam_is_equipped(void) BANKED;
  * diagonal, or still on cooldown). A refused diagonal press costs nothing. */
 uint8_t beam_fire(int16_t px, int16_t py, uint8_t dir) BANKED;
 
-/* Per-frame tick. Call in the game-logic phase AFTER camera_update(). Closes the
- * damage window, ticks the cooldown and the visible timer, and queues the BG
- * restore when the pulse ends. */
-void    beam_update(void) BANKED;
+/* Per-frame tick. Call in the game-logic phase AFTER camera_update(). px/py are
+ * the player's world-pixel top-left corner, the same values beam_fire() takes.
+ * Closes the damage window, ticks the cooldown and the visible timer, re-aims
+ * the live pulse's start at the car nose, re-measures its length, and queues the
+ * whole-lane BG restore when the pulse ends. */
+void    beam_update(int16_t px, int16_t py) BANKED;
 
 /* VBlank-phase render. Call immediately after camera_flush_vram(). */
 void    beam_render(void) BANKED;

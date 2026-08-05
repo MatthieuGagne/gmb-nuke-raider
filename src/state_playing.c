@@ -209,7 +209,7 @@ static void update(void) {
         explosion_update();
         hud_set_hp(damage_get_hp());    /* sync damage HP to HUD each frame */
         camera_update(px, py);
-        beam_update();            /* AFTER camera_update: queueing first makes the camera drop its own row stream */
+        beam_update(px, py);      /* AFTER camera_update: queueing first makes the camera drop its own row stream */
         hud_update();
         /* Death: keep the world live (D6); play the car blast, then game-over (D7). */
         if (damage_is_dead()) {
