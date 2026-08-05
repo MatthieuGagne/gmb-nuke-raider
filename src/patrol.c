@@ -12,28 +12,29 @@
 #include "enemy_common.h"    /* enemy_aim_dir, enemy_dir_from_delta, enemy_wp_reached, enemy_wp_advance */
 #include "vehicle_physics.h" /* vehicle_apply_physics, vehicle_step_axis_x/y */
 #include "beam.h"            /* beam_hit_damage() — LASER hitscan poll (#430) */
+#include "debug.h"
 
 extern int16_t cam_x;
 extern int16_t cam_y;
 
 /* ---- SoA pool ---- */
-static int16_t patrol_px[MAX_PATROLS];
-static int16_t patrol_py[MAX_PATROLS];
-static int8_t  patrol_vx[MAX_PATROLS];
-static int8_t  patrol_vy[MAX_PATROLS];
-static uint8_t patrol_dir[MAX_PATROLS];
-static uint8_t patrol_mode[MAX_PATROLS];
-static uint8_t patrol_hp[MAX_PATROLS];
-static uint8_t patrol_ram_cd[MAX_PATROLS];     /* per-patrol ram-damage cooldown (#417) */
-static uint8_t patrol_hit_flash[MAX_PATROLS];  /* hit-blink frames, bullet + ram (#417) */
-static uint8_t patrol_active[MAX_PATROLS];
-static uint8_t patrol_timer[MAX_PATROLS];   /* fire-cadence countdown */
-static uint8_t patrol_wp_idx[MAX_PATROLS];
-static uint8_t patrol_oam[MAX_PATROLS * 4u];
-static uint8_t patrol_wp_tx[MAX_PATROLS][PATROL_MAX_WAYPOINTS];
-static uint8_t patrol_wp_ty[MAX_PATROLS][PATROL_MAX_WAYPOINTS];
-static uint8_t patrol_wp_count[MAX_PATROLS];
-static uint8_t s_tile_base;
+DBG_STATIC int16_t patrol_px[MAX_PATROLS];
+DBG_STATIC int16_t patrol_py[MAX_PATROLS];
+DBG_STATIC int8_t  patrol_vx[MAX_PATROLS];
+DBG_STATIC int8_t  patrol_vy[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_dir[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_mode[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_hp[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_ram_cd[MAX_PATROLS];     /* per-patrol ram-damage cooldown (#417) */
+DBG_STATIC uint8_t patrol_hit_flash[MAX_PATROLS];  /* hit-blink frames, bullet + ram (#417) */
+DBG_STATIC uint8_t patrol_active[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_timer[MAX_PATROLS];   /* fire-cadence countdown */
+DBG_STATIC uint8_t patrol_wp_idx[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_oam[MAX_PATROLS * 4u];
+DBG_STATIC uint8_t patrol_wp_tx[MAX_PATROLS][PATROL_MAX_WAYPOINTS];
+DBG_STATIC uint8_t patrol_wp_ty[MAX_PATROLS][PATROL_MAX_WAYPOINTS];
+DBG_STATIC uint8_t patrol_wp_count[MAX_PATROLS];
+DBG_STATIC uint8_t patrol_tile_base;
 
 /* ---- Directional car tile tables — identical to racer.c so it reuses the
  * player car sprite sheet. Layout: 0=T,1=RT,2=R,3=RB,4=B,5=LB,6=L,7=LT. ---- */
@@ -85,7 +86,7 @@ void patrol_init(uint8_t tile_base) BANKED {
     static uint8_t tx[MAX_NPCS], ty[MAX_NPCS], type[MAX_NPCS], dir[MAX_NPCS];
     uint8_t track_id;
 
-    s_tile_base = tile_base;
+    patrol_tile_base = tile_base;
     for (i = 0u; i < MAX_PATROLS; i++) {
         patrol_active[i] = 0u;
         patrol_wp_count[i] = 0u;
@@ -387,10 +388,10 @@ void patrol_render(void) BANKED {
         hw_y = (uint8_t)scr_y;
         d    = patrol_dir[i];
 
-        set_sprite_tile(patrol_oam[i * 4u + 0u], s_tile_base + PATROL_TILE_TL[d]);
-        set_sprite_tile(patrol_oam[i * 4u + 1u], s_tile_base + PATROL_TILE_BL[d]);
-        set_sprite_tile(patrol_oam[i * 4u + 2u], s_tile_base + PATROL_TILE_TR[d]);
-        set_sprite_tile(patrol_oam[i * 4u + 3u], s_tile_base + PATROL_TILE_BR[d]);
+        set_sprite_tile(patrol_oam[i * 4u + 0u], patrol_tile_base + PATROL_TILE_TL[d]);
+        set_sprite_tile(patrol_oam[i * 4u + 1u], patrol_tile_base + PATROL_TILE_BL[d]);
+        set_sprite_tile(patrol_oam[i * 4u + 2u], patrol_tile_base + PATROL_TILE_TR[d]);
+        set_sprite_tile(patrol_oam[i * 4u + 3u], patrol_tile_base + PATROL_TILE_BR[d]);
 
         flags = PATROL_FLIP[d];
 #ifdef __SDCC
