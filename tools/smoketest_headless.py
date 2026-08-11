@@ -193,8 +193,14 @@ def run_one(rom, scenario, args, symbols, manifest, out_dir, tag=""):
     failure = None
     try:
         ps.run(emu, scenario["steps"], ctx)
-    except ps.StepFailure as exc:
-        failure = exc
+    except (ps.StepFailure, ps.ScenarioError) as exc:
+        # A ScenarioError raised mid-run — an unknown symbol, or a nav target
+        # the manifest does not carry — used to escape as a traceback and kill
+        # every scenario after this one, the blocking gate included (#507).
+        # Report it as this scenario's failure instead. Everything downstream
+        # then treats it exactly like an assertion failure.
+        failure = exc if isinstance(exc, ps.StepFailure) else ps.StepFailure(
+            ctx.step, "scenario", str(exc), ctx.action)
         try:
             ctx.capture(emu, os.path.join(out_dir, f"failure{tag}.png"))
         except Exception:
