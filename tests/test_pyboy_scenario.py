@@ -320,6 +320,21 @@ class ChangingEmu(FakeEmu):
         self.memory[0xC247] = (val >> 8) & 0xFF
 
 
+class TickingSymbolEmu(FakeEmu):
+    """A FakeEmu whose watched byte advances on every tick, while the screen
+    payload never changes. It is the fixture that separates "the symbol moved"
+    from "the screen moved"."""
+
+    def __init__(self, address, memory=None, frames=None):
+        super().__init__(memory=dict(memory or {}), frames=frames)
+        self._address = address
+
+    def tick(self, n=1, render=False):
+        for _ in range(int(n)):
+            super().tick(1, render=render)
+            self.memory[self._address] = (self.memory[self._address] + 1) & 0xFF
+
+
 class TestAssertMemory(unittest.TestCase):
 
     def test_passes_on_equal(self):
@@ -955,16 +970,29 @@ class TestLivenessSplit(unittest.TestCase):
         self.assertNotEqual(symbol_msg, screen_msg)
 
     def test_assert_changes_ignores_a_frozen_screen(self):
-        """A frozen screen is not this action's business — only the symbol is."""
+        """A live symbol behind a frozen screen must satisfy assert_changes.
+        This is the case that fails if assert_changes also checks the screen."""
+        emu = TickingSymbolEmu(0xC24B, memory={0xC24B: 0, 0xC24C: 0},
+                               frames=[[1]])
+        ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_px'],
+                      'frames': 5}], self.ctx())
+
+    def test_assert_live_still_reports_the_frozen_screen(self):
+        """Same fixture, assert_live: the screen half must still bite."""
+        emu = TickingSymbolEmu(0xC24B, memory={0xC24B: 0, 0xC24C: 0},
+                               frames=[[1]])
         with self.assertRaises(ps.StepFailure) as caught:
-            ps.run(self.dead_emu(),
-                   [{'action': 'assert_changes', 'symbols': ['_px'],
-                     'frames': 3}], self.ctx())
-        self.assertEqual(caught.exception.kind, 'stale-symbol')
+            ps.run(emu, [{'action': 'assert_live', 'symbols': ['_px'],
+                          'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
 
     def test_assert_screen_changes_ignores_symbols(self):
+        """A stale symbol must not fail assert_screen_changes. `live_screen_emu`
+        holds _px at 7 for the whole run, so a version that checked symbols
+        would raise stale-symbol here."""
         ps.run(self.live_screen_emu(),
-               [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+               [{'action': 'assert_screen_changes', 'symbols': ['_px'],
+                 'frames': 5}], self.ctx())
 
     def test_assert_live_reports_the_symbol_first(self):
         with self.assertRaises(ps.StepFailure) as caught:
