@@ -165,10 +165,20 @@ def _parse_manifest_symbols(path):
     return out
 
 
-def load_symbols(manifest_path=None, noi_path=None, map_path=None):
-    """Merge symbol sources, lowest priority first: .map -> .noi -> manifest."""
+def load_symbols(manifest_path=None, noi_path=None, map_path=None,
+                 debug_noi_path=None):
+    """Merge symbol sources, lowest priority first:
+    .map -> debug .noi -> .noi -> manifest.
+
+    The debug symbol file is a strict superset built from the same bytes
+    (tests/test_rom_parity.py). It sits below the release .noi so a release
+    address always wins, and it is what makes the `static` state-machine
+    variables readable. `_parse_noi` swallows OSError, so a missing file
+    contributes nothing and raises nothing.
+    """
     symbols = {}
     symbols.update(_parse_map(map_path))
+    symbols.update(_parse_noi(debug_noi_path))
     symbols.update(_parse_noi(noi_path))
     symbols.update(_parse_manifest_symbols(manifest_path))
     return symbols

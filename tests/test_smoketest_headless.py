@@ -293,5 +293,81 @@ class ScenarioErrorDuringRun(unittest.TestCase):
         self.assertEqual(self.read_result('a-bad')['verdict'], 'scenario-invalid')
 
 
+class FakeFailure:
+    def __init__(self, kind, context=None):
+        self.step, self.action, self.kind = 0, 'advance', kind
+        self.message = kind
+        self.context = context
+
+
+class FakeCtx:
+    def __init__(self):
+        self.step, self.frame, self.screenshots = 0, 10, []
+
+
+class TestPreconditionVerdict(unittest.TestCase):
+
+    def test_a_precondition_failure_is_scenario_invalid_with_one_rom(self):
+        self.assertEqual(sh.verdict_for(FakeFailure('precondition'), None),
+                         'scenario-invalid')
+
+    def test_a_precondition_failure_never_reads_as_a_game_failure(self):
+        self.assertNotEqual(sh.verdict_for(FakeFailure('precondition'), None),
+                            'fail')
+
+    def test_an_ordinary_failure_keeps_the_default_verdict(self):
+        self.assertIsNone(sh.verdict_for(FakeFailure('stale-symbol'), None))
+
+    def test_two_failing_roms_are_still_scenario_invalid(self):
+        self.assertEqual(
+            sh.verdict_for(FakeFailure('stale-symbol'),
+                           FakeFailure('stale-symbol')),
+            'scenario-invalid')
+
+    def test_no_failure_has_no_verdict_override(self):
+        self.assertIsNone(sh.verdict_for(None, None))
+
+    def test_the_exit_code_for_a_precondition_failure_is_three(self):
+        """AC1, through the code that decides the process result."""
+        verdict = sh.verdict_for(FakeFailure('precondition'), None)
+        self.assertEqual(
+            sh.resolve_exit_code([{'verdict': verdict, 'blocking': True}]),
+            sh.EXIT_SCENARIO_INVALID)
+
+
+class TestFailureContextIsSerialised(unittest.TestCase):
+
+    def test_the_context_reaches_the_result_record(self):
+        block = {'state_at_start': 'playing', 'hint': 'the game left it'}
+        result = sh.build_result('x', FakeCtx(),
+                                 failure=FakeFailure('stale-symbol', block))
+        self.assertEqual(result['failure']['context'], block)
+
+    def test_a_failure_without_a_context_serialises_null(self):
+        result = sh.build_result('x', FakeCtx(), failure=FakeFailure('assert'))
+        self.assertIsNone(result['failure']['context'])
+
+    def test_a_passing_result_has_no_failure_block(self):
+        self.assertIsNone(sh.build_result('x', FakeCtx())['failure'])
+
+
+class TestDebugNoi(unittest.TestCase):
+
+    def test_the_default_points_at_the_debug_build(self):
+        args = sh.build_parser().parse_args([])
+        self.assertTrue(args.debug_noi.replace('\\', '/')
+                        .endswith('build/debug/nuke-raider.noi'))
+
+    def test_it_can_be_overridden(self):
+        self.assertEqual(
+            sh.build_parser().parse_args(['--debug-noi', 'X.noi']).debug_noi,
+            'X.noi')
+
+    def test_a_missing_debug_file_contributes_nothing_and_raises_nothing(self):
+        import pyboy_scenario as ps
+        self.assertEqual(ps.load_symbols(None, None, None,
+                                         debug_noi_path='absent.noi'), {})
+
+
 if __name__ == '__main__':
     unittest.main()
