@@ -819,5 +819,95 @@ class TestStateSupport(unittest.TestCase):
               'require': {'state': 'playing'}}], True)
 
 
+class StatefulEmu(FakeEmu):
+    """A FakeEmu that walks a scripted list of states as it ticks.
+
+    `schedule` maps a tick count to a (bank, ptr) pair. The greatest key at or
+    below the current tick wins, so the game changes under the harness exactly
+    as it does on hardware.
+    """
+
+    def __init__(self, schedule, depth=1, extra=None):
+        super().__init__(memory=dict(extra or {}))
+        self._schedule = dict(schedule)
+        self._depth = depth
+        self._apply(0)
+
+    def _apply(self, tick):
+        keys = [k for k in self._schedule if k <= tick]
+        if not keys:
+            return
+        bank, ptr = self._schedule[max(keys)]
+        self.memory.update(state_memory(bank, ptr, self._depth))
+
+    def tick(self, n=1, render=False):
+        for _ in range(int(n)):
+            super().tick(1, render=render)
+            self._apply(self.ticks)
+
+
+class TestStatefulEmuFixture(unittest.TestCase):
+    """The fixture is machinery the other tests trust. Prove it first."""
+
+    def test_a_schedule_that_starts_late_does_not_raise(self):
+        emu = StatefulEmu({5: (1, 0x7EED)})
+        emu.tick(4)
+        emu.tick(1)
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        self.assertEqual(ctx.read_state(emu), 'playing')
+
+
+class TestAssertState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_it_passes_in_the_expected_state(self):
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'assert_state', 'state': 'playing'}], self.ctx())
+
+    def test_it_fails_after_the_race_ends_and_names_the_real_state(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5620),
+                   [{'action': 'assert_state', 'state': 'playing'}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'state')
+        self.assertIn('results', caught.exception.message)
+
+    def test_the_state_field_is_required(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'assert_state'}])
+
+
+class TestWaitState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_it_reaches_the_target_state_inside_the_budget(self):
+        emu = StatefulEmu({0: (3, 0x5704), 25: (1, 0x7EED)})
+        ctx = self.ctx()
+        ps.run(emu, [{'action': 'wait_state', 'state': 'playing',
+                      'max_frames': 200}], ctx)
+        self.assertLessEqual(ctx.frame, 200)
+        self.assertEqual(ctx.read_state(emu), 'playing')
+
+    def test_it_returns_at_once_when_already_there(self):
+        emu = emu_in_state(1, 0x7EED)
+        ps.run(emu, [{'action': 'wait_state', 'state': 'playing'}], self.ctx())
+        self.assertEqual(emu.ticks, 0)
+
+    def test_it_times_out_and_names_the_state_it_found(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5704),
+                   [{'action': 'wait_state', 'state': 'playing',
+                     'max_frames': 12}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'timeout')
+        self.assertIn('title', caught.exception.message)
+
+    def test_the_state_field_is_required(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'wait_state'}])
+
+
 if __name__ == '__main__':
     unittest.main()

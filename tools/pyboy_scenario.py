@@ -193,7 +193,8 @@ MAX_INCLUDE_DEPTH = 8
 
 KNOWN_ACTIONS = {
     "advance", "press", "wait_memory", "screenshot",
-    "assert_memory", "assert_live", "nav",
+    "assert_memory", "assert_live", "assert_changes",
+    "assert_screen_changes", "assert_state", "wait_state", "nav",
 }
 
 REQUIRE_KEYS = {"state", "address", "value", "op", "width"}
@@ -203,13 +204,17 @@ STATE_FIELD_ACTIONS = ("assert_state", "wait_state")
 
 # action -> required field names
 _REQUIRED = {
-    "advance":       ("frames",),
-    "press":         ("buttons",),
-    "wait_memory":   ("address", "value"),
-    "screenshot":    (),
-    "assert_memory": ("address", "value"),
-    "assert_live":   (),
-    "nav":           ("to", "id"),
+    "advance":               ("frames",),
+    "press":                 ("buttons",),
+    "wait_memory":           ("address", "value"),
+    "screenshot":            (),
+    "assert_memory":         ("address", "value"),
+    "assert_live":           (),
+    "assert_changes":        ("symbols",),
+    "assert_screen_changes": (),
+    "assert_state":          ("state",),
+    "wait_state":            ("state",),
+    "nav":                   ("to", "id"),
 }
 
 
@@ -605,6 +610,26 @@ def _dispatch(emu, step, ctx, i):
             raise StepFailure(
                 i, "liveness",
                 f"screen hash unchanged over {frames} frames", act)
+
+    elif act == "assert_state":
+        want = normalize_state_name(step["state"])
+        actual = ctx.read_state(emu)
+        if actual != want:
+            raise StepFailure(
+                i, "state",
+                f"expected state {want!r}, the game is in {actual!r}", act)
+
+    elif act == "wait_state":
+        want = normalize_state_name(step["state"])
+        max_f = int(step.get("max_frames", 600))
+        for _ in range(max_f):
+            if ctx.read_state(emu) == want:
+                return
+            ctx.tick(emu, 1)
+        raise StepFailure(
+            i, "timeout",
+            f"wait_state timed out after {max_f} frames "
+            f"(want {want!r}, the game is in {ctx.read_state(emu)!r})", act)
 
     elif act == "nav":
         nav = ctx.manifest.get("navigation")
