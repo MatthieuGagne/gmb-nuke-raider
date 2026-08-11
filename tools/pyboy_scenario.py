@@ -567,6 +567,10 @@ class RunContext:
         if failure.kind == "precondition":
             return ("the scenario ran an action whose precondition is false, "
                     "so the scenario is wrong, not the game")
+        if (failure.kind in ("stale-symbol", "freeze")
+                and block["state_at_failure"] not in ("playing", None)):
+            return (f"the game is in _state_{block['state_at_failure']}, not "
+                    f"racing, so a race symbol stops for a correct reason")
         if block["at_limit"] and failure.kind in ("stale-symbol", "freeze"):
             return (f"the car is at the {', '.join(block['at_limit'])} drive "
                     f"limit, so it cannot move on that axis")

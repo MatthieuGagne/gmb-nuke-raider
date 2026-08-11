@@ -1204,6 +1204,28 @@ class TestFailureContext(unittest.TestCase):
         self.assertEqual(caught.exception.context['state_at_start'], 'results')
         self.assertIn('scenario', caught.exception.context['hint'])
 
+    def test_a_stale_symbol_outside_the_race_names_the_state(self):
+        """AC5 shape: the race already ended before this action started.
+
+        The state change happened during the PREVIOUS action, so this one
+        starts and ends in `results` with an empty `state_changes` — the
+        `at_limit` branch also misses because the game is not racing. Without
+        the new branch this degrades to the generic fallback (#589).
+        """
+        mem = dict(state_memory(3, 0x5620))
+        mem.update(self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem),
+                   [{'action': 'assert_changes', 'symbols': ['_py'],
+                     'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_changes'], [])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertIn('results', block['hint'])
+        self.assertNotIn('no state change and no drive limit', block['hint'])
+
     def test_the_context_survives_without_the_state_reader(self):
         ctx = ps.RunContext(symbols={'_px': 0xC24B, '_py': 0xC24D,
                                      '_active_map_w': 0xC5F1,
