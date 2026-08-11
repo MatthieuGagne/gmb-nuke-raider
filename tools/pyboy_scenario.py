@@ -196,6 +196,11 @@ KNOWN_ACTIONS = {
     "assert_memory", "assert_live", "nav",
 }
 
+REQUIRE_KEYS = {"state", "address", "value", "op", "width"}
+
+# Actions whose `state` field names a state.
+STATE_FIELD_ACTIONS = ("assert_state", "wait_state")
+
 # action -> required field names
 _REQUIRED = {
     "advance":       ("frames",),
@@ -244,6 +249,11 @@ def _inline(steps, library_dir, stack, depth):
         if step.get("action") != "include":
             out.append(step)
             continue
+        if "require" in step:
+            raise ScenarioError(
+                "include step cannot carry a 'require' field — the include is "
+                "inlined at load time and the field would be discarded. Put "
+                "the 'require' on the first step after the include instead.")
         name = step.get("name")
         if not name:
             raise ScenarioError("include step requires a 'name'")
@@ -259,7 +269,22 @@ def _inline(steps, library_dir, stack, depth):
     return out
 
 
-def _validate(steps):
+def _validate_require(i, req):
+    if not isinstance(req, dict):
+        raise ScenarioError(
+            f"Step {i}: 'require' must be an object, got {type(req).__name__}")
+    extra = sorted(set(req) - REQUIRE_KEYS)
+    if extra:
+        raise ScenarioError(f"Step {i}: 'require' has unknown field(s) {extra}")
+    if "state" not in req and "address" not in req:
+        raise ScenarioError(f"Step {i}: 'require' needs a 'state' or an 'address'")
+    if "address" in req and "value" not in req:
+        raise ScenarioError(f"Step {i}: 'require' with an 'address' needs a 'value'")
+    if "op" in req and req["op"] not in _OPS:
+        raise ScenarioError(f"Step {i}: unknown operator {req['op']!r}")
+
+
+def _validate(steps, state_names=None):
     for i, step in enumerate(steps):
         act = step.get("action")
         if act not in KNOWN_ACTIONS:
@@ -267,9 +292,24 @@ def _validate(steps):
         for field in _REQUIRED[act]:
             if field not in step:
                 raise ScenarioError(f"Step {i}: action {act!r} requires field {field!r}")
+        if "require" in step:
+            _validate_require(i, step["require"])
+        if state_names is None:
+            continue
+        wanted = []
+        req = step.get("require")
+        if isinstance(req, dict) and "state" in req:
+            wanted.append(req["state"])
+        if act in STATE_FIELD_ACTIONS and "state" in step:
+            wanted.append(step["state"])
+        for name in wanted:
+            if normalize_state_name(name) not in state_names:
+                known = ', '.join(sorted(state_names)) or '(none loaded)'
+                raise ScenarioError(
+                    f"Step {i}: unknown state {name!r} (known: {known})")
 
 
-def load_scenario(src, library_dir=None):
+def load_scenario(src, library_dir=None, state_names=None):
     """Parse a scenario, inline its includes, and validate it.
 
     src may be a path, a bare step list, or a scenario dict.
@@ -283,7 +323,7 @@ def load_scenario(src, library_dir=None):
         obj = src
     sc = _as_dict(obj, name)
     sc["steps"] = _inline(sc["steps"], library_dir, [sc["name"]], 1)
-    _validate(sc["steps"])
+    _validate(sc["steps"], state_names)
     return sc
 
 
@@ -447,11 +487,62 @@ def _addr_and_width(ctx, step):
     return addr, width
 
 
+def check_require(emu, step, ctx, i):
+    """Evaluate a step's `require` field BEFORE the step runs.
+
+    A false requirement is a defect in the scenario, not in the game, so it
+    raises the kind `precondition`, which the harness maps to the verdict
+    `scenario-invalid` (R3).
+    """
+    req = step.get("require")
+    if not req:
+        return
+    act = step.get("action")
+    if "state" in req:
+        want = normalize_state_name(req["state"])
+        actual = ctx.read_state(emu)
+        if actual != want:
+            raise StepFailure(
+                i, "precondition",
+                f"require state {want!r}, the game is in {actual!r}", act)
+    if "address" in req:
+        name = req["address"]
+        addr = resolve(name, ctx.symbols)
+        width = int(req.get(
+            "width", ctx.width_of(name) if isinstance(name, str) else 1))
+        actual = read_value(emu, addr, width)
+        target = int(req["value"])
+        if not _cmp(req, actual, target):
+            raise StepFailure(
+                i, "precondition",
+                f"require {name} {req.get('op', 'eq')} {target}, it is {actual}",
+                act)
+
+
+def validate_state_support(steps, state_readable):
+    """Reject a scenario that needs the state reader when it is unavailable.
+
+    Raised before frame 0, as a usage error: the run cannot answer the
+    question the scenario asks (R14).
+    """
+    if state_readable:
+        return
+    for i, step in enumerate(steps):
+        req = step.get("require") or {}
+        if step.get("action") in STATE_FIELD_ACTIONS or "state" in req:
+            raise ScenarioError(
+                f"Step {i}: action {step.get('action')!r} needs the game state, "
+                "and the state-machine symbols are missing. They live in the "
+                "debug symbol file only. Run 'make build-debug', then pass "
+                "--debug-noi build/debug/nuke-raider.noi")
+
+
 def run(emu, steps, ctx):
     """Execute a flat step list. Raises StepFailure; never calls sys.exit."""
     for i, step in enumerate(steps):
         ctx.step = i
         ctx.action = step.get("action")
+        check_require(emu, step, ctx, i)
         _dispatch(emu, step, ctx, i)
     return ctx
 

@@ -668,5 +668,156 @@ class TestReadState(unittest.TestCase):
             ps.RunContext(symbols=state_symbols(), state_table={}).state_readable())
 
 
+class TestRequire(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=dict(state_symbols(), _hp=0xC535),
+                             state_table=state_table())
+
+    def test_a_true_state_requirement_lets_the_action_run(self):
+        ctx = self.ctx()
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'advance', 'frames': 3,
+                 'require': {'state': 'playing'}}], ctx)
+        self.assertEqual(ctx.frame, 3)
+
+    def test_a_false_state_requirement_is_a_precondition_failure(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5620),
+                   [{'action': 'advance', 'frames': 3,
+                     'require': {'state': 'playing'}}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'precondition')
+        self.assertIn('playing', caught.exception.message)
+        self.assertIn('results', caught.exception.message)
+
+    def test_a_false_requirement_stops_the_action_before_it_runs(self):
+        emu = emu_in_state(3, 0x5620)
+        with self.assertRaises(ps.StepFailure):
+            ps.run(emu, [{'action': 'advance', 'frames': 50,
+                          'require': {'state': 'playing'}}], self.ctx())
+        self.assertEqual(emu.ticks, 0)
+
+    def test_the_long_state_spelling_is_accepted(self):
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'advance', 'frames': 1,
+                 'require': {'state': '_state_playing'}}], self.ctx())
+
+    def test_a_false_memory_requirement_is_a_precondition_failure(self):
+        emu = emu_in_state(1, 0x7EED)
+        emu.memory[0xC535] = 0
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'advance', 'frames': 1,
+                          'require': {'address': '_hp', 'op': 'gt',
+                                      'value': 0}}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'precondition')
+        self.assertIn('_hp', caught.exception.message)
+
+    def test_a_satisfied_memory_requirement_lets_the_action_run(self):
+        emu = emu_in_state(1, 0x7EED)
+        emu.memory[0xC535] = 5
+        ctx = self.ctx()
+        ps.run(emu, [{'action': 'advance', 'frames': 2,
+                      'require': {'address': '_hp', 'op': 'gt',
+                                  'value': 0}}], ctx)
+        self.assertEqual(ctx.frame, 2)
+
+    def test_a_memory_requirement_needs_no_state_reader(self):
+        emu = FakeEmu(memory={0xC535: 5})
+        ctx = ps.RunContext(symbols={'_hp': 0xC535})
+        ps.run(emu, [{'action': 'advance', 'frames': 1,
+                      'require': {'address': '_hp', 'op': 'gt',
+                                  'value': 0}}], ctx)
+        self.assertEqual(ctx.frame, 1)
+
+
+class TestRequireValidation(unittest.TestCase):
+
+    def load(self, step, state_names=None):
+        return ps.load_scenario([step], state_names=state_names)
+
+    def test_a_require_that_is_not_an_object_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1, 'require': 'playing'})
+
+    def test_an_unknown_require_field_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'stat': 'playing'}})
+
+    def test_an_empty_require_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1, 'require': {}})
+
+    def test_an_address_without_a_value_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'address': '_hp'}})
+
+    def test_an_unknown_operator_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'address': '_hp', 'value': 0, 'op': 'wat'}})
+
+    def test_an_unknown_state_name_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError) as caught:
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'state': 'flying'}},
+                      state_names=set(state_table()))
+        self.assertIn('flying', str(caught.exception))
+
+    def test_a_known_state_name_loads(self):
+        self.load({'action': 'advance', 'frames': 1,
+                   'require': {'state': 'playing'}},
+                  state_names=set(state_table()))
+
+    def test_an_empty_state_name_set_still_rejects_a_state(self):
+        """An empty set is not the same as 'do not check' — a missing symbol
+        file must not switch AC7 off."""
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'state': 'playing'}}, state_names=set())
+
+    def test_state_names_are_not_checked_when_none_is_passed(self):
+        self.load({'action': 'advance', 'frames': 1,
+                   'require': {'state': 'flying'}})
+
+    def test_require_on_an_include_step_is_a_usage_error(self):
+        """`_inline` rebuilds the step list and drops every other key, so a
+        `require` here would vanish without a word."""
+        with tempfile.TemporaryDirectory() as d:
+            write(os.path.join(d, 'inner.json'),
+                  json.dumps([{'action': 'advance', 'frames': 1}]))
+            with self.assertRaises(ps.ScenarioError) as caught:
+                ps.load_scenario([{'action': 'include', 'name': 'inner',
+                                   'require': {'state': 'playing'}}],
+                                 library_dir=d)
+            self.assertIn('require', str(caught.exception))
+
+
+class TestStateSupport(unittest.TestCase):
+
+    def test_a_state_requirement_without_the_reader_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError) as caught:
+            ps.validate_state_support(
+                [{'action': 'advance', 'frames': 1,
+                  'require': {'state': 'playing'}}], False)
+        self.assertIn('build-debug', str(caught.exception))
+
+    def test_a_state_action_without_the_reader_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.validate_state_support(
+                [{'action': 'assert_state', 'state': 'playing'}], False)
+
+    def test_a_memory_requirement_needs_no_reader(self):
+        ps.validate_state_support(
+            [{'action': 'advance', 'frames': 1,
+              'require': {'address': '_hp', 'value': 0, 'op': 'gt'}}], False)
+
+    def test_a_state_requirement_with_the_reader_is_accepted(self):
+        ps.validate_state_support(
+            [{'action': 'advance', 'frames': 1,
+              'require': {'state': 'playing'}}], True)
+
+
 if __name__ == '__main__':
     unittest.main()
