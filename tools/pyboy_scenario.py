@@ -60,6 +60,9 @@ class StepFailure(Exception):
         self.kind = kind
         self.message = message
         self.action = action
+        # Filled by run() at raise time: the state, the car and the hint that
+        # explain this failure (R11-R13).
+        self.context = None
 
 
 def _parse_map(path):
@@ -477,7 +480,7 @@ class RunContext:
         self.state_at_start = self.state
 
     def observe_state(self, emu):
-        """Sample the state and record a change. Three reads per frame."""
+        """Sample the state and record a change. Four reads per frame."""
         if not self.state_readable():
             return None
         now = self.read_state(emu)
@@ -486,6 +489,93 @@ class RunContext:
                 {"frame": self.frame, "from": self.state, "to": now})
             self.state = now
         return now
+
+    # --- failure context --------------------------------------------------
+    def car_position(self, emu):
+        """The car in pixels and in tiles, or None when the symbols are absent."""
+        if '_px' not in self.symbols or '_py' not in self.symbols:
+            return None
+        px = read_value(emu, self.symbols['_px'], self.width_of('_px'))
+        py = read_value(emu, self.symbols['_py'], self.width_of('_py'))
+        return {"px": px, "py": py, "tx": px // TILE_PX, "ty": py // TILE_PX}
+
+    def drive_limits(self, emu):
+        """The clamp the game applies to the car during a race, or None.
+
+        The live map size is the first source: `_active_map_w` and
+        `_active_map_h` are plain globals, they reach the release symbol file,
+        and they describe the map the game actually loaded. The manifest track
+        block is the fallback.
+        """
+        if '_active_map_w' in self.symbols and '_active_map_h' in self.symbols:
+            w = emu.memory[self.symbols['_active_map_w']]
+            h = emu.memory[self.symbols['_active_map_h']]
+            return {"x_min": 0, "x_max": w * TILE_PX - CAR_SIZE_PX,
+                    "y_min": 0, "y_max": h * TILE_PX - CAR_SIZE_PX,
+                    "source": "wram"}
+        tracks = (self.manifest or {}).get("tracks") or {}
+        if '_current_race_id' in self.symbols:
+            track = tracks.get(str(emu.memory[self.symbols['_current_race_id']]))
+            limits = (track or {}).get("drive_limits")
+            if limits:
+                out = dict(limits)
+                out["source"] = "manifest"
+                return out
+        return None
+
+    def at_limit(self, car, limits):
+        """Which clamps the car currently sits on."""
+        if not car or not limits:
+            return []
+        hits = []
+        for axis, value in (("x", car["px"]), ("y", car["py"])):
+            for edge in ("min", "max"):
+                key = f"{axis}_{edge}"
+                if key in limits and value == limits[key]:
+                    hits.append(key)
+        return hits
+
+    def hint(self, failure, block):
+        """One sentence naming the most probable cause (R13)."""
+        changes = block["state_changes"]
+        if changes:
+            first, last = changes[0], changes[-1]
+            return (f"the game left _state_{first['from']} for "
+                    f"_state_{last['to']} at frame {first['frame']}, so the "
+                    f"action ran across a state change")
+        if failure.kind == "precondition":
+            return ("the scenario ran an action whose precondition is false, "
+                    "so the scenario is wrong, not the game")
+        if block["at_limit"] and failure.kind in ("stale-symbol", "freeze"):
+            return (f"the car is at the {', '.join(block['at_limit'])} drive "
+                    f"limit, so it cannot move on that axis")
+        if failure.kind == "stale-screen":
+            return "the screen did not change, so the game may be on a static screen"
+        if failure.kind == "state":
+            return (f"the game is in _state_{block['state_at_failure']}, "
+                    f"not the state the scenario expects")
+        return "no state change and no drive limit explains this failure"
+
+    def failure_context(self, emu, failure):
+        """The `context` block on a failure record (R11-R13)."""
+        state_now = self.read_state(emu)
+        block = {
+            "state_at_start":   self.state_at_start,
+            "state_at_failure": state_now,
+            "state_changes":    list(self.state_changes),
+            "car":              None,
+            "drive_limits":     None,
+            "at_limit":         [],
+        }
+        # R12 applies when the state held still. `state_now is None` covers a
+        # run with no debug symbols, where the state cannot be read at all.
+        if not block["state_changes"] and state_now in ("playing", None):
+            block["car"] = self.car_position(emu)
+            block["drive_limits"] = self.drive_limits(emu)
+            block["at_limit"] = self.at_limit(block["car"],
+                                              block["drive_limits"])
+        block["hint"] = self.hint(failure, block)
+        return block
 
 
 def press(emu, ctx, buttons, delay=1):
@@ -569,8 +659,12 @@ def run(emu, steps, ctx):
         ctx.step = i
         ctx.action = step.get("action")
         ctx.begin_action(emu)
-        check_require(emu, step, ctx, i)
-        _dispatch(emu, step, ctx, i)
+        try:
+            check_require(emu, step, ctx, i)
+            _dispatch(emu, step, ctx, i)
+        except StepFailure as exc:
+            exc.context = ctx.failure_context(emu, exc)
+            raise
     return ctx
 
 

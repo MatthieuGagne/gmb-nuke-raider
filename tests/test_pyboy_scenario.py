@@ -1071,5 +1071,124 @@ class TestTraceState(unittest.TestCase):
         self.assertEqual(emu.rendered, 1)
 
 
+class TestFailureContext(unittest.TestCase):
+
+    SYMS = dict(_px=0xC24B, _py=0xC24D, _active_map_w=0xC5F1,
+                _active_map_h=0xC5F2, **state_symbols())
+
+    def car(self, px, py, w=20, h=100):
+        """Both bytes of each 16-bit symbol, plus the live map size."""
+        return {0xC24B: px & 0xFF, 0xC24C: (px >> 8) & 0xFF,
+                0xC24D: py & 0xFF, 0xC24E: (py >> 8) & 0xFF,
+                0xC5F1: w, 0xC5F2: h}
+
+    def racing(self, px, py, **kw):
+        mem = dict(state_memory(1, 0x7EED))
+        mem.update(self.car(px, py, **kw))
+        return mem
+
+    def test_a_state_change_is_reported_with_its_frame(self):
+        """AC5 shape: the race ends under the assertion."""
+        emu = StatefulEmu({0: (1, 0x7EED), 8: (3, 0x5620)},
+                          extra=self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 20}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_start'], 'playing')
+        self.assertEqual(block['state_at_failure'], 'results')
+        self.assertEqual(block['state_changes'],
+                         [{'frame': 8, 'from': 'playing', 'to': 'results'}])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+        self.assertIn('results', block['hint'])
+        self.assertIn('8', block['hint'])
+
+    def test_a_car_at_the_top_limit_is_reported_with_the_limit(self):
+        """AC4 shape: the car drives into the top limit and stops."""
+        emu = FakeEmu(memory=self.racing(64, 0))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_changes'], [])
+        self.assertEqual(block['car'], {'px': 64, 'py': 0, 'tx': 8, 'ty': 0})
+        self.assertEqual(block['drive_limits']['y_min'], 0)
+        self.assertEqual(block['drive_limits']['y_max'], 100 * 8 - 16)
+        self.assertEqual(block['drive_limits']['source'], 'wram')
+        self.assertEqual(block['at_limit'], ['y_min'])
+        self.assertIn('y_min', block['hint'])
+
+    def test_a_car_in_the_far_corner_names_both_limits(self):
+        emu = FakeEmu(memory=self.racing(144, 784))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 5}], ctx)
+        self.assertEqual(sorted(caught.exception.context['at_limit']),
+                         ['x_max', 'y_max'])
+
+    def test_a_failure_outside_a_race_reports_no_drive_limit(self):
+        """The loader sets the same map size for the overmap."""
+        mem = dict(state_memory(0, 0x1014))
+        mem.update(self.car(64, 0))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem, frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_failure'], 'overmap')
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+
+    def test_a_precondition_failure_carries_a_context(self):
+        mem = dict(state_memory(3, 0x5620))
+        mem.update(self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem),
+                   [{'action': 'advance', 'frames': 5,
+                     'require': {'state': 'playing'}}], ctx)
+        self.assertEqual(caught.exception.context['state_at_start'], 'results')
+        self.assertIn('scenario', caught.exception.context['hint'])
+
+    def test_the_context_survives_without_the_state_reader(self):
+        ctx = ps.RunContext(symbols={'_px': 0xC24B, '_py': 0xC24D,
+                                     '_active_map_w': 0xC5F1,
+                                     '_active_map_h': 0xC5F2})
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=self.car(64, 0), frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertIsNone(block['state_at_start'])
+        self.assertEqual(block['car'], {'px': 64, 'py': 0, 'tx': 8, 'ty': 0})
+        self.assertTrue(block['hint'])
+
+    def test_the_context_omits_the_car_when_no_symbol_resolves(self):
+        ctx = ps.RunContext(symbols={})
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory={}, frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 3}], ctx)
+        self.assertIsNone(caught.exception.context['car'])
+        self.assertIsNone(caught.exception.context['drive_limits'])
+
+    def test_the_manifest_supplies_limits_when_wram_cannot(self):
+        manifest = {'tracks': {'3': {'drive_limits': {
+            'x_min': 0, 'x_max': 144, 'y_min': 0, 'y_max': 192}}}}
+        ctx = ps.RunContext(symbols={'_px': 0xC24B, '_py': 0xC24D,
+                                     '_current_race_id': 0xC5DD},
+                            manifest=manifest)
+        emu = FakeEmu(memory={0xC24B: 64, 0xC24C: 0, 0xC24D: 0, 0xC24E: 0,
+                              0xC5DD: 3}, frames=[[1]])
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_screen_changes', 'frames': 3}], ctx)
+        limits = caught.exception.context['drive_limits']
+        self.assertEqual(limits['y_max'], 192)
+        self.assertEqual(limits['source'], 'manifest')
+
+
 if __name__ == '__main__':
     unittest.main()
