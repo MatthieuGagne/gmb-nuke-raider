@@ -537,5 +537,136 @@ class TestDiffTraces(unittest.TestCase):
         self.assertIsNone(ps.diff_traces(a, b))
 
 
+# Fixture WRAM map. The literals below match the real debug build:
+#   _stack 0xC176 (StateEntry[2], stride 7), _sm_slot_src 0xC184 (2 bytes per
+#   slot), _sm_depth 0xC5E9. Slot 1 is where a race actually runs, because the
+#   canonical path is overmap(0) -> prerace(+1) -> playing(1).
+SM_DEPTH, SM_SLOT_SRC, SM_STACK = 0xC5E9, 0xC184, 0xC176
+
+NOI_STATES = (
+    'DEF ___bank_state_hub 0x0\n'
+    'DEF ___bank_state_overmap 0x0\n'
+    'DEF ___bank_state_playing 0x1\n'
+    'DEF ___bank_state_results 0x3\n'
+    'DEF ___bank_state_title 0x3\n'
+    'DEF ___func_state_playing 0x177E0\n'
+    'DEF _state_hub 0xB9C\n'
+    'DEF _state_overmap 0x1014\n'
+    'DEF _state_playing 0x17EED\n'
+    'DEF _state_results 0x35620\n'
+    'DEF _state_title 0x35704\n'
+    'DEF _state_push 0x136A\n'
+    'DEF _state_pop 0x1397\n'
+    'DEF _state_replace 0x13EC\n'
+    'DEF _state_manager_init 0x1341\n'
+    'DEF _state_manager_update 0x1346\n'
+    'DEF _state_results_set_earned 0x3557C\n'
+)
+
+
+def state_symbols():
+    return {'_sm_depth': SM_DEPTH, '_sm_slot_src': SM_SLOT_SRC,
+            '_stack': SM_STACK}
+
+
+def state_table():
+    return {'hub': (0, 0x0B9C), 'overmap': (0, 0x1014),
+            'playing': (1, 0x7EED), 'results': (3, 0x5620),
+            'title': (3, 0x5704)}
+
+
+def state_memory(bank, ptr, depth=1):
+    """WRAM bytes that name one state at slot depth-1. Literal offsets."""
+    if depth == 1:
+        return {SM_DEPTH: 1,
+                0xC184: ptr & 0xFF, 0xC185: (ptr >> 8) & 0xFF,   # slot 0 ptr
+                0xC176: bank}                                     # slot 0 bank
+    return {SM_DEPTH: 2,
+            0xC184: 0xED, 0xC185: 0x7E,                           # slot 0 ptr
+            0xC176: 1,                                            # slot 0 bank
+            0xC186: ptr & 0xFF, 0xC187: (ptr >> 8) & 0xFF,        # slot 1 ptr
+            0xC17D: bank}                                         # slot 1 bank
+
+
+def emu_in_state(bank, ptr, depth=1):
+    return FakeEmu(memory=state_memory(bank, ptr, depth))
+
+
+class TestStateTable(unittest.TestCase):
+
+    def test_every_state_object_is_listed_with_its_bank(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, NOI_STATES)
+            self.assertEqual(ps.load_state_table(noi), state_table())
+
+    def test_state_manager_functions_are_not_states(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, NOI_STATES)
+            table = ps.load_state_table(noi)
+            for name in ('push', 'pop', 'replace', 'manager_init',
+                         'manager_update', 'results_set_earned'):
+                self.assertNotIn(name, table)
+
+    def test_a_bank_symbol_that_disagrees_with_the_flat_address_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, 'DEF ___bank_state_bogus 0x2\nDEF _state_bogus 0x17EED\n')
+            self.assertEqual(ps.load_state_table(noi), {})
+
+    def test_a_missing_file_gives_an_empty_table(self):
+        self.assertEqual(ps.load_state_table('nope.noi'), {})
+
+    def test_names_normalize_to_the_short_form(self):
+        self.assertEqual(ps.normalize_state_name('_state_playing'), 'playing')
+        self.assertEqual(ps.normalize_state_name('state_playing'), 'playing')
+        self.assertEqual(ps.normalize_state_name('playing'), 'playing')
+
+
+class TestReadState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_a_banked_state_is_named(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(1, 0x7EED)), 'playing')
+
+    def test_a_bank_zero_state_is_named(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(0, 0x1014)), 'overmap')
+
+    def test_slot_one_is_read_at_the_right_offsets(self):
+        """Depth 2 is the depth a race runs at. This is the test that fails
+        when STATE_PTR_WIDTH or STATE_ENTRY_STRIDE is wrong."""
+        self.assertEqual(self.ctx().read_state(emu_in_state(3, 0x5620, depth=2)),
+                         'results')
+
+    def test_depth_zero_has_no_state(self):
+        self.assertIsNone(self.ctx().read_state(FakeEmu(memory={SM_DEPTH: 0})))
+
+    def test_a_wrong_bank_byte_still_resolves_by_address(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(0xFF, 0x7EED)),
+                         'playing')
+
+    def test_a_colliding_address_needs_the_bank_to_decide(self):
+        table = {'alpha': (1, 0x4000), 'beta': (2, 0x4000)}
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=table)
+        self.assertEqual(ctx.read_state(emu_in_state(2, 0x4000)), 'beta')
+
+    def test_a_colliding_address_with_no_bank_match_is_unknown(self):
+        table = {'alpha': (1, 0x4000), 'beta': (2, 0x4000)}
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=table)
+        self.assertIsNone(ctx.read_state(emu_in_state(7, 0x4000)))
+
+    def test_state_is_unreadable_without_the_debug_symbols(self):
+        ctx = ps.RunContext(symbols={'_hp': 0xC535}, state_table=state_table())
+        self.assertFalse(ctx.state_readable())
+        self.assertIsNone(ctx.read_state(FakeEmu()))
+
+    def test_state_is_unreadable_without_a_state_table(self):
+        self.assertFalse(
+            ps.RunContext(symbols=state_symbols(), state_table={}).state_readable())
+
+
 if __name__ == '__main__':
     unittest.main()

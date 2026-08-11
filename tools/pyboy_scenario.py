@@ -25,6 +25,27 @@ _MAP_RE = re.compile(r'([0-9A-Fa-f]{8})\s+(_\w+)')
 
 WRAM_LO, WRAM_HI = 0xC000, 0xDFFF
 
+# A .noi flat address is `bank << 16 | gb_addr` — the rule in
+# tools/bank_post_build.py:25.
+BANK_STRIDE = 0x10000
+
+# `StateEntry` in src/state_manager.c is one uint8_t bank followed by three
+# function pointers. SDCC packs structs on SM83, so the stride is 1 + 3*2.
+# The bank byte sits at offset 0 of each entry. Measured on a real debug
+# build: _stack 0xC176, _sm_slot_src 0xC184 — 14 bytes for STACK_MAX 2.
+STATE_ENTRY_STRIDE = 7
+# `sm_slot_src` is an array of `const State *` — two bytes per slot.
+STATE_PTR_WIDTH = 2
+
+# A Game Boy background tile is 8 px. The car is 16 px on each side, so it
+# stops 16 px short of the far edge — the rule in src/vehicle_physics.c, and
+# the one tools/emit_manifest.py uses for `drive_limits`.
+TILE_PX = 8
+CAR_SIZE_PX = 16
+
+_STATE_OBJ_RE = re.compile(r'^_state_(\w+)$')
+_STATE_BANK_PREFIX = '___bank_state_'
+
 
 class ScenarioError(Exception):
     """Malformed scenario, unknown symbol, or unresolvable include (usage error)."""
@@ -73,6 +94,56 @@ def _parse_noi(path):
     except OSError:
         pass
     return out
+
+
+def parse_noi_all(path):
+    """Every DEF line as `{name: flat address}`. No mask, no range filter.
+
+    `_parse_noi` keeps WRAM only, which drops every banked-ROM symbol. The
+    state objects live in ROM, so they need the unfiltered view.
+    """
+    out = {}
+    if not path:
+        return out
+    try:
+        with open(path) as f:
+            for line in f:
+                m = _NOI_RE.match(line.strip())
+                if m:
+                    out[m.group(1)] = int(m.group(2), 16)
+    except OSError:
+        pass
+    return out
+
+
+def load_state_table(noi_path):
+    """`{short state name: (bank, gb_addr)}` for every `const State` object.
+
+    A name qualifies only when a `___bank_state_<name>` symbol exists AND its
+    value equals `flat >> 16`. That pair separates a state object from a
+    state-manager function: `_state_push` and `_state_results_set_earned` both
+    start with `_state_`, and neither has a companion bank symbol.
+    """
+    defs = parse_noi_all(noi_path)
+    table = {}
+    for name, flat in defs.items():
+        m = _STATE_OBJ_RE.match(name)
+        if not m:
+            continue
+        bank = flat // BANK_STRIDE
+        if defs.get(_STATE_BANK_PREFIX + m.group(1)) != bank:
+            continue
+        table[m.group(1)] = (bank, flat % BANK_STRIDE)
+    return table
+
+
+def normalize_state_name(name):
+    """`_state_playing`, `state_playing` and `playing` all name one state."""
+    text = str(name)
+    for prefix in ('_state_', 'state_'):
+        if text.startswith(prefix):
+            return text[len(prefix):]
+    return text
 
 
 def _parse_manifest_symbols(path):
@@ -235,7 +306,8 @@ class RunContext:
     """
 
     def __init__(self, symbols, manifest=None, watch=None, trace_every=0,
-                 freeze_frames=0, default_out=None, widths=None):
+                 freeze_frames=0, default_out=None, widths=None,
+                 state_table=None):
         self.symbols = symbols
         self.manifest = manifest or {}
         self.watch = list(watch or [])
@@ -252,6 +324,16 @@ class RunContext:
         self.screenshots = []
         self._last_hash = None
         self._unchanged = 0
+
+        self.state_table = dict(state_table or {})
+        self._state_by_bank_addr = {(b, a): n
+                                    for n, (b, a) in self.state_table.items()}
+        self._state_by_addr = {}
+        for n, (b, a) in self.state_table.items():
+            self._state_by_addr.setdefault(a, []).append(n)
+        self.state = None
+        self.state_at_start = None
+        self.state_changes = []
 
     # --- helpers ---------------------------------------------------------
     def screen_hash(self, emu):
@@ -308,6 +390,37 @@ class RunContext:
         self.frame += 1
         emu.screen.image.save(path)
         self.screenshots.append(path)
+
+    # --- state ------------------------------------------------------------
+    def state_readable(self):
+        """True when a state table AND the debug symbols are both present."""
+        return bool(self.state_table) and all(
+            name in self.symbols for name in ('_sm_depth', '_sm_slot_src'))
+
+    def read_state(self, emu):
+        """The name of the state on top of the stack, or None.
+
+        `sm_slot_src[depth-1]` holds the address of the `const State` object
+        and `stack[depth-1].bank` holds its bank. The pair identifies the
+        state. A unique address answers on its own, so a wrong bank byte
+        degrades to the address match instead of naming the wrong state.
+        """
+        if not self.state_readable():
+            return None
+        depth = emu.memory[self.symbols['_sm_depth']]
+        if depth == 0:
+            return None
+        slot = depth - 1
+        ptr = read_value(
+            emu, self.symbols['_sm_slot_src'] + STATE_PTR_WIDTH * slot, 2)
+        stack = self.symbols.get('_stack')
+        if stack is not None:
+            bank = emu.memory[stack + STATE_ENTRY_STRIDE * slot]
+            name = self._state_by_bank_addr.get((bank, ptr))
+            if name is not None:
+                return name
+        names = self._state_by_addr.get(ptr, [])
+        return names[0] if len(names) == 1 else None
 
 
 def press(emu, ctx, buttons, delay=1):
