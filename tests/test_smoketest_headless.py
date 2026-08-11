@@ -304,6 +304,21 @@ class ScenarioErrorDuringRun(unittest.TestCase):
         self.assertEqual(self.run_main('--scenario', 'e-assert'), sh.EXIT_FAIL)
         self.assertEqual(self.read_result('e-assert')['failure']['kind'], 'assert')
 
+    # --- R11 (final review Finding 2) -------------------------------------
+    def test_a_scenario_kind_failure_carries_a_context_and_its_own_hint(self):
+        """A mid-run ScenarioError (#507) is wrapped into a fresh StepFailure
+        OUTSIDE ps.run()'s except clause, so nothing ever attached a context
+        to it. R11 requires every failure record to hold one.
+        """
+        self.write_scenario('a-bad', dict(BAD, blocking=True))
+        self.run_main('--scenario', 'a-bad')
+        failure = self.read_result('a-bad')['failure']
+        self.assertIsNotNone(failure['context'])
+        self.assertEqual(
+            failure['context']['hint'],
+            "the scenario names something the build does not carry, "
+            "so the scenario is wrong, not the game")
+
     # --- R5: the differential path keeps the verdict it has today --------
     def test_a_scenario_error_on_both_roms_stays_scenario_invalid(self):
         """Global Constraints: the --ref-rom promotion is not bypassed.

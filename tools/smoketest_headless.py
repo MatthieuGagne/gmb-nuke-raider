@@ -225,6 +225,16 @@ def run_one(rom, scenario, args, symbols, manifest, out_dir, tag="",
         # then treats it exactly like an assertion failure.
         failure = exc if isinstance(exc, ps.StepFailure) else ps.StepFailure(
             ctx.step, "scenario", str(exc), ctx.action)
+        if failure.context is None:
+            # A ScenarioError escapes ps.run() entirely, so nothing has
+            # attached a context to the failure we just wrapped it into
+            # (unlike a StepFailure, which run() already annotated before
+            # re-raising it). Build one here — guarded, so a failure to
+            # build the context can never mask the original error.
+            try:
+                failure.context = ctx.failure_context(emu, failure)
+            except Exception:
+                pass
         try:
             ctx.capture(emu, os.path.join(out_dir, f"failure{tag}.png"))
         except Exception:

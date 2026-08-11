@@ -143,8 +143,14 @@ When the state held still during a race, the block reports the car instead:
 ```
 
 `source` is `wram` when the limits come from the live map size, and `manifest` when they come
-from `build/game-manifest.json`. The block omits the car and the limits outside a race, because
-the loader sets the same map size for the overmap and the hub.
+from `build/game-manifest.json`. The car and the limits do NOT share one rule: the car position
+is a fact the release symbol file can supply on its own, so it is reported whenever the state
+held still AND is either `playing` or unreadable (no debug symbol file — the default
+configuration). The limits need more — proof the game is actually racing — so they and
+`at_limit` are reported only when the state held still and reads exactly `playing`. An unreadable
+state is never treated as "racing": that would blame a drive limit for a freeze on a menu, which
+is the misdiagnosis this block exists to prevent. When the state cannot be read, the hint says so
+and names `make build-debug` instead of blaming an axis.
 
 `at_limit` names the limits the car is pressed against, not only the ones it sits on exactly. A
 limit counts when the car is within one frame of movement of it, because the clamp that stops the

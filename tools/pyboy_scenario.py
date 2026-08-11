@@ -62,12 +62,17 @@ class ScenarioError(Exception):
 class StepFailure(Exception):
     """A step's assertion, timeout, or watchdog fired (run outcome)."""
 
-    def __init__(self, step, kind, message, action=None):
+    def __init__(self, step, kind, message, action=None, symbols=None):
         super().__init__(message)
         self.step = step
         self.kind = kind
         self.message = message
         self.action = action
+        # The stale-symbol names that raised this failure, or None when the
+        # kind has no such list (e.g. a freeze). Lets the hint correlate a
+        # drive-limit hit against the axis that was actually being watched
+        # (#589).
+        self.symbols = symbols
         # Filled by run() at raise time: the state, the car and the hint that
         # explain this failure (R11-R13).
         self.context = None
@@ -362,6 +367,27 @@ _OPS = {
     "ge": lambda a, b: a >= b,
 }
 
+# Which `at_limit` keys a stale watched symbol can explain (#589 D4). A
+# stale `_px` beside a `y_min` hit does not make `y_min` the cause — only an
+# `at_limit` entry on a matching axis does.
+_AXIS_LIMITS = {"_px": ("x_min", "x_max"), "_py": ("y_min", "y_max")}
+
+
+def _limits_matching_stale(at_limit, stale_symbols):
+    """The `at_limit` entries a stale symbol list can actually explain.
+
+    `stale_symbols` is None for a failure kind with no such list (a freeze
+    has no axis to correlate against), so every hit stays eligible there.
+    """
+    if not at_limit:
+        return []
+    if stale_symbols is None:
+        return list(at_limit)
+    axes = set()
+    for name in stale_symbols:
+        axes.update(_AXIS_LIMITS.get(name, ()))
+    return [lim for lim in at_limit if lim in axes]
+
 
 class RunContext:
     """Frame counter, trace sampler, and freeze watchdog for one run.
@@ -558,6 +584,9 @@ class RunContext:
 
     def hint(self, failure, block):
         """One sentence naming the most probable cause (R13)."""
+        if failure.kind == "scenario":
+            return ("the scenario names something the build does not carry, "
+                    "so the scenario is wrong, not the game")
         changes = block["state_changes"]
         if changes:
             first, last = changes[0], changes[-1]
@@ -567,13 +596,26 @@ class RunContext:
         if failure.kind == "precondition":
             return ("the scenario ran an action whose precondition is false, "
                     "so the scenario is wrong, not the game")
+        # `state_at_failure is None` is ambiguous on its own: it means either
+        # "the game is not yet in any state" (readable) or "the state cannot
+        # be read at all" (no debug symbol file — the default configuration).
+        # Only the second case gets this hint; it must sit ahead of every
+        # branch below that would otherwise fire on a None state, and behind
+        # `precondition` so a false `require` keeps its own message.
+        if block["state_at_failure"] is None and not self.state_readable():
+            return ("the state could not be read (no debug symbol file), so "
+                    "run 'make build-debug' before trusting a drive-limit "
+                    "hint")
         if (failure.kind in ("stale-symbol", "freeze")
                 and block["state_at_failure"] not in ("playing", None)):
             return (f"the game is in _state_{block['state_at_failure']}, not "
                     f"racing, so a race symbol stops for a correct reason")
-        if block["at_limit"] and failure.kind in ("stale-symbol", "freeze"):
-            return (f"the car is at the {', '.join(block['at_limit'])} drive "
-                    f"limit, so it cannot move on that axis")
+        if failure.kind in ("stale-symbol", "freeze"):
+            matched = _limits_matching_stale(
+                block["at_limit"], getattr(failure, "symbols", None))
+            if matched:
+                return (f"the car is at the {', '.join(matched)} drive "
+                        f"limit, so it cannot move on that axis")
         if failure.kind == "stale-screen":
             return "the screen did not change, so the game may be on a static screen"
         if failure.kind == "state":
@@ -592,10 +634,17 @@ class RunContext:
             "drive_limits":     None,
             "at_limit":         [],
         }
-        # R12 applies when the state held still. `state_now is None` covers a
-        # run with no debug symbols, where the state cannot be read at all.
-        if not block["state_changes"] and state_now in ("playing", None):
+        held_still = not block["state_changes"]
+        # The car position is a fact the release symbol file can supply on
+        # its own, so it is reported whenever the state held still and is
+        # either racing or unreadable (`state_now is None`).
+        if held_still and state_now in ("playing", None):
             block["car"] = self.car_position(emu)
+        # The drive limits (and therefore `at_limit`) need more: proof the
+        # game is actually racing. An unreadable state must not be treated
+        # as "racing" here — that is the misdiagnosis this block exists to
+        # remove (#589).
+        if held_still and state_now == "playing":
             block["drive_limits"] = self.drive_limits(emu)
             block["at_limit"] = self.at_limit(block["car"],
                                               block["drive_limits"])
@@ -716,7 +765,8 @@ def _liveness(emu, ctx, step, i, want_symbols, want_screen):
     if stale:
         raise StepFailure(
             i, "stale-symbol",
-            f"{', '.join(stale)} did not change over {frames} frames", act)
+            f"{', '.join(stale)} did not change over {frames} frames", act,
+            symbols=stale)
     if want_screen and len(hashes) < 2:
         raise StepFailure(
             i, "stale-screen",

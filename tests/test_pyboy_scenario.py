@@ -1246,14 +1246,74 @@ class TestFailureContext(unittest.TestCase):
         self.assertIsNone(caught.exception.context['car'])
         self.assertIsNone(caught.exception.context['drive_limits'])
 
+    def test_an_unreadable_state_keeps_the_car_but_drops_the_limits(self):
+        """(#589) `state_now is None` means "the state cannot be read" — the
+        DEFAULT configuration, no debug ROM — not "not racing". A freeze on a
+        menu must still report the car (a release symbol can supply it) but
+        must not report drive limits, `at_limit`, or a limit-blaming hint.
+        """
+        symbols = {'_px': 0xC24B, '_py': 0xC24D,
+                   '_active_map_w': 0xC5F1, '_active_map_h': 0xC5F2}
+        emu = FakeEmu(memory=self.car(64, 1), frames=[[1]])
+        ctx = ps.RunContext(symbols=symbols)  # no state_table -> unreadable
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertIsNone(block['state_at_failure'])
+        self.assertEqual(block['car'], {'px': 64, 'py': 1, 'tx': 8, 'ty': 0})
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+        self.assertIn('make build-debug', block['hint'])
+
+    def test_hint_does_not_blame_an_axis_the_stale_symbol_does_not_share(self):
+        """(#589) A stale `_px` beside a `y_min` limit must not blame `y_min`
+        — `at_limit` still reports it (the car really is there), but the
+        hint only blames a limit whose axis matches a stale symbol.
+        """
+        emu = FakeEmu(memory=self.racing(64, 1))   # py=1 -> at y_min
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_px'],
+                          'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertIn('y_min', block['at_limit'])
+        self.assertNotIn('y_min', block['hint'])
+
+    def test_hint_blames_the_axis_the_stale_symbol_shares(self):
+        """Same fixture, watching the axis that IS at its limit."""
+        emu = FakeEmu(memory=self.racing(64, 1))   # py=1 -> at y_min
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertIn('y_min', caught.exception.context['hint'])
+
+    def test_a_freeze_still_gets_the_limit_hint_with_no_symbol_list(self):
+        """A freeze has no stale-symbol list to correlate against, so every
+        `at_limit` entry stays eligible (documented, deliberate)."""
+        emu = FakeEmu(memory=self.racing(64, 1), frames=[[1]])
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table(),
+                            trace_every=1, freeze_frames=3)
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'advance', 'frames': 20}], ctx)
+        self.assertEqual(caught.exception.kind, 'freeze')
+        self.assertIn('y_min', caught.exception.context['hint'])
+
     def test_the_manifest_supplies_limits_when_wram_cannot(self):
+        """The manifest fallback still needs a readable, racing state (#589):
+        `state_now is None` is "cannot read", not "racing", so this fixture
+        must supply the debug state symbols and put the game in `playing`
+        for the limits to be computed at all.
+        """
         manifest = {'tracks': {'3': {'drive_limits': {
             'x_min': 0, 'x_max': 144, 'y_min': 0, 'y_max': 192}}}}
-        ctx = ps.RunContext(symbols={'_px': 0xC24B, '_py': 0xC24D,
-                                     '_current_race_id': 0xC5DD},
-                            manifest=manifest)
-        emu = FakeEmu(memory={0xC24B: 64, 0xC24C: 0, 0xC24D: 0, 0xC24E: 0,
-                              0xC5DD: 3}, frames=[[1]])
+        ctx = ps.RunContext(symbols=dict(state_symbols(),
+                                         _px=0xC24B, _py=0xC24D,
+                                         _current_race_id=0xC5DD),
+                            manifest=manifest, state_table=state_table())
+        mem = dict(state_memory(1, 0x7EED))
+        mem.update({0xC24B: 64, 0xC24C: 0, 0xC24D: 0, 0xC24E: 0, 0xC5DD: 3})
+        emu = FakeEmu(memory=mem, frames=[[1]])
         with self.assertRaises(ps.StepFailure) as caught:
             ps.run(emu, [{'action': 'assert_screen_changes', 'frames': 3}], ctx)
         limits = caught.exception.context['drive_limits']
