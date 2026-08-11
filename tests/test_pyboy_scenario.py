@@ -376,7 +376,7 @@ class TestAssertLive(unittest.TestCase):
         with self.assertRaises(ps.StepFailure) as cm:
             ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
                           "screen": True, "frames": 20}], ctx)
-        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertEqual(cm.exception.kind, 'stale-symbol')
         self.assertIn('_px', cm.exception.message)
 
     def test_fails_when_screen_is_frozen(self):
@@ -385,7 +385,7 @@ class TestAssertLive(unittest.TestCase):
         with self.assertRaises(ps.StepFailure) as cm:
             ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
                           "screen": True, "frames": 20}], ctx)
-        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertEqual(cm.exception.kind, 'stale-screen')
         self.assertIn('screen', cm.exception.message)
 
     def test_screen_check_can_be_disabled(self):
@@ -483,11 +483,11 @@ class TestSmoketestResults(unittest.TestCase):
     def test_failing_result_records_step_and_kind(self):
         st = self._mod()
         ctx = ps.RunContext(symbols={})
-        fail = ps.StepFailure(19, 'liveness', '_px unchanged over 60 frames', 'assert_live')
+        fail = ps.StepFailure(19, 'stale-symbol', '_px unchanged over 60 frames', 'assert_live')
         res = st.build_result('generic-smoke', ctx, failure=fail)
         self.assertEqual(res['verdict'], 'fail')
         self.assertEqual(res['failure']['step'], 19)
-        self.assertEqual(res['failure']['kind'], 'liveness')
+        self.assertEqual(res['failure']['kind'], 'stale-symbol')
         self.assertEqual(res['failure']['action'], 'assert_live')
 
     def test_exit_codes_are_zero_one_two(self):
@@ -907,6 +907,82 @@ class TestWaitState(unittest.TestCase):
     def test_the_state_field_is_required(self):
         with self.assertRaises(ps.ScenarioError):
             ps.load_scenario([{'action': 'wait_state'}])
+
+
+class TestLivenessSplit(unittest.TestCase):
+
+    def dead_emu(self):
+        """One frame payload for every tick: the screen hash never changes."""
+        return FakeEmu(memory={0xC24B: 7, 0xC24C: 0}, frames=[[1]])
+
+    def live_screen_emu(self):
+        return FakeEmu(memory={0xC24B: 7, 0xC24C: 0},
+                       frames=[[i % 7] for i in range(200)])
+
+    def ctx(self):
+        return ps.RunContext(symbols={'_px': 0xC24B})
+
+    def test_a_stale_symbol_has_the_kind_stale_symbol(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.live_screen_emu(),
+                   [{'action': 'assert_changes', 'symbols': ['_px'],
+                     'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-symbol')
+        self.assertIn('_px', caught.exception.message)
+
+    def test_a_stale_screen_has_the_kind_stale_screen(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
+        self.assertIn('screen', caught.exception.message)
+
+    def test_the_two_messages_differ(self):
+        symbol_msg = screen_msg = None
+        try:
+            ps.run(self.live_screen_emu(),
+                   [{'action': 'assert_changes', 'symbols': ['_px'],
+                     'frames': 5}], self.ctx())
+        except ps.StepFailure as exc:
+            symbol_msg = exc.message
+        try:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+        except ps.StepFailure as exc:
+            screen_msg = exc.message
+        self.assertIsNotNone(symbol_msg)
+        self.assertIsNotNone(screen_msg)
+        self.assertNotEqual(symbol_msg, screen_msg)
+
+    def test_assert_changes_ignores_a_frozen_screen(self):
+        """A frozen screen is not this action's business — only the symbol is."""
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_changes', 'symbols': ['_px'],
+                     'frames': 3}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-symbol')
+
+    def test_assert_screen_changes_ignores_symbols(self):
+        ps.run(self.live_screen_emu(),
+               [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+
+    def test_assert_live_reports_the_symbol_first(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_live', 'symbols': ['_px'], 'frames': 5}],
+                   self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-symbol')
+
+    def test_assert_live_reports_the_screen_when_no_symbol_is_watched(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_live', 'symbols': [], 'frames': 5}],
+                   self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
+
+    def test_assert_changes_requires_symbols(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'assert_changes'}])
 
 
 if __name__ == '__main__':

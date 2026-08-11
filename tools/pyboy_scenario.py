@@ -552,6 +552,36 @@ def run(emu, steps, ctx):
     return ctx
 
 
+def _liveness(emu, ctx, step, i, want_symbols, want_screen):
+    """The body behind assert_live, assert_changes and assert_screen_changes.
+
+    The two failures are separate kinds on purpose: a symbol that does not
+    move and a screen that does not move have different causes and different
+    fixes (R9).
+    """
+    act = step.get("action")
+    frames = int(step.get("frames", 60))
+    names = list(step.get("symbols", [])) if want_symbols else []
+    addrs = {n: (resolve(n, ctx.symbols), ctx.width_of(n)) for n in names}
+    start = {n: read_value(emu, a, w) for n, (a, w) in addrs.items()}
+    changed, hashes = set(), set()
+    for _ in range(frames):
+        ctx.tick(emu, 1, render_all=True)
+        hashes.add(ctx.screen_hash(emu))
+        for n, (a, w) in addrs.items():
+            if read_value(emu, a, w) != start[n]:
+                changed.add(n)
+    stale = [n for n in names if n not in changed]
+    if stale:
+        raise StepFailure(
+            i, "stale-symbol",
+            f"{', '.join(stale)} did not change over {frames} frames", act)
+    if want_screen and len(hashes) < 2:
+        raise StepFailure(
+            i, "stale-screen",
+            f"the screen did not change over {frames} frames", act)
+
+
 def _dispatch(emu, step, ctx, i):
     act = step.get("action")
 
@@ -589,27 +619,13 @@ def _dispatch(emu, step, ctx, i):
                 f"{step.get('op', 'eq')} {target}", act)
 
     elif act == "assert_live":
-        frames = int(step.get("frames", 60))
-        names = list(step.get("symbols", []))
-        want_screen = bool(step.get("screen", True))
-        addrs = {n: (resolve(n, ctx.symbols), ctx.width_of(n)) for n in names}
-        start = {n: read_value(emu, a, w) for n, (a, w) in addrs.items()}
-        changed, hashes = set(), set()
-        for _ in range(frames):
-            ctx.tick(emu, 1, render_all=True)
-            hashes.add(ctx.screen_hash(emu))
-            for n, (a, w) in addrs.items():
-                if read_value(emu, a, w) != start[n]:
-                    changed.add(n)
-        stale = [n for n in names if n not in changed]
-        if stale:
-            raise StepFailure(
-                i, "liveness",
-                f"{', '.join(stale)} unchanged over {frames} frames", act)
-        if want_screen and len(hashes) < 2:
-            raise StepFailure(
-                i, "liveness",
-                f"screen hash unchanged over {frames} frames", act)
+        _liveness(emu, ctx, step, i, True, bool(step.get("screen", True)))
+
+    elif act == "assert_changes":
+        _liveness(emu, ctx, step, i, True, False)
+
+    elif act == "assert_screen_changes":
+        _liveness(emu, ctx, step, i, False, True)
 
     elif act == "assert_state":
         want = normalize_state_name(step["state"])
