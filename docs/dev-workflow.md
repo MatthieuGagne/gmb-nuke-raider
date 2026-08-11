@@ -458,12 +458,14 @@ means the scenario is wrong, not the game, and it is returned for a blocking sce
 scenario that is not blocking. A non-blocking scenario that the GAME failed still exits 0 — read
 the `verdict` field, never the exit code, for evidence scenarios.
 
-A scenario error during a run does not stop the run (#507). An `assert_memory` action that
-names an unknown symbol becomes that scenario's failure, and `results.json` records it as
-`kind` `scenario`. The run continues with the next scenario.
+A scenario error during a run does not stop the run (#507). This covers an unknown symbol, an
+unknown operator, and a navigation id with no matching track. Any of these becomes that
+scenario's failure, and `results.json` records it as `failure.kind` `scenario`. The run
+continues with the next scenario.
 
 A blocking scenario then exits `1`. A scenario that is not blocking keeps the exit code at `0`.
-A scenario file that does not load is different: it exits `2` before it starts a scenario. With
+A scenario file that does not load is different: the smoketest exits `2` before it starts a
+scenario. With
 `--ref-rom`, the same error fails on both ROMs, so the verdict is `scenario-invalid` and the
 exit code is `3`.
 

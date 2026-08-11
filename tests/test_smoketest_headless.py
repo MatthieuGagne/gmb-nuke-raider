@@ -1,4 +1,4 @@
-"""Tests for tools/smoketest_headless.py (#588 R13-R15, AC8, AC9).
+"""Tests for tools/smoketest_headless.py (#588 R13-R15, AC8, AC9; #507).
 
 No ROM and no PyBoy: every test here exercises the parts that decide an exit
 code, an output path or a result file.
