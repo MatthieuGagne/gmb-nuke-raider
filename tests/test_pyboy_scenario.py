@@ -562,12 +562,14 @@ NOI_STATES = (
     'DEF ___bank_state_hub 0x0\n'
     'DEF ___bank_state_overmap 0x0\n'
     'DEF ___bank_state_playing 0x1\n'
+    'DEF ___bank_state_prerace 0x3\n'
     'DEF ___bank_state_results 0x3\n'
     'DEF ___bank_state_title 0x3\n'
     'DEF ___func_state_playing 0x177E0\n'
     'DEF _state_hub 0xB9C\n'
     'DEF _state_overmap 0x1014\n'
     'DEF _state_playing 0x17EED\n'
+    'DEF _state_prerace 0x34673\n'
     'DEF _state_results 0x35620\n'
     'DEF _state_title 0x35704\n'
     'DEF _state_push 0x136A\n'
@@ -586,8 +588,8 @@ def state_symbols():
 
 def state_table():
     return {'hub': (0, 0x0B9C), 'overmap': (0, 0x1014),
-            'playing': (1, 0x7EED), 'results': (3, 0x5620),
-            'title': (3, 0x5704)}
+            'playing': (1, 0x7EED), 'prerace': (3, 0x4673),
+            'results': (3, 0x5620), 'title': (3, 0x5704)}
 
 
 def state_memory(bank, ptr, depth=1):
@@ -1131,6 +1133,27 @@ class TestFailureContext(unittest.TestCase):
         self.assertEqual(sorted(caught.exception.context['at_limit']),
                          ['x_max', 'y_max'])
 
+    def test_a_state_change_that_ends_in_playing_still_omits_the_car(self):
+        """R12 keys off whether the state CHANGED, not where it landed.
+
+        This is the only shape that separates the two guard clauses: the state
+        moves during the action and is back in `playing` at the raise, so the
+        second clause admits it and only `not state_changes` closes the block.
+        """
+        emu = StatefulEmu({0: (3, 0x4673), 6: (1, 0x7EED)},
+                          extra=self.car(64, 0))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 20}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_failure'], 'playing')
+        self.assertEqual([(c['from'], c['to']) for c in block['state_changes']],
+                         [('prerace', 'playing')])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+
     def test_a_failure_outside_a_race_reports_no_drive_limit(self):
         """The loader sets the same map size for the overmap."""
         mem = dict(state_memory(0, 0x1014))
@@ -1141,6 +1164,7 @@ class TestFailureContext(unittest.TestCase):
                    [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
         block = caught.exception.context
         self.assertEqual(block['state_at_failure'], 'overmap')
+        self.assertIsNone(block['car'])
         self.assertIsNone(block['drive_limits'])
         self.assertEqual(block['at_limit'], [])
 
