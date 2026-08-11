@@ -43,6 +43,14 @@ STATE_PTR_WIDTH = 2
 TILE_PX = 8
 CAR_SIZE_PX = 16
 
+# The largest distance the car can move in one frame: TERRAIN_BOOST_MAX_SPEED
+# in src/config.h, the boost-pad cap. `vehicle_step_axis_*` rejects a move that
+# would cross a drive limit and keeps the old position, so a car pressed
+# against a limit parks strictly less than one step short of it — almost never
+# exactly on it. An equality test therefore misses the case this block exists
+# to explain (#589, found by the AC4 evidence run).
+MAX_STEP_PX = 8
+
 _STATE_OBJ_RE = re.compile(r'^_state_(\w+)$')
 _STATE_BANK_PREFIX = '___bank_state_'
 
@@ -534,14 +542,17 @@ class RunContext:
         return None
 
     def at_limit(self, car, limits):
-        """Which clamps the car currently sits on."""
+        """Which clamps the car is pressed against.
+
+        Within one frame of movement counts as 'at': see MAX_STEP_PX.
+        """
         if not car or not limits:
             return []
         hits = []
         for axis, value in (("x", car["px"]), ("y", car["py"])):
             for edge in ("min", "max"):
                 key = f"{axis}_{edge}"
-                if key in limits and value == limits[key]:
+                if key in limits and abs(value - limits[key]) < MAX_STEP_PX:
                     hits.append(key)
         return hits
 

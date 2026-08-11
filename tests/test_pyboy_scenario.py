@@ -1109,20 +1109,45 @@ class TestFailureContext(unittest.TestCase):
         self.assertIn('8', block['hint'])
 
     def test_a_car_at_the_top_limit_is_reported_with_the_limit(self):
-        """AC4 shape: the car drives into the top limit and stops."""
-        emu = FakeEmu(memory=self.racing(64, 0))
+        """AC4 shape: the car drives into the top limit and stops.
+
+        The car parks at py=1, not py=0: `vehicle_step_axis_y` rejects a move
+        that would go below the limit and keeps the old position, so on real
+        hardware the car stops strictly less than one step short of the edge,
+        almost never exactly on it (#589, found by the AC4 evidence run).
+        """
+        emu = FakeEmu(memory=self.racing(64, 1))
         ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
         with self.assertRaises(ps.StepFailure) as caught:
             ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
                           'frames': 10}], ctx)
         block = caught.exception.context
         self.assertEqual(block['state_changes'], [])
-        self.assertEqual(block['car'], {'px': 64, 'py': 0, 'tx': 8, 'ty': 0})
+        self.assertEqual(block['car'], {'px': 64, 'py': 1, 'tx': 8, 'ty': 0})
         self.assertEqual(block['drive_limits']['y_min'], 0)
         self.assertEqual(block['drive_limits']['y_max'], 100 * 8 - 16)
         self.assertEqual(block['drive_limits']['source'], 'wram')
         self.assertEqual(block['at_limit'], ['y_min'])
         self.assertIn('y_min', block['hint'])
+
+    def test_the_tolerance_does_not_over_report(self):
+        """One full step away is not 'at' the limit; less than one step is.
+
+        Pins the MAX_STEP_PX boundary in both directions (#589).
+        """
+        emu = FakeEmu(memory=self.racing(64, 8))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertNotIn('y_min', caught.exception.context['at_limit'])
+
+        emu = FakeEmu(memory=self.racing(64, 7))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertIn('y_min', caught.exception.context['at_limit'])
 
     def test_a_car_in_the_far_corner_names_both_limits(self):
         emu = FakeEmu(memory=self.racing(144, 784))

@@ -139,6 +139,10 @@ When the state held still during a race, the block reports the car instead:
 from `build/game-manifest.json`. The block omits the car and the limits outside a race, because
 the loader sets the same map size for the overmap and the hub.
 
+`at_limit` names the limits the car is pressed against, not only the ones it sits on exactly. A
+limit counts when the car is within one frame of movement of it, because the clamp that stops the
+car parks it just short of the edge, never exactly on it.
+
 Two limits of the record, both deliberate:
 
 - Without the debug symbol file every `state` field reads `null`, and `state_changes` is empty.
