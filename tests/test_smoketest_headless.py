@@ -131,6 +131,34 @@ class TestScenarioLibrary(unittest.TestCase):
                 text = f.read()
             self.assertNotIn('build/smoketest', text, name)
 
+    def test_no_library_scenario_carries_a_require_or_a_state_action(self):
+        """Two reasons neither belongs in a scenario shipped in this library.
+
+        `resolve_exit_code` computes the `scenario-invalid` verdict without
+        consulting `blocking`, so a false `require` on ANY library scenario —
+        blocking or not — can gate the whole `--all` run. And `assert_state`
+        / `wait_state` need the debug symbol file, which nothing in the build
+        pipeline produces, so a library scenario using them would reject the
+        whole library at the pre-flight check.
+
+        `include` steps are read raw here, not inlined — the raw `steps` list
+        of every file in the library is still exactly what this asserts over,
+        since every include target is itself one of these same files.
+        """
+        library = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), 'tools', 'scenarios')
+        for name in sorted(os.listdir(library)):
+            if not name.endswith('.json'):
+                continue
+            with open(os.path.join(library, name)) as f:
+                data = json.load(f)
+            steps = data['steps'] if isinstance(data, dict) else data
+            for i, step in enumerate(steps):
+                with self.subTest(file=name, step=i):
+                    self.assertNotIn('require', step)
+                    self.assertNotIn(step.get('action'),
+                                     ('assert_state', 'wait_state'))
+
 
 class _ZeroMemory(dict):
     """PyBoy's memory view reads as zero everywhere the test does not set it."""

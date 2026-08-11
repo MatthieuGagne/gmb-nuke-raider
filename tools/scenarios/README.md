@@ -85,6 +85,13 @@ gate. And nothing in the build pipeline produces the debug symbol file, so the p
 reject the whole library. Use `assert_state`, `wait_state` and `require.state` in a scenario you
 pass by path.
 
+**No scenario in this directory carries a `require` field, either — on ANY step, not only one
+naming a state.** `resolve_exit_code` decides `scenario-invalid` without consulting `blocking`,
+so a false `require` on a non-blocking library scenario would still fail the whole `--all` run.
+Worse, a `require` that watches a game outcome (`_hp > 0`, say) turns a real game failure into a
+report that says the scenario was wrong, not the game. Put a `require` only on a scenario you
+pass by path.
+
 ## Verdicts
 
 | Verdict | Exit code | Meaning |

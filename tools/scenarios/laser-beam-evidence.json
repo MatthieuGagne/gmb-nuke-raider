@@ -27,8 +27,7 @@
     {"action": "screenshot", "out": "nose-at-speed-8.png"},
 
     {"action": "press", "buttons": ["down", "a"], "delay": 90},
-    {"action": "assert_live", "symbols": ["_py"], "screen": true, "frames": 60,
-     "require": {"address": "_hp", "op": "gt", "value": 0}},
+    {"action": "assert_live", "symbols": ["_py"], "screen": true, "frames": 60},
     {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
     {"action": "screenshot", "out": "fire-down.png"},
 
