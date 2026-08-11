@@ -68,6 +68,12 @@ survives a worktree removal, and is namespaced by checkout so two concurrent run
 overwrite each other's evidence. `--out-dir` overrides it.
 See [`docs/dev-workflow.md`](docs/dev-workflow.md) for the scenario format and differential mode.
 
+A scenario states what must hold before an action with a `require` field. It asserts a game
+state with `assert_state`. It waits for one with `wait_state`. A false `require` field reports
+the scenario as wrong, not the game: the verdict is `scenario-invalid` and the exit code is 3.
+Every failure record carries a `context` block that names the state, the car position and the
+probable cause. See [`tools/scenarios/README.md`](tools/scenarios/README.md) for the format.
+
 ## Running
 
 ```sh
