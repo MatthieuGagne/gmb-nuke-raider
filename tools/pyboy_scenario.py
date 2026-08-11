@@ -397,6 +397,7 @@ class RunContext:
         digest = self.screen_hash(emu)
         self.trace.append({
             "frame": self.frame, "step": self.step, "action": self.action,
+            "state": self.state,
             "values": values, "screen_hash": digest,
         })
         if digest == self._last_hash:
@@ -416,8 +417,9 @@ class RunContext:
         if n <= 0:
             return
         sampling = self.trace_every > 0
-        if not sampling and not render_all:
-            # Fast path: no trace, no watchdog (screenshot.py's default).
+        watching = self.state_readable()
+        if not sampling and not render_all and not watching:
+            # Fast path: no trace, no watchdog, no state (screenshot.py).
             if n > 1:
                 emu.tick(n - 1, render=False)
             emu.tick(1, render=render_last)
@@ -427,6 +429,7 @@ class RunContext:
             self.frame += 1
             due = sampling and (self.frame % self.trace_every == 0)
             emu.tick(1, render=bool(due or render_all))
+            self.observe_state(emu)
             if due:
                 self.sample(emu)
 
@@ -467,12 +470,30 @@ class RunContext:
         names = self._state_by_addr.get(ptr, [])
         return names[0] if len(names) == 1 else None
 
+    def begin_action(self, emu):
+        """Reset the per-action state record. Called once per step."""
+        self.state_changes = []
+        self.state = self.read_state(emu)
+        self.state_at_start = self.state
+
+    def observe_state(self, emu):
+        """Sample the state and record a change. Three reads per frame."""
+        if not self.state_readable():
+            return None
+        now = self.read_state(emu)
+        if now != self.state:
+            self.state_changes.append(
+                {"frame": self.frame, "from": self.state, "to": now})
+            self.state = now
+        return now
+
 
 def press(emu, ctx, buttons, delay=1):
     """Canonical press: one rendered frame first (KEY_TICKED), all buttons
     queued together (simultaneous), then held for `delay` frames."""
     emu.tick(1, render=True)
     ctx.frame += 1
+    ctx.observe_state(emu)
     for btn in buttons:
         emu.button(str(btn).lower(), int(delay))
     ctx.tick(emu, int(delay))
@@ -547,6 +568,7 @@ def run(emu, steps, ctx):
     for i, step in enumerate(steps):
         ctx.step = i
         ctx.action = step.get("action")
+        ctx.begin_action(emu)
         check_require(emu, step, ctx, i)
         _dispatch(emu, step, ctx, i)
     return ctx

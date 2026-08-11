@@ -1013,5 +1013,63 @@ class TestLivenessSplit(unittest.TestCase):
             ps.load_scenario([{'action': 'assert_changes'}])
 
 
+class TestTraceState(unittest.TestCase):
+
+    def test_every_sample_carries_the_state(self):
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table(),
+                            trace_every=2)
+        ps.run(emu_in_state(1, 0x7EED), [{'action': 'advance', 'frames': 6}], ctx)
+        self.assertTrue(ctx.trace)
+        for rec in ctx.trace:
+            self.assertEqual(rec['state'], 'playing')
+
+    def test_the_state_key_is_present_without_a_state_table(self):
+        ctx = ps.RunContext(symbols={}, trace_every=2)
+        ps.run(FakeEmu(memory={}), [{'action': 'advance', 'frames': 4}], ctx)
+        self.assertTrue(ctx.trace)
+        for rec in ctx.trace:
+            self.assertIsNone(rec['state'])
+
+    def test_a_state_change_during_an_action_carries_its_own_frame(self):
+        """The fast path must not collapse a change onto the last frame."""
+        emu = StatefulEmu({0: (1, 0x7EED), 10: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 30}], ctx)
+        self.assertEqual([(c['from'], c['to']) for c in ctx.state_changes],
+                         [('playing', 'results')])
+        self.assertEqual(ctx.state_changes[0]['frame'], 10)
+
+    def test_two_changes_in_one_action_are_both_recorded(self):
+        emu = StatefulEmu({0: (3, 0x5704), 5: (1, 0x7EED), 15: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 25}], ctx)
+        self.assertEqual([(c['frame'], c['to']) for c in ctx.state_changes],
+                         [(5, 'playing'), (15, 'results')])
+
+    def test_the_change_list_resets_at_every_action(self):
+        emu = StatefulEmu({0: (1, 0x7EED), 5: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 10},
+                     {'action': 'advance', 'frames': 10}], ctx)
+        self.assertEqual(ctx.state_changes, [])
+        self.assertEqual(ctx.state_at_start, 'results')
+
+    def test_the_fast_path_still_runs_when_no_state_is_readable(self):
+        """The batched advance keeps screenshot.py fast.
+
+        `emu.rendered` is what separates the two paths, NOT `len(render_log)`:
+        `FakeEmu.tick` appends one entry per FRAME, so the log holds 40 entries
+        either way. The fast path honours `render_last` and renders exactly one
+        frame; the per-frame path renders only when a sample is due, and with
+        `trace_every=0` none ever is, so it renders zero.
+        """
+        emu = FakeEmu(memory={})
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{'action': 'advance', 'frames': 40}], ctx)
+        self.assertEqual(emu.ticks, 40)
+        self.assertEqual(ctx.frame, 40)
+        self.assertEqual(emu.rendered, 1)
+
+
 if __name__ == '__main__':
     unittest.main()
