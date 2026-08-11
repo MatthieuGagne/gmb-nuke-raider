@@ -464,8 +464,8 @@ names an unknown symbol becomes that scenario's failure, and `results.json` reco
 
 A blocking scenario then exits `1`. A scenario that is not blocking keeps the exit code at `0`.
 A scenario file that does not load is different: it exits `2` before it starts a scenario. With
-`--ref-rom`, the same error stops the run on both ROMs, so the verdict is `scenario-invalid`
-and the exit code is `3`.
+`--ref-rom`, the same error fails on both ROMs, so the verdict is `scenario-invalid` and the
+exit code is `3`.
 
 The manifest each run reads (`build/game-manifest.json`) describes every track: its size in tiles
 and pixels, the drive limits (`0` to `map_h * 8 - 16`, the rule in `src/vehicle_physics.c`), the
