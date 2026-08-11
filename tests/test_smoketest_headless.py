@@ -369,5 +369,88 @@ class TestDebugNoi(unittest.TestCase):
                                          debug_noi_path='absent.noi'), {})
 
 
+class TestPreflightChecksAreNotBypassable(unittest.TestCase):
+    """Pins the two lines the brief singled out as easy silent reverts:
+    `state_names=set(state_table)` weakening to `set(state_table) or None`,
+    and the `validate_state_support` loop moving after `run_one`.
+
+    `build/probe_ac7.py` (the brief's own falsification harness) lives
+    under `build/`, which is gitignored, so nothing committed noticed
+    either revert. With an EMPTY state table both gates fire on an unknown
+    name, so "exit code 2" alone proves nothing — these tests discriminate
+    on which gate answered (its exact message) and on whether the emulator
+    was ever reached, using a real subprocess and a real `pyboy` import so
+    a wrongly-reached PyBoy on a garbage ROM cannot be mistaken for success
+    by a permissive fake.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.rom = os.path.join(self.dir, 'rom.gb')
+        with open(self.rom, 'wb') as f:
+            f.write(b'\x00' * 64)                  # exists, not a real ROM
+        self.manifest = os.path.join(self.dir, 'game-manifest.json')
+        with open(self.manifest, 'w') as f:
+            json.dump({'symbols': {}}, f)
+        self.absent_noi = os.path.join(self.dir, 'absent.noi')
+        self.absent_debug_noi = os.path.join(self.dir, 'absent-debug.noi')
+        self.absent_map = os.path.join(self.dir, 'absent.map')
+        self.script = os.path.join(os.path.dirname(__file__), '..',
+                                   'tools', 'smoketest_headless.py')
+
+    def write_scenario(self, stem, state):
+        path = os.path.join(self.dir, stem + '.json')
+        with open(path, 'w') as f:
+            json.dump({'name': stem, 'blocking': True, 'steps': [
+                {'action': 'assert_state', 'state': state}]}, f)
+        return path
+
+    def run_smoketest(self, scenario_path, noi):
+        return subprocess.run(
+            [sys.executable, self.script, '--scenario', scenario_path,
+             '--rom', self.rom, '--manifest', self.manifest,
+             '--noi', noi, '--debug-noi', self.absent_debug_noi,
+             '--map', self.absent_map],
+            capture_output=True, text=True, timeout=60)
+
+    def test_an_unknown_state_name_is_named_by_the_name_check(self):
+        """Test A: an empty state table must still reject 'flying' by name.
+
+        `state_names=set(state_table)` (never `or None`) is what makes an
+        empty table still say "no" to a named state, instead of silently
+        skipping the name check and letting `validate_state_support`
+        answer with a message that never mentions the state at all.
+        """
+        scenario = self.write_scenario('bad-name', 'flying')
+        proc = self.run_smoketest(scenario, self.absent_noi)
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn('flying', proc.stderr)
+        self.assertIn('known:', proc.stderr)
+        self.assertNotIn('build-debug', proc.stderr)
+
+    def test_the_state_support_check_runs_before_the_emulator_starts(self):
+        """Test B: validate_state_support gates before run_one/PyBoy.
+
+        A hand-written .noi carries just enough to make 'playing' a known
+        state (so the name check passes and cannot be the thing catching
+        this), while `_sm_depth`/`_sm_slot_src` stay unresolved (--debug-noi
+        and --map both absent) so state_readable is false and only
+        validate_state_support can object. The ROM is a garbage file, so if
+        this check ever moved after run_one, PyBoy would be constructed on
+        it and this test would see a crash or a different exit code instead
+        of a clean, pre-flight exit 2.
+        """
+        noi = os.path.join(self.dir, 'release.noi')
+        with open(noi, 'w') as f:
+            f.write('DEF ___bank_state_playing 0x1\n'
+                    'DEF _state_playing 0x17EED\n')
+        scenario = self.write_scenario('good-name', 'playing')
+        proc = self.run_smoketest(scenario, noi)
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn('build-debug', proc.stderr)
+        self.assertNotIn('Traceback', proc.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
