@@ -453,9 +453,37 @@ blocking VERIFY gate for the agent factory.
   reports the first WRAM divergence by step. If the scenario fails on both ROMs it is reported
   `scenario-invalid` rather than blamed on the game.
 
+- A run with ONE ROM also reports `scenario-invalid`, when a step's `require` field is false
+  (#589). A `require` field states what must hold before the action runs. It accepts a state
+  name, or a memory comparison. A false one gives the failure kind `precondition`. It never
+  gives the verdict `fail`.
+
+- `assert_state` and `wait_state` name a game state instead of a frame count. A state name is
+  the short form of a `const State` object: `title`, `overmap`, `prerace`, `playing`, `results`,
+  `game_over`, `hub`.
+
+- The harness reads the state out of the WRAM state stack. It matches the address and the bank
+  against the `_state_*` names in the `.noi` file. Those WRAM variables stay `static` in the
+  release ROM. A scenario that names a state therefore needs `build/debug/nuke-raider.noi`.
+  Run `make build-debug` first. Then add `--debug-noi` to the command.
+
+- A scenario that names a state without those symbols stops before frame 0. It reports a usage
+  error. No scenario in `tools/scenarios/` names a state, so the ROM gate needs one ROM only.
+
+- `assert_live` divides into `assert_changes` for symbols and `assert_screen_changes` for the
+  screen. `assert_live` remains, and means both. The failure kinds are `stale-symbol` and
+  `stale-screen`. Each names its own cause.
+
+- Every failure record carries a `context` block. It names the state at the start of the action,
+  the state at the failure, and each state change during the action. It adds a one-sentence
+  `hint`. During a race, a `context` block with no state change adds more. It gives the car
+  position in pixels and in tiles, the drive limits, and the limits the car sits on.
+  `tools/scenarios/README.md` describes each field.
+
 Exit codes: `0` pass, `1` run failure, `2` tool or usage error, `3` scenario invalid. Code 3
-means the scenario is wrong, not the game, and it is returned for a blocking scenario and for a
-scenario that is not blocking. A non-blocking scenario that the GAME failed still exits 0 — read
+means the scenario is wrong, not the game. A false `require` field gives it, and so does a
+failure on both ROMs. It is returned for a blocking scenario and for a scenario that is not
+blocking. A non-blocking scenario that the GAME failed still exits 0 — read
 the `verdict` field, never the exit code, for evidence scenarios.
 
 A scenario error during a run does not stop the run (#507). This covers an unknown symbol, an

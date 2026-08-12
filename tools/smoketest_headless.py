@@ -96,6 +96,21 @@ def resolve_exit_code(results):
     return EXIT_PASS
 
 
+def verdict_for(failure, ref_failure):
+    """The verdict override for one scenario run, or None for the default.
+
+    A false precondition is a defect in the scenario, so it never reads as a
+    game failure — and it needs no reference ROM to say so (R4).
+    """
+    if failure is None:
+        return None
+    if failure.kind == "precondition":
+        return "scenario-invalid"
+    if ref_failure is not None:
+        return "scenario-invalid"
+    return None
+
+
 def write_combined_results(results, out_dir):
     """One file holding every scenario outcome (R15). Returns its path."""
     os.makedirs(out_dir, exist_ok=True)
@@ -119,6 +134,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ref-rom",       default=None, dest="ref_rom")
     p.add_argument("--map",           default=str(root / "build" / "nuke-raider.map"))
     p.add_argument("--noi",           default=str(root / "build" / "nuke-raider.noi"))
+    p.add_argument("--debug-noi",
+                   default=str(root / "build" / "debug" / "nuke-raider.noi"),
+                   dest="debug_noi",
+                   help="symbol file of the debug ROM. It is the only place "
+                        "the state-machine variables are visible. Build it "
+                        "with 'make build-debug'.")
     p.add_argument("--manifest",      default=str(root / "build" / "game-manifest.json"))
     p.add_argument("--library",       default=str(root / "tools" / "scenarios"))
     p.add_argument("--out-dir",       default=default_out_dir(),
@@ -153,6 +174,7 @@ def build_result(scenario_name, ctx, failure=None, divergence=None,
             "action":  failure.action,
             "kind":    failure.kind,
             "message": failure.message,
+            "context": getattr(failure, "context", None),
         },
         "divergence": divergence,
         "artifacts": {"screenshots": list(ctx.screenshots)},
@@ -176,7 +198,8 @@ def _load_manifest(path):
         return json.load(f)
 
 
-def run_one(rom, scenario, args, symbols, manifest, out_dir, tag=""):
+def run_one(rom, scenario, args, symbols, manifest, out_dir, tag="",
+           state_table=None):
     """Run one scenario against one ROM. Returns (ctx, failure_or_None)."""
     from pyboy import PyBoy
 
@@ -188,6 +211,7 @@ def run_one(rom, scenario, args, symbols, manifest, out_dir, tag=""):
         trace_every=args.trace_every,
         freeze_frames=args.freeze_frames,
         default_out=os.path.join(out_dir, f"final{tag}.png"),
+        state_table=state_table,
     )
     emu = PyBoy(rom, window="null", sound_emulated=False)
     failure = None
@@ -201,6 +225,16 @@ def run_one(rom, scenario, args, symbols, manifest, out_dir, tag=""):
         # then treats it exactly like an assertion failure.
         failure = exc if isinstance(exc, ps.StepFailure) else ps.StepFailure(
             ctx.step, "scenario", str(exc), ctx.action)
+        if failure.context is None:
+            # A ScenarioError escapes ps.run() entirely, so nothing has
+            # attached a context to the failure we just wrapped it into
+            # (unlike a StepFailure, which run() already annotated before
+            # re-raising it). Build one here — guarded, so a failure to
+            # build the context can never mask the original error.
+            try:
+                failure.context = ctx.failure_context(emu, failure)
+            except Exception:
+                pass
         try:
             ctx.capture(emu, os.path.join(out_dir, f"failure{tag}.png"))
         except Exception:
@@ -226,6 +260,9 @@ def _report(result, as_json):
     if result["failure"]:
         f = result["failure"]
         print(f"    step {f['step']} ({f['action']}) {f['kind']}: {f['message']}")
+        block = f.get("context") or {}
+        if block.get("hint"):
+            print(f"    hint: {block['hint']}")
     if result["divergence"]:
         d = result["divergence"]
         print(f"    first divergence: step {d['step']} frame {d['frame']} "
@@ -239,6 +276,14 @@ def main() -> int:
         print(f"ROM not found: {args.rom} (build first with 'make')", file=sys.stderr)
         return EXIT_USAGE
 
+    symbols = ps.load_symbols(args.manifest, args.noi, args.map,
+                              debug_noi_path=args.debug_noi)
+    state_table = ps.load_state_table(args.noi)
+    if not state_table:
+        state_table = ps.load_state_table(args.debug_noi)
+    state_readable = bool(state_table) and all(
+        name in symbols for name in ('_sm_depth', '_sm_slot_src'))
+
     try:
         manifest = _load_manifest(args.manifest)
         names = ([os.path.splitext(os.path.basename(p))[0]
@@ -248,30 +293,34 @@ def main() -> int:
             print(f"No scenarios found in {args.library}", file=sys.stderr)
             return EXIT_USAGE
         scenarios = [ps.load_scenario(_resolve_scenario_path(n, args.library),
-                                      library_dir=args.library) for n in names]
+                                      library_dir=args.library,
+                                      state_names=set(state_table))
+                     for n in names]
+        for scenario in scenarios:
+            ps.validate_state_support(scenario["steps"], state_readable)
     except ps.ScenarioError as exc:
         print(f"Scenario error: {exc}", file=sys.stderr)
         return EXIT_USAGE
-
-    symbols = ps.load_symbols(args.manifest, args.noi, args.map)
 
     results = []
     for scenario in scenarios:
         out_dir = os.path.join(args.out_dir, scenario["name"])
         os.makedirs(out_dir, exist_ok=True)
         rebase_screenshots(scenario["steps"], out_dir)
-        ctx, failure = run_one(args.rom, scenario, args, symbols, manifest, out_dir)
-        divergence, verdict = None, None
+        ctx, failure = run_one(args.rom, scenario, args, symbols, manifest,
+                               out_dir, state_table=state_table)
+        divergence, ref_failure = None, None
 
         if args.ref_rom:
             if not os.path.exists(args.ref_rom):
                 print(f"Reference ROM not found: {args.ref_rom}", file=sys.stderr)
                 return EXIT_USAGE
             ref_ctx, ref_failure = run_one(args.ref_rom, scenario, args, symbols,
-                                           manifest, out_dir, tag="-ref")
+                                           manifest, out_dir, tag="-ref",
+                                           state_table=state_table)
             divergence = ps.diff_traces(ctx.trace, ref_ctx.trace)
-            if failure is not None and ref_failure is not None:
-                verdict = "scenario-invalid"
+
+        verdict = verdict_for(failure, ref_failure)
 
         result = build_result(scenario["name"], ctx, failure=failure,
                               divergence=divergence, verdict=verdict,

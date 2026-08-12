@@ -19,11 +19,20 @@ _DEF = re.compile(r'^DEF\s+(_\w+)\s+(0x[0-9A-Fa-f]+)', re.M)
 # The three names the spec calls out, plus every mutable file-scope variable in
 # src/beam.c. beam.c is the case that made this work necessary: the LASER
 # feature (#430) could not be observed by its own evidence scenario.
+#
+# This list had drifted: `setUp` skips the whole module unless BOTH symbol
+# files exist, and CI builds only the release ROM, so nothing here ran there.
+# The #582 beam refactor renamed `s_cell_tx`/`s_cell_ty`/`s_cell_count` out of
+# existence without anyone noticing. Building the debug ROM for #589's
+# evidence run is what finally exercised this test and exposed the drift.
 REQUIRED = [
     '_ld_weapon1', '_ld_unlock_mask', '_sm_depth',
     '_beam_tile_base', '_s_equipped', '_s_cooldown', '_s_dmg_window',
     '_s_vis_frames', '_s_dirty', '_s_axis', '_s_x0', '_s_x1', '_s_y0', '_s_y1',
-    '_s_cell_tx', '_s_cell_ty', '_s_cell_count', '_s_lane_tile', '_s_cell_buf',
+    '_s_lane_px', '_s_step', '_s_nose', '_s_lo_tile', '_s_count',
+    '_s_drawn_lo', '_s_drawn_count', '_s_lane_tile', '_s_lane_repair',
+    '_s_cast_memo_ok', '_s_cast_nose', '_s_cast_vis_lo', '_s_cast_vis_hi',
+    '_s_cast_n', '_s_cast_lo', '_s_cell_buf',
 ]
 
 

@@ -131,6 +131,34 @@ class TestScenarioLibrary(unittest.TestCase):
                 text = f.read()
             self.assertNotIn('build/smoketest', text, name)
 
+    def test_no_library_scenario_carries_a_require_or_a_state_action(self):
+        """Two reasons neither belongs in a scenario shipped in this library.
+
+        `resolve_exit_code` computes the `scenario-invalid` verdict without
+        consulting `blocking`, so a false `require` on ANY library scenario —
+        blocking or not — can gate the whole `--all` run. And `assert_state`
+        / `wait_state` need the debug symbol file, which nothing in the build
+        pipeline produces, so a library scenario using them would reject the
+        whole library at the pre-flight check.
+
+        `include` steps are read raw here, not inlined — the raw `steps` list
+        of every file in the library is still exactly what this asserts over,
+        since every include target is itself one of these same files.
+        """
+        library = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), 'tools', 'scenarios')
+        for name in sorted(os.listdir(library)):
+            if not name.endswith('.json'):
+                continue
+            with open(os.path.join(library, name)) as f:
+                data = json.load(f)
+            steps = data['steps'] if isinstance(data, dict) else data
+            for i, step in enumerate(steps):
+                with self.subTest(file=name, step=i):
+                    self.assertNotIn('require', step)
+                    self.assertNotIn(step.get('action'),
+                                     ('assert_state', 'wait_state'))
+
 
 class _ZeroMemory(dict):
     """PyBoy's memory view reads as zero everywhere the test does not set it."""
@@ -276,6 +304,21 @@ class ScenarioErrorDuringRun(unittest.TestCase):
         self.assertEqual(self.run_main('--scenario', 'e-assert'), sh.EXIT_FAIL)
         self.assertEqual(self.read_result('e-assert')['failure']['kind'], 'assert')
 
+    # --- R11 (final review Finding 2) -------------------------------------
+    def test_a_scenario_kind_failure_carries_a_context_and_its_own_hint(self):
+        """A mid-run ScenarioError (#507) is wrapped into a fresh StepFailure
+        OUTSIDE ps.run()'s except clause, so nothing ever attached a context
+        to it. R11 requires every failure record to hold one.
+        """
+        self.write_scenario('a-bad', dict(BAD, blocking=True))
+        self.run_main('--scenario', 'a-bad')
+        failure = self.read_result('a-bad')['failure']
+        self.assertIsNotNone(failure['context'])
+        self.assertEqual(
+            failure['context']['hint'],
+            "the scenario names something the build does not carry, "
+            "so the scenario is wrong, not the game")
+
     # --- R5: the differential path keeps the verdict it has today --------
     def test_a_scenario_error_on_both_roms_stays_scenario_invalid(self):
         """Global Constraints: the --ref-rom promotion is not bypassed.
@@ -291,6 +334,165 @@ class ScenarioErrorDuringRun(unittest.TestCase):
         code = self.run_main('--scenario', 'a-bad', '--ref-rom', ref)
         self.assertEqual(code, sh.EXIT_SCENARIO_INVALID)
         self.assertEqual(self.read_result('a-bad')['verdict'], 'scenario-invalid')
+
+
+class FakeFailure:
+    def __init__(self, kind, context=None):
+        self.step, self.action, self.kind = 0, 'advance', kind
+        self.message = kind
+        self.context = context
+
+
+class FakeCtx:
+    def __init__(self):
+        self.step, self.frame, self.screenshots = 0, 10, []
+
+
+class TestPreconditionVerdict(unittest.TestCase):
+
+    def test_a_precondition_failure_is_scenario_invalid_with_one_rom(self):
+        self.assertEqual(sh.verdict_for(FakeFailure('precondition'), None),
+                         'scenario-invalid')
+
+    def test_a_precondition_failure_never_reads_as_a_game_failure(self):
+        self.assertNotEqual(sh.verdict_for(FakeFailure('precondition'), None),
+                            'fail')
+
+    def test_an_ordinary_failure_keeps_the_default_verdict(self):
+        self.assertIsNone(sh.verdict_for(FakeFailure('stale-symbol'), None))
+
+    def test_two_failing_roms_are_still_scenario_invalid(self):
+        self.assertEqual(
+            sh.verdict_for(FakeFailure('stale-symbol'),
+                           FakeFailure('stale-symbol')),
+            'scenario-invalid')
+
+    def test_no_failure_has_no_verdict_override(self):
+        self.assertIsNone(sh.verdict_for(None, None))
+
+    def test_the_exit_code_for_a_precondition_failure_is_three(self):
+        """AC1, through the code that decides the process result."""
+        verdict = sh.verdict_for(FakeFailure('precondition'), None)
+        self.assertEqual(
+            sh.resolve_exit_code([{'verdict': verdict, 'blocking': True}]),
+            sh.EXIT_SCENARIO_INVALID)
+
+
+class TestFailureContextIsSerialised(unittest.TestCase):
+
+    def test_the_context_reaches_the_result_record(self):
+        block = {'state_at_start': 'playing', 'hint': 'the game left it'}
+        result = sh.build_result('x', FakeCtx(),
+                                 failure=FakeFailure('stale-symbol', block))
+        self.assertEqual(result['failure']['context'], block)
+
+    def test_a_failure_without_a_context_serialises_null(self):
+        result = sh.build_result('x', FakeCtx(), failure=FakeFailure('assert'))
+        self.assertIsNone(result['failure']['context'])
+
+    def test_a_passing_result_has_no_failure_block(self):
+        self.assertIsNone(sh.build_result('x', FakeCtx())['failure'])
+
+
+class TestDebugNoi(unittest.TestCase):
+
+    def test_the_default_points_at_the_debug_build(self):
+        args = sh.build_parser().parse_args([])
+        self.assertTrue(args.debug_noi.replace('\\', '/')
+                        .endswith('build/debug/nuke-raider.noi'))
+
+    def test_it_can_be_overridden(self):
+        self.assertEqual(
+            sh.build_parser().parse_args(['--debug-noi', 'X.noi']).debug_noi,
+            'X.noi')
+
+    def test_a_missing_debug_file_contributes_nothing_and_raises_nothing(self):
+        import pyboy_scenario as ps
+        self.assertEqual(ps.load_symbols(None, None, None,
+                                         debug_noi_path='absent.noi'), {})
+
+
+class TestPreflightChecksAreNotBypassable(unittest.TestCase):
+    """Pins the two lines the brief singled out as easy silent reverts:
+    `state_names=set(state_table)` weakening to `set(state_table) or None`,
+    and the `validate_state_support` loop moving after `run_one`.
+
+    `build/probe_ac7.py` (the brief's own falsification harness) lives
+    under `build/`, which is gitignored, so nothing committed noticed
+    either revert. With an EMPTY state table both gates fire on an unknown
+    name, so "exit code 2" alone proves nothing — these tests discriminate
+    on which gate answered (its exact message) and on whether the emulator
+    was ever reached, using a real subprocess and a real `pyboy` import so
+    a wrongly-reached PyBoy on a garbage ROM cannot be mistaken for success
+    by a permissive fake.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.rom = os.path.join(self.dir, 'rom.gb')
+        with open(self.rom, 'wb') as f:
+            f.write(b'\x00' * 64)                  # exists, not a real ROM
+        self.manifest = os.path.join(self.dir, 'game-manifest.json')
+        with open(self.manifest, 'w') as f:
+            json.dump({'symbols': {}}, f)
+        self.absent_noi = os.path.join(self.dir, 'absent.noi')
+        self.absent_debug_noi = os.path.join(self.dir, 'absent-debug.noi')
+        self.absent_map = os.path.join(self.dir, 'absent.map')
+        self.script = os.path.join(os.path.dirname(__file__), '..',
+                                   'tools', 'smoketest_headless.py')
+
+    def write_scenario(self, stem, state):
+        path = os.path.join(self.dir, stem + '.json')
+        with open(path, 'w') as f:
+            json.dump({'name': stem, 'blocking': True, 'steps': [
+                {'action': 'assert_state', 'state': state}]}, f)
+        return path
+
+    def run_smoketest(self, scenario_path, noi):
+        return subprocess.run(
+            [sys.executable, self.script, '--scenario', scenario_path,
+             '--rom', self.rom, '--manifest', self.manifest,
+             '--noi', noi, '--debug-noi', self.absent_debug_noi,
+             '--map', self.absent_map],
+            capture_output=True, text=True, timeout=60)
+
+    def test_an_unknown_state_name_is_named_by_the_name_check(self):
+        """Test A: an empty state table must still reject 'flying' by name.
+
+        `state_names=set(state_table)` (never `or None`) is what makes an
+        empty table still say "no" to a named state, instead of silently
+        skipping the name check and letting `validate_state_support`
+        answer with a message that never mentions the state at all.
+        """
+        scenario = self.write_scenario('bad-name', 'flying')
+        proc = self.run_smoketest(scenario, self.absent_noi)
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn('flying', proc.stderr)
+        self.assertIn('known:', proc.stderr)
+        self.assertNotIn('build-debug', proc.stderr)
+
+    def test_the_state_support_check_runs_before_the_emulator_starts(self):
+        """Test B: validate_state_support gates before run_one/PyBoy.
+
+        A hand-written .noi carries just enough to make 'playing' a known
+        state (so the name check passes and cannot be the thing catching
+        this), while `_sm_depth`/`_sm_slot_src` stay unresolved (--debug-noi
+        and --map both absent) so state_readable is false and only
+        validate_state_support can object. The ROM is a garbage file, so if
+        this check ever moved after run_one, PyBoy would be constructed on
+        it and this test would see a crash or a different exit code instead
+        of a clean, pre-flight exit 2.
+        """
+        noi = os.path.join(self.dir, 'release.noi')
+        with open(noi, 'w') as f:
+            f.write('DEF ___bank_state_playing 0x1\n'
+                    'DEF _state_playing 0x17EED\n')
+        scenario = self.write_scenario('good-name', 'playing')
+        proc = self.run_smoketest(scenario, noi)
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn('build-debug', proc.stderr)
+        self.assertNotIn('Traceback', proc.stderr)
 
 
 if __name__ == '__main__':

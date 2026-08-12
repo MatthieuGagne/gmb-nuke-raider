@@ -261,7 +261,7 @@ test-tools: hooks
 hooks:
 	python tools/install_hooks.py .
 
-# Headless ROM liveness gate — runs every scenario in tools/scenarios/.
+# Headless ROM still-alive gate — runs every scenario in tools/scenarios/.
 # Blocking scenarios fail the target; evidence scenarios only WARN.
 smoketest:
 	python tools/smoketest_headless.py --all

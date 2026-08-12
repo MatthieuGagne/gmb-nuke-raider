@@ -320,6 +320,21 @@ class ChangingEmu(FakeEmu):
         self.memory[0xC247] = (val >> 8) & 0xFF
 
 
+class TickingSymbolEmu(FakeEmu):
+    """A FakeEmu whose watched byte advances on every tick, while the screen
+    payload never changes. It is the fixture that separates "the symbol moved"
+    from "the screen moved"."""
+
+    def __init__(self, address, memory=None, frames=None):
+        super().__init__(memory=dict(memory or {}), frames=frames)
+        self._address = address
+
+    def tick(self, n=1, render=False):
+        for _ in range(int(n)):
+            super().tick(1, render=render)
+            self.memory[self._address] = (self.memory[self._address] + 1) & 0xFF
+
+
 class TestAssertMemory(unittest.TestCase):
 
     def test_passes_on_equal(self):
@@ -376,7 +391,7 @@ class TestAssertLive(unittest.TestCase):
         with self.assertRaises(ps.StepFailure) as cm:
             ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
                           "screen": True, "frames": 20}], ctx)
-        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertEqual(cm.exception.kind, 'stale-symbol')
         self.assertIn('_px', cm.exception.message)
 
     def test_fails_when_screen_is_frozen(self):
@@ -385,7 +400,7 @@ class TestAssertLive(unittest.TestCase):
         with self.assertRaises(ps.StepFailure) as cm:
             ps.run(emu, [{"action": "assert_live", "symbols": ["_px"],
                           "screen": True, "frames": 20}], ctx)
-        self.assertEqual(cm.exception.kind, 'liveness')
+        self.assertEqual(cm.exception.kind, 'stale-screen')
         self.assertIn('screen', cm.exception.message)
 
     def test_screen_check_can_be_disabled(self):
@@ -483,11 +498,11 @@ class TestSmoketestResults(unittest.TestCase):
     def test_failing_result_records_step_and_kind(self):
         st = self._mod()
         ctx = ps.RunContext(symbols={})
-        fail = ps.StepFailure(19, 'liveness', '_px unchanged over 60 frames', 'assert_live')
+        fail = ps.StepFailure(19, 'stale-symbol', '_px unchanged over 60 frames', 'assert_live')
         res = st.build_result('generic-smoke', ctx, failure=fail)
         self.assertEqual(res['verdict'], 'fail')
         self.assertEqual(res['failure']['step'], 19)
-        self.assertEqual(res['failure']['kind'], 'liveness')
+        self.assertEqual(res['failure']['kind'], 'stale-symbol')
         self.assertEqual(res['failure']['action'], 'assert_live')
 
     def test_exit_codes_are_zero_one_two(self):
@@ -535,6 +550,775 @@ class TestDiffTraces(unittest.TestCase):
         a = [rec(10, 0, {"_hp": 8, "_px": 5})]
         b = [rec(10, 0, {"_hp": 8})]
         self.assertIsNone(ps.diff_traces(a, b))
+
+
+# Fixture WRAM map. The literals below match the real debug build:
+#   _stack 0xC176 (StateEntry[2], stride 7), _sm_slot_src 0xC184 (2 bytes per
+#   slot), _sm_depth 0xC5E9. Slot 1 is where a race actually runs, because the
+#   canonical path is overmap(0) -> prerace(+1) -> playing(1).
+SM_DEPTH, SM_SLOT_SRC, SM_STACK = 0xC5E9, 0xC184, 0xC176
+
+NOI_STATES = (
+    'DEF ___bank_state_hub 0x0\n'
+    'DEF ___bank_state_overmap 0x0\n'
+    'DEF ___bank_state_playing 0x1\n'
+    'DEF ___bank_state_prerace 0x3\n'
+    'DEF ___bank_state_results 0x3\n'
+    'DEF ___bank_state_title 0x3\n'
+    'DEF ___func_state_playing 0x177E0\n'
+    'DEF _state_hub 0xB9C\n'
+    'DEF _state_overmap 0x1014\n'
+    'DEF _state_playing 0x17EED\n'
+    'DEF _state_prerace 0x34673\n'
+    'DEF _state_results 0x35620\n'
+    'DEF _state_title 0x35704\n'
+    'DEF _state_push 0x136A\n'
+    'DEF _state_pop 0x1397\n'
+    'DEF _state_replace 0x13EC\n'
+    'DEF _state_manager_init 0x1341\n'
+    'DEF _state_manager_update 0x1346\n'
+    'DEF _state_results_set_earned 0x3557C\n'
+)
+
+
+def state_symbols():
+    return {'_sm_depth': SM_DEPTH, '_sm_slot_src': SM_SLOT_SRC,
+            '_stack': SM_STACK}
+
+
+def state_table():
+    return {'hub': (0, 0x0B9C), 'overmap': (0, 0x1014),
+            'playing': (1, 0x7EED), 'prerace': (3, 0x4673),
+            'results': (3, 0x5620), 'title': (3, 0x5704)}
+
+
+def state_memory(bank, ptr, depth=1):
+    """WRAM bytes that name one state at slot depth-1. Literal offsets."""
+    if depth == 1:
+        return {SM_DEPTH: 1,
+                0xC184: ptr & 0xFF, 0xC185: (ptr >> 8) & 0xFF,   # slot 0 ptr
+                0xC176: bank}                                     # slot 0 bank
+    return {SM_DEPTH: 2,
+            0xC184: 0xED, 0xC185: 0x7E,                           # slot 0 ptr
+            0xC176: 1,                                            # slot 0 bank
+            0xC186: ptr & 0xFF, 0xC187: (ptr >> 8) & 0xFF,        # slot 1 ptr
+            0xC17D: bank}                                         # slot 1 bank
+
+
+def emu_in_state(bank, ptr, depth=1):
+    return FakeEmu(memory=state_memory(bank, ptr, depth))
+
+
+class TestStateTable(unittest.TestCase):
+
+    def test_every_state_object_is_listed_with_its_bank(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, NOI_STATES)
+            self.assertEqual(ps.load_state_table(noi), state_table())
+
+    def test_state_manager_functions_are_not_states(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, NOI_STATES)
+            table = ps.load_state_table(noi)
+            for name in ('push', 'pop', 'replace', 'manager_init',
+                         'manager_update', 'results_set_earned'):
+                self.assertNotIn(name, table)
+
+    def test_a_bank_symbol_that_disagrees_with_the_flat_address_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            noi = os.path.join(d, 'rom.noi')
+            write(noi, 'DEF ___bank_state_bogus 0x2\nDEF _state_bogus 0x17EED\n')
+            self.assertEqual(ps.load_state_table(noi), {})
+
+    def test_a_missing_file_gives_an_empty_table(self):
+        self.assertEqual(ps.load_state_table('nope.noi'), {})
+
+    def test_names_normalize_to_the_short_form(self):
+        self.assertEqual(ps.normalize_state_name('_state_playing'), 'playing')
+        self.assertEqual(ps.normalize_state_name('state_playing'), 'playing')
+        self.assertEqual(ps.normalize_state_name('playing'), 'playing')
+
+
+class TestReadState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_a_banked_state_is_named(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(1, 0x7EED)), 'playing')
+
+    def test_a_bank_zero_state_is_named(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(0, 0x1014)), 'overmap')
+
+    def test_slot_one_is_read_at_the_right_offsets(self):
+        """Depth 2 is the depth a race runs at. This is the test that fails
+        when STATE_PTR_WIDTH or STATE_ENTRY_STRIDE is wrong."""
+        self.assertEqual(self.ctx().read_state(emu_in_state(3, 0x5620, depth=2)),
+                         'results')
+
+    def test_depth_zero_has_no_state(self):
+        self.assertIsNone(self.ctx().read_state(FakeEmu(memory={SM_DEPTH: 0})))
+
+    def test_a_wrong_bank_byte_still_resolves_by_address(self):
+        self.assertEqual(self.ctx().read_state(emu_in_state(0xFF, 0x7EED)),
+                         'playing')
+
+    def test_a_colliding_address_needs_the_bank_to_decide(self):
+        table = {'alpha': (1, 0x4000), 'beta': (2, 0x4000)}
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=table)
+        self.assertEqual(ctx.read_state(emu_in_state(2, 0x4000)), 'beta')
+
+    def test_a_colliding_address_with_no_bank_match_is_unknown(self):
+        table = {'alpha': (1, 0x4000), 'beta': (2, 0x4000)}
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=table)
+        self.assertIsNone(ctx.read_state(emu_in_state(7, 0x4000)))
+
+    def test_state_is_unreadable_without_the_debug_symbols(self):
+        ctx = ps.RunContext(symbols={'_hp': 0xC535}, state_table=state_table())
+        self.assertFalse(ctx.state_readable())
+        self.assertIsNone(ctx.read_state(FakeEmu()))
+
+    def test_state_is_unreadable_without_a_state_table(self):
+        self.assertFalse(
+            ps.RunContext(symbols=state_symbols(), state_table={}).state_readable())
+
+
+class TestRequire(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=dict(state_symbols(), _hp=0xC535),
+                             state_table=state_table())
+
+    def test_a_true_state_requirement_lets_the_action_run(self):
+        ctx = self.ctx()
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'advance', 'frames': 3,
+                 'require': {'state': 'playing'}}], ctx)
+        self.assertEqual(ctx.frame, 3)
+
+    def test_a_false_state_requirement_is_a_precondition_failure(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5620),
+                   [{'action': 'advance', 'frames': 3,
+                     'require': {'state': 'playing'}}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'precondition')
+        self.assertIn('playing', caught.exception.message)
+        self.assertIn('results', caught.exception.message)
+
+    def test_a_false_requirement_stops_the_action_before_it_runs(self):
+        emu = emu_in_state(3, 0x5620)
+        with self.assertRaises(ps.StepFailure):
+            ps.run(emu, [{'action': 'advance', 'frames': 50,
+                          'require': {'state': 'playing'}}], self.ctx())
+        self.assertEqual(emu.ticks, 0)
+
+    def test_the_long_state_spelling_is_accepted(self):
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'advance', 'frames': 1,
+                 'require': {'state': '_state_playing'}}], self.ctx())
+
+    def test_a_false_memory_requirement_is_a_precondition_failure(self):
+        emu = emu_in_state(1, 0x7EED)
+        emu.memory[0xC535] = 0
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'advance', 'frames': 1,
+                          'require': {'address': '_hp', 'op': 'gt',
+                                      'value': 0}}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'precondition')
+        self.assertIn('_hp', caught.exception.message)
+
+    def test_a_satisfied_memory_requirement_lets_the_action_run(self):
+        emu = emu_in_state(1, 0x7EED)
+        emu.memory[0xC535] = 5
+        ctx = self.ctx()
+        ps.run(emu, [{'action': 'advance', 'frames': 2,
+                      'require': {'address': '_hp', 'op': 'gt',
+                                  'value': 0}}], ctx)
+        self.assertEqual(ctx.frame, 2)
+
+    def test_a_memory_requirement_needs_no_state_reader(self):
+        emu = FakeEmu(memory={0xC535: 5})
+        ctx = ps.RunContext(symbols={'_hp': 0xC535})
+        ps.run(emu, [{'action': 'advance', 'frames': 1,
+                      'require': {'address': '_hp', 'op': 'gt',
+                                  'value': 0}}], ctx)
+        self.assertEqual(ctx.frame, 1)
+
+
+class TestRequireValidation(unittest.TestCase):
+
+    def load(self, step, state_names=None):
+        return ps.load_scenario([step], state_names=state_names)
+
+    def test_a_require_that_is_not_an_object_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1, 'require': 'playing'})
+
+    def test_an_unknown_require_field_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'stat': 'playing'}})
+
+    def test_an_empty_require_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1, 'require': {}})
+
+    def test_an_address_without_a_value_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'address': '_hp'}})
+
+    def test_an_unknown_operator_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'address': '_hp', 'value': 0, 'op': 'wat'}})
+
+    def test_an_unknown_state_name_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError) as caught:
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'state': 'flying'}},
+                      state_names=set(state_table()))
+        self.assertIn('flying', str(caught.exception))
+
+    def test_a_known_state_name_loads(self):
+        self.load({'action': 'advance', 'frames': 1,
+                   'require': {'state': 'playing'}},
+                  state_names=set(state_table()))
+
+    def test_an_empty_state_name_set_still_rejects_a_state(self):
+        """An empty set is not the same as 'do not check' — a missing symbol
+        file must not switch AC7 off."""
+        with self.assertRaises(ps.ScenarioError):
+            self.load({'action': 'advance', 'frames': 1,
+                       'require': {'state': 'playing'}}, state_names=set())
+
+    def test_state_names_are_not_checked_when_none_is_passed(self):
+        self.load({'action': 'advance', 'frames': 1,
+                   'require': {'state': 'flying'}})
+
+    def test_require_on_an_include_step_is_a_usage_error(self):
+        """`_inline` rebuilds the step list and drops every other key, so a
+        `require` here would vanish without a word."""
+        with tempfile.TemporaryDirectory() as d:
+            write(os.path.join(d, 'inner.json'),
+                  json.dumps([{'action': 'advance', 'frames': 1}]))
+            with self.assertRaises(ps.ScenarioError) as caught:
+                ps.load_scenario([{'action': 'include', 'name': 'inner',
+                                   'require': {'state': 'playing'}}],
+                                 library_dir=d)
+            self.assertIn('require', str(caught.exception))
+
+
+class TestStateSupport(unittest.TestCase):
+
+    def test_a_state_requirement_without_the_reader_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError) as caught:
+            ps.validate_state_support(
+                [{'action': 'advance', 'frames': 1,
+                  'require': {'state': 'playing'}}], False)
+        self.assertIn('build-debug', str(caught.exception))
+
+    def test_a_state_action_without_the_reader_is_a_usage_error(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.validate_state_support(
+                [{'action': 'assert_state', 'state': 'playing'}], False)
+
+    def test_a_memory_requirement_needs_no_reader(self):
+        ps.validate_state_support(
+            [{'action': 'advance', 'frames': 1,
+              'require': {'address': '_hp', 'value': 0, 'op': 'gt'}}], False)
+
+    def test_a_state_requirement_with_the_reader_is_accepted(self):
+        ps.validate_state_support(
+            [{'action': 'advance', 'frames': 1,
+              'require': {'state': 'playing'}}], True)
+
+
+class StatefulEmu(FakeEmu):
+    """A FakeEmu that walks a scripted list of states as it ticks.
+
+    `schedule` maps a tick count to a (bank, ptr) pair. The greatest key at or
+    below the current tick wins, so the game changes under the harness exactly
+    as it does on hardware.
+    """
+
+    def __init__(self, schedule, depth=1, extra=None):
+        super().__init__(memory=dict(extra or {}))
+        self._schedule = dict(schedule)
+        self._depth = depth
+        self._apply(0)
+
+    def _apply(self, tick):
+        keys = [k for k in self._schedule if k <= tick]
+        if not keys:
+            return
+        bank, ptr = self._schedule[max(keys)]
+        self.memory.update(state_memory(bank, ptr, self._depth))
+
+    def tick(self, n=1, render=False):
+        for _ in range(int(n)):
+            super().tick(1, render=render)
+            self._apply(self.ticks)
+
+
+class TestStatefulEmuFixture(unittest.TestCase):
+    """The fixture is machinery the other tests trust. Prove it first."""
+
+    def test_a_schedule_that_starts_late_does_not_raise(self):
+        emu = StatefulEmu({5: (1, 0x7EED)})
+        emu.tick(4)
+        emu.tick(1)
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        self.assertEqual(ctx.read_state(emu), 'playing')
+
+
+class TestAssertState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_it_passes_in_the_expected_state(self):
+        ps.run(emu_in_state(1, 0x7EED),
+               [{'action': 'assert_state', 'state': 'playing'}], self.ctx())
+
+    def test_it_fails_after_the_race_ends_and_names_the_real_state(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5620),
+                   [{'action': 'assert_state', 'state': 'playing'}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'state')
+        self.assertIn('results', caught.exception.message)
+
+    def test_the_state_field_is_required(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'assert_state'}])
+
+
+class TestWaitState(unittest.TestCase):
+
+    def ctx(self):
+        return ps.RunContext(symbols=state_symbols(), state_table=state_table())
+
+    def test_it_reaches_the_target_state_inside_the_budget(self):
+        emu = StatefulEmu({0: (3, 0x5704), 25: (1, 0x7EED)})
+        ctx = self.ctx()
+        ps.run(emu, [{'action': 'wait_state', 'state': 'playing',
+                      'max_frames': 200}], ctx)
+        self.assertLessEqual(ctx.frame, 200)
+        self.assertEqual(ctx.read_state(emu), 'playing')
+
+    def test_it_returns_at_once_when_already_there(self):
+        emu = emu_in_state(1, 0x7EED)
+        ps.run(emu, [{'action': 'wait_state', 'state': 'playing'}], self.ctx())
+        self.assertEqual(emu.ticks, 0)
+
+    def test_it_times_out_and_names_the_state_it_found(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu_in_state(3, 0x5704),
+                   [{'action': 'wait_state', 'state': 'playing',
+                     'max_frames': 12}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'timeout')
+        self.assertIn('title', caught.exception.message)
+
+    def test_the_state_field_is_required(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'wait_state'}])
+
+
+class TestLivenessSplit(unittest.TestCase):
+
+    def dead_emu(self):
+        """One frame payload for every tick: the screen hash never changes."""
+        return FakeEmu(memory={0xC24B: 7, 0xC24C: 0}, frames=[[1]])
+
+    def live_screen_emu(self):
+        return FakeEmu(memory={0xC24B: 7, 0xC24C: 0},
+                       frames=[[i % 7] for i in range(200)])
+
+    def ctx(self):
+        return ps.RunContext(symbols={'_px': 0xC24B})
+
+    def test_a_stale_symbol_has_the_kind_stale_symbol(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.live_screen_emu(),
+                   [{'action': 'assert_changes', 'symbols': ['_px'],
+                     'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-symbol')
+        self.assertIn('_px', caught.exception.message)
+
+    def test_a_stale_screen_has_the_kind_stale_screen(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
+        self.assertIn('screen', caught.exception.message)
+
+    def test_the_two_messages_differ(self):
+        symbol_msg = screen_msg = None
+        try:
+            ps.run(self.live_screen_emu(),
+                   [{'action': 'assert_changes', 'symbols': ['_px'],
+                     'frames': 5}], self.ctx())
+        except ps.StepFailure as exc:
+            symbol_msg = exc.message
+        try:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_screen_changes', 'frames': 5}], self.ctx())
+        except ps.StepFailure as exc:
+            screen_msg = exc.message
+        self.assertIsNotNone(symbol_msg)
+        self.assertIsNotNone(screen_msg)
+        self.assertNotEqual(symbol_msg, screen_msg)
+
+    def test_assert_changes_ignores_a_frozen_screen(self):
+        """A live symbol behind a frozen screen must satisfy assert_changes.
+        This is the case that fails if assert_changes also checks the screen."""
+        emu = TickingSymbolEmu(0xC24B, memory={0xC24B: 0, 0xC24C: 0},
+                               frames=[[1]])
+        ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_px'],
+                      'frames': 5}], self.ctx())
+
+    def test_assert_live_still_reports_the_frozen_screen(self):
+        """Same fixture, assert_live: the screen half must still bite."""
+        emu = TickingSymbolEmu(0xC24B, memory={0xC24B: 0, 0xC24C: 0},
+                               frames=[[1]])
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_live', 'symbols': ['_px'],
+                          'frames': 5}], self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
+
+    def test_assert_screen_changes_ignores_symbols(self):
+        """A stale symbol must not fail assert_screen_changes. `live_screen_emu`
+        holds _px at 7 for the whole run, so a version that checked symbols
+        would raise stale-symbol here."""
+        ps.run(self.live_screen_emu(),
+               [{'action': 'assert_screen_changes', 'symbols': ['_px'],
+                 'frames': 5}], self.ctx())
+
+    def test_assert_live_reports_the_symbol_first(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_live', 'symbols': ['_px'], 'frames': 5}],
+                   self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-symbol')
+
+    def test_assert_live_reports_the_screen_when_no_symbol_is_watched(self):
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(self.dead_emu(),
+                   [{'action': 'assert_live', 'symbols': [], 'frames': 5}],
+                   self.ctx())
+        self.assertEqual(caught.exception.kind, 'stale-screen')
+
+    def test_assert_changes_requires_symbols(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'assert_changes'}])
+
+
+class TestTraceState(unittest.TestCase):
+
+    def test_every_sample_carries_the_state(self):
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table(),
+                            trace_every=2)
+        ps.run(emu_in_state(1, 0x7EED), [{'action': 'advance', 'frames': 6}], ctx)
+        self.assertTrue(ctx.trace)
+        for rec in ctx.trace:
+            self.assertEqual(rec['state'], 'playing')
+
+    def test_the_state_key_is_present_without_a_state_table(self):
+        ctx = ps.RunContext(symbols={}, trace_every=2)
+        ps.run(FakeEmu(memory={}), [{'action': 'advance', 'frames': 4}], ctx)
+        self.assertTrue(ctx.trace)
+        for rec in ctx.trace:
+            self.assertIsNone(rec['state'])
+
+    def test_a_state_change_during_an_action_carries_its_own_frame(self):
+        """The fast path must not collapse a change onto the last frame."""
+        emu = StatefulEmu({0: (1, 0x7EED), 10: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 30}], ctx)
+        self.assertEqual([(c['from'], c['to']) for c in ctx.state_changes],
+                         [('playing', 'results')])
+        self.assertEqual(ctx.state_changes[0]['frame'], 10)
+
+    def test_two_changes_in_one_action_are_both_recorded(self):
+        emu = StatefulEmu({0: (3, 0x5704), 5: (1, 0x7EED), 15: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 25}], ctx)
+        self.assertEqual([(c['frame'], c['to']) for c in ctx.state_changes],
+                         [(5, 'playing'), (15, 'results')])
+
+    def test_the_change_list_resets_at_every_action(self):
+        emu = StatefulEmu({0: (1, 0x7EED), 5: (3, 0x5620)})
+        ctx = ps.RunContext(symbols=state_symbols(), state_table=state_table())
+        ps.run(emu, [{'action': 'advance', 'frames': 10},
+                     {'action': 'advance', 'frames': 10}], ctx)
+        self.assertEqual(ctx.state_changes, [])
+        self.assertEqual(ctx.state_at_start, 'results')
+
+    def test_the_fast_path_still_runs_when_no_state_is_readable(self):
+        """The batched advance keeps screenshot.py fast.
+
+        `emu.rendered` is what separates the two paths, NOT `len(render_log)`:
+        `FakeEmu.tick` appends one entry per FRAME, so the log holds 40 entries
+        either way. The fast path honours `render_last` and renders exactly one
+        frame; the per-frame path renders only when a sample is due, and with
+        `trace_every=0` none ever is, so it renders zero.
+        """
+        emu = FakeEmu(memory={})
+        ctx = ps.RunContext(symbols={})
+        ps.run(emu, [{'action': 'advance', 'frames': 40}], ctx)
+        self.assertEqual(emu.ticks, 40)
+        self.assertEqual(ctx.frame, 40)
+        self.assertEqual(emu.rendered, 1)
+
+
+class TestFailureContext(unittest.TestCase):
+
+    SYMS = dict(_px=0xC24B, _py=0xC24D, _active_map_w=0xC5F1,
+                _active_map_h=0xC5F2, **state_symbols())
+
+    def car(self, px, py, w=20, h=100):
+        """Both bytes of each 16-bit symbol, plus the live map size."""
+        return {0xC24B: px & 0xFF, 0xC24C: (px >> 8) & 0xFF,
+                0xC24D: py & 0xFF, 0xC24E: (py >> 8) & 0xFF,
+                0xC5F1: w, 0xC5F2: h}
+
+    def racing(self, px, py, **kw):
+        mem = dict(state_memory(1, 0x7EED))
+        mem.update(self.car(px, py, **kw))
+        return mem
+
+    def test_a_state_change_is_reported_with_its_frame(self):
+        """AC5 shape: the race ends under the assertion."""
+        emu = StatefulEmu({0: (1, 0x7EED), 8: (3, 0x5620)},
+                          extra=self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 20}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_start'], 'playing')
+        self.assertEqual(block['state_at_failure'], 'results')
+        self.assertEqual(block['state_changes'],
+                         [{'frame': 8, 'from': 'playing', 'to': 'results'}])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+        self.assertIn('results', block['hint'])
+        self.assertIn('8', block['hint'])
+
+    def test_a_car_at_the_top_limit_is_reported_with_the_limit(self):
+        """AC4 shape: the car drives into the top limit and stops.
+
+        The car parks at py=1, not py=0: `vehicle_step_axis_y` rejects a move
+        that would go below the limit and keeps the old position, so on real
+        hardware the car stops strictly less than one step short of the edge,
+        almost never exactly on it (#589, found by the AC4 evidence run).
+        """
+        emu = FakeEmu(memory=self.racing(64, 1))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_changes'], [])
+        self.assertEqual(block['car'], {'px': 64, 'py': 1, 'tx': 8, 'ty': 0})
+        self.assertEqual(block['drive_limits']['y_min'], 0)
+        self.assertEqual(block['drive_limits']['y_max'], 100 * 8 - 16)
+        self.assertEqual(block['drive_limits']['source'], 'wram')
+        self.assertEqual(block['at_limit'], ['y_min'])
+        self.assertIn('y_min', block['hint'])
+
+    def test_the_tolerance_does_not_over_report(self):
+        """One full step away is not 'at' the limit; less than one step is.
+
+        Pins the MAX_STEP_PX boundary in both directions (#589).
+        """
+        emu = FakeEmu(memory=self.racing(64, 8))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertNotIn('y_min', caught.exception.context['at_limit'])
+
+        emu = FakeEmu(memory=self.racing(64, 7))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertIn('y_min', caught.exception.context['at_limit'])
+
+    def test_a_car_in_the_far_corner_names_both_limits(self):
+        emu = FakeEmu(memory=self.racing(144, 784))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 5}], ctx)
+        self.assertEqual(sorted(caught.exception.context['at_limit']),
+                         ['x_max', 'y_max'])
+
+    def test_a_state_change_that_ends_in_playing_still_omits_the_car(self):
+        """R12 keys off whether the state CHANGED, not where it landed.
+
+        This is the only shape that separates the two guard clauses: the state
+        moves during the action and is back in `playing` at the raise, so the
+        second clause admits it and only `not state_changes` closes the block.
+        """
+        emu = StatefulEmu({0: (3, 0x4673), 6: (1, 0x7EED)},
+                          extra=self.car(64, 0))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 20}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_failure'], 'playing')
+        self.assertEqual([(c['from'], c['to']) for c in block['state_changes']],
+                         [('prerace', 'playing')])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+
+    def test_a_failure_outside_a_race_reports_no_drive_limit(self):
+        """The loader sets the same map size for the overmap."""
+        mem = dict(state_memory(0, 0x1014))
+        mem.update(self.car(64, 0))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem, frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_at_failure'], 'overmap')
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+
+    def test_a_precondition_failure_carries_a_context(self):
+        mem = dict(state_memory(3, 0x5620))
+        mem.update(self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem),
+                   [{'action': 'advance', 'frames': 5,
+                     'require': {'state': 'playing'}}], ctx)
+        self.assertEqual(caught.exception.context['state_at_start'], 'results')
+        self.assertIn('scenario', caught.exception.context['hint'])
+
+    def test_a_stale_symbol_outside_the_race_names_the_state(self):
+        """AC5 shape: the race already ended before this action started.
+
+        The state change happened during the PREVIOUS action, so this one
+        starts and ends in `results` with an empty `state_changes` — the
+        `at_limit` branch also misses because the game is not racing. Without
+        the new branch this degrades to the generic fallback (#589).
+        """
+        mem = dict(state_memory(3, 0x5620))
+        mem.update(self.car(64, 300))
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=mem),
+                   [{'action': 'assert_changes', 'symbols': ['_py'],
+                     'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertEqual(block['state_changes'], [])
+        self.assertIsNone(block['car'])
+        self.assertIsNone(block['drive_limits'])
+        self.assertIn('results', block['hint'])
+        self.assertNotIn('no state change and no drive limit', block['hint'])
+
+    def test_the_context_survives_without_the_state_reader(self):
+        ctx = ps.RunContext(symbols={'_px': 0xC24B, '_py': 0xC24D,
+                                     '_active_map_w': 0xC5F1,
+                                     '_active_map_h': 0xC5F2})
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory=self.car(64, 0), frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertIsNone(block['state_at_start'])
+        self.assertEqual(block['car'], {'px': 64, 'py': 0, 'tx': 8, 'ty': 0})
+        self.assertTrue(block['hint'])
+
+    def test_the_context_omits_the_car_when_no_symbol_resolves(self):
+        ctx = ps.RunContext(symbols={})
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(FakeEmu(memory={}, frames=[[1]]),
+                   [{'action': 'assert_screen_changes', 'frames': 3}], ctx)
+        self.assertIsNone(caught.exception.context['car'])
+        self.assertIsNone(caught.exception.context['drive_limits'])
+
+    def test_an_unreadable_state_keeps_the_car_but_drops_the_limits(self):
+        """(#589) `state_now is None` means "the state cannot be read" — the
+        DEFAULT configuration, no debug ROM — not "not racing". A freeze on a
+        menu must still report the car (a release symbol can supply it) but
+        must not report drive limits, `at_limit`, or a limit-blaming hint.
+        """
+        symbols = {'_px': 0xC24B, '_py': 0xC24D,
+                   '_active_map_w': 0xC5F1, '_active_map_h': 0xC5F2}
+        emu = FakeEmu(memory=self.car(64, 1), frames=[[1]])
+        ctx = ps.RunContext(symbols=symbols)  # no state_table -> unreadable
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_screen_changes', 'frames': 4}], ctx)
+        block = caught.exception.context
+        self.assertIsNone(block['state_at_failure'])
+        self.assertEqual(block['car'], {'px': 64, 'py': 1, 'tx': 8, 'ty': 0})
+        self.assertIsNone(block['drive_limits'])
+        self.assertEqual(block['at_limit'], [])
+        self.assertIn('make build-debug', block['hint'])
+
+    def test_hint_does_not_blame_an_axis_the_stale_symbol_does_not_share(self):
+        """(#589) A stale `_px` beside a `y_min` limit must not blame `y_min`
+        — `at_limit` still reports it (the car really is there), but the
+        hint only blames a limit whose axis matches a stale symbol.
+        """
+        emu = FakeEmu(memory=self.racing(64, 1))   # py=1 -> at y_min
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_px'],
+                          'frames': 10}], ctx)
+        block = caught.exception.context
+        self.assertIn('y_min', block['at_limit'])
+        self.assertNotIn('y_min', block['hint'])
+
+    def test_hint_blames_the_axis_the_stale_symbol_shares(self):
+        """Same fixture, watching the axis that IS at its limit."""
+        emu = FakeEmu(memory=self.racing(64, 1))   # py=1 -> at y_min
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table())
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_changes', 'symbols': ['_py'],
+                          'frames': 10}], ctx)
+        self.assertIn('y_min', caught.exception.context['hint'])
+
+    def test_a_freeze_still_gets_the_limit_hint_with_no_symbol_list(self):
+        """A freeze has no stale-symbol list to correlate against, so every
+        `at_limit` entry stays eligible (documented, deliberate)."""
+        emu = FakeEmu(memory=self.racing(64, 1), frames=[[1]])
+        ctx = ps.RunContext(symbols=self.SYMS, state_table=state_table(),
+                            trace_every=1, freeze_frames=3)
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'advance', 'frames': 20}], ctx)
+        self.assertEqual(caught.exception.kind, 'freeze')
+        self.assertIn('y_min', caught.exception.context['hint'])
+
+    def test_the_manifest_supplies_limits_when_wram_cannot(self):
+        """The manifest fallback still needs a readable, racing state (#589):
+        `state_now is None` is "cannot read", not "racing", so this fixture
+        must supply the debug state symbols and put the game in `playing`
+        for the limits to be computed at all.
+        """
+        manifest = {'tracks': {'3': {'drive_limits': {
+            'x_min': 0, 'x_max': 144, 'y_min': 0, 'y_max': 192}}}}
+        ctx = ps.RunContext(symbols=dict(state_symbols(),
+                                         _px=0xC24B, _py=0xC24D,
+                                         _current_race_id=0xC5DD),
+                            manifest=manifest, state_table=state_table())
+        mem = dict(state_memory(1, 0x7EED))
+        mem.update({0xC24B: 64, 0xC24C: 0, 0xC24D: 0, 0xC24E: 0, 0xC5DD: 3})
+        emu = FakeEmu(memory=mem, frames=[[1]])
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [{'action': 'assert_screen_changes', 'frames': 3}], ctx)
+        limits = caught.exception.context['drive_limits']
+        self.assertEqual(limits['y_max'], 192)
+        self.assertEqual(limits['source'], 'manifest')
 
 
 if __name__ == '__main__':
