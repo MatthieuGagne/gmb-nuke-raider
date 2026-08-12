@@ -94,7 +94,7 @@ State is written only through `tools/factory_event.py`:
 ```
 python tools/factory_event.py --issue <N> --kind stage    --field stage=BUILD
 python tools/factory_event.py --issue <N> --kind gate     --field stage=VERIFY --field gate=memory-check --field result=pass
-python tools/factory_event.py --issue <N> --kind decision --field "text=<the ruling, one sentence, 20 words or fewer>" --field "rationale=<the reasoning>"
+python tools/factory_event.py --issue <N> --kind decision --field "text=<the ruling, one sentence>" --field "rationale=<the reasoning, 1-3 sentences>"
 python tools/factory_event.py --issue <N> --kind scenario --field scenario=generic-smoke --field result=pass --field blocking=true
 python tools/factory_event.py --issue <N> --kind retry    --field stage=BUILD --attempt 2
 python tools/factory_event.py --issue <N> --kind failure  --field "message=<stage>: <reason>"
@@ -164,27 +164,16 @@ An unmarked ruling stays a decision, so a forgotten marker costs nothing.
 
 ## How to write a decision, a failure, and a PR summary
 
-The factory writes ASD-STE100. It never invokes the `simplified-technical-english` skill inside a
-run — these rules are inline on purpose, because a run must not stop to load a skill.
-
-- Write one instruction per sentence. Keep an instruction to 20 words or fewer.
-- Keep a description sentence to 25 words or fewer.
-- Use the active voice. Name the actor: "the linter reports", not "findings are reported".
-- Use the simple tense. Write "the gate failed", not "the gate has failed".
-- Do not stack more than three nouns together.
-- Keep a paragraph to 6 sentences or fewer.
-- Use the word `CONTEXT.md` defines. Its `_Avoid_` lists outrank every rule above.
+Plain English: short sentences, active voice, simple tense, concrete verbs. Use the term
+`CONTEXT.md` defines. **A `failure` message that quotes tool output keeps that output verbatim** —
+simplifying it falsifies it.
 
 A `decision` event carries two fields:
 
-- `text` — the ruling, one sentence, 20 words or fewer. This is what a reader skims.
-- `rationale` — the reasoning, as long as it needs to be. This renders inside a collapsed block.
+- `text` — the ruling, one sentence. This is what a reader skims.
+- `rationale` — the reasoning, one to three sentences. This renders inside a collapsed block.
 
-Never drop a decision because its summary is hard to shorten. `factory_event.py` accepts any
-length, and an unrecorded decision is a worse outcome than a long one.
-
-**A `failure` message that quotes tool output keeps that output verbatim.** Simplification of
-quoted output falsifies it.
+Neither length is enforced. Never drop a decision, or pad a rationale to fill the cap.
 
 ## Retry budgets
 
