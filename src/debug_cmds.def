@@ -1,0 +1,21 @@
+/* src/debug_cmds.def — the only place that names a mailbox opcode (#590 R13).
+ *
+ * DBG_CMD(NAME, opcode, argc, arg0_max, arg1_max)
+ *
+ * APPEND ONLY (#590 R14). Never renumber an opcode. Never reuse a retired one.
+ * A retired command keeps its number and becomes DBG_OP_RESERVED_<n>.
+ *
+ * Opcode 0 means "the mailbox is empty" and is not a command.
+ * arg0_max / arg1_max are inclusive upper bounds. An unused argument has max 0.
+ */
+
+DBG_CMD(ADD_SCRAP,      1,  2, 255, 255)  /* arg0 = low byte, arg1 = high byte */
+DBG_CMD(UNLOCK_FIELD,   2,  1,   3,   0)  /* arg0 = LOADOUT_FIELD_*            */
+DBG_CMD(SET_OPTION,     3,  2,   3,   1)  /* arg0 = field, arg1 = option       */
+DBG_CMD(DAMAGE,         4,  1, 255,   0)  /* arg0 = amount                     */
+DBG_CMD(HEAL,           5,  1, 255,   0)  /* arg0 = amount                     */
+DBG_CMD(FORCE_STATE,    6,  2,   6,   2)  /* arg0 = state id, arg1 = 0 push / 1 pop / 2 replace */
+DBG_CMD(SPAWN_TURRET,   7,  2, 255, 255)  /* arg0 = tile x, arg1 = tile y      */
+DBG_CMD(DESPAWN_TURRET, 8,  1,   7,   0)  /* arg0 = pool slot, MAX_ENEMIES - 1 */
+DBG_CMD(SPAWN_RACER,    9,  2, 255, 255)  /* reserved — always UNSUPPORTED (R17) */
+DBG_CMD(SPAWN_PATROL,  10,  2, 255, 255)  /* reserved — always UNSUPPORTED (R17) */
