@@ -91,8 +91,8 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    - Are the types, names and signatures consistent between tasks?
 
    Every unresolved judgment call it raises becomes a `decision` event, written as **two
-   fields**: `text` holds the ruling in one sentence of 20 words or fewer, and `rationale` holds
-   the reasoning. Both renderers show `text` as a bold line and put `rationale` in a collapsed
+   fields**: `text` holds the ruling in one sentence, and `rationale` holds the reasoning in one
+   to three sentences. Both renderers show `text` as a bold line and put `rationale` in a collapsed
    block, so a reader skims the rulings and opens only the ones that matter (#517 R15, R17).
    Add `--field finding=true` to each of these: they name defects in the draft plan, so the run
    issue renders them under *Plan review findings* and the PR body omits them (#530 R3).

@@ -908,68 +908,23 @@ accumulates per-attempt assets indefinitely. Deleting old assets is always safe 
 local registry is the source of truth (#450 R5), and deleting `cache/` is always safe because it
 refills lazily. No automatic policy is specified. Accepted cost for a solo project.
 
-## 10. Writing standard
+## 10. House style
 
-### ASD-STE100
+Write factory-authored GitHub text, PRD bodies, plan documents and repository docs in plain
+English:
 
-This repository writes ASD-STE100 (Simplified Technical English). The skill lives at
-`.claude/skills/simplified-technical-english/`, vendored from
-[danyuchn/asd-ste100-skill](https://github.com/danyuchn/asd-ste100-skill) under MIT. Its
-`## Project scope` section is the authority on what the standard binds.
+1. Short sentences, one idea each.
+2. Active voice — name the actor. "The linter reports", not "findings are reported".
+3. Simple tense. "The gate failed", not "the gate has failed".
+4. Concrete verbs, plain words.
+5. Use the term `CONTEXT.md` defines. An `_Avoid_` ban wins even when the banned word is plainer.
 
-It binds factory-authored GitHub text (the run issue, the spec-issue comment, the pull request
-body), PRD issue bodies, factory plan documents, and repository documentation. Game text is
-exempt; `docs/STORY_BIBLE.md` keeps that authority. Verbatim tool output is exempt, because
-simplifying a quoted `make` error falsifies it.
+Two exemptions. Game text follows `docs/STORY_BIBLE.md`, not this section. **Verbatim tool output
+is quoted as-is** — simplifying a quoted `make` error falsifies it.
 
-`CONTEXT.md` outranks the standard on word choice. An `_Avoid_` ban wins even when the banned word
-is the plainer word.
-
-The standard applies **forward only**. It binds a document when an author creates it or edits it
-substantially. Nothing in the repository was rewritten to satisfy it.
-
-### `tools/ste_lint.py`
-
-```bash
-python tools/ste_lint.py docs/dev-workflow.md   # one or more files
-python tools/ste_lint.py --all                  # the tracked documentation set
-python tools/ste_lint.py --all --write-baseline # re-record the pre-existing findings
-python tools/ste_lint.py --issue 517            # a GitHub issue body, via gh
-```
-
-Two finding classes, two outcomes:
-
-| Class | Rules | Exit code |
-|---|---|---|
-| ASD-STE100 rule | long instruction (over 20 words), long description (over 25 words), perfect tense, passive voice, noun cluster of 4 or more, more than one instruction per sentence, paragraph over 6 sentences | 0 — reports only |
-| Banned synonym | a literal word from a `CONTEXT.md` `_Avoid_` list | 1 in the file-path and `--issue` forms; **0 in `--all`** |
-
-The detectors are approximations and they produce false positives. That is why a rule finding
-never fails the linter: a finding a reader dismisses costs less than a gate a reader learns to
-bypass.
-
-`--all` is the one form that never fails. Baseline suppression is keyed on the offending text, and
-the glossary bans ordinary words — `step`, `build`, `gate`, `check` and `pass` already occur 750,
-431, 276, 206 and 181 times across the scanned set. One more of any of them in a new sentence is a
-finding the baseline cannot have recorded, so a failing `--all` would turn the next documentation
-change red for a word nobody can avoid. Lint the file you are writing, or the issue body you are
-filing, and the exit code bites where you can act on it.
-
-`make test-tools` runs `--all`. It never runs `--issue`, because the pre-commit hook must not make
-a network call. The factory `GATE` stage does not run the linter either, so a PRD filed before
-this standard stays runnable by `/factory`.
-
-`--all` scans the R12 file set intersected with `git ls-files`: root `*.md`, `docs/**/*.md`,
-`.claude/skills/**/*.md`, `.claude/agents/**/*.md` and `tests/fixtures/factory/expected_*.md`,
-minus `docs/STORY_BIBLE.md`, `docs/game/**`, `CLAUDE.local.md`, `.claude/skill-overlays/**` and the
-vendored skill. The `git ls-files` intersection is what keeps the run reproducible: `docs/plans/`
-is gitignored but carries two tracked legacy plans, so a bare glob would also sweep whatever local
-plans a machine happens to hold.
-
-`tools/ste_baseline.json` records the findings the tree already carried. A finding is reported only
-when it is absent from the baseline, keyed by rule plus a hash of the offending text — not by line
-number, so editing the top of a file does not resurface everything below it. Regenerate it with
-`--write-baseline` after a deliberate documentation change, and read the diff before committing it.
+This is guidance, not a gate. There is no linter and nothing fails a build over it. #517 shipped an
+`ste_lint.py` plus a 3.6k-line baseline; the `--all` form could not fail by construction, so it
+caught nothing while charging a rebaseline for every documentation change. Both are now deleted.
 
 ### Decision fields
 
@@ -977,8 +932,8 @@ A factory `decision` event carries two fields:
 
 | Field | Holds | Length |
 |---|---|---|
-| `text` | The ruling | One sentence, 20 words or fewer |
-| `rationale` | The reasoning | As long as it needs to be |
+| `text` | The ruling | One sentence |
+| `rationale` | The reasoning | One to three sentences |
 
 ```bash
 python tools/factory_event.py --issue 517 --kind decision \
@@ -991,5 +946,5 @@ a bold summary plus a collapsed `<details>` block, and a decision that has none 
 so a journal written before the split still renders. `SCHEMA_VERSION` stays at 1 and no journal is
 migrated.
 
-`factory_event.py` never rejects an over-length summary. An unrecorded decision is a worse outcome
-than a long one.
+`factory_event.py` enforces neither length. Both are guidance: an unrecorded decision is a worse
+outcome than a long one.
