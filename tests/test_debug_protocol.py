@@ -130,13 +130,56 @@ class TestCommitByte(unittest.TestCase):
             self.skipTest('src/debug.h has no mailbox contract yet')
 
     def test_the_fold_matches_the_seed(self):
-        self.assertEqual(dp.commit_byte(3, 2, 1), (dp.seed() ^ 3 ^ 2 ^ 1) & 0xFF)
+        # DBG_MB_SEED is fixed at 0x5A (the mailbox wire contract, #590 R7). opcode=5, arg0=9,
+        # arg1=2 is not degenerate (unlike 3^2^1==0) so the fold actually moves the result:
+        #   0x5A = 0101 1010
+        # ^    5 = 0000 0101  ->  0101 1111 = 0x5F
+        # ^    9 = 0000 1001  ->  0101 0110 = 0x56
+        # ^    2 = 0000 0010  ->  0101 0100 = 0x54 = 84
+        # This literal was worked out by hand, not by re-evaluating commit_byte's own
+        # expression, so a broken operator inside commit_byte (e.g. `|` or `+` swapped in for
+        # `^`) changes the result and this assertion catches it.
+        self.assertEqual(dp.commit_byte(5, 9, 2), 84)
 
     def test_a_changed_argument_changes_the_fold(self):
         self.assertNotEqual(dp.commit_byte(3, 2, 1), dp.commit_byte(3, 2, 0))
 
-    def test_the_offsets_and_the_addresses_agree(self):
-        self.assertEqual(dp.addresses()['epoch'], dp.base() + dp.OFFSETS['epoch'])
+    def test_the_addresses_match_the_fixed_wire_layout(self):
+        # The wire is fixed at DBG_MB_BASE = 0xDF70, nine consecutive bytes (#590 R7).
+        self.assertEqual(dp.base(), 0xDF70)
+        self.assertEqual(dp.addresses(), {
+            'ready':   0xDF70,
+            'opcode':  0xDF71,
+            'arg0':    0xDF72,
+            'arg1':    0xDF73,
+            'commit':  0xDF74,
+            'outcome': 0xDF75,
+            'detail':  0xDF76,
+            'epoch':   0xDF77,
+            'torn':    0xDF78,
+        })
+
+
+class TestOffsetsMatchTheHeader(unittest.TestCase):
+    """Closes the hole under the old offsets/addresses test: OFFSETS is hand-maintained Python
+    and nothing checked it against src/debug.h's DBG_MB_OFF_* defines. Skips until the header
+    carries the mailbox contract, then starts biting the moment it does."""
+
+    def setUp(self):
+        if not dp.has_mailbox():
+            self.skipTest('src/debug.h has no mailbox contract yet')
+
+    def test_every_offset_matches_its_header_define(self):
+        for key, value in dp.OFFSETS.items():
+            with self.subTest(field=key):
+                header_name = 'DBG_MB_OFF_' + key.upper()
+                self.assertIn(header_name, dp.mailbox())
+                self.assertEqual(dp.mailbox()[header_name], value)
+
+    def test_the_two_field_sets_cover_each_other_exactly(self):
+        header_fields = {name[len('DBG_MB_OFF_'):].lower()
+                          for name in dp.mailbox() if name.startswith('DBG_MB_OFF_')}
+        self.assertEqual(header_fields, set(dp.OFFSETS))
 
 
 class TestPack(unittest.TestCase):
@@ -179,6 +222,30 @@ class TestPack(unittest.TestCase):
         """Not IndexError: the caller reports this, it must not crash the load."""
         with self.assertRaises(dp.ProtocolError):
             dp.pack('set_option', {'field': 9, 'option': 0})
+
+    def test_a_non_numeric_amount_is_a_protocol_error_not_a_value_error(self):
+        """add_scrap path: int('not-a-number') raises ValueError if not caught (review Finding 1)."""
+        with self.assertRaises(dp.ProtocolError) as cm:
+            dp.pack('add_scrap', {'amount': 'not-a-number'})
+        self.assertIn('amount', str(cm.exception))
+
+    def test_a_none_amount_is_a_protocol_error_not_a_type_error(self):
+        """add_scrap path: int(None) raises TypeError if not caught (review Finding 1)."""
+        with self.assertRaises(dp.ProtocolError) as cm:
+            dp.pack('add_scrap', {'amount': None})
+        self.assertIn('amount', str(cm.exception))
+
+    def test_a_non_numeric_generic_argument_is_a_protocol_error_not_a_value_error(self):
+        """Generic path (not add_scrap/unlock_field/set_option/force_state) hits `int(args[n])`
+        directly; despawn_turret exercises it (review Finding 1)."""
+        with self.assertRaises(dp.ProtocolError) as cm:
+            dp.pack('despawn_turret', {'slot': 'abc'})
+        self.assertIn('slot', str(cm.exception))
+
+    def test_a_none_generic_argument_is_a_protocol_error_not_a_type_error(self):
+        with self.assertRaises(dp.ProtocolError) as cm:
+            dp.pack('despawn_turret', {'slot': None})
+        self.assertIn('slot', str(cm.exception))
 
 
 if __name__ == '__main__':

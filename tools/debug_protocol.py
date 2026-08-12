@@ -208,6 +208,15 @@ def _lookup(table, key, what):
             f'unknown {what} {key!r}; known: {", ".join(sorted(table))}') from None
 
 
+def _to_int(cmd_name, arg_name, value):
+    """int(value), but a bad scenario value is a ProtocolError, never a raw ValueError/TypeError."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ProtocolError(
+            f'{cmd_name}: {arg_name} must be a whole number, got {value!r}') from None
+
+
 def pack(cmd, args=None):
     """Turn a named command and named arguments into (opcode, arg0, arg1).
 
@@ -233,7 +242,7 @@ def pack(cmd, args=None):
         raise ProtocolError(f'{name}: missing argument(s) {", ".join(missing)}')
 
     if name == 'add_scrap':
-        amount = int(args['amount'])
+        amount = _to_int(name, 'amount', args['amount'])
         if not 0 <= amount <= 0xFFFF:
             raise ProtocolError(f'add_scrap: amount {amount} is outside 0..65535')
         arg0, arg1 = amount & 0xFF, (amount >> 8) & 0xFF
@@ -250,7 +259,7 @@ def pack(cmd, args=None):
         arg0 = _lookup(STATES, args['state'], 'state')
         arg1 = _lookup(MODES, args['mode'], 'mode')
     else:
-        vals = [int(args[n]) for n in names]
+        vals = [_to_int(name, n, args[n]) for n in names]
         arg0 = vals[0]
         arg1 = vals[1] if len(vals) > 1 else 0
 
