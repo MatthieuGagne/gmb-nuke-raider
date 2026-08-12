@@ -13,6 +13,7 @@
   "src/main.c":                  {"bank": 0,   "reason": "game entry / VBL handling — no #pragma bank"},
   "src/music.c":                 {"bank": 0,   "reason": "VBL ISR music_tick must be in HOME bank — no #pragma bank"},
   "src/music_data.c":            {"bank": 31,  "reason": "explicit pin — 11 KB data file; pinned to last bank (31) to permanently isolate music from all game data banks"},
+  "src/debug.c":                 {"bank": 30,  "reason": "explicit pin — test command mailbox; debug ROM only. Pinned one below music (31) to keep it out of the autobank pool, which banks 1-2 are too full to absorb (#590 R2)"},
   "src/npc_drifter_portrait.c":  {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/npc_mechanic_portrait.c": {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},
   "src/npc_trader_portrait.c":   {"bank": 255, "reason": "autobank — loader.c handles BANK(sym) switching"},

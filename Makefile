@@ -8,10 +8,20 @@ LCC       := $(GBDK_HOME)/bin/lcc
 BUILD_DIR ?= build
 
 CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/include
-# DEBUG=1 changes linkage only: DBG_STATIC stops hiding module data, so every
-# variable reaches the .noi symbol file. It adds no code — see AC2.
+# DEBUG=1 does two things. DBG_STATIC stops hiding module data, so every variable reaches the
+# .noi symbol file — that half adds no code. It also compiles in the test command mailbox
+# (#590), which does add code, in bank 30 and in bank 0. The two ROMs therefore no longer hold
+# identical bytes; banks 1-3 do, and tests/test_rom_parity.py checks exactly that.
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
+# The test command mailbox compiles into the debug ROM only (#590 R1). src/debug.c wraps its
+# whole body in this guard, so the release ROM links it as an empty translation unit.
+CFLAGS += -DDEBUG_MAILBOX
+# The mailbox (0xDF70-0xDF78) and the existing ring buffer (0xDF80-0xDFC1) sit at fixed WRAM
+# addresses the linker does not know about. Move the initial stack pointer below both, so a deep
+# call chain cannot overwrite either (#590 R11, R12). lcc searches its own arguments for
+# `.STACK=` before it appends its 0xE000 default, so this replaces the default.
+CFLAGS += -Wl-g.STACK=0xDF00
 endif
 # DEBUG_TRACE=1 turns the emitting diagnostics back on (EMU_printf, the WRAM
 # ring buffer, the music tick counter). It DOES add code, which is why it is a
