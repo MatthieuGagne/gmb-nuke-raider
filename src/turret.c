@@ -211,6 +211,17 @@ uint8_t turret_count_active(void) BANKED {
     return count;
 }
 
+uint8_t turret_despawn(uint8_t slot) BANKED {
+    if (slot >= MAX_ENEMIES) return 0u;
+    if (!turret_active[slot]) return 0u;
+    turret_active[slot] = 0u;
+    if (turret_oam[slot] != SPRITE_POOL_INVALID) {
+        clear_sprite(turret_oam[slot]);
+        turret_oam[slot] = SPRITE_POOL_INVALID;
+    }
+    return 1u;
+}
+
 #ifndef __SDCC
 uint8_t turret_get_type(uint8_t i)  { return turret_type[i]; }
 uint8_t turret_get_dir(uint8_t i)   { return turret_dir[i]; }

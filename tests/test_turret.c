@@ -233,6 +233,14 @@ void test_turret_outside_the_lane_survives_the_pulse(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, turret_count_active());
 }
 
+void test_turret_despawn_frees_the_slot_and_reports_it(void) {
+    turret_init(0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_spawn(4u, 5u));
+    TEST_ASSERT_EQUAL_UINT8(1u, turret_despawn(0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, turret_despawn(0u));   /* already free */
+    TEST_ASSERT_EQUAL_UINT8(0u, turret_despawn(MAX_ENEMIES));  /* out of range */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_npc_type_constants_defined);
@@ -267,5 +275,6 @@ int main(void) {
     RUN_TEST(test_turret_death_spawns_explosion);
     RUN_TEST(test_beam_pulse_destroys_turret_in_the_lane);
     RUN_TEST(test_turret_outside_the_lane_survives_the_pulse);
+    RUN_TEST(test_turret_despawn_frees_the_slot_and_reports_it);
     return UNITY_END();
 }

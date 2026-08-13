@@ -22,4 +22,11 @@ void state_push(const State *s, uint8_t bank);
 void state_pop(void);
 void state_replace(const State *s, uint8_t bank);
 
+#ifdef DEBUG_MAILBOX
+/* Read-only views for the test command mailbox (#590 R19). Compiled out of the release
+ * ROM, so neither adds a byte to it. */
+uint8_t      state_manager_depth(void);
+const State *state_manager_top(void);
+#endif
+
 #endif

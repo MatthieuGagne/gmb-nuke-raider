@@ -85,3 +85,13 @@ void state_replace(const State *s, uint8_t bank) {
     load_entry(sm_depth - 1, s, bank);
     invoke(stack[sm_depth - 1].enter, stack[sm_depth - 1].bank);
 }
+
+#ifdef DEBUG_MAILBOX
+uint8_t state_manager_depth(void) {
+    return sm_depth;
+}
+
+const State *state_manager_top(void) {
+    return (sm_depth == 0u) ? 0 : sm_slot_src[sm_depth - 1u];
+}
+#endif

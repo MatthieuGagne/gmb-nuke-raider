@@ -5,6 +5,18 @@
 #include <stdint.h>
 #include "debug.h"
 #include "config.h"
+#include "economy.h"
+#include "loadout.h"
+#include "damage.h"
+#include "turret.h"
+#include "state_manager.h"
+#include "state_title.h"
+#include "state_overmap.h"
+#include "state_hub.h"
+#include "state_prerace.h"
+#include "state_playing.h"
+#include "state_results.h"
+#include "state_game_over.h"
 
 /* ---- the generated argument table (R13) ---------------------------------- */
 /* No parens around individual fields: tests/test_debug_protocol.py's drift-check regex
@@ -75,8 +87,63 @@ uint8_t debug_decide(const DbgRequest *req, const DbgEnv *env) {
     return DBG_OUT_OK;
 }
 
-/* Replaced by the real dispatcher in Task 4. Until then every accepted command is a no-op. */
 static uint8_t debug_run(const DbgRequest *req, uint8_t *detail);
+
+/* The forced-transition table. Index order matches DBG_STATE_PLAYING in src/debug.h,
+ * STATES in tools/debug_protocol.py, and the table in tools/scenarios/README.md.
+ * Keep all four in step. */
+static const State *const REAL_STATES[DBG_STATE_COUNT] = {
+    &state_title, &state_overmap, &state_hub, &state_prerace,
+    &state_playing, &state_results, &state_game_over
+};
+
+/* A function, not a static initializer: BANK(x) expands to a cast of a link-time symbol's
+ * address, which this project only ever passes as a runtime argument (src/main.c:60). */
+static uint8_t bank_for(uint8_t i) {
+    switch (i) {
+        case 0u: return BANK(state_title);
+        case 1u: return 0u;                    /* state_overmap.c is bank 0 */
+        case 2u: return 0u;                    /* state_hub.c is bank 0     */
+        case 3u: return BANK(state_prerace);
+        case 4u: return BANK(state_playing);
+        case 5u: return BANK(state_results);
+        default: return BANK(state_game_over);
+    }
+}
+
+#ifdef __SDCC
+/* The ROM calls the real functions directly. A BANKED function in a struct field would make
+ * SDCC emit a broken double dereference (.claude/agents/gbdk-expert.md:123). */
+#define DBG_SPAWN(tx, ty)   turret_spawn((tx), (ty))
+#define DBG_DESPAWN(slot)   turret_despawn((slot))
+#define DBG_STATE(i)        REAL_STATES[(i)]
+#define DBG_STATE_LIMIT     DBG_STATE_COUNT
+#else
+DBG_STATIC const DbgEnemyOps *dbg_ops;            /* 0 until set; falls back to the real ones */
+DBG_STATIC const State *const *dbg_states;
+DBG_STATIC uint8_t dbg_state_count;
+
+void debug_set_enemy_ops(const DbgEnemyOps *ops) { dbg_ops = ops; }
+
+void debug_set_state_table(const State *const *states, uint8_t count) {
+    dbg_states = states;
+    dbg_state_count = count;
+}
+
+static uint8_t host_spawn(uint8_t tx, uint8_t ty) {
+    return (dbg_ops != 0) ? dbg_ops->spawn(tx, ty) : turret_spawn(tx, ty);
+}
+static uint8_t host_despawn(uint8_t slot) {
+    return (dbg_ops != 0) ? dbg_ops->despawn(slot) : turret_despawn(slot);
+}
+static const State *host_state(uint8_t i) {
+    return (dbg_states != 0) ? dbg_states[i] : REAL_STATES[i];
+}
+#define DBG_SPAWN(tx, ty)   host_spawn((tx), (ty))
+#define DBG_DESPAWN(slot)   host_despawn((slot))
+#define DBG_STATE(i)        host_state((i))
+#define DBG_STATE_LIMIT     DBG_STATE_COUNT
+#endif
 
 /* ---- the frame poll (R6, R8, R9) ------------------------------------------ */
 void debug_mailbox_start(void) BANKED {
@@ -111,19 +178,89 @@ void debug_mailbox_poll(void) BANKED {
     dbg_mb[DBG_MB_OFF_EPOCH]++;                           /* R9: last */
 }
 
+static void snapshot(const DbgRequest *req, DbgEnv *env) {
+    env->depth = state_manager_depth();
+    env->in_race =
+        (state_manager_top() == DBG_STATE(DBG_STATE_PLAYING)) ? 1u : 0u;
+    env->option_unlocked =
+        (req->opcode == DBG_OP_SET_OPTION)
+        ? loadout_is_option_unlocked(req->arg0, req->arg1)   /* the game's own rule */
+        : 1u;
+}
+
+static void set_option(uint8_t field, uint8_t option) {
+    switch (field) {
+        case LOADOUT_FIELD_CAR:     loadout_set_car(option);     break;
+        case LOADOUT_FIELD_ARMOR:   loadout_set_armor(option);   break;
+        case LOADOUT_FIELD_WEAPON1: loadout_set_weapon1(option); break;
+        default:                    loadout_set_weapon2(option); break;
+    }
+}
+
 static uint8_t debug_run(const DbgRequest *req, uint8_t *detail) {
     DbgEnv env;
-    uint8_t outcome;
-    env.depth = 1u; env.in_race = 0u; env.option_unlocked = 1u;
-    *detail = 0u;
-    outcome = debug_decide(req, &env);
-    /* UNKNOWN_OP and UNSUPPORTED name themselves via detail=opcode (see debug.h
-     * outcome-code comments) — that's a property of the refusal itself, not of a
-     * command effect, so the stub fills it even before Task 4's real dispatcher. */
-    if (outcome == DBG_OUT_UNKNOWN_OP || outcome == DBG_OUT_UNSUPPORTED) {
-        *detail = req->opcode;
+    uint8_t verdict;
+    uint8_t hp_before;
+
+    snapshot(req, &env);
+    verdict = debug_decide(req, &env);
+    if (verdict != DBG_OUT_OK) {
+        switch (verdict) {
+            case DBG_OUT_UNKNOWN_OP:
+            case DBG_OUT_UNSUPPORTED: *detail = req->opcode; break;
+            case DBG_OUT_LOCKED:      *detail = req->arg0;   break;
+            case DBG_OUT_STACK_FULL:  *detail = env.depth;   break;
+            default:                  *detail = 0u;          break;
+        }
+        return verdict;
     }
-    return outcome;
+
+    *detail = 0u;
+    switch (req->opcode) {
+        case DBG_OP_ADD_SCRAP:
+            economy_add_scrap((uint16_t)req->arg0 | ((uint16_t)req->arg1 << 8));
+            break;
+        case DBG_OP_UNLOCK_FIELD:
+            loadout_unlock_option(req->arg0);
+            break;
+        case DBG_OP_SET_OPTION:
+            set_option(req->arg0, req->arg1);
+            break;
+        case DBG_OP_DAMAGE:
+            hp_before = damage_get_hp();
+            damage_apply(req->arg0);
+            *detail = damage_get_hp();
+            if (req->arg0 > 0u && damage_get_hp() == hp_before) {
+                return DBG_OUT_NO_EFFECT;   /* i-frames, or already dead */
+            }
+            break;
+        case DBG_OP_HEAL:
+            damage_heal(req->arg0);
+            *detail = damage_get_hp();
+            break;
+        case DBG_OP_FORCE_STATE:
+            if (req->arg1 == 1u) {
+                state_pop();
+            } else if (req->arg1 == 2u) {
+                state_replace(DBG_STATE(req->arg0), bank_for(req->arg0));
+            } else {
+                state_push(DBG_STATE(req->arg0), bank_for(req->arg0));
+            }
+            *detail = state_manager_depth();
+            break;
+        case DBG_OP_SPAWN_TURRET:
+            if (!DBG_SPAWN(req->arg0, req->arg1)) return DBG_OUT_POOL_FULL;
+            break;
+        case DBG_OP_DESPAWN_TURRET:
+            if (!DBG_DESPAWN(req->arg0)) {
+                *detail = req->arg0;
+                return DBG_OUT_NOT_ACTIVE;
+            }
+            break;
+        default:
+            return DBG_OUT_UNKNOWN_OP;
+    }
+    return DBG_OUT_OK;
 }
 
 #else
