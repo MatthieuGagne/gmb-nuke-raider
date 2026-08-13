@@ -117,7 +117,6 @@ static uint8_t bank_for(uint8_t i) {
 #define DBG_SPAWN(tx, ty)   turret_spawn((tx), (ty))
 #define DBG_DESPAWN(slot)   turret_despawn((slot))
 #define DBG_STATE(i)        REAL_STATES[(i)]
-#define DBG_STATE_LIMIT     DBG_STATE_COUNT
 #else
 DBG_STATIC const DbgEnemyOps *dbg_ops;            /* 0 until set; falls back to the real ones */
 DBG_STATIC const State *const *dbg_states;
@@ -142,7 +141,6 @@ static const State *host_state(uint8_t i) {
 #define DBG_SPAWN(tx, ty)   host_spawn((tx), (ty))
 #define DBG_DESPAWN(slot)   host_despawn((slot))
 #define DBG_STATE(i)        host_state((i))
-#define DBG_STATE_LIMIT     DBG_STATE_COUNT
 #endif
 
 /* ---- the frame poll (R6, R8, R9) ------------------------------------------ */

@@ -307,6 +307,7 @@ void test_a_forced_pop_at_depth_zero_is_refused(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, state_manager_depth());
     TEST_ASSERT_EQUAL_UINT8(DBG_OUT_STACK_FULL,
                             run_cmd(DBG_OP_FORCE_STATE, 0u, 1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, state_manager_depth());
 }
 
 void test_a_forced_replace_swaps_the_top_slot_without_changing_the_depth(void) {
