@@ -107,6 +107,7 @@ DEBUG_ROM = os.path.join(_ROOT, 'build', 'debug', 'nuke-raider.gb')
 BANK_SIZE = 0x4000  # 16 KB per bank
 COMPARED_BANKS = (1, 2, 3)  # Game data banks only
 HOME_BANK_LIMIT = 0x4000  # Addresses below this are HOME (bank 0), always mapped
+MAILBOX_BANK = 30  # src/debug.c is pinned here (bank-manifest.json); debug ROM only
 
 # Every SM83 opcode that takes a 16-bit absolute or immediate operand: the four
 # 16-bit register-pair loads (LD BC/DE/HL/SP,nn), LD (nn),SP, LD (nn),A / LD
@@ -340,4 +341,22 @@ class TestGameDataBankParity(RomParityTestBase):
         )
 
 
-# Bank 30 comparison arrives with main.c calling into it, in Task 5.
+class TestBankThirtyParity(RomParityTestBase):
+    def test_bank_30_carries_the_mailbox_in_the_debug_rom_only(self):
+        """AC10. src/debug.c compiles to nothing under the release build (#590 R1), so its
+        pinned bank (30) should be entirely unused there. makebin pads unused space with
+        whatever its pad byte is (0xFF here, not the 0x00 an earlier draft assumed) — assert
+        the release ROM's bank 30 is UNIFORM FILLER (every byte identical, whatever that byte
+        is), which is robust to the pad value, and that the debug ROM's bank 30 is not
+        uniform, proving the mailbox ships in exactly one ROM.
+        """
+        release_bank30 = _bank(RELEASE_ROM, MAILBOX_BANK)
+        debug_bank30 = _bank(DEBUG_ROM, MAILBOX_BANK)
+        self.assertEqual(
+            len(set(release_bank30)), 1,
+            'the release ROM has non-uniform content in bank 30 — the mailbox must not ship'
+        )
+        self.assertGreater(
+            len(set(debug_bank30)), 1,
+            'the debug ROM has no content in bank 30 — the mailbox is not wired up'
+        )

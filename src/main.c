@@ -10,6 +10,7 @@
 #include "sfx.h"
 #include "economy.h"
 #include "loadout.h"
+#include "debug.h"
 
 uint8_t input     = 0;
 uint8_t prev_input = 0;
@@ -58,6 +59,9 @@ void main(void) {
 
     state_manager_init();
     state_push(&state_title, BANK(state_title));
+#ifdef DEBUG_MAILBOX
+    debug_mailbox_start();   /* the ready byte says this ROM has a mailbox (#590 R10) */
+#endif
 
     while (1) {
         while (!frame_ready);
@@ -66,5 +70,12 @@ void main(void) {
         sfx_tick();
         input_update();           /* saves prev frame, reads joypad() */
         state_manager_update();
+#ifdef DEBUG_MAILBOX
+        /* After the update, so a forced transition gives the new state its first update on
+         * the following frame, exactly as a real transition does (#590 R20, AC12).
+         * Not guarded by a test on the command byte: that test costs more bank-0 bytes
+         * than the call it would skip. */
+        debug_mailbox_poll();
+#endif
     }
 }
