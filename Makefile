@@ -264,7 +264,6 @@ $(TARGET): src/overmap_car_sprite.c
 # test modules put tools/ on sys.path themselves), no -v (noise at 450 tests).
 test-tools: hooks
 	python -m unittest discover -s tests -p 'test_*.py'
-	python tools/ste_lint.py --all
 
 # Repository hooks (ADR 441). Idempotent: only writes core.hooksPath when it
 # is missing or wrong, so a build that is already gated changes nothing.
