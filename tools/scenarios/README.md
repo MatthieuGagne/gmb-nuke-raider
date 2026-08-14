@@ -105,11 +105,17 @@ A refusal means the game is correct. Without an `expect` field a refusal gives t
 | `arg_range` | an argument is outside the range the command accepts |
 | `locked` | the economy has not unlocked this loadout option yet |
 | `in_race` | the mailbox refuses a loadout change during a race, because the race latched its loadout when it started |
-| `stack_full` | the state stack is at its depth limit |
+| `stack_full` | the state stack cannot take this push or pop at its current depth (detail = the depth) |
 | `unsupported` | the opcode is reserved and the game has no function behind it |
 | `pool_full` | the entity pool has no free slot |
 | `no_effect` | the game refused the change and left the value alone |
 | `not_active` | that pool slot is not active |
+
+`unknown_op` and `arg_range` are listed for completeness, but neither is reachable as `expect`:
+`_validate_command` (`tools/pyboy_scenario.py`) calls `dp.pack()` when the scenario loads, and
+`dp.pack()` rejects an unknown `cmd` or an out-of-range argument before frame 0 — the scenario
+never runs far enough for the game to refuse either one. Catching the typo at load time is worth
+more than making these two reachable, so the validation stays as strict as it is.
 
 `locked` is the game's own answer: the mailbox calls `loadout_is_option_unlocked`, the same
 predicate the shop and the prerace menu use. `in_race` is the mailbox's own precondition — the

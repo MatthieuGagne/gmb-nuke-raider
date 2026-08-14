@@ -41,6 +41,10 @@ DBG_STATIC uint8_t dbg_mb_storage[DBG_MB_SIZE];
 static uint8_t *const dbg_mb = dbg_mb_storage;
 #endif
 
+#ifndef __SDCC
+/* Host tests only (final review item 7): debug_mailbox_start()/debug_mailbox_poll() index
+ * dbg_mb[] directly and never call these. Not BANKED, so compiling them into the ROM would let
+ * a future bank-0 caller embed a direct call into bank 30 without mapping it first. */
 uint8_t debug_mb_read(uint8_t offset) {
     return dbg_mb[offset];
 }
@@ -48,6 +52,7 @@ uint8_t debug_mb_read(uint8_t offset) {
 void debug_mb_write(uint8_t offset, uint8_t value) {
     dbg_mb[offset] = value;
 }
+#endif
 
 static const DbgCmdSpec *spec_for(uint8_t opcode) {
     uint8_t i;
@@ -77,12 +82,11 @@ uint8_t debug_decide(const DbgRequest *req, const DbgEnv *env) {
         if (env->in_race)          return DBG_OUT_IN_RACE;    /* R4 */
         if (!env->option_unlocked) return DBG_OUT_LOCKED;     /* R4 */
     }
-    if (req->opcode == DBG_OP_UNLOCK_FIELD && env->in_race) {
-        return DBG_OUT_IN_RACE;
-    }
     if (req->opcode == DBG_OP_FORCE_STATE) {
         if (req->arg1 == 0u && env->depth >= STACK_MAX) return DBG_OUT_STACK_FULL; /* R5 */
-        if (req->arg1 == 1u && env->depth == 0u)        return DBG_OUT_STACK_FULL;
+        /* A pop at depth 1 would empty the stack, a state real play never reaches — the
+         * canonical race path never pops below depth 1 (final review item 2). */
+        if (req->arg1 == 1u && env->depth <= 1u)        return DBG_OUT_STACK_FULL;
     }
     return DBG_OUT_OK;
 }

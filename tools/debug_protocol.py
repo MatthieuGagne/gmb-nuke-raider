@@ -134,7 +134,7 @@ OPTIONS = {
     'weapon1': {'cannon': 0, 'laser': 1},
     'weapon2': {'rocket': 0, 'mine': 1},
 }
-# Index order must match DBG_STATES[] in src/debug.c and the table in tools/scenarios/README.md.
+# Index order must match REAL_STATES[] in src/debug.c and the table in tools/scenarios/README.md.
 STATES = {'title': 0, 'overmap': 1, 'hub': 2, 'prerace': 3,
           'playing': 4, 'results': 5, 'game_over': 6}
 MODES = {'push': 0, 'pop': 1, 'replace': 2}
@@ -160,7 +160,8 @@ OUTCOME_MESSAGES = {
     'DBG_OUT_LOCKED':      'the economy has not unlocked this loadout option yet',
     'DBG_OUT_IN_RACE':     'the mailbox refuses a loadout change during a race, because the '
                            'race latched its loadout when it started',
-    'DBG_OUT_STACK_FULL':  'the state stack is at its depth limit',
+    'DBG_OUT_STACK_FULL':  'the state stack cannot take this push or pop at its current '
+                           'depth (detail = the depth)',
     'DBG_OUT_UNSUPPORTED': 'this opcode is reserved and the game has no function behind it',
     'DBG_OUT_POOL_FULL':   'the entity pool has no free slot',
     'DBG_OUT_NO_EFFECT':   'the game refused the change and left the value alone',

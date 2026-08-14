@@ -19,9 +19,9 @@
  * linkage, not code. The two ROMs still diverge, but for different reasons:
  * the debug ROM also compiles in the test command mailbox (#590), whose
  * BANKED trampolines and reserved stack (-Wl-g.STACK=0xDF00) both live in
- * bank 0. tests/test_rom_parity.py bounds that divergence for banks 1-3 (the
- * relocated-operand classification and its two caps); for bank 0 it only
- * asserts that a difference exists.
+ * bank 0. tests/test_rom_parity.py bounds that divergence for every bank that isn't HOME (0),
+ * the mailbox bank (30), or uniform filler (currently 1, 2, 3, 31) via the relocated-operand
+ * classification and its two caps; for bank 0 it only asserts that a difference exists.
  */
 #ifdef DEBUG
   #define DBG_STATIC
@@ -128,7 +128,7 @@
 /* Outcome codes. C holds no message text — tools/debug_protocol.py owns every message (R21). */
 #define DBG_OUT_OK           0
 #define DBG_OUT_UNKNOWN_OP   1   /* detail = the opcode                       */
-#define DBG_OUT_ARG_RANGE    2   /* detail = the index of the bad argument    */
+#define DBG_OUT_ARG_RANGE    2   /* detail = 0                                */
 #define DBG_OUT_LOCKED       3   /* detail = the loadout field                */
 #define DBG_OUT_IN_RACE      4   /* detail = 0                                */
 #define DBG_OUT_STACK_FULL   5   /* detail = the stack depth                  */
@@ -138,7 +138,7 @@
 #define DBG_OUT_NOT_ACTIVE   9   /* detail = the slot                         */
 
 /* The index a FORCE_STATE argument uses for the racing state. Keep in step with
- * DBG_STATES[] in src/debug.c and STATES in tools/debug_protocol.py. */
+ * REAL_STATES[] in src/debug.c and STATES in tools/debug_protocol.py. */
 #define DBG_STATE_PLAYING    4
 #define DBG_STATE_COUNT      7
 
@@ -178,15 +178,23 @@ typedef struct {
                                  1 for every other command                                 */
 } DbgEnv;
 
+/* Stays exported unconditionally (not #ifndef __SDCC'd like debug_mb_read/write below):
+ * tests/test_debug_symbols.py asserts it reaches the debug .noi. It is bank-30-local — nothing
+ * outside src/debug.c calls it, so it needs no BANKED trampoline (final review item 7). */
 uint8_t debug_decide(const DbgRequest *req, const DbgEnv *env);
 
 void    debug_mailbox_start(void) BANKED;
 void    debug_mailbox_poll(void) BANKED;
 
-/* Wire access. A host test reads and writes ordinary storage; the ROM reads and writes
- * DBG_MB_BASE. Both go through these two functions, so the test drives the real code. */
+#ifndef __SDCC
+/* Wire access, host tests only. A host test reads and writes ordinary storage through these;
+ * the ROM's debug_mailbox_start()/debug_mailbox_poll() index dbg_mb[] directly and never call
+ * these. Keeping them out of the SDCC build means nothing in ROM code can accidentally compile
+ * a direct (non-BANKED) call across banks into bank 30 — these are not BANKED, so a bank-0
+ * caller would embed a bank-30 address without mapping bank 30 first (final review item 7). */
 uint8_t debug_mb_read(uint8_t offset);
 void    debug_mb_write(uint8_t offset, uint8_t value);
+#endif
 
 #ifndef __SDCC
 /* Host-only seams. The ROM calls the real functions directly, because a BANKED function in a

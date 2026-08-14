@@ -318,16 +318,24 @@ it, and banked code calls bank-0 routines by absolute address, so those calls' o
 with it — the instructions themselves, opcode included, are untouched. Bank 30 exists only in
 the debug ROM (the mailbox itself, see below); the release ROM's bank 30 is uniform filler.
 
-`tests/test_rom_parity.py` no longer compares bytes. For banks 1-3 it asserts: every differing
-byte belongs to a 16-bit absolute operand whose opcode is unchanged in both ROMs and whose
-value is a bank-0 address on both sides; the release-to-debug address mapping is a consistent
-function (one release address never maps to two different debug addresses); the number of
-distinct relocated targets stays under a cap (128); and the number of distinct relocation
-deltas stays under a cap (8). Measured today: 40 distinct targets, 3 distinct deltas, zero
-unexplained bytes. It also asserts bank 0 differs (a control — if it didn't, the invariant
-above would prove nothing) and that bank 30 is uniform filler in the release ROM and not in the
-debug ROM. `DEBUG=1` changes linkage and adds this reserved stack and the mailbox; it does not
-otherwise change what the game does.
+`tests/test_rom_parity.py` no longer compares bytes. It asserts, for every ROM bank that is not
+HOME (0), not the mailbox bank (30), and not uniform filler in the release ROM — derived at test
+time, currently `(1, 2, 3, 31)`: every differing byte belongs to a 16-bit absolute operand whose
+opcode is unchanged in both ROMs and whose value is a bank-0 address on both sides; the
+release-to-debug address mapping is a consistent function (one release address never maps to two
+different debug addresses); the number of distinct relocated targets stays under a cap (128); and
+the number of distinct relocation deltas stays under a cap (8). Measured today: 40 distinct
+targets, 3 distinct deltas (-570, +47, +675), 684 relocated bytes, zero unexplained bytes. It also
+asserts bank 0 differs (a control — if it didn't, the invariant above would prove nothing) and
+that bank 30 is uniform filler in the release ROM and not in the debug ROM. `DEBUG=1` changes
+linkage and adds this reserved stack and the mailbox; it does not otherwise change what the game
+does.
+
+**Scope, stated honestly:** the invariant above only bounds banks 1-3 and 31 — the ones the
+derivation currently finds non-filler. Bank 0 is checked only for "differs from the release ROM",
+never analyzed byte-by-byte: it holds ~67% differing bytes between the two ROMs (measured today),
+and no test classifies any of them as relocation vs. real change. A defect confined to bank 0
+would not be caught by this test at all.
 
 ### Bank gates (C files only)
 

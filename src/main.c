@@ -74,7 +74,9 @@ void main(void) {
         /* After the update, so a forced transition gives the new state its first update on
          * the following frame, exactly as a real transition does (#590 R20, AC12).
          * Not guarded by a test on the command byte: that test costs more bank-0 bytes
-         * than the call it would skip. */
+         * than the call it would skip.
+         * No unit test can reach main.c — tools/scenarios/laser-beam-evidence.json is the
+         * only coverage for this call. Deleting it fails that scenario, not any make test run. */
         debug_mailbox_poll();
 #endif
     }

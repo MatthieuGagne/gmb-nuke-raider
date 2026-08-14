@@ -71,9 +71,10 @@ instead of with real change:
      moved.
   4. **The number of distinct relocation deltas is capped.** A real HOME-layout
      shift moves everything after the insertion point by the same small
-     handful of amounts (today: mostly +31, plus two larger moves); a
-     fabricated relocation that happens to pass checks 1-3 almost never lands
-     on one of those exact deltas.
+     handful of amounts (today: three deltas, -570/+47/+675, across 40
+     distinct relocated targets and 684 relocated bytes); a fabricated
+     relocation that happens to pass checks 1-3 almost never lands on one of
+     those exact deltas.
 
 Measured detection rate of this four-check invariant (2026-08-13), via the same
 300-single-byte-mutation experiment described above — 300 distinct offsets in
@@ -89,9 +90,9 @@ relocations, not a lone one. See `task-4-report.md` for the reproduction
 script and the full before/after comparison against the invariant this one
 replaced (49.3%, 148/300).
 
-Bank 30 is asserted in a later task (Task 5), once main.c actually calls into
-it — right now it would be all-filler in the release ROM and near-empty in the
-debug ROM, which proves nothing.
+Bank 30 is asserted separately, by TestBankThirtyParity below: the release ROM's bank 30 must
+be uniform filler (src/debug.c compiles to nothing there, R1) and the debug ROM's must not be
+(the mailbox actually ships).
 
 The test skips when either ROM is absent, because `make test-tools` also runs
 from the pre-commit hook before any ROM has been built.
@@ -105,7 +106,6 @@ RELEASE_ROM = os.path.join(_ROOT, 'build', 'nuke-raider.gb')
 DEBUG_ROM = os.path.join(_ROOT, 'build', 'debug', 'nuke-raider.gb')
 
 BANK_SIZE = 0x4000  # 16 KB per bank
-COMPARED_BANKS = (1, 2, 3)  # Game data banks only
 HOME_BANK_LIMIT = 0x4000  # Addresses below this are HOME (bank 0), always mapped
 MAILBOX_BANK = 30  # src/debug.c is pinned here (bank-manifest.json); debug ROM only
 
@@ -139,12 +139,12 @@ MAX_DISTINCT_RELOCATED_TARGETS = 128
 
 # How many distinct (debug_target - release_target) deltas may appear across
 # every relocated pair. A real HOME-layout shift moves everything placed after
-# the insertion point by the SAME handful of amounts (today: mostly +31, plus
-# two larger moves for symbols that crossed the insertion point from the other
-# side) — so legitimate relocations cluster into very few distinct deltas. A
-# stray single-byte mutation that happens to pass check 1 almost never lands
-# on one of those exact deltas; it invents a fresh one. This catches what an
-# opcode check alone cannot: a plausible-looking but fabricated relocation.
+# the insertion point by the SAME handful of amounts (today: three deltas,
+# -570, +47, +675, across 40 distinct targets) — so legitimate relocations
+# cluster into very few distinct deltas. A stray single-byte mutation that
+# happens to pass check 1 almost never lands on one of those exact deltas; it
+# invents a fresh one. This catches what an opcode check alone cannot: a
+# plausible-looking but fabricated relocation.
 MAX_DISTINCT_RELOCATION_DELTAS = 8
 
 
@@ -160,6 +160,25 @@ def _bank(path, n):
     with open(path, 'rb') as f:
         f.seek(n * BANK_SIZE)
         return f.read(BANK_SIZE)
+
+
+def _compared_banks(release_path):
+    """Every bank that is not HOME (0), not the mailbox bank (30, debug ROM only), and not
+    uniform filler in the release ROM — i.e. every bank that actually carries game data.
+
+    Derived rather than hardcoded (final review item 10): a fixed `(1, 2, 3)` tuple would
+    silently stop covering parity the day a module's code or assets land in bank 4, with no
+    test failure to say so. "Uniform filler" mirrors TestBankThirtyParity's own test for an
+    unused bank — makebin pads with a single repeated byte, whatever that byte is.
+    """
+    total = os.path.getsize(release_path) // BANK_SIZE
+    banks = []
+    for n in range(1, total):
+        if n == MAILBOX_BANK:
+            continue
+        if len(set(_bank(release_path, n))) > 1:
+            banks.append(n)
+    return tuple(banks)
 
 
 def _relocation_at(release_bank, debug_bank, p):
@@ -260,7 +279,7 @@ class TestGameDataBankParity(RomParityTestBase):
         all_unexplained = []          # [(bank, offset), ...]
         all_relocations = []          # [(bank, offset, release_target, debug_target), ...]
 
-        for bank_num in COMPARED_BANKS:
+        for bank_num in _compared_banks(RELEASE_ROM):
             release_bank = _bank(RELEASE_ROM, bank_num)
             debug_bank = _bank(DEBUG_ROM, bank_num)
             unexplained, relocations = _classify_bank_diff(release_bank, debug_bank)
@@ -325,6 +344,17 @@ class TestGameDataBankParity(RomParityTestBase):
             f'handful of amounts, so this many distinct deltas means a real '
             f'code change may be hiding among what looks like benign relocation'
         )
+
+    def test_compared_banks_are_derived_and_currently_cover_one_two_three_and_thirty_one(self):
+        """Pins today's answer so a silent shift is visible: if a module ever lands in bank 4,
+        this assertion is what changes, not the coverage itself (final review item 10).
+
+        Bank 31 (src/music_data.c, pinned by hand rather than autobanked) is real game data,
+        not filler, so the derivation includes it too — it happens to be byte-identical between
+        the two ROMs today (no BANKED trampoline lands there), so its presence changes none of
+        the other counts in this class, only which banks get scanned.
+        """
+        self.assertEqual(_compared_banks(RELEASE_ROM), (1, 2, 3, 31))
 
     def test_bank_zero_differs_because_the_reserved_stack_lives_there(self):
         """Bank 0 must differ: it holds the reserved stack (#590 R12).

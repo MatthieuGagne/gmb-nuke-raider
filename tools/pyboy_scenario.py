@@ -921,7 +921,8 @@ def _run_command(emu, step, ctx, i):
             f"the game did not answer command {step['cmd']!r} within {max_f} frames "
             f"(torn={emu.memory[addr['torn']]}). Either this ROM has no mailbox — the ready "
             f"byte can read {hex(dp.ready_value())} by chance, because it is stack memory in "
-            f"the release ROM — or the game stopped running.",
+            f"the release ROM; build the debug ROM with `make build-debug` and point --rom at "
+            f"build/debug/nuke-raider.gb — or the game stopped running.",
             step.get("action"))
 
     outcome = emu.memory[addr['outcome']]

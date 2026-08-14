@@ -21,6 +21,7 @@ GOLDEN = {
 
 SRC = os.path.join(dp.REPO_ROOT, 'src')
 DEBUG_C = os.path.join(SRC, 'debug.c')
+CONFIG_H = os.path.join(SRC, 'config.h')
 
 
 class TestOpcodesAreAppendOnly(unittest.TestCase):
@@ -180,6 +181,57 @@ class TestOffsetsMatchTheHeader(unittest.TestCase):
         header_fields = {name[len('DBG_MB_OFF_'):].lower()
                           for name in dp.mailbox() if name.startswith('DBG_MB_OFF_')}
         self.assertEqual(header_fields, set(dp.OFFSETS))
+
+
+class TestStateTableMatchesTheHeader(unittest.TestCase):
+    """Final review item 1: STATES, FIELDS and OPTIONS were hand-written literals with no
+    drift test, unlike opcodes (TestCTableMatchesTheDefFile) and mailbox offsets
+    (TestOffsetsMatchTheHeader). A state inserted into REAL_STATES[] without a matching entry
+    here would leave every test green while `force_state playing` pushed the wrong state and
+    the `in_race` snapshot read the wrong slot (the case AC4's refusal rests on)."""
+
+    def setUp(self):
+        if not dp.has_mailbox():
+            self.skipTest('src/debug.h has no mailbox contract yet')
+
+    def _state_defines(self):
+        return dp.parse_defines('DBG_STATE_', dp._header())
+
+    def test_state_count_matches_the_header(self):
+        defines = self._state_defines()
+        self.assertIn('DBG_STATE_COUNT', defines)
+        self.assertEqual(len(dp.STATES), defines['DBG_STATE_COUNT'])
+
+    def test_playing_index_matches_the_header(self):
+        defines = self._state_defines()
+        self.assertIn('DBG_STATE_PLAYING', defines)
+        self.assertEqual(dp.STATES['playing'], defines['DBG_STATE_PLAYING'])
+
+
+class TestLoadoutTablesMatchConfigHeader(unittest.TestCase):
+    """Final review item 1: dp.FIELDS and dp.OPTIONS are hand-written literals encoding
+    src/config.h's LOADOUT_FIELD_*/LOADOUT_WEAPON1_LASER constants. Reuses dp.parse_defines,
+    the same parser TestOffsetsMatchTheHeader already uses against src/debug.h."""
+
+    def setUp(self):
+        if not os.path.exists(CONFIG_H):
+            self.skipTest('src/config.h does not exist')
+
+    def _config_text(self):
+        with open(CONFIG_H, encoding='utf-8') as f:
+            return f.read()
+
+    def test_field_indices_match_config_header(self):
+        defines = dp.parse_defines('LOADOUT_FIELD_', self._config_text())
+        self.assertEqual(dp.FIELDS['car'], defines['LOADOUT_FIELD_CAR'])
+        self.assertEqual(dp.FIELDS['armor'], defines['LOADOUT_FIELD_ARMOR'])
+        self.assertEqual(dp.FIELDS['weapon1'], defines['LOADOUT_FIELD_WEAPON1'])
+        self.assertEqual(dp.FIELDS['weapon2'], defines['LOADOUT_FIELD_WEAPON2'])
+
+    def test_weapon1_laser_option_matches_config_header(self):
+        defines = dp.parse_defines('LOADOUT_WEAPON1_', self._config_text())
+        self.assertIn('LOADOUT_WEAPON1_LASER', defines)
+        self.assertEqual(dp.OPTIONS['weapon1']['laser'], defines['LOADOUT_WEAPON1_LASER'])
 
 
 class TestPack(unittest.TestCase):

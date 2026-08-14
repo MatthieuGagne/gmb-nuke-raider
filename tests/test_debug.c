@@ -310,6 +310,17 @@ void test_a_forced_pop_at_depth_zero_is_refused(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, state_manager_depth());
 }
 
+/* Final review item 2: a pop at depth 1 would empty the stack, a state real play never
+ * reaches (the canonical race path never pops below depth 1). */
+void test_a_forced_pop_at_depth_one_is_refused(void) {
+    mailbox_fixture();
+    state_push(&FAKE_PLAIN, 0u);
+    TEST_ASSERT_EQUAL_UINT8(1u, state_manager_depth());
+    TEST_ASSERT_EQUAL_UINT8(DBG_OUT_STACK_FULL,
+                            run_cmd(DBG_OP_FORCE_STATE, 0u, 1u));
+    TEST_ASSERT_EQUAL_UINT8(1u, state_manager_depth());
+}
+
 void test_a_forced_replace_swaps_the_top_slot_without_changing_the_depth(void) {
     mailbox_fixture();
     state_push(&FAKE_PLAIN, 0u);
@@ -399,6 +410,7 @@ int main(void) {
     RUN_TEST(test_a_push_at_the_depth_limit_is_refused_and_the_depth_holds);
     RUN_TEST(test_a_forced_push_runs_the_new_state_update_on_the_following_frame);
     RUN_TEST(test_a_forced_pop_at_depth_zero_is_refused);
+    RUN_TEST(test_a_forced_pop_at_depth_one_is_refused);
     RUN_TEST(test_a_forced_replace_swaps_the_top_slot_without_changing_the_depth);
     RUN_TEST(test_damage_reaches_the_damage_module);
     RUN_TEST(test_damage_during_invincibility_reports_no_effect);
