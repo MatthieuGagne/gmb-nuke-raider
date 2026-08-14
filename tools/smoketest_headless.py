@@ -181,6 +181,30 @@ def build_result(scenario_name, ctx, failure=None, divergence=None,
     }
 
 
+def _rom_provides_mailbox(rom_path):
+    """True when the ROM under test is a debug build (mailbox opcodes wired
+    in). Compares the ROM path's parent directory name, not a path suffix:
+    on Windows the path arrives with backslashes, so an
+    `endswith('debug/nuke-raider.gb')` suffix test would silently never
+    match — the exact failure this field exists to prevent (#590 R23)."""
+    return os.path.basename(os.path.dirname(os.path.abspath(rom_path))) == 'debug'
+
+
+def _skipped_result(scenario):
+    """A `--all`-only stand-in result for a scenario that declares
+    `requires_debug_rom` while the ROM under test has none (#590 R23)."""
+    return {
+        "verdict":  "skipped",
+        "scenario": scenario["name"],
+        "blocking": scenario["blocking"],
+        "steps_executed": 0,
+        "frames":   0,
+        "failure":  None,
+        "divergence": None,
+        "artifacts": {"screenshots": []},
+    }
+
+
 def _resolve_scenario_path(name, library):
     if os.path.exists(name):
         return name
@@ -254,7 +278,8 @@ def _report(result, as_json):
         return
     name = result["scenario"]
     mark = {"pass": "PASS", "fail": "FAIL",
-            "scenario-invalid": "SCENARIO-INVALID"}[result["verdict"]]
+            "scenario-invalid": "SCENARIO-INVALID",
+            "skipped": "SKIPPED"}[result["verdict"]]
     print(f"[{mark}] {name}  ({result['frames']} frames, "
           f"{result['steps_executed']} steps)")
     if result["failure"]:
@@ -304,6 +329,17 @@ def main() -> int:
 
     results = []
     for scenario in scenarios:
+        if args.all and scenario.get("requires_debug_rom") \
+                and not _rom_provides_mailbox(args.rom):
+            result = _skipped_result(scenario)
+            results.append(result)
+            _report(result, args.as_json)
+            out_dir = os.path.join(args.out_dir, scenario["name"])
+            os.makedirs(out_dir, exist_ok=True)
+            with open(os.path.join(out_dir, "results.json"), "w") as f:
+                json.dump(result, f, indent=2)
+            continue
+
         out_dir = os.path.join(args.out_dir, scenario["name"])
         os.makedirs(out_dir, exist_ok=True)
         rebase_screenshots(scenario["steps"], out_dir)

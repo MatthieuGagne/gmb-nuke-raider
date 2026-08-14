@@ -17,6 +17,8 @@ import json
 import os
 import re
 
+import debug_protocol as dp
+
 # _px / _py are little-endian 16-bit words; every other sentinel is one byte.
 DEFAULT_WIDTHS = {"_px": 2, "_py": 2}
 
@@ -221,6 +223,7 @@ KNOWN_ACTIONS = {
     "advance", "press", "wait_memory", "screenshot",
     "assert_memory", "assert_live", "assert_changes",
     "assert_screen_changes", "assert_state", "wait_state", "nav",
+    "command",
 }
 
 REQUIRE_KEYS = {"state", "address", "value", "op", "width"}
@@ -241,6 +244,7 @@ _REQUIRED = {
     "assert_state":          ("state",),
     "wait_state":            ("state",),
     "nav":                   ("to", "id"),
+    "command":               ("cmd",),
 }
 
 
@@ -256,16 +260,23 @@ def _read_json(path):
 
 def _as_dict(obj, name):
     if isinstance(obj, list):
-        return {"name": name, "blocking": True, "watch": [], "steps": obj}
+        return {"name": name, "blocking": True, "watch": [], "steps": obj,
+                "requires_debug_rom": False}
     if isinstance(obj, dict):
         steps = obj.get("steps")
         if not isinstance(steps, list):
             raise ScenarioError(f"Scenario {name!r} has no 'steps' array")
+        requires_debug_rom = obj.get("requires_debug_rom", False)
+        if not isinstance(requires_debug_rom, bool):
+            raise ScenarioError(
+                f"Scenario {name!r}: 'requires_debug_rom' must be a boolean, "
+                f"got {type(requires_debug_rom).__name__}")
         return {
             "name":     obj.get("name", name),
             "blocking": bool(obj.get("blocking", True)),
             "watch":    list(obj.get("watch", [])),
             "steps":    steps,
+            "requires_debug_rom": requires_debug_rom,
         }
     raise ScenarioError(f"Scenario {name!r} must be a JSON array or object")
 
@@ -315,6 +326,21 @@ def _validate_require(i, req):
         raise ScenarioError(f"Step {i}: unknown operator {req['op']!r}")
 
 
+def _validate_command(step, i):
+    """Reject an unknown `cmd`, argument name or `expect` value at load
+    time, so a typo stops the scenario before frame 0 (#590 R21)."""
+    try:
+        dp.pack(step['cmd'], step.get('args'))
+    except dp.ProtocolError as exc:
+        raise ScenarioError(f'Step {i}: {exc}') from None
+    expect = step.get('expect')
+    if expect is not None:
+        try:
+            dp.refusal_code(expect)
+        except dp.ProtocolError as exc:
+            raise ScenarioError(f'Step {i}: {exc}') from None
+
+
 def _validate(steps, state_names=None):
     for i, step in enumerate(steps):
         act = step.get("action")
@@ -325,6 +351,8 @@ def _validate(steps, state_names=None):
                 raise ScenarioError(f"Step {i}: action {act!r} requires field {field!r}")
         if "require" in step:
             _validate_require(i, step["require"])
+        if act == "command":
+            _validate_command(step, i)
         if state_names is None:
             continue
         wanted = []
@@ -857,8 +885,70 @@ def _dispatch(emu, step, ctx, i):
             press(emu, ctx, [direction], per_tile)
             ctx.tick(emu, settle)
 
+    elif act == "command":
+        _run_command(emu, step, ctx, i)
+
     else:
         raise ScenarioError(f"Step {i}: unhandled action {act!r}")
+
+
+def _run_command(emu, step, ctx, i):
+    """Write one command, wait for the epoch, and read the reply (#590 R6-R9)."""
+    addr = dp.addresses()
+    if emu.memory[addr['ready']] != dp.ready_value():
+        raise StepFailure(
+            i, "precondition",
+            "this ROM has no test mailbox — build the debug ROM with "
+            "`make build-debug` and point --rom at build/debug/nuke-raider.gb",
+            step.get("action"))
+
+    opcode, arg0, arg1 = dp.pack(step['cmd'], step.get('args'))
+    epoch_before = emu.memory[addr['epoch']]
+
+    emu.memory[addr['arg0']] = arg0
+    emu.memory[addr['arg1']] = arg1
+    emu.memory[addr['commit']] = dp.commit_byte(opcode, arg0, arg1)
+    emu.memory[addr['opcode']] = opcode        # last (R7)
+
+    max_f = int(step.get("max_frames", 60))
+    for _ in range(max_f):
+        ctx.tick(emu, 1)
+        if emu.memory[addr['epoch']] != epoch_before:
+            break
+    else:
+        raise StepFailure(
+            i, "precondition",
+            f"the game did not answer command {step['cmd']!r} within {max_f} frames "
+            f"(torn={emu.memory[addr['torn']]}). Either this ROM has no mailbox — the ready "
+            f"byte can read {hex(dp.ready_value())} by chance, because it is stack memory in "
+            f"the release ROM — or the game stopped running.",
+            step.get("action"))
+
+    outcome = emu.memory[addr['outcome']]
+    detail = emu.memory[addr['detail']]
+    expect = step.get('expect')
+    args = step.get('args') or {}
+
+    if expect is None:
+        if outcome != dp.outcomes()['DBG_OUT_OK']:
+            # A refusal is the game being correct, so it is never a game failure (R22).
+            raise StepFailure(
+                i, "precondition",
+                f"the game refused {step['cmd']}({_fmt(args)}): "
+                f"{dp.describe_outcome(outcome, detail)}", step.get("action"))
+        return
+
+    want = dp.refusal_code(expect)
+    if outcome != want:
+        raise StepFailure(
+            i, "assert",
+            f"{step['cmd']}({_fmt(args)}) expected the refusal {expect!r}, "
+            f"the game answered {dp.describe_outcome(outcome, detail)}",
+            step.get("action"))
+
+
+def _fmt(args):
+    return ", ".join(f"{k}={v!r}" for k, v in sorted(args.items()))
 
 
 def _group_by_step(trace):
