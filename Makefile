@@ -11,9 +11,10 @@ CFLAGS    := -Wa-l -Wl-m -Wl-j -Wm-ya32 -autobank -Wb-ext=.rel -Ilib/hUGEDriver/
 # DEBUG=1 does two things. DBG_STATIC stops hiding module data, so every variable reaches the
 # .noi symbol file — that half adds no code. It also compiles in the test command mailbox
 # (#590), which does add code, in bank 30 and in bank 0. The two ROMs therefore no longer hold
-# identical bytes anywhere: bank 0 differs because the mailbox needs BANKED trampolines there,
-# and banks 1-3 differ too, but only in the absolute operands those trampolines shift —
-# tests/test_rom_parity.py checks that banks 1-3 differ in no other way.
+# identical bytes anywhere: bank 0 differs because of both the mailbox's BANKED trampolines and
+# the reserved stack (-Wl-g.STACK=0xDF00, below) living there, and banks 1-3 differ too, but
+# only in the absolute operands those trampolines shift — tests/test_rom_parity.py checks that
+# banks 1-3 differ in no other way.
 ifeq ($(DEBUG),1)
 CFLAGS += -DDEBUG
 # The test command mailbox compiles into the debug ROM only (#590 R1). src/debug.c wraps its

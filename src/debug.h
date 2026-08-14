@@ -16,10 +16,12 @@
  *
  * SDCC gives a file-scope variable the same area and the same address whether
  * it is static or not, and the access code is identical — DBG_STATIC changes
- * linkage, not code. The two ROMs still diverge, but for a different reason:
- * the debug ROM also compiles in the test command mailbox (#590) and the
- * BANKED trampolines it needs. tests/test_rom_parity.py checks that divergence
- * stays limited to that.
+ * linkage, not code. The two ROMs still diverge, but for different reasons:
+ * the debug ROM also compiles in the test command mailbox (#590), whose
+ * BANKED trampolines and reserved stack (-Wl-g.STACK=0xDF00) both live in
+ * bank 0. tests/test_rom_parity.py bounds that divergence for banks 1-3 (the
+ * relocated-operand classification and its two caps); for bank 0 it only
+ * asserts that a difference exists.
  */
 #ifdef DEBUG
   #define DBG_STATIC
