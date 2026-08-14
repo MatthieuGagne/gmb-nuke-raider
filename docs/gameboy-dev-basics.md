@@ -70,7 +70,9 @@ VBlank ISRs are commonly used to do safe VRAM updates every frame automatically,
 512 KB doesn't fit in the CPU's address space at once (it only sees 16 KB of ROM at a time). So the cartridge has an **MBC (Memory Bank Controller)** chip that lets you swap in different 16 KB chunks ("banks") of ROM on demand.
 
 - **Bank 0** is always visible. Put your core game loop and frequently-called code here.
-- **Banks 1–31** are swappable. Assets (tile data, music) go here.
+- **Banks 1–31** are swappable. Assets (tile data, music) go here. The compiler auto-assigns most
+  of them (banks 1–29); two are pinned by hand — bank 31 for music data, bank 30 for the debug
+  ROM's test command mailbox (#590).
 - Before calling code or reading data in a non-zero bank, you must switch to that bank first.
 
 ---

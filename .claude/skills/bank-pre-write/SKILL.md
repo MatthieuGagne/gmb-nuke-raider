@@ -37,7 +37,7 @@ If the file's manifest bank is **not 0** (i.e., it lives in the switchable windo
   > Reason: calling SET_BANK/SWITCH_ROM from banked code switches the window away from the running function → crash.
   > Fix: move the SET_BANK call into `loader.c` (a bank-0 NONBANKED wrapper), or into another bank-0 file.
 
-Only these bank-0 files may call `SET_BANK`/`SWITCH_ROM`: `main.c`, `music.c`, `hub_data.c`, `state_hub.c`, `state_overmap.c`, `loader.c`, `state_manager.c`.
+Only these bank-0 files may call `SET_BANK`/`SWITCH_ROM`: `main.c`, `music.c`, `sfx.c`, `hub_data.c`, `state_hub.c`, `state_overmap.c`, `loader.c`, `state_manager.c`.
 
 ## Check 4 — No `BANKED` on static functions or bank-0 functions
 
@@ -50,6 +50,10 @@ Only these bank-0 files may call `SET_BANK`/`SWITCH_ROM`: `main.c`, `music.c`, `
 All generated asset files use `--bank 255` (autobank). Use `--bank N` only for architecturally justified overrides (documented in `bank-manifest.json`).
 
 If adding a new generated file, ensure the Makefile passes `--bank 255` to `png_to_tiles.py` and the manifest entry is `bank: 255`.
+
+Two files are pinned rather than autobanked: `src/music_data.c` at bank 31 and `src/debug.c`
+at bank 30. Bank 30 holds the test command mailbox and exists in the debug ROM only. Do not
+add a third pin without an ADR — banks 1 and 2 are too full to absorb a displaced module.
 
 ## If all checks pass
 

@@ -57,6 +57,12 @@ with full rationale in `docs/dev-workflow.md` §4.
 Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt25` (MBC5), `-Wm-yn"NUKERAIDER"`.
 To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
 
+**Bank 30 — the test command mailbox (#590):** debug-ROM-only, pinned one bank below music (31)
+because banks 1 and 2 are too full to absorb a displaced module. `src/debug.c` compiles to
+nothing under a release build, so bank 30 is uniform filler there. In the debug ROM it holds a
+nine-byte WRAM wire that a headless test harness writes to drive the game through its own
+functions — see `docs/dev-workflow.md`'s "The test command mailbox" section.
+
 ## Git & GitHub
 
 Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git` if push fails due to missing credentials.
@@ -179,6 +185,16 @@ When the user asks for a brainstorm or PRD: stay at the **requirements and desig
 ## Build & Test Rules
 
 - Always use a clean build (`make clean && make`) when testing historical PRs or comparing versions. Never assume a prior build is still valid.
+
+**Two ROMs:** `make` builds the release ROM; `make build-debug` builds the debug ROM, which
+adds `DBG_STATIC` symbols, the bank-30 test command mailbox and a stack reserved to 0xDF00. The
+two ROMs no longer hold identical bytes anywhere, bank 0 included: the reserved stack and the
+`BANKED` trampolines it needs live in bank 0, and a `BANKED` function's trampoline shifts
+bank-0 addresses, which shifts the absolute operands banked code (banks 1-3) uses to call it.
+`tests/test_rom_parity.py` no longer checks byte identity for banks 1-3 — it checks that every
+differing byte there is an operand relocated to another bank-0 address, that the relocation
+mapping is consistent, and that the number of distinct relocated targets and deltas stays
+small.
 
 ## Workflow
 
