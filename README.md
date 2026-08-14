@@ -24,10 +24,14 @@ never overwrite each other:
 make build-debug        # build/debug/nuke-raider.gb, .map, .noi, game-manifest.json
 ```
 
-The two ROMs hold the same bytes. `DEBUG=1` changes linkage only: `DBG_STATIC` stops hiding
-module data, so every mutable file-scope variable reaches `build/debug/nuke-raider.noi` and a
-headless scenario can watch it. Add `DEBUG_TRACE=1` to turn the emitting diagnostics
-(`EMU_printf`, the WRAM ring buffer) back on — those do add code.
+The two ROMs no longer hold the same bytes. `DEBUG=1` changes linkage — `DBG_STATIC` stops
+hiding module data, so every mutable file-scope variable reaches `build/debug/nuke-raider.noi`
+and a headless scenario can watch it — but it also reserves the stack at `-Wl-g.STACK=0xDF00`
+and adds a test command mailbox pinned to bank 30, both debug-ROM-only. Bank 0 differs because
+that reserved stack and the mailbox's cross-bank call trampolines live there; banks 1-3 differ
+only in the absolute operands that shift when a trampoline moves, never in an instruction
+itself — `tests/test_rom_parity.py` checks exactly that. Add `DEBUG_TRACE=1` to turn the
+emitting diagnostics (`EMU_printf`, the WRAM ring buffer) back on — those do add code.
 
 The first build also points git at this repo's tracked hooks (`git config core.hooksPath
 .githooks`), so a `pre-commit` tool-suite gate and a `pre-push` clean-build gate apply from then
@@ -114,7 +118,7 @@ Or load `build/nuke-raider.gb` in any GB/GBC emulator ([Emulicious](https://emul
 | Input | `src/input.h` | Key tick/press/release/debounce helpers |
 | Economy | `src/economy.c/.h` | Scrap balance tracker: add/spend/query; initialized once at boot |
 | Config | `src/config.h` | Capacity constants (`MAX_NPCS`, etc.) |
-| Debug | `src/debug.h` | `DBG_STATIC` visibility macro; `EMU_printf` macros behind `DEBUG_TRACE` |
+| Debug | `src/debug.h`, `src/debug.c` | `DBG_STATIC` visibility macro; `EMU_printf` macros behind `DEBUG_TRACE`; `src/debug.c` (bank 30, pinned, debug ROM only, #590) is the test command mailbox — a nine-byte WRAM wire that lets a headless scenario drive the game through its own functions |
 
 ### Game States
 

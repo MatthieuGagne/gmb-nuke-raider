@@ -64,6 +64,7 @@
     border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;color:#0e1117;text-align:center;padding:2px}
   .bk-home{background:#7ee787}
   .bk-auto{background:#388bfd}
+  .bk-mailbox{background:#f78166}
   .bk-music{background:#bc8cff}
   .bankcell small{font-size:8px;font-weight:400;opacity:.85;line-height:1.1}
 
@@ -193,6 +194,7 @@
   <div class="legend">
     <span><i class="bk-home"></i> Bank 0 — HOME (always mapped)</span>
     <span><i class="bk-auto"></i> Auto-banked (compiler assigns)</span>
+    <span><i class="bk-mailbox"></i> Bank 30 — test command mailbox (pinned, debug ROM only)</span>
     <span><i class="bk-music"></i> Bank 31 — music data (pinned)</span>
   </div>
   <div class="bankgrid" id="bankgrid"></div>
@@ -282,7 +284,10 @@ const D = {
   "bank-music":{t:"Bank 31 — music data (pinned)",m:"src/music_data.c · ~11 KB · explicitly pinned",
     h:"The song data is large (~11 KB) and is deliberately nailed to the last bank so it can never collide with growing game-data banks. Pinning = we chose its bank by hand instead of letting the compiler decide.",
     a:"A reserved parking spot at the far end of the lot, so nobody else ever parks there."},
-  "bank-auto":{t:"Auto-banked pool (banks 1–30)",m:"~40 files · {\"bank\":255} = compiler assigns",
+  "bank-mailbox":{t:"Bank 30 — test command mailbox (pinned, debug ROM only)",m:"src/debug.c · explicitly pinned · debug ROM only (#590)",
+    h:"src/debug.c compiles to nothing in the release ROM, so this bank is empty filler there. In the debug ROM it holds the test command mailbox: a fixed nine-byte WRAM wire (0xDF70-0xDF78) that lets a headless test harness drive the game through its own functions. Pinned one bank below music (31) because banks 1 and 2 are too full to absorb a displaced module.",
+    a:"A back room that's locked and empty on opening night, but stocked for dress rehearsal."},
+  "bank-auto":{t:"Auto-banked pool (banks 1–29)",m:"~40 files · {\"bank\":255} = compiler assigns",
     h:"Most of the game — gameplay modules (player, racer, turret, patrol, projectile, explosion…), sprite art, tilesets, track maps, and per-state screens — is marked 'autobank' (255). The linker packs them into whichever banks have room. The state dispatcher swaps the right one in before calling into it.",
     a:"General parking — you don't pick a spot, the attendant fits each car wherever it lands."},
 
@@ -335,6 +340,7 @@ for(let i=0;i<32;i++){
   let key,label;
   if(i===0){c.classList.add('bk-home');key='bank-home';label='HOME';}
   else if(i===31){c.classList.add('bk-music');key='bank-music';label='music';}
+  else if(i===30){c.classList.add('bk-mailbox');key='bank-mailbox';label='mailbox';}
   else{c.classList.add('bk-auto');key='bank-auto';label='auto';}
   c.dataset.key=key;
   c.innerHTML=`${i}<small>${label}</small>`;

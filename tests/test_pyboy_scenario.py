@@ -7,6 +7,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import pyboy_scenario as ps
+import debug_protocol as dp
 
 
 class FakeScreen:
@@ -1319,6 +1320,163 @@ class TestFailureContext(unittest.TestCase):
         limits = caught.exception.context['drive_limits']
         self.assertEqual(limits['y_max'], 192)
         self.assertEqual(limits['source'], 'manifest')
+
+
+class _Zero(dict):
+    def __missing__(self, key):
+        return 0
+
+
+class _RecordingMemory(_Zero):
+    """Logs every harness-initiated write. The fake's own internal
+    responses use `_poke` so they never appear in the log a test uses to
+    assert R7's write order (arguments, commit, opcode — last)."""
+
+    def __init__(self, writes):
+        super().__init__()
+        self._writes = writes
+
+    def __setitem__(self, key, value):
+        self._writes.append((key, value))
+        dict.__setitem__(self, key, value)
+
+    def _poke(self, key, value):
+        dict.__setitem__(self, key, value)
+
+
+class MailboxEmu:
+    """A fake that answers a command the way src/debug.c does.
+
+    `outcome` and `detail` are set per test. `ready` is live unless a test clears it, and the
+    epoch moves one tick after an opcode is written unless `silent` is True.
+    """
+
+    def __init__(self, outcome=0, detail=0, ready=True, silent=False):
+        self.writes = []
+        self.memory = _RecordingMemory(self.writes)
+        self.addr = dp.addresses()
+        self.outcome = outcome
+        self.detail = detail
+        self.silent = silent
+        self.ticks = 0
+        # record every (address, value) write in self.writes, so a test can assert the order
+        self.memory._poke(self.addr['ready'], dp.ready_value() if ready else 0)
+        self.memory._poke(self.addr['epoch'], 0)
+        self.memory._poke(self.addr['torn'], 0)
+
+    def tick(self, n=1, render=False):
+        for _ in range(int(n)):
+            self.ticks += 1
+            if self.silent:
+                continue
+            addr = self.addr
+            if self.memory[addr['opcode']] != 0:
+                self.memory._poke(addr['outcome'], self.outcome)
+                self.memory._poke(addr['detail'], self.detail)
+                self.memory._poke(addr['opcode'], 0)
+                self.memory._poke(addr['epoch'], (self.memory[addr['epoch']] + 1) & 0xFF)
+
+    def button(self, name, delay=1):
+        pass
+
+
+@unittest.skipUnless(dp.has_mailbox(), 'src/debug.h predates the mailbox contract')
+class TestCommandAction(unittest.TestCase):
+    def test_the_harness_writes_the_opcode_last(self):
+        """R7: the last recorded write must be the opcode address."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_OK'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'add_scrap', 'args': {'amount': 50}}
+        ps.run(emu, [step], ctx)
+        self.assertEqual(emu.writes[-1][0], dp.addresses()['opcode'])
+
+    def test_the_commit_byte_matches_the_arguments(self):
+        """R7: the written commit must equal dp.commit_byte of the packed request."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_OK'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'add_scrap', 'args': {'amount': 300}}
+        ps.run(emu, [step], ctx)
+        opcode, arg0, arg1 = dp.pack('add_scrap', {'amount': 300})
+        commit_addr = dp.addresses()['commit']
+        commit_writes = [v for a, v in emu.writes if a == commit_addr]
+        self.assertEqual(commit_writes[-1], dp.commit_byte(opcode, arg0, arg1))
+
+    def test_a_missing_ready_byte_is_a_precondition_failure(self):
+        """R10, AC3: a release ROM says so, it does not read as a game defect."""
+        emu = MailboxEmu(ready=False)
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'add_scrap', 'args': {'amount': 1}}
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [step], ctx)
+        self.assertEqual(caught.exception.kind, 'precondition')
+        self.assertIn('mailbox', caught.exception.message)
+
+    def test_a_silent_game_reports_the_torn_count_and_both_causes(self):
+        """The ready byte can read 0xA5 by chance in the release ROM."""
+        emu = MailboxEmu(silent=True)
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'add_scrap', 'args': {'amount': 1},
+                'max_frames': 3}
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [step], ctx)
+        self.assertEqual(caught.exception.kind, 'precondition')
+        msg = caught.exception.message
+        self.assertIn('torn=', msg)
+        self.assertIn('no mailbox', msg)
+        self.assertIn('stopped running', msg)
+
+    def test_an_unexpected_refusal_raises_precondition(self):
+        """R22: the verdict becomes scenario-invalid, never fail."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_LOCKED'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'unlock_field', 'args': {'field': 'armor'}}
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [step], ctx)
+        self.assertEqual(caught.exception.kind, 'precondition')
+
+    def test_the_message_names_the_command_the_arguments_and_the_reason(self):
+        """AC3: assert all three appear — the cmd name, the arg values, the DBG_OUT_ name."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_LOCKED'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'unlock_field', 'args': {'field': 'armor'}}
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [step], ctx)
+        msg = caught.exception.message
+        self.assertIn('unlock_field', msg)
+        self.assertIn('armor', msg)
+        self.assertIn('DBG_OUT_LOCKED', msg)
+
+    def test_an_expected_refusal_passes(self):
+        """R23."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_LOCKED'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'unlock_field', 'args': {'field': 'armor'},
+                'expect': 'locked'}
+        ps.run(emu, [step], ctx)   # must not raise
+
+    def test_an_expected_refusal_that_does_not_arrive_is_an_assert(self):
+        """The scenario made a claim about the game and the claim was wrong."""
+        emu = MailboxEmu(outcome=dp.outcomes()['DBG_OUT_OK'])
+        ctx = ps.RunContext(symbols={})
+        step = {'action': 'command', 'cmd': 'unlock_field', 'args': {'field': 'armor'},
+                'expect': 'locked'}
+        with self.assertRaises(ps.StepFailure) as caught:
+            ps.run(emu, [step], ctx)
+        self.assertEqual(caught.exception.kind, 'assert')
+
+    def test_an_unknown_command_name_is_refused_at_load_time(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'command', 'cmd': 'not_a_real_command'}])
+
+    def test_an_unknown_expect_value_is_refused_at_load_time(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'command', 'cmd': 'add_scrap',
+                              'args': {'amount': 5}, 'expect': 'not_a_real_refusal'}])
+
+    def test_an_out_of_range_argument_is_refused_at_load_time(self):
+        with self.assertRaises(ps.ScenarioError):
+            ps.load_scenario([{'action': 'command', 'cmd': 'add_scrap',
+                              'args': {'amount': 999999}}])
 
 
 if __name__ == '__main__':

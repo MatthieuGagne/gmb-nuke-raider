@@ -159,6 +159,25 @@ class TestScenarioLibrary(unittest.TestCase):
                     self.assertNotIn(step.get('action'),
                                      ('assert_state', 'wait_state'))
 
+    def test_a_scenario_that_sends_a_command_declares_that_it_needs_the_debug_rom(self):
+        """`--all` runs against the release ROM, and `resolve_exit_code` ignores `blocking`
+        for a scenario-invalid verdict, so an undeclared mailbox scenario would gate the
+        whole library run (#590)."""
+        library = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), 'tools', 'scenarios')
+        for name in sorted(os.listdir(library)):
+            if not name.endswith('.json'):
+                continue
+            with open(os.path.join(library, name)) as f:
+                data = json.load(f)
+            steps = data['steps'] if isinstance(data, dict) else data
+            if any(s.get('action') == 'command' for s in steps):
+                with self.subTest(file=name):
+                    self.assertTrue(isinstance(data, dict)
+                                    and data.get('requires_debug_rom') is True,
+                                    f'{name} sends a command but does not declare '
+                                    f'requires_debug_rom')
+
 
 class _ZeroMemory(dict):
     """PyBoy's memory view reads as zero everywhere the test does not set it."""

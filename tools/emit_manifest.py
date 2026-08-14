@@ -14,10 +14,14 @@ Usage:
 """
 import sys
 import json
+import os
 import re
 import argparse
 import xml.etree.ElementTree as ET
 from collections import deque
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import debug_protocol  # noqa: E402
 
 GID_FLAGS = 0x0FFFFFFF
 
@@ -343,7 +347,13 @@ def main():
         'tiles':    tiles,
         'tile_legend': TILE_TYPE_CHARS,
         'solid_tile_types': SOLID_TILE_TYPES,
-        'symbols':  symbols
+        'symbols':  symbols,
+        'mailbox': ({
+            'base': debug_protocol.base(),
+            'ready_value': debug_protocol.ready_value(),
+            'seed': debug_protocol.seed(),
+            'addresses': debug_protocol.addresses(),
+        } if debug_protocol.has_mailbox() else None),
     }
 
     print(json.dumps(manifest, indent=2))

@@ -10,6 +10,43 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+
+def _repo(*parts):
+    return os.path.join(_ROOT, *parts)
+
+
+def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
+    """Run emit_manifest.main() against the repo's real assets and return the
+    parsed manifest. The module's only driver, so a broken payload key fails
+    here instead of passing silently."""
+    import emit_manifest
+    f = tempfile.NamedTemporaryFile(mode='w', suffix='.noi', delete=False)
+    f.write(noi_text)
+    f.close()
+    argv = [
+        'emit_manifest.py',
+        '--noi', f.name,
+        '--overmap', _repo('assets', 'maps', 'overmap.tmx'),
+        '--tracks', _repo('assets', 'maps', 'track.tmx'),
+                    _repo('assets', 'maps', 'track2.tmx'),
+                    _repo('assets', 'maps', 'track3.tmx'),
+        '--tsx', _repo('assets', 'maps', 'track.tsx'),
+        '--state-overmap', _repo('src', 'state_overmap.c'),
+        '--state-prerace', _repo('src', 'state_prerace.c'),
+    ]
+    buf = io.StringIO()
+    old_argv = sys.argv
+    sys.argv = argv
+    try:
+        with contextlib.redirect_stdout(buf):
+            emit_manifest.main()
+    finally:
+        sys.argv = old_argv
+        os.unlink(f.name)
+    return json.loads(buf.getvalue())
+
 
 class TestBFS(unittest.TestCase):
     def _em(self):
@@ -178,41 +215,18 @@ class TestManifestSymbolEmission(unittest.TestCase):
     """Drives emit_manifest.main() for real, so a hoisted-but-unwired
     CURATED_SYMBOLS list fails here instead of passing silently."""
 
-    _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-    def _repo(self, *parts):
-        return os.path.join(self._ROOT, *parts)
-
     def test_main_emits_curated_symbols(self):
-        import emit_manifest
-        f = tempfile.NamedTemporaryFile(mode='w', suffix='.noi', delete=False)
-        f.write("DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n")
-        f.close()
-        argv = [
-            'emit_manifest.py',
-            '--noi', f.name,
-            '--overmap', self._repo('assets', 'maps', 'overmap.tmx'),
-            '--tracks', self._repo('assets', 'maps', 'track.tmx'),
-                        self._repo('assets', 'maps', 'track2.tmx'),
-                        self._repo('assets', 'maps', 'track3.tmx'),
-            '--tsx', self._repo('assets', 'maps', 'track.tsx'),
-            '--state-overmap', self._repo('src', 'state_overmap.c'),
-            '--state-prerace', self._repo('src', 'state_prerace.c'),
-        ]
-        buf = io.StringIO()
-        old_argv = sys.argv
-        sys.argv = argv
-        try:
-            with contextlib.redirect_stdout(buf):
-                emit_manifest.main()
-        finally:
-            sys.argv = old_argv
-            os.unlink(f.name)
-
-        symbols = json.loads(buf.getvalue())['symbols']
+        payload = _run_main()
+        symbols = payload['symbols']
         self.assertEqual(symbols['_rs_laps'], '0xc1a4')
         self.assertEqual(symbols['_rs_cp_next'], '0xc1a8')
         self.assertNotIn('_cp_next', symbols)
+
+    def test_the_manifest_carries_the_mailbox_addresses(self):
+        payload = _run_main()
+        mb = payload['mailbox']
+        self.assertEqual(mb['base'], 0xDF70)
+        self.assertEqual(mb['addresses']['epoch'], 0xDF77)
 
 
 class TestTrackDescription(unittest.TestCase):

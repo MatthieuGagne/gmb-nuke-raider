@@ -8,6 +8,9 @@ Usage:
     python3 tools/bank_check.py <file.c> [repo_root] # check one file (pre-write hook mode)
     or imported as a module: bank_check.check(repo_root) -> list[str]
                              bank_check.check_file(file_path, repo_root='.') -> list[str]
+
+Pinned banks in use: 30 (src/debug.c, debug ROM only, #590) and 31 (src/music_data.c).
+Nothing here enumerates them — the manifest does. This line is a reader's map, not a rule.
 """
 import glob
 import json

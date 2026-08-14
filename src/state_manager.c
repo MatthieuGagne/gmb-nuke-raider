@@ -19,8 +19,11 @@ DBG_STATIC uint8_t sm_depth = 0;
  * (#588 R9). The game never reads this array; a headless scenario reads it
  * out of WRAM to name the state the game is in.
  *
- * It is compiled into BOTH ROMs on purpose. An `#ifdef DEBUG` array would add
- * code to the debug ROM only, and the two ROMs must hold the same bytes (AC2).
+ * It is compiled into BOTH ROMs on purpose. An `#ifdef DEBUG` array would give
+ * this one declaration a different compilation path from every other
+ * DBG_STATIC variable in src/*.c, for no benefit — the array costs nothing a
+ * release ROM needs to avoid. One pattern for every file-scope debug-visible
+ * variable keeps the two builds' code identical here.
  * DBG_STATIC is what makes the symbol reachable in the debug build alone. */
 DBG_STATIC const State *sm_slot_src[STACK_MAX];
 
@@ -85,3 +88,13 @@ void state_replace(const State *s, uint8_t bank) {
     load_entry(sm_depth - 1, s, bank);
     invoke(stack[sm_depth - 1].enter, stack[sm_depth - 1].bank);
 }
+
+#ifdef DEBUG_MAILBOX
+uint8_t state_manager_depth(void) {
+    return sm_depth;
+}
+
+const State *state_manager_top(void) {
+    return (sm_depth == 0u) ? 0 : sm_slot_src[sm_depth - 1u];
+}
+#endif

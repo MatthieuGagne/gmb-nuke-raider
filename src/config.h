@@ -187,8 +187,12 @@
  * cannot spiral or produce an audible fast-forward. Above this, excess ticks drop. */
 #define MUSIC_MAX_CATCHUP 3u
 
-/* Debug ring buffer — EMU_printf / Emulicious debug output (DEBUG=1 only).
- * Fixed WRAM addresses in the last 66 bytes — well above static data (~0xC000-0xC242). */
+/* Debug ring buffer — EMU_printf / Emulicious debug output, behind DEBUG_TRACE (not DEBUG=1
+ * alone; see src/debug.h). Fixed WRAM addresses in the last 66 bytes — well above static data
+ * (~0xC000-0xC242).
+ *
+ * 0xDF00-0xDFFF is reserved in the debug ROM: the linker's stack pointer is moved to
+ * 0xDF00 (-Wl-g.STACK, #590 R12). The mailbox holds 0xDF70-0xDF78; see src/debug.h. */
 #define DEBUG_LOG_ADDR    0xDF80U  /* WRAM: ring buffer content (64 bytes) */
 #define DEBUG_LOG_SIZE    64U
 #define DEBUG_LOG_IDX     0xDFC0U  /* WRAM: ring buffer write index (1 byte) */

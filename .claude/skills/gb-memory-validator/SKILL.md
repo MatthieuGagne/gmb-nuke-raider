@@ -27,3 +27,9 @@ description: TRIGGER after every successful ROM build. Runs `make memory-check` 
 - ERROR (map symbol missing): treat as FAIL — ROM may not be built correctly.
 - WARN: advisory only — document, do not block.
 - ROM bank FAIL: handled by `bank-post-build` skill, not this script.
+
+## Debug ROM note
+
+The debug ROM links with `-Wl-g.STACK=0xDF00`, reserving 0xDF00-0xDFFF for the test mailbox
+(0xDF70-0xDF78) and the debug ring buffer (0xDF80-0xDFC1). `make memory-check-debug` reads
+`s__HEAP_E`, which must stay below 0xDF00; `tests/test_debug_symbols.py` enforces it.

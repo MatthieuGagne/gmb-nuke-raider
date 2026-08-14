@@ -34,6 +34,11 @@ uint8_t turret_blocks_tile(uint8_t tx, uint8_t ty) BANKED;
 /* Returns number of active turrets — used by tests. */
 uint8_t turret_count_active(void) BANKED;
 
+/* Deactivate turret `slot` and return its OAM handle to the sprite pool.
+ * Returns 1 when the slot was active, 0 when it was already free or out of range.
+ * No explosion: this is a silent removal, unlike the damage path (#590 R18). */
+uint8_t turret_despawn(uint8_t slot) BANKED;
+
 /* Test-only accessors — do not call from production code */
 #ifndef __SDCC
 uint8_t turret_get_type(uint8_t i);

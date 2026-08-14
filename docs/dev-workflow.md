@@ -310,8 +310,32 @@ with its own `.map`, `.noi` and `game-manifest.json`. Neither writes over the ot
 `make clean` removes both. `make memory-check` reports on the release ROM, `make
 memory-check-debug` on the debug one.
 
-The two ROMs hold the same bytes. `tests/test_rom_parity.py` checks it. `DEBUG=1` changes
-linkage only.
+The two ROMs no longer hold the same bytes (#590 ends #588 AC2). Bank 0 differs: the debug
+build reserves the stack at `-Wl-g.STACK=0xDF00` and adds the `BANKED` trampolines the
+mailbox's cross-bank calls need, and both live in bank 0. Banks 1-3 differ too, but only in
+each `BANKED` call site's absolute operand: a new trampoline shifts every bank-0 address after
+it, and banked code calls bank-0 routines by absolute address, so those calls' operands move
+with it — the instructions themselves, opcode included, are untouched. Bank 30 exists only in
+the debug ROM (the mailbox itself, see below); the release ROM's bank 30 is uniform filler.
+
+`tests/test_rom_parity.py` no longer compares bytes. It asserts, for every ROM bank that is not
+HOME (0), not the mailbox bank (30), and not uniform filler in the release ROM — derived at test
+time, currently `(1, 2, 3, 31)`: every differing byte belongs to a 16-bit absolute operand whose
+opcode is unchanged in both ROMs and whose value is a bank-0 address on both sides; the
+release-to-debug address mapping is a consistent function (one release address never maps to two
+different debug addresses); the number of distinct relocated targets stays under a cap (128); and
+the number of distinct relocation deltas stays under a cap (8). Measured today: 40 distinct
+targets, 3 distinct deltas (-570, +47, +675), 684 relocated bytes, zero unexplained bytes. It also
+asserts bank 0 differs (a control — if it didn't, the invariant above would prove nothing) and
+that bank 30 is uniform filler in the release ROM and not in the debug ROM. `DEBUG=1` changes
+linkage and adds this reserved stack and the mailbox; it does not otherwise change what the game
+does.
+
+**Scope, stated honestly:** the invariant above only bounds banks 1-3 and 31 — the ones the
+derivation currently finds non-filler. Bank 0 is checked only for "differs from the release ROM",
+never analyzed byte-by-byte: it holds ~67% differing bytes between the two ROMs (measured today),
+and no test classifies any of them as relocation vs. real change. A defect confined to bank 0
+would not be caught by this test at all.
 
 ### Bank gates (C files only)
 
@@ -330,7 +354,7 @@ Every `src/*.c` file must have an entry in `bank-manifest.json` before it is wri
 | OAM | 40 sprites | Player = 2; rest for enemies/projectiles/HUD |
 | VRAM BG tiles | 192 (DMG bank 0) + 192 (CGB bank 1) | CGB bank 1 for color variants |
 | WRAM | 8 KB | Large arrays must be `global` or `static`, never local |
-| ROM | MBC5, 512 KB = 32 banks, auto-sized by makebin (`-yo A`) and recorded in cartridge header `0x148` | `-autobank` places code past bank 0 — state code sits in banks 2-3 today; assets tagged for banking. `-Wm-ya32` in `CFLAGS` is **not** the ROM bank count: `-ya` is makebin's *RAM* bank count and the value is discarded (header `0x149=0x00`) |
+| ROM | MBC5, 512 KB = 32 banks, auto-sized by makebin (`-yo A`) and recorded in cartridge header `0x148` | `-autobank` places code past bank 0, into the autobank pool (banks 1-29) — state code sits in banks 2-3 today; assets tagged for banking. Two banks are pinned by hand instead of autobanked: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590). `-Wm-ya32` in `CFLAGS` is **not** the ROM bank count: `-ya` is makebin's *RAM* bank count and the value is discarded (header `0x149=0x00`) |
 
 Run `make memory-check` to validate budgets. Any FAIL or ERROR must be fixed before continuing.
 
@@ -520,6 +544,25 @@ Two facts about the game that scenarios must respect:
 `make test-tools` covers the engine itself host-side (no ROM, no PyBoy emulation — though it does
 import PyBoy via `screenshot.py`). The two gates are deliberately separate: unit tests verify the
 engine, `make smoketest` verifies the ROM.
+
+### The test command mailbox
+
+The debug ROM carries a nine-byte WRAM wire at a fixed address (`src/debug.h`,
+`DBG_MB_BASE = 0xDF70`): `ready`, `opcode`, two arguments, a commit byte, an outcome, a detail
+byte, an epoch and a torn-commit count. A scenario's `command` action writes a request into it
+and waits for the epoch to advance, then reads the outcome back. Every command calls one of the
+game's own functions — `debug_mailbox_poll()` dispatches through the same code paths a player's
+input would reach, so a scenario cannot create a state the game itself could not enter. Commands
+that would break a game invariant (a locked loadout option, a loadout change mid-race, a push at
+the state-stack depth limit) are refused with a named reason (`expect` in the scenario), not
+silently applied.
+
+A scenario that sends a `command` step must set `"requires_debug_rom": true` at the top level.
+Build it with `make build-debug` and point `--rom`/`--map`/`--noi`/`--manifest` at
+`build/debug/nuke-raider.gb` and its siblings; `--all` skips such a scenario against a ROM with
+no mailbox and reports it `skipped`, while naming it directly with `--scenario` still runs it.
+The mailbox lives in bank 30 — see `CLAUDE.md`'s ROM Header section and the "Two ROMs" section
+above. Full command list, argument ranges and refusal codes: `tools/scenarios/README.md`.
 
 ---
 

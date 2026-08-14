@@ -124,6 +124,10 @@ State struct carries a `uint8_t bank` field. Callbacks are plain function pointe
 
 **BANKREF for autobank:** Use `BANKREF(sym)` in `#pragma bank 255` files — bankpack rewrites `___bank_sym` to the real assigned bank at link time. Use `volatile __at(N)` only for explicit bank N (not 255), in data-only files.
 
+Pinned banks: 31 = `src/music_data.c`, 30 = `src/debug.c` (test command mailbox, debug ROM
+only, #590). A pinned **code** file needs the `#pragma bank N` line and nothing else — the
+`volatile __at(N)` form is for data-only files whose bank symbol a loader reads.
+
 ## Verification Commands
 After making changes, verify with:
 - `/test` skill — run `make test` (host-side unit tests, gcc only)
