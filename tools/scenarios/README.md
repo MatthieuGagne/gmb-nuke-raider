@@ -20,6 +20,7 @@ A scenario file is a JSON object:
 | `blocking` | `true` makes a failure fail the gate. `false` makes the run evidence only. |
 | `watch` | WRAM symbols sampled into `trace.jsonl`. |
 | `steps` | The action list. A bare JSON array is also accepted, and it means `steps`. |
+| `requires_debug_rom` | `true` marks a scenario that sends a `command` step. `--all` skips it against a ROM with no mailbox; `--scenario <name>` still runs it. |
 
 ## Actions
 
@@ -36,6 +37,7 @@ A scenario file is a JSON object:
 | `assert_screen_changes` | — | `frames` | Checks the screen changes inside `frames`. Default 60. |
 | `assert_live` | — | `symbols`, `screen`, `frames` | Both checks above. `screen` defaults to `true`. |
 | `screenshot` | — | `out` | Writes one PNG. |
+| `command` | `cmd` | `args`, `expect`, `max_frames` (60) | Sends one command to the debug ROM's test mailbox and waits for the game's answer. Needs the debug ROM. |
 | `include` | `name` | — | Inlines another scenario at load time. |
 
 Every action accepts `require`, except `include`. An `include` step is replaced by the steps it
@@ -61,6 +63,69 @@ asked the wrong question, so the harness reports the verdict `scenario-invalid`,
 | `value` | The number to compare against. Required with `address`. |
 | `op` | `eq`, `ne`, `lt`, `le`, `gt`, `ge`. The default is `eq`. |
 | `width` | 1 or 2 bytes. The default comes from the symbol. |
+
+## The `command` action
+
+The debug ROM carries a nine-byte mailbox. A `command` step writes one command into it, waits for
+the game to answer, and reads the outcome. Every command calls a game function — the mailbox never
+writes another module's variable, so a scenario cannot create a state the game will not enter.
+
+**The debug ROM only.** Run `make build-debug` and point `--rom` at `build/debug/nuke-raider.gb`.
+A scenario with a `command` step must set `"requires_debug_rom": true` at the top level;
+`--all` then skips it when the ROM under test is the release ROM, and `--scenario <name>` still
+runs it. Against the release ROM the first `command` step stops with the failure kind
+`precondition` and the verdict `scenario-invalid`, naming the ROM you need.
+
+### The commands and their named arguments
+
+| `cmd` | `args` | Values |
+|---|---|---|
+| `add_scrap` | `amount` | 0-65535 |
+| `unlock_field` | `field` | `car`, `armor`, `weapon1`, `weapon2` |
+| `set_option` | `field`, `option` | `car`: `viper`/`tank`; `armor`: `light`/`heavy`; `weapon1`: `cannon`/`laser`; `weapon2`: `rocket`/`mine` |
+| `damage` | `amount` | 0-255 |
+| `heal` | `amount` | 0-255 |
+| `force_state` | `state`, `mode` | `state`: `title`, `overmap`, `hub`, `prerace`, `playing`, `results`, `game_over`; `mode`: `push`, `pop`, `replace` |
+| `spawn_turret` | `tx`, `ty` | tile coordinates |
+| `despawn_turret` | `slot` | 0-7 |
+| `spawn_racer` | `tx`, `ty` | reserved — always refused with `unsupported` |
+| `spawn_patrol` | `tx`, `ty` | reserved — always refused with `unsupported` |
+
+There is no command that sets an absolute HP value, because the game holds no such function.
+Compose one from the readable `_hp` and a `damage` or `heal` amount.
+
+### Refusal codes
+
+A refusal means the game is correct. Without an `expect` field a refusal gives the verdict
+`scenario-invalid`, never `fail`.
+
+| `expect` | The game's reason |
+|---|---|
+| `unknown_op` | the game does not know this opcode |
+| `arg_range` | an argument is outside the range the command accepts |
+| `locked` | the economy has not unlocked this loadout option yet |
+| `in_race` | the mailbox refuses a loadout change during a race, because the race latched its loadout when it started |
+| `stack_full` | the state stack is at its depth limit |
+| `unsupported` | the opcode is reserved and the game has no function behind it |
+| `pool_full` | the entity pool has no free slot |
+| `no_effect` | the game refused the change and left the value alone |
+| `not_active` | that pool slot is not active |
+
+`locked` is the game's own answer: the mailbox calls `loadout_is_option_unlocked`, the same
+predicate the shop and the prerace menu use. `in_race` is the mailbox's own precondition — the
+game has no such refusal, because its loadout menu exists only before a race. The mailbox adds it
+because a race latches its loadout in `state_playing`'s `enter()`, so a mid-race change would
+alter the readable variable and change nothing the player can see.
+
+### Proving a refusal on purpose
+
+```json
+{"action": "command", "cmd": "set_option",
+ "args": {"field": "weapon1", "option": "laser"}, "expect": "locked"}
+```
+
+The step passes when the game refuses for that reason, and fails when the game allows it. This is
+how a scenario proves the economy still works before it unlocks anything.
 
 ## State names
 
@@ -108,7 +173,7 @@ against the reference ROM as well.
 
 | Kind | Raised by |
 |---|---|
-| `precondition` | A false `require` field. |
+| `precondition` | A false `require` field, or a `command` step that meets no mailbox, gets no answer, or is refused without an `expect`. |
 | `assert` | `assert_memory`. |
 | `state` | `assert_state`. |
 | `timeout` | `wait_memory`, `wait_state`. |
