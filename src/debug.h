@@ -15,8 +15,11 @@
  *     addresses only (R5). A mutable POINTER to const data is not const data.
  *
  * SDCC gives a file-scope variable the same area and the same address whether
- * it is static or not, and the access code is identical, so the two ROMs hold
- * the same bytes. tests/test_rom_parity.py checks that.
+ * it is static or not, and the access code is identical — DBG_STATIC changes
+ * linkage, not code. The two ROMs still diverge, but for a different reason:
+ * the debug ROM also compiles in the test command mailbox (#590) and the
+ * BANKED trampolines it needs. tests/test_rom_parity.py checks that divergence
+ * stays limited to that.
  */
 #ifdef DEBUG
   #define DBG_STATIC
