@@ -4,7 +4,7 @@ Authoritative copy with rationale lives in [`docs/dev-workflow.md`](../docs/dev-
 
 ## Scalability Conventions (every feature, no matter how small)
 
-- **Module structure:** each system gets its own `.c`/`.h` pair. New-module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review-and-fix before merge.
+- **Module structure:** each system gets its own `.c`/`.h` pair. New-module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review before merge — dispatched by the controller after the commit, report-only (#633 R5).
 - **Entity management:** no singletons for things that could multiply — fixed-size pools with an `active` flag. Use **Structure-of-Arrays (SoA)**, not Array-of-Structs (AoS). Capacity constants live in `src/config.h`.
   ```c
   /* SoA canonical template — one array per field */
