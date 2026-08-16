@@ -46,7 +46,7 @@ report can be false.
 - **C tasks:** dispatch the `gbdk-expert` agent with `"implement this task: <full task text>"` — it owns the TDD cycle, bank gates, build and the commit. It does **not** own `gb-c-optimizer`: the controller dispatches that after the commit. **Music C tasks** (`src/music_data.c`, `src/music_data.h`, or any new song `.c`) go to `music-expert` the same way.
 - **After every implementer dispatch, verify the commit landed:** run `git log --oneline -1`. Never treat the agent's return message as proof of a commit — agents often return only their final step's output. If the commit is missing, re-dispatch the task from scratch.
 - **Review range.** Record BASE with `git rev-parse HEAD` **before** dispatching an implementer, and review from that BASE — never `HEAD~1`, which silently truncates a multi-commit task to its last commit. Hand the reviewer its diff as a file path, not as pasted text, so the diff never enters this session's context.
-- **Batch atomicity:** if any implementer in a parallel group fails, halt the whole batch. Passing implementers discard in-progress work — do not stage or commit partial results. Fix, then re-dispatch the entire group.
+- **Task atomicity:** implementers run one at a time — see the `subagent-driven-development` overlay's `### Dispatch order`. A failed task therefore invalidates only itself: committed, reviewed tasks stand. Fix and re-dispatch that task alone, never the whole group.
 
 ### `make test` early-exit behavior
 

@@ -31,7 +31,7 @@ Fix mode is always on in post-implementation contexts (`executing-plans`, `subag
 4. **Build verification** — after all fixes are applied, run `make` and confirm zero errors
 5. **Report** — summarize each fix applied (anti-pattern found, line(s) changed, why)
 
-**Plan-phase exception:** When invoked from `writing-plans` (Step 10 of the C task template), Fix Mode is **off** — report issues only, do not edit files. The implementer will apply fixes during execution.
+**Plan-phase exception:** When invoked from `writing-plans` (Step 11 of the C task template), Fix Mode is **off** — report issues only, do not edit files. The implementer will apply fixes during execution.
 
 ## Domain Knowledge
 

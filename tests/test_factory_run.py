@@ -391,9 +391,13 @@ class TestAutopsy(JournalTestCase):
         self.assertTrue({'state', 'journal', 'scenario', 'smoketest'} <= names)
 
     def test_unwritable_registry_returns_none_instead_of_raising(self):
-        dest = factory_run.write_autopsy(
-            436, registry=os.path.join(self.tmp, 'file-not-dir', 'x'))
-        self.assertIn(dest, (None,) if dest is None else (dest,))
+        """AC4: a registry path nested inside a real file cannot be made."""
+        blocker = os.path.join(self.tmp, 'file-not-dir')
+        with open(blocker, 'w') as fh:
+            fh.write('not a directory')
+
+        self.assertIsNone(factory_run.write_autopsy(
+            436, registry=os.path.join(blocker, 'x')))
 
     def test_unresolvable_registry_returns_none_instead_of_raising(self):
         """The bundle degrades to None rather than raising (#633 fix round)."""
