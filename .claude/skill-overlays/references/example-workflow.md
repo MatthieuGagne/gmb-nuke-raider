@@ -1,6 +1,7 @@
 # Example Workflow
 
-A worked end-to-end walkthrough of subagent-driven development, including a parallel batch.
+A worked end-to-end walkthrough of subagent-driven development, including a `(parallel)` group
+dispatched one implementer at a time.
 
 ```
 [Worktree gate confirmed]
@@ -27,20 +28,27 @@ Task reviewer: Spec ✅ compliant. Task quality: Approved.
 
 [Mark Task 1 complete]
 
-Task 3 + Task 4: Parallel batch (Group A in Parallel Execution Groups table)
+Task 3 + Task 4: (parallel) group A — free ordering, still one at a time
 
-[Read group table: Tasks 3 and 4 are (parallel) — different output files]
-[Dispatch implementer for Task 3 AND implementer for Task 4 in a single message]
+[Read group table: Tasks 3 and 4 are (parallel) — different output files, so either may go first]
+[Dispatch implementer for Task 3. Only Task 3.]
 
 Implementer 3: [Implements Task 3, commits sha-abc]
+
+[Verify the commit landed: git log --oneline -1]
+[Controller dispatches gb-c-optimizer on Task 3's committed diff, report-only — C task]
+[Run review-package; dispatch ONE task reviewer for Task 3; close its fix loop]
+Task reviewer 3: Spec compliant. Task quality: Approved.
+
+[Mark Task 3 complete. ONLY NOW dispatch Task 4's implementer.]
+
 Implementer 4: [Implements Task 4, commits sha-def]
 
-[Verify both commits landed: git log --oneline -2]
-[One review package per task, from each task's recorded BASE; one task reviewer per task]
-Task reviewer 3: Spec ✅ compliant. Task quality: Approved.
-Task reviewer 4: Spec ✅ compliant. Task quality: Approved.
+[Verify the commit landed: git log --oneline -1]
+[Run review-package from Task 4's recorded BASE; dispatch ONE task reviewer for Task 4]
+Task reviewer 4: Spec compliant. Task quality: Approved.
 
-[Mark Task 3 complete, Task 4 complete]
+[Mark Task 4 complete]
 
 ...
 

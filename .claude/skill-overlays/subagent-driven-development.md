@@ -179,32 +179,72 @@ serializes them: one commit per tool call, never chained. **Never `--no-verify`.
   It owns the full music pipeline — export, BANKREF declarations, `music_song_validate.py`,
   `music_wire_check.py`, the bank gates, build and commit. Do NOT add separate gate
   instructions; its own body and the PreToolUse/PostToolUse hooks enforce them.
-- **All other C tasks** (`src/*.c` / `src/*.h`): the implementer IS `gbdk-expert`. Dispatch the
-  same way. It owns the full TDD cycle, the bank gates, the build, `gb-c-optimizer` review AND
-  fix (applied in-place before commit), and the commit.
+- **All other C tasks** (`src/*.c` / `src/*.h`): the implementer IS `gbdk-expert`. Dispatch
+  the same way. It owns the full TDD cycle, the bank gates, the build and the commit. It
+  does **not** own `gb-c-optimizer` — see *Who dispatches `gb-c-optimizer`* below.
 - **Non-C tasks:** dispatch a general implementer with the task text as-is.
 
 Follow the baseline's brief-file discipline for the task text itself: the brief is the single
 source of requirements, and a subagent never reads the whole plan file.
 
-### Parallel dispatch
+### Who dispatches `gb-c-optimizer`
 
-**Why:** this genuinely overrides the baseline, which forbids parallel implementers outright.
-The baseline cannot know that this project's plans carry a `#### Parallel Execution Groups`
-table computed at plan time from file-level dependency analysis — a `(parallel)` group is
-already proven to write disjoint files.
+**Why:** the baseline has no notion of this agent, and the overlay used to assign it to the
+`gbdk-expert` implementer — an assignment that cannot be carried out, because the same
+dispatch forbids the implementer from dispatching subagents and `gb-c-optimizer` is an agent.
 
-The plan's group table is the **authoritative source** — do not re-analyze file dependencies at
-runtime.
+**The controller dispatches it.** After the implementer's commit lands and before the task
+review is dispatched, the controller dispatches `gb-c-optimizer` in **report-only** mode
+(validate, report, do not apply fixes). Its findings join the task review's findings and go
+through the same fix loop, so the implementer stays the only writer and the only committer.
 
-- `(parallel)` group → dispatch all its tasks as concurrent implementers in one message.
-  **Max 3 concurrent implementers.**
-- `(sequential)` group → one task at a time.
-- No group table → fall back to per-task `**Parallelizable with:**` annotations. Neither present
-  → treat all tasks as sequential, exactly as the baseline requires.
+This moves the gate **after** the commit, which is why the `writing-plans` Hard Gate Sequence,
+the C-File Task Template and `docs/dev-workflow.md` all say so too. A rule stated in one of
+four documents is the same defect wearing a different file name.
 
-**Never** parallelize tasks that write the same file, share git state (multiple committers on
-one branch), or have sequential data dependencies.
+In run #590 the implementer could not dispatch the agent, so it applied that agent's
+checklist to its own work by hand. The controller dispatched the real gate afterwards; it
+reproduced the self-check's findings and named one hazard the self-check had missed. A
+self-applied checklist is not this gate.
+
+### Dispatch order
+
+**Why:** the baseline forbids concurrent implementers and gives one reason; this project has
+a second the baseline cannot know — the `pre-commit` repository hook runs the whole tool
+suite on every commit, so concurrent committers on one branch collide on `index.lock` and are
+serialized by the hook anyway. What this section overrides is not the concurrency ban but the
+baseline's assumption that task order is fixed: this project's plans carry a
+`#### Parallel Execution Groups` table computed at plan time from file-level dependency
+analysis, and that table is what licenses free ordering.
+
+The plan's group table is the **authoritative source** — do not re-analyze file dependencies
+at runtime.
+
+**One rule, and it is the only one: dispatch one implementer at a time.** A `(parallel)`
+group is not an instruction to run its tasks concurrently.
+
+- `(parallel)` group → its tasks write disjoint files, so dispatch them **in any order**, one
+  at a time. One task's failure does not invalidate another's work.
+- `(sequential)` group → one task at a time, in the listed order.
+- No group table → fall back to per-task `**Parallelizable with:**` annotations for ordering
+  only. Neither present → the plan's order stands.
+
+**Why concurrency lost, recorded so a third run does not re-derive it.** This overlay used to
+tell the controller to dispatch every task in a `(parallel)` group as concurrent
+implementers, four lines above "never parallelize tasks that share git state (multiple
+committers on one branch)". Every task in this project commits, so both rules bound every
+group and the section contradicted itself. Runs #430 and #590 each hit the contradiction and
+each resolved it the same way — keep the file-level analysis, drop the concurrency. The
+`index.lock` collision and the serializing `pre-commit` hook are why: the concurrency was
+never buying wall-clock time it could keep.
+
+**A task's review closes before the next task's implementer is dispatched.** The review, and
+any fix loop it opens, finishes first. **Why:** the reviewer builds and runs tests in this
+same working tree. Dispatch the next implementer first and the tree holds another task's
+uncommitted work while the reviewer builds — so the reviewer verifies code it was not asked to review,
+and nothing in its report says so. In run #590 the Task 3 reviewer found 403 lines of
+uncommitted Task 4 work and isolated itself in a detached checkout before building. It was
+right, and it was working around the controller.
 
 ### Batch boundaries are smoketest checkpoints
 
@@ -243,6 +283,14 @@ Everything else stands unchanged and is **not** waived:
 - `### Pre-PR Gate (HARD STOP)` — all four checks.
 - `### Red flags — never` — all of them, including the worktree gate.
 
+**A ruling that makes the plan stale is written into the plan file, in the same step that
+records it.** Task briefs are extracted from the plan once, at dispatch time, so a ruling that
+amends a fact a later task's brief states never reaches that task unless the plan itself
+changes. Record the `decision` event **and** edit the plan file before dispatching the next
+task. In run #590 three implementers corrected the controller about facts their briefs stated
+and later rulings had already falsified — the controller was handing out text it had itself
+ruled false.
+
 Retry budget in factory mode is **2 attempts per task**. Append
 `--kind retry --field stage=BUILD --attempt <k>` before the second attempt. Exhausted → terminal
 failure; do not proceed to the next task.
@@ -268,10 +316,10 @@ Any failure → fix and re-run this gate from check 1. Only then call
 ### Example workflow
 
 **Why:** the baseline's own example is upstream-shaped; this one shows the project's agent
-routing and its parallel-batch override in one place.
+routing and its dispatch-order override in one place.
 
 See `.claude/skill-overlays/references/example-workflow.md` for a worked end-to-end walkthrough,
-including a parallel batch.
+including a `(parallel)` group dispatched one implementer at a time.
 
 ### Red flags — never
 
