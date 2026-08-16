@@ -11,10 +11,11 @@ number. Pass `--attempt <k>` on every retry.
 
 `LOG <STAGE> --stream -- <cmd>` is the same wrapper with `--stream` added before the `--`.
 
-Seven invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
+Eight invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
 quiet on success without it (#529). They are GATE's `spec_lint --json`, PLAN's
 `trace.py --check --plans-only`, both `smoketest_headless --json` runs, `factory_cache.py`,
-VERIFY's evidence scenario, and SHIP's `factory_publish --open-pr`. VERIFY's is stated as a rule
+VERIFY's evidence scenario, SHIP's `factory_publish --open-pr`, and SHIP's `preserve_workspace`
+call. VERIFY's is stated as a rule
 rather than a literal command line because step 6's scenario is composed ad hoc — there is no
 fixed command to tag. Every other wrapped command is gated on its exit code alone, so the summary
 line is enough.
@@ -89,6 +90,14 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
      the wrong platform, and checks that pass standalone but fail under the hook they were
      written for.
    - Are the types, names and signatures consistent between tasks?
+   - **Which already-landed tests does each task break, and does the plan say how it handles
+     them?** The `pre-commit` hook runs the whole suite and `--no-verify` is forbidden, so every
+     existing test is a hard gate on every task. Concrete rejection: a task that adds a `BANKED`
+     function and does not name `tests/test_rom_parity.py`. The new trampoline shifts bank-0
+     addresses, the parity test refuses the commit, and the plan is silent — reject it and make
+     the plan say whether the test is updated or why it still passes. Run #590 paid for this
+     three times: `tests/test_rom_parity.py` refused a commit at Tasks 2, 3 and 4, and each fix
+     was a mid-run ruling that a plan-time read would have caught.
 
    Every unresolved judgment call it raises becomes a `decision` event, written as **two
    fields**: `text` holds the ruling in one sentence, and `rationale` holds the reasoning in one
@@ -128,13 +137,21 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    - A README task is added when user-visible behavior changes.
 3. **Retry budget: 2 attempts per task.** On the second attempt append
    `--kind retry --field stage=BUILD --attempt <k>` first. Exhausted → terminal failure.
-4. Commits: tool choice is free (#441 voided the old PowerShell-routing premise — repository
+4. **A ruling that makes the plan stale is written into the plan file, in the same step that
+   records it.** Task briefs are extracted from the plan once, at dispatch time, so a ruling
+   that amends a fact a later task's brief states never reaches that task unless the plan
+   itself changes. Record the `decision` event **and** edit the plan file before dispatching
+   the next task. The publisher re-syncs the plan issue on every later `--stage-completed`
+   call, so the amendment reaches GitHub with no extra command. In run #590 three implementers
+   corrected the controller about facts their briefs stated and later rulings had falsified —
+   the controller was handing out text it had itself ruled false.
+5. Commits: tool choice is free (#441 voided the old PowerShell-routing premise — repository
    hooks fire for every actor). Give every commit an explicit **300 s timeout**: the
    `pre-commit` hook runs the whole tool suite, which is past the 120 s default, and a
    default-timeout call is killed mid-hook. This is a ceiling, not a measurement — if a commit
    ever exceeds it, that is the signal, not a number to bump.
    **Never `--no-verify`.**
-5. `python tools/factory_publish.py --issue <N> --stage-completed BUILD`
+6. `python tools/factory_publish.py --issue <N> --stage-completed BUILD`
 
 ## VERIFY
 
@@ -197,8 +214,20 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    This records the run's result. Do not add a `pr` field. The `finish` event ignores it.
    Step 4 already saved the PR URL in `publish.json`, through `--open-pr`. The run issue
    reads the URL from there, not from the `finish` event.
-6. `python tools/factory_publish.py --issue <N> --terminal`
-7. **Stop.** Never merge. Never delete the worktree.
+6. Preserve the run's own working notes, so they outlive the worktree:
+   ```
+   LOG SHIP --stream -- python -c "import sys; sys.path.insert(0, 'tools'); import factory_run; print(factory_run.preserve_workspace(<N>))"
+   ```
+   `--stream` is required: the printed path is read, not merely exit-code checked.
+   It takes the worktree and plan from the run state, copies the plan, the SDD ledger
+   (`progress.md`) and every task brief and report into
+   `.factory/runs/issue-<N>/sdd-workspace/`, and writes a `manifest.json` listing each
+   artifact as present or absent-with-reason. **It never raises and never fails the run**
+   (#633 R7): a missing artifact is a manifest line, not an error. A printed `None` means the
+   registry itself was unusable — report it and continue to the `--terminal` publish.
+   Not published: like the autopsy bundle, these notes stay local.
+7. `python tools/factory_publish.py --issue <N> --terminal`
+8. **Stop.** Never merge. Never delete the worktree.
 
 ## Doc-only route (R10)
 

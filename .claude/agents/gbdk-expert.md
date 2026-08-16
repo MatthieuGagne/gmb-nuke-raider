@@ -149,7 +149,10 @@ When called with a prompt starting with **"implement this task: …"**, act as t
 5. Build the ROM (`make` → PASS).
 6. Invoke the `bank-post-build` skill (HARD GATE) after a successful build.
 7. Run the refactor checkpoint: "Does this generalize, or did I hard-code something that breaks when N > 1?"
-8. Invoke the `gb-c-optimizer` agent on new/modified C files.
-9. Commit.
+8. Commit.
+
+`gb-c-optimizer` is **not** yours to invoke. You cannot dispatch an agent, and that is one. After
+your commit lands, the controller dispatches it on the committed diff; whatever it reports or
+edits comes back to you through the task review's fix loop (#633 R5).
 
 **Consultation mode is unchanged** — when called with a question (not "implement this task: …"), answer as normal.

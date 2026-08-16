@@ -44,7 +44,7 @@ unfamiliar territory, STOP and dispatch an Explore agent instead.
 | Agent | Dispatch when |
 |-------|---------------|
 | `gbdk-expert` — **consultation mode** | GBDK API questions: hardware registers, sprite/tile/palette setup, CGB palettes, VBlank timing, interrupts, compile errors |
-| `gbdk-expert` — **implementation mode** | Any C implementation task. Dispatch with `"implement this task: <full task text>"` — it owns TDD, the bank gates, the build, `gb-c-optimizer` review and fix, and the commit |
+| `gbdk-expert` — **implementation mode** | Any C implementation task. Dispatch with `"implement this task: <full task text>"` — it owns TDD, the bank gates, the build and the commit. It does **not** own `gb-c-optimizer`: the controller dispatches that after the commit (see the `subagent-driven-development` overlay's `### Who dispatches gb-c-optimizer`) |
 | `music-expert` | Anything touching `src/music_data.c` / `.h` or a new song `.c`; hUGEDriver, SFX routing, audio debugging |
 | `map-expert` | New/edited maps, TMX conversion pipeline, BG tilemap hardware |
 | `sprite-expert` | New sprite types, Aseprite pipeline, OAM slot allocation, sprite rendering |
@@ -77,8 +77,13 @@ here.
 | Tasks with a sequential data dependency | B needs A's output — fire B only after A returns |
 | Task review before the implementer commits | Nothing to review yet |
 
-**Batch size limit:** max 3 concurrent implementers. Beyond that, coordination overhead exceeds
-the parallelism benefit.
+**Implementers are never batched.** Whatever else this file says about batching, an
+implementer dispatch is one at a time — see the `subagent-driven-development` overlay's
+`### Dispatch order`. The prohibition two rows above ("multiple implementers committing to
+the same branch simultaneously") is the binding rule, and this file used to give a batch
+size that contradicted it. For non-committing agents — reviewers on different files,
+read-only exploration — the practical ceiling is 3 concurrent dispatches, beyond which
+coordination overhead exceeds the benefit.
 
 The task review itself is **one dispatch, not two** — see the `subagent-driven-development`
 baseline: a single task review carries both the spec-compliance and the code-quality verdict.
@@ -91,7 +96,8 @@ extends the same reasoning to ordinary sequential work.
 **Before firing ANY agent** — formal plan or ad-hoc work — scan the next 1–2 steps: do they
 produce different output files, with no sequential data dependency? If yes, **batch them into
 the same message.** This applies to ALL sequential multi-step work — ad-hoc investigations, doc
-edits, read-only explorations, and review dispatches all qualify.
+edits, read-only explorations, and review dispatches all qualify. Implementer dispatches never
+qualify — see the `subagent-driven-development` overlay's `### Dispatch order`.
 
 ### Red flags
 
@@ -103,7 +109,7 @@ the baseline has no equivalent table.
 | "I'll just read a few more files to understand the codebase" | > 2 files → Explore agent |
 | "I'll grep for this pattern myself" | Open-ended search → Explore agent |
 | "I'll split the review into a spec pass and a quality pass" | One task review carries both verdicts — splitting doubles the cost for the same answer |
-| "These two tasks write different files, I'll run them sequentially" | They're parallelizable — single message |
+| "These two tasks write different files, I'll run them sequentially" | They're parallelizable — single message, unless they are implementers (see `### Dispatch order`) |
 | "I'll let both implementers commit to the branch at once" | Race condition — coordinate |
 | "This is ad-hoc work, not a formal plan, so I don't need to parallelize" | The look-ahead batch rule applies to ALL multi-step work |
 | "The subagent said it committed" | Not proof — `git log --oneline -1` |

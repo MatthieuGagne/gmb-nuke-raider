@@ -56,7 +56,16 @@ Exact command sequences are in `references/stages.md` — follow them literally.
 | PLAN | Create the factory worktree and branch, write the plan, adversarially self-review it | Plan self-review cannot be waived |
 | BUILD | subagent-driven-development in factory mode; all GB hard gates fire unchanged | 2 attempts per task |
 | VERIFY | fetch+merge, clean build, memory check, blocking smoketest, evidence scenario | memory FAIL aborts immediately; smoketest gets 1 differential-guided fix attempt |
-| SHIP | Push, open the PR with the reporter body | `pre-push` runs `make clean && make` |
+| SHIP | Push, open the PR with the reporter body, preserve the run's working notes | `pre-push` runs `make clean && make` |
+
+**SHIP preserves the run's working notes.** The plan, the subagent-driven-development ledger
+and every task brief and report live in the worktree, and `docs/plans/` and `.superpowers/`
+are both gitignored — so the record of *why* the run made its choices dies with ordinary
+worktree cleanup. `factory_run.preserve_workspace` copies them into
+`.factory/runs/issue-<N>/sdd-workspace/` at SHIP. It is best-effort by contract: a missing
+artifact is recorded in `manifest.json` and never raised, so preservation cannot fail a run
+that has already opened its pull request. Terminal failure keeps its own bundle —
+`write_autopsy` — and the two do not overlap.
 
 ## Every command goes through the stage-log helper
 
