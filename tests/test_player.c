@@ -36,12 +36,14 @@ void test_player_init_sets_start_position(void) {
 /* --- basic movement from track spawn (88,720) on road (cols 6-17, row 90) */
 
 void test_player_update_moves_left(void) {
+    player_set_dir(DIR_L);
     input = J_LEFT | J_A;
     player_update();
     TEST_ASSERT_EQUAL_INT16(86, player_get_x()); /* gear1 accel=2 */
 }
 
 void test_player_update_moves_right(void) {
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     player_update();
     TEST_ASSERT_EQUAL_INT16(90, player_get_x()); /* gear1 accel=2 */
@@ -54,6 +56,7 @@ void test_player_update_moves_up(void) {
 }
 
 void test_player_update_moves_down(void) {
+    player_set_dir(DIR_B);
     input = J_DOWN;  /* face south + gas → moves south (+vy) */
     player_update();
     TEST_ASSERT_EQUAL_INT16(10, player_get_y()); /* gear1 accel=2 */
@@ -64,6 +67,7 @@ void test_player_update_moves_down(void) {
 /* Left wall: tile col 3 (x=24-31) is off-track for rows 0-49 */
 void test_player_blocked_by_left_wall(void) {
     player_set_pos(32, 80);   /* leftmost road tile (col 4, x=32) */
+    player_set_dir(DIR_L);
     input = J_LEFT | J_A;
     player_update();          /* new_px=31 -> col 3 -> off-track -> blocked */
     TEST_ASSERT_EQUAL_INT16(32, player_get_x());
@@ -73,6 +77,7 @@ void test_player_blocked_by_left_wall(void) {
 void test_player_blocked_by_right_wall_16px(void) {
     /* px=112: right corner = 127 (col 15, road). Moving right: corner=128 -> off-track */
     player_set_pos(112, 80);
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     player_update();
     TEST_ASSERT_EQUAL_INT16(112, player_get_x());
@@ -82,6 +87,7 @@ void test_player_blocked_by_right_wall_16px(void) {
 
 void test_player_clamped_at_screen_left(void) {
     player_set_pos(0, 80);
+    player_set_dir(DIR_L);
     input = J_LEFT | J_A;
     player_update();          /* new_px=-1 < 0 -> blocked */
     TEST_ASSERT_EQUAL_INT16(0, player_get_x());
@@ -90,6 +96,7 @@ void test_player_clamped_at_screen_left(void) {
 void test_player_clamped_at_screen_right_16px(void) {
     /* active_map_w=20: max px = 20*8-16 = 144 */
     player_set_pos(144, 80);
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     player_update();          /* new_px=145 > 144 -> blocked */
     TEST_ASSERT_EQUAL_INT16(144, player_get_x());
@@ -100,6 +107,7 @@ void test_player_x_bound_uses_active_map_w(void) {
     active_map_w = 30u;
     active_map_h = 100u;
     player_set_pos(224, 80);
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     player_update();          /* new_px=225 > 224 -> blocked at 224 */
     TEST_ASSERT_TRUE(player_get_x() <= (int16_t)(30u * 8u - 16u));
@@ -120,6 +128,7 @@ void test_player_moves_below_old_screen_top(void) {
 void test_player_clamped_at_bottom_map_bound_16px(void) {
     int16_t map_px_h = (int16_t)((uint16_t)active_map_h * 8u);
     player_set_pos(80, (int16_t)(map_px_h - 16));
+    player_set_dir(DIR_B);
     input = J_DOWN;
     player_update();          /* new_py = map_px_h-15 > map_px_h-16 -> blocked */
     TEST_ASSERT_EQUAL_INT16((int16_t)(map_px_h - 16), player_get_y());
@@ -183,6 +192,7 @@ void test_gas_while_facing_up_decreases_vy(void) {
 
 /* UP+RIGHT=NE facing + gas: both axes get gear1 ACCEL=2 simultaneously */
 void test_gas_diagonal_dpad_applies_diagonal_vector(void) {
+    player_set_dir(DIR_RT);
     player_apply_physics(J_RIGHT | J_UP, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
@@ -197,6 +207,7 @@ void test_brake_while_stopped_facing_up_reverses_down(void) {
 
 /* Gas east (vx=1), then gas south: friction on vx — must not reverse. */
 void test_brake_while_moving_laterally_does_not_reverse_x(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gas east: vx=1 */
     player_apply_physics(J_DOWN,  TILE_ROAD);   /* gas south: friction on vx */
     TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
@@ -261,6 +272,7 @@ void test_heal_call_restores_hp(void) {
 
 /* Gas NE (vx=1, vy=-1), then gas south: vy toward +1, vx friction'd — must not reverse. */
 void test_brake_while_moving_does_not_reverse(void) {
+    player_set_dir(DIR_RT);
     player_apply_physics(J_RIGHT | J_UP, TILE_ROAD);  /* gas NE: vx=1, vy=-1 */
     player_apply_physics(J_DOWN,         TILE_ROAD);  /* gas S: vy toward +1 */
     TEST_ASSERT_GREATER_OR_EQUAL_INT8(0, player_get_vx());
@@ -303,6 +315,7 @@ void test_gas_facing_T_moves_north(void) {
 
 /* DIR_RT (NE): dx=+ACCEL, dy=-ACCEL → vx=2, vy=-2 (gear1 accel=2) */
 void test_gas_facing_RT_moves_northeast(void) {
+    player_set_dir(DIR_RT);
     player_apply_physics(J_UP | J_RIGHT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
@@ -310,6 +323,7 @@ void test_gas_facing_RT_moves_northeast(void) {
 
 /* DIR_R (East): dx=+ACCEL, dy=0 → vx=2, vy=0 (gear1 accel=2) */
 void test_gas_facing_R_moves_east(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
@@ -317,6 +331,7 @@ void test_gas_facing_R_moves_east(void) {
 
 /* DIR_RB (SE): dx=+ACCEL, dy=+ACCEL → vx=2, vy=2 (gear1 accel=2) */
 void test_gas_facing_RB_moves_southeast(void) {
+    player_set_dir(DIR_RB);
     player_apply_physics(J_DOWN | J_RIGHT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
@@ -324,6 +339,7 @@ void test_gas_facing_RB_moves_southeast(void) {
 
 /* DIR_B (South): dx=0, dy=+ACCEL → vx=0, vy=2 (gear1 accel=2) */
 void test_gas_facing_B_moves_south(void) {
+    player_set_dir(DIR_B);
     player_apply_physics(J_DOWN, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
@@ -331,6 +347,7 @@ void test_gas_facing_B_moves_south(void) {
 
 /* DIR_LB (SW): dx=-ACCEL, dy=+ACCEL → vx=-2, vy=2 (gear1 accel=2) */
 void test_gas_facing_LB_moves_southwest(void) {
+    player_set_dir(DIR_LB);
     player_apply_physics(J_DOWN | J_LEFT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 2, player_get_vy());
@@ -338,6 +355,7 @@ void test_gas_facing_LB_moves_southwest(void) {
 
 /* DIR_L (West): dx=-ACCEL, dy=0 → vx=-2, vy=0 (gear1 accel=2) */
 void test_gas_facing_L_moves_west(void) {
+    player_set_dir(DIR_L);
     player_apply_physics(J_LEFT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8( 0, player_get_vy());
@@ -345,6 +363,7 @@ void test_gas_facing_L_moves_west(void) {
 
 /* DIR_LT (NW): dx=-ACCEL, dy=-ACCEL → vx=-2, vy=-2 (gear1 accel=2) */
 void test_gas_facing_LT_moves_northwest(void) {
+    player_set_dir(DIR_LT);
     player_apply_physics(J_UP | J_LEFT, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
@@ -352,6 +371,7 @@ void test_gas_facing_LT_moves_northwest(void) {
 
 /* No D-pad: direction preserved but no gas — velocity stays at zero */
 void test_no_dpad_preserves_dir_but_no_gas(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);  /* face R + gas east: vx=1 */
     player_reset_vel();
     player_apply_physics(0, TILE_ROAD);        /* no dpad: keep R, no gas */
@@ -398,6 +418,7 @@ void test_dir_T_tile_tl_is_up_base(void) {
 
 void test_dir_B_tile_tl_is_up_bl_with_flipy(void) {
     /* DIR_B = UP + FLIPY + row-swap: TL slot gets UP's BL tile, flip = S_FLIPY */
+    player_set_dir(DIR_B);
     mock_move_sprite_reset();
     player_apply_physics(J_DOWN, TILE_ROAD);
     player_render();
@@ -410,6 +431,7 @@ void test_dir_B_tile_tl_is_up_bl_with_flipy(void) {
 
 void test_dir_L_tile_tl_is_right_tr_with_flipx(void) {
     /* DIR_L = RIGHT + FLIPX + col-swap: TL slot gets RIGHT's TR tile, flip = S_FLIPX */
+    player_set_dir(DIR_L);
     mock_move_sprite_reset();
     player_apply_physics(J_LEFT, TILE_ROAD);
     player_render();
@@ -421,24 +443,28 @@ void test_dir_L_tile_tl_is_right_tr_with_flipx(void) {
 }
 
 void test_dir_R_no_flip(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);
     player_render();
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_prop[0]);
 }
 
 void test_dir_RB_no_flip(void) {
+    player_set_dir(DIR_RB);
     player_apply_physics(J_DOWN | J_RIGHT, TILE_ROAD);
     player_render();
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_prop[0]);
 }
 
 void test_dir_LB_flipx(void) {
+    player_set_dir(DIR_LB);
     player_apply_physics(J_DOWN | J_LEFT, TILE_ROAD);
     player_render();
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
 }
 
 void test_dir_LT_flipx(void) {
+    player_set_dir(DIR_LT);
     player_apply_physics(J_UP | J_LEFT, TILE_ROAD);
     player_render();
     TEST_ASSERT_EQUAL_UINT8(S_FLIPX, mock_sprite_prop[0]);
@@ -449,9 +475,9 @@ void test_dir_LT_flipx(void) {
  * OAM center formula: scr_x = px+16 - cam_x, scr_y = py-cam_y+24
  * Front offset: DIR_DX[dir]*8, DIR_DY[dir]*8                               */
 
-static void setup_dir_and_fire(uint8_t dpad_buttons) {
+static void setup_dir_and_fire(player_dir_t dir) {
     projectile_init(0u);          /* clear cooldown + active flags */
-    player_apply_physics(dpad_buttons, TILE_ROAD); /* set direction */
+    player_set_dir(dir);          /* set direction — no sweep, this is a setter (#628) */
     player_reset_vel();           /* zero velocity so px/py stay at setUp pos */
     input = J_A;                  /* fire only — no movement direction */
     player_update();
@@ -460,35 +486,35 @@ static void setup_dir_and_fire(uint8_t dpad_buttons) {
 void test_bullet_spawn_north(void) {
     /* DIR_T: dx=0, dy=-1 → bullet center at car top-center
      * oam_x=88+12+0=100, oam_y=8+20-8=20 */
-    setup_dir_and_fire(J_UP);
+    setup_dir_and_fire(DIR_T);
     TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_south(void) {
     /* DIR_B: dx=0, dy=+1 → oam_x=100, oam_y=8+20+8=36 */
-    setup_dir_and_fire(J_DOWN);
+    setup_dir_and_fire(DIR_B);
     TEST_ASSERT_EQUAL_UINT8(100u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 36u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_east(void) {
     /* DIR_R: dx=+1, dy=0 → oam_x=88+12+8=108, oam_y=8+20+0=28 */
-    setup_dir_and_fire(J_RIGHT);
+    setup_dir_and_fire(DIR_R);
     TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_west(void) {
     /* DIR_L: dx=-1, dy=0 → oam_x=88+12-8=92, oam_y=28 */
-    setup_dir_and_fire(J_LEFT);
+    setup_dir_and_fire(DIR_L);
     TEST_ASSERT_EQUAL_UINT8( 92u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 28u, projectile_get_y(0u));
 }
 
 void test_bullet_spawn_northeast(void) {
     /* DIR_RT: dx=+1, dy=-1 → oam_x=108, oam_y=20 */
-    setup_dir_and_fire(J_RIGHT | J_UP);
+    setup_dir_and_fire(DIR_RT);
     TEST_ASSERT_EQUAL_UINT8(108u, projectile_get_x(0u));
     TEST_ASSERT_EQUAL_UINT8( 20u, projectile_get_y(0u));
 }
@@ -529,6 +555,7 @@ void test_hitbox_cardinal_wall_blocks(void) {
      * Player at x=32 (leftmost road tile), driving left.
      * DIR_L hitbox X offsets: {0,15,0,15} — left points at new_px+0=30 -> col 3 = wall */
     player_set_pos(32, 80);
+    player_set_dir(DIR_L);
     input = J_LEFT | J_A;
     player_update();
     TEST_ASSERT_EQUAL_INT16(32, player_get_x());
@@ -540,6 +567,7 @@ void test_hitbox_diagonal_along_wall_passes(void) {
      * DIR_RT hitbox X offsets: {8,14,1,8}.
      * new_px = 32+2 = 34; leftmost point = 34+1 = 35 -> col 4 (road) -> passes. */
     player_set_pos(32, 80);
+    player_set_dir(DIR_RT);
     input = J_RIGHT | J_UP | J_A;
     player_update();
     TEST_ASSERT_TRUE(player_get_x() > 32);
@@ -549,6 +577,7 @@ void test_hitbox_diagonal_along_wall_passes(void) {
 void test_hitbox_cardinal_damage_on_collision(void) {
     uint8_t hp_before = damage_get_hp();
     player_set_pos(32, 80);
+    player_set_dir(DIR_L);
     input = J_LEFT | J_A;
     player_update();   /* blocked by left wall -> damage_wall_hit() */
     TEST_ASSERT_EQUAL_UINT8(hp_before - 1u, damage_get_hp());
@@ -680,6 +709,7 @@ void test_player_blocked_by_racer(void) {
     track_test_set_map(s_road_12x8, 12u, 8u);
     racer_spawn_for_test(56, 40, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
     player_set_pos(40, 40);
+    player_set_dir(DIR_R);
     input = J_RIGHT;
     player_update();
     TEST_ASSERT_EQUAL_INT16(40, player_get_x());
@@ -692,6 +722,7 @@ void test_player_takes_racer_ram_damage(void) {
     track_test_set_map(s_road_12x8, 12u, 8u);
     racer_spawn_for_test(56, 40, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
     player_set_pos(40, 40);
+    player_set_dir(DIR_R);
     hp_before = damage_get_hp();
     input = J_RIGHT;
     player_update();
@@ -701,6 +732,7 @@ void test_player_takes_racer_ram_damage(void) {
 void test_player_not_blocked_when_racer_inactive(void) {
     track_test_set_map(s_road_12x8, 12u, 8u);
     player_set_pos(40, 40);
+    player_set_dir(DIR_R);
     input = J_RIGHT;
     player_update();
     TEST_ASSERT_GREATER_THAN_INT16(40, player_get_x());

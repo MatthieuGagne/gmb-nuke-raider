@@ -25,6 +25,7 @@ void tearDown(void) {}
  * through gear1 (accel=2) then gear2 (accel=1) then gear3 (accel=1), reaching 6. */
 void test_accel_reaches_max_speed(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     for (i = 0u; i < 5u; i++) player_update();
     TEST_ASSERT_EQUAL_INT8(6, player_get_vx());
@@ -35,6 +36,7 @@ void test_accel_reaches_max_speed(void) {
 /* Extra frames beyond gear3 max do not exceed 6. */
 void test_accel_capped_at_max_speed(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     for (i = 0u; i < 6u; i++) player_update();
     TEST_ASSERT_EQUAL_INT8(6, player_get_vx());
@@ -45,6 +47,7 @@ void test_accel_capped_at_max_speed(void) {
 /* Releasing direction from vx=6 (gear3 max) reaches vx==0 in 6 friction frames. */
 void test_friction_decelerates_to_zero(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     input = J_RIGHT | J_A;
     for (i = 0u; i < 5u; i++) player_update();  /* reach gear3 max */
     input = 0;
@@ -60,6 +63,7 @@ void test_friction_decelerates_to_zero(void) {
  * Moving right (gas): new_px=129, corner=144 (col 18 = sand) → blocked → vx=0. */
 void test_wall_zeros_vx_not_vy(void) {
     player_set_pos(128, 720);
+    player_set_dir(DIR_RT);
     input = J_RIGHT | J_UP;  /* face NE, gas → vx blocked by wall, vy moves */
     player_update();
     TEST_ASSERT_EQUAL_INT8(0,              player_get_vx()); /* wall blocks x */
@@ -82,6 +86,7 @@ void test_wall_zeros_vy_not_vx(void) {
 /* NE facing + gas: both axes reach gear3 max (6) in 5 frames. */
 void test_x_and_y_axes_accumulate_independently(void) {
     uint8_t i;
+    player_set_dir(DIR_RT);
     input = J_RIGHT | J_UP;
     for (i = 0u; i < 5u; i++) {
         player_update();
@@ -94,6 +99,7 @@ void test_x_and_y_axes_accumulate_independently(void) {
  * Player at py=792: moving down → new_py=793 > 792 → map clamp blocks. */
 void test_y_clamped_at_map_bottom(void) {
     player_set_pos(88, 792);  /* py at map bottom boundary */
+    player_set_dir(DIR_B);
     input = J_DOWN;
     player_update();           /* new_py=793 > active_map_h*8-8=792 → blocked */
     TEST_ASSERT_TRUE(player_get_y() <= 792);
@@ -105,6 +111,7 @@ void test_y_clamped_at_map_bottom(void) {
  * Gear 2 accel = 1, so frame 2 adds 1 → vx = 3.
  * If still gear 1: vx would be clamped at 2 (gear1 max). */
 void test_gear_shifts_to_gear2_after_reaching_threshold(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear1: vx=2, shifts to gear2 */
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear2: vx=3 */
     TEST_ASSERT_EQUAL_INT8(3, player_get_vx());
@@ -116,6 +123,7 @@ void test_gear_shifts_to_gear2_after_reaching_threshold(void) {
  * Frames 4-5: gear3 accel=1, vx=5,6 (capped at gear3 max=6). */
 void test_gear_reaches_gear3_max_speed_in_5_frames(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     input = J_RIGHT;
     for (i = 0u; i < 5u; i++) player_update();
     TEST_ASSERT_EQUAL_INT8(6, player_get_vx());
@@ -131,6 +139,7 @@ void test_gear_reaches_gear3_max_speed_in_5_frames(void) {
  * If downshifted to gear1: vx=0+2=2. */
 void test_gear_does_not_downshift_before_8_frames(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear1→gear2, vx=2 */
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear2, vx=3 */
     for (i = 0u; i < 4u; i++) player_apply_physics(0, TILE_ROAD); /* coast */
@@ -147,6 +156,7 @@ void test_gear_does_not_downshift_before_8_frames(void) {
  * If still gear2: vx=0+1=1. */
 void test_gear2_downshifts_to_gear1_after_8_frames(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear1→gear2, vx=2 */
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear2, vx=3 */
     for (i = 0u; i < 9u; i++) player_apply_physics(0, TILE_ROAD); /* coast 9 frames */
@@ -161,6 +171,7 @@ void test_gear2_downshifts_to_gear1_after_8_frames(void) {
  * If gear2 (no reset): vx=0+1=1. */
 void test_gear_resets_on_wall_collision(void) {
     /* Build gear2 via player_apply_physics */
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear1→gear2, vx=2 */
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear2, vx=3 */
     /* Hit right wall: px=128, col 17 is road, col 18 is off-track */
@@ -178,6 +189,7 @@ void test_gear_resets_on_wall_collision(void) {
  * If no reset (gear3, max=6): vx stays 6. */
 void test_gear_resets_on_oil(void) {
     uint8_t i;
+    player_set_dir(DIR_R);
     for (i = 0u; i < 5u; i++) player_apply_physics(J_RIGHT, TILE_ROAD); /* gear3, vx=6 */
     player_apply_physics(0, TILE_OIL);   /* gear reset: vx clamped to gear1 max=2 */
     TEST_ASSERT_EQUAL_INT8(2, player_get_vx());
@@ -187,6 +199,7 @@ void test_gear_resets_on_oil(void) {
  * Build gear2, then respawn. After respawn: gear1 accel=2.
  * From vx=0: next frame vx=2. If gear2: vx=1. */
 void test_gear_resets_on_respawn(void) {
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear1→gear2, vx=2 */
     player_apply_physics(J_RIGHT, TILE_ROAD);   /* gear2, vx=3 */
     player_reset_vel();                          /* vx=0, gear=0, timer=0 */
