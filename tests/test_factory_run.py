@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_run
@@ -394,6 +395,12 @@ class TestAutopsy(JournalTestCase):
             436, registry=os.path.join(self.tmp, 'file-not-dir', 'x'))
         self.assertIn(dest, (None,) if dest is None else (dest,))
 
+    def test_unresolvable_registry_returns_none_instead_of_raising(self):
+        """The bundle degrades to None rather than raising (#633 fix round)."""
+        with mock.patch.object(factory_run, 'registry_root',
+                               side_effect=RuntimeError('not a git repository')):
+            self.assertIsNone(factory_run.write_autopsy(436))
+
 
 class TestPreserveWorkspace(JournalTestCase):
     """R6/R7: a successful run keeps its own working notes."""
@@ -481,6 +488,29 @@ class TestPreserveWorkspace(JournalTestCase):
         by_name = {e['name']: e for e in manifest['artifacts']}
         self.assertFalse(by_name['plan']['present'])
         self.assertFalse(by_name['workspace']['present'])
+
+    def test_unresolvable_registry_returns_none_instead_of_raising(self):
+        """AC7: repo_root raises outside a git tree; the caller still gets None."""
+        with mock.patch.object(factory_run, 'registry_root',
+                               side_effect=RuntimeError('not a git repository')):
+            self.assertIsNone(factory_run.preserve_workspace(436))
+
+    def test_state_does_not_override_an_explicit_argument(self):
+        """AC6: the caller's worktree and plan win over the recorded ones."""
+        wt, plan = self._workspace()
+        self.append('start', slug='demo', branch='b',
+                    worktree=os.path.join(self.tmp, 'stale'),
+                    plan='docs/plans/stale.md', stage='SHIP')
+
+        dest = factory_run.preserve_workspace(436, registry=self.reg,
+                                              worktree=wt, plan=plan)
+
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        by_name = {e['name']: e for e in manifest['artifacts']}
+        self.assertTrue(by_name['plan']['present'])
+        self.assertTrue(by_name['ledger']['present'])
+        self.assertEqual(by_name['workspace']['count'], 4)
 
     def test_unwritable_registry_returns_none_instead_of_raising(self):
         """AC7: the caller gets None, never an exception."""

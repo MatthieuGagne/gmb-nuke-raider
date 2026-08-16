@@ -434,8 +434,8 @@ def write_autopsy(issue, registry=None, worktree=None, scenario=None,
     during a failure destroys the evidence it exists to preserve. Returns the
     bundle directory, or None when the registry itself is unusable.
     """
-    registry = registry or registry_root()
     try:
+        registry = registry or registry_root()
         state = load_state(issue, registry) or new_state(issue)
         attempt = int(state.get("attempt") or 1)
         dest = os.path.join(run_dir(issue, registry), "autopsy",
@@ -574,8 +574,8 @@ def preserve_workspace(issue, registry=None, worktree=None, plan=None):
     a run is worse than no preservation. Returns the directory, or None when
     the registry itself is unusable.
     """
-    registry = registry or registry_root()
     try:
+        registry = registry or registry_root()
         state = load_state(issue, registry) or new_state(issue)
         worktree = worktree or state.get("worktree")
         plan = plan or state.get("plan")
