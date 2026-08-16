@@ -82,7 +82,7 @@ git commit -m "feat: add foo module"
 **Step 11: HARD GATE — gb-c-optimizer, dispatched by the controller**
 
 This step is **not yours**. After your commit lands, the controller dispatches the
-`gb-c-optimizer` agent on the committed diff, report only. Do not invoke it yourself: your
+`gb-c-optimizer` agent on the committed diff. Do not invoke it yourself: your
 dispatch forbids you from dispatching subagents, and this is an agent (#633 R5). Its findings
 reach you through the task review's fix loop.
 ````

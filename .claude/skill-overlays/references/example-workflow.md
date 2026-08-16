@@ -36,7 +36,7 @@ Task 3 + Task 4: (parallel) group A — free ordering, still one at a time
 Implementer 3: [Implements Task 3, commits sha-abc]
 
 [Verify the commit landed: git log --oneline -1]
-[Controller dispatches gb-c-optimizer on Task 3's committed diff, report-only — C task]
+[Controller dispatches gb-c-optimizer on Task 3's committed diff — C task; any edits it makes are committed before the review]
 [Run review-package; dispatch ONE task reviewer for Task 3; close its fix loop]
 Task reviewer 3: Spec compliant. Task quality: Approved.
 

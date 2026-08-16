@@ -44,7 +44,7 @@ unfamiliar territory, STOP and dispatch an Explore agent instead.
 | Agent | Dispatch when |
 |-------|---------------|
 | `gbdk-expert` — **consultation mode** | GBDK API questions: hardware registers, sprite/tile/palette setup, CGB palettes, VBlank timing, interrupts, compile errors |
-| `gbdk-expert` — **implementation mode** | Any C implementation task. Dispatch with `"implement this task: <full task text>"` — it owns TDD, the bank gates, the build and the commit. It does **not** own `gb-c-optimizer`: the controller dispatches that after the commit, report-only (see the `subagent-driven-development` overlay's `### Who dispatches gb-c-optimizer`) |
+| `gbdk-expert` — **implementation mode** | Any C implementation task. Dispatch with `"implement this task: <full task text>"` — it owns TDD, the bank gates, the build and the commit. It does **not** own `gb-c-optimizer`: the controller dispatches that after the commit (see the `subagent-driven-development` overlay's `### Who dispatches gb-c-optimizer`) |
 | `music-expert` | Anything touching `src/music_data.c` / `.h` or a new song `.c`; hUGEDriver, SFX routing, audio debugging |
 | `map-expert` | New/edited maps, TMX conversion pipeline, BG tilemap hardware |
 | `sprite-expert` | New sprite types, Aseprite pipeline, OAM slot allocation, sprite rendering |

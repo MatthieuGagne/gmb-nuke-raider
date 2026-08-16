@@ -193,10 +193,13 @@ source of requirements, and a subagent never reads the whole plan file.
 `gbdk-expert` implementer — an assignment that cannot be carried out, because the same
 dispatch forbids the implementer from dispatching subagents and `gb-c-optimizer` is an agent.
 
-**The controller dispatches it.** After the implementer's commit lands and before the task
-review is dispatched, the controller dispatches `gb-c-optimizer` in **report-only** mode
-(validate, report, do not apply fixes). Its findings join the task review's findings and go
-through the same fix loop, so the implementer stays the only writer and the only committer.
+**The controller dispatches it.** After the implementer's commit lands, the controller
+dispatches `gb-c-optimizer` on the committed diff. What R5 changes is **who dispatches the
+gate, not what the gate does**: in this post-implementation context the agent's own charter
+has fix mode on, so it may edit files in place. Those edits are committed through the task
+review's fix loop **before** the task review is dispatched — otherwise the reviewer builds
+against a tree holding uncommitted work, which is the hazard *Dispatch order* above
+describes.
 
 This moves the gate **after** the commit, which is why the `writing-plans` Hard Gate Sequence,
 the C-File Task Template and `docs/dev-workflow.md` all say so too. A rule stated in one of

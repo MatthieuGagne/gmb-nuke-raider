@@ -54,7 +54,7 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 | 7 | Invoke `bank-post-build` skill (HARD GATE) |
 | 8 | Refactor checkpoint ("breaks when N > 1?") |
 | 9 | Commit |
-| 10 | **Controller, not the implementer** — dispatch the `gb-c-optimizer` agent on the committed diff (HARD GATE, report only, no fixes applied). Findings join the task review's and go through its fix loop. |
+| 10 | **Controller, not the implementer** — dispatch the `gb-c-optimizer` agent on the committed diff (HARD GATE). Whatever it reports or edits goes through the task review's fix loop, which commits it before the review is dispatched. |
 
 Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
 

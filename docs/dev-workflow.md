@@ -193,7 +193,7 @@ When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatc
 7. Commit
 
 `gb-c-optimizer` is **not** part of that cycle. The controller dispatches it on the
-committed diff, report only, and its findings go through the task review's fix loop —
+committed diff, and whatever it reports or edits goes through the task review's fix loop —
 an implementer cannot dispatch an agent (#633 R5).
 
 **Consultation mode** (API questions, hardware register questions): call `gbdk-expert` agent without the "implement this task:" prefix — it answers as normal.
