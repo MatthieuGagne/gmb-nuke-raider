@@ -72,17 +72,19 @@ Ask: "Does this implementation generalize, or did I hard-code something that bre
 - If generalized: proceed.
 - If hard-coded and not fixing now: open a follow-up GitHub issue immediately before closing this task.
 
-**Step 10: HARD GATE — gb-c-optimizer (validate only)**
-
-Invoke the `gb-c-optimizer` agent on the new/modified C files.
-Validate only — report issues, do not apply fixes. Any issues found will be applied during execution (executing-plans / subagent-driven-development phase).
-
-**Step 11: Commit**
+**Step 10: Commit**
 
 ```bash
 git add src/foo.c src/foo.h tests/test_foo.c bank-manifest.json
 git commit -m "feat: add foo module"
 ```
+
+**Step 11: HARD GATE — gb-c-optimizer, dispatched by the controller**
+
+This step is **not yours**. After your commit lands, the controller dispatches the
+`gb-c-optimizer` agent on the committed diff, report only. Do not invoke it yourself: your
+dispatch forbids you from dispatching subagents, and this is an agent (#633 R5). Its findings
+reach you through the task review's fix loop.
 ````
 
 ## Non-C Task Template

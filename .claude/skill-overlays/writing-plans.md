@@ -53,10 +53,14 @@ Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence �
 | 6 | Build ROM (`make` → PASS) |
 | 7 | Invoke `bank-post-build` skill (HARD GATE) |
 | 8 | Refactor checkpoint ("breaks when N > 1?") |
-| 9 | Invoke `gb-c-optimizer` agent (HARD GATE — validate only, report issues, do not apply fixes) |
-| 10 | Commit |
+| 9 | Commit |
+| 10 | **Controller, not the implementer** — dispatch the `gb-c-optimizer` agent on the committed diff (HARD GATE, report only, no fixes applied). Findings join the task review's and go through its fix loop. |
 
 Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
+
+Step 10 is the one step in this table an implementer does not perform. It is listed here
+because the plan must show the whole sequence, and because an implementer that sees it
+listed knows the gate exists and knows it is not being skipped (#633 R5).
 
 **Constant-removal audit:** if any task removes or renames a shared constant (e.g. `PLAYER_ACCEL`, `PLAYER_MAX_SPEED`), add a grep step at the top of that task before listing affected files:
 ```bash
@@ -68,8 +72,9 @@ Include ALL matching test files in the task's file list — not just the ones yo
 
 **Why:** the baseline right-sizes tasks around a reviewer's gate; it has no concept of a
 checkpoint where a ROM must visibly run. The `#### Parallel Execution Groups` table is also what
-licenses the `subagent-driven-development` overlay's parallel-implementer override — without it,
-the baseline's "never dispatch implementers in parallel" stands.
+licenses the `subagent-driven-development` overlay's free task ordering — without it, the plan's
+written order stands. It never licenses concurrency: that overlay dispatches one implementer at a
+time whatever the table says.
 
 **Tasks MUST be grouped into batches of 2–4.** Each batch ends with a **Smoketest Checkpoint** — a point where the ROM runs in Emulicious and the user confirms it looks correct. A good batch boundary = any point where the game should visually work end-to-end (even partially). If a batch cannot be independently smoke-tested, the plan must explain why.
 
@@ -185,11 +190,19 @@ Run this before offering the execution handoff. Fix any failures first.
 | 4 | **Parallel Execution Groups tables present** | Every batch that precedes a Smoketest Checkpoint has a `#### Parallel Execution Groups` table |
 | 5 | **No implementation details leaked from brainstorming** | Plan contains file paths and task steps, not design narrative or requirement rationale (those belong in the GitHub issue) |
 | 6 | **Issue header + filename** | The plan has an `**Issue:** #N` line matching the `issue<N>` in its filename. Verify with `python tools/trace.py --check --plans-only` — expect `PASS` and no `ERROR` lines mentioning this plan |
+| 7 | **Landed-test impact named** | Every task that changes behaviour an already-landed test asserts names that test by path and says how the task handles it — update the test, or state why it still passes. A task that breaks a landed test without saying so is a **plan defect**, not a build-stage surprise. |
 
 **Failure handling:**
-- Checks #1, #2, #4, #5 fail → fix the plan now and re-run the checklist from the top.
+- Checks #1, #2, #4, #5, #7 fail → fix the plan now and re-run the checklist from the top.
 - Check #6 fails → fix the header and/or rename the file now, then re-run `python tools/trace.py --check --plans-only`.
 - Check #3 fails (unjustified `none`) → do NOT silently fix. Present the plan WITH the Incomplete Warning block below, immediately after the plan header. The user decides whether to proceed or fix first.
+
+**Why #7 exists.** The `pre-commit` repository hook runs the whole tool suite on every
+commit and `--no-verify` is forbidden, so every already-landed test is a hard gate on every
+task in the plan. Three of run #590's four escalations were the same shape:
+`tests/test_rom_parity.py` refused a commit at Tasks 2, 3 and 4, and each time the plan had
+not said the task would break it. A plan that leaves this to BUILD converts a five-minute
+plan-time edit into a mid-run ruling.
 
 ```markdown
 > ⚠️ **Plan incomplete — unjustified parallelism annotations**
@@ -247,6 +260,12 @@ the `### Handoff` subsection above**, and nothing else in this overlay.
   ```
   python tools/factory_event.py --issue <N> --kind decision --field "text=<what and why>"
   ```
+- A ruling recorded after the plan is written can make the plan itself stale. The plan file
+  is then amended in the same step that records the ruling — the operative rule lives in the
+  `subagent-driven-development` overlay's `### Factory mode`, because that is the overlay
+  loaded while tasks are being dispatched. What matters here is that **the plan file is a
+  live document during BUILD, not a frozen one**: briefs are extracted from it, once, at
+  dispatch time.
 - The Plan Self-Review Checklist still runs in full. Check #3's Incomplete Warning block is
   **not** presented to a user — an unjustified `**Parallelizable with:** none` is fixed in place
   and the fix logged as a decision.

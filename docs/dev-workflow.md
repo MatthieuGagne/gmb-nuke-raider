@@ -190,8 +190,11 @@ When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatc
 4. `make` → ROM builds
 5. Invoke `bank-post-build` skill (hard gate)
 6. Run refactor checkpoint: "Does this generalize, or hard-coded for N=1?"
-7. Invoke `gb-c-optimizer` agent on new/modified C files — **review AND fix** (applies edits directly, then rebuilds to verify)
-8. Commit
+7. Commit
+
+`gb-c-optimizer` is **not** part of that cycle. The controller dispatches it on the
+committed diff, report only, and its findings go through the task review's fix loop —
+an implementer cannot dispatch an agent (#633 R5).
 
 **Consultation mode** (API questions, hardware register questions): call `gbdk-expert` agent without the "implement this task:" prefix — it answers as normal.
 
