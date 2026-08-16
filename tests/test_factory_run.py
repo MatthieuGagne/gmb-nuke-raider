@@ -395,6 +395,103 @@ class TestAutopsy(JournalTestCase):
         self.assertIn(dest, (None,) if dest is None else (dest,))
 
 
+class TestPreserveWorkspace(JournalTestCase):
+    """R6/R7: a successful run keeps its own working notes."""
+
+    def _workspace(self, plan='docs/plans/2026-08-15-issue436-demo.md'):
+        """A worktree holding the plan and its SDD workspace."""
+        wt = os.path.join(self.tmp, 'wt')
+        os.makedirs(os.path.join(wt, 'docs', 'plans'))
+        with open(os.path.join(wt, plan), 'w') as fh:
+            fh.write('# Demo Implementation Plan\n\n**Issue:** #436\n')
+        sdd = os.path.join(wt, '.superpowers', 'sdd',
+                           '2026-08-15-issue436-demo')
+        os.makedirs(sdd)
+        for name, body in (('progress.md', '# SDD ledger — plan: %s\n' % plan),
+                           ('task-1-brief.md', 'brief 1\n'),
+                           ('task-1-report.md', 'report 1\n'),
+                           ('task-2-report.md', 'report 2\n')):
+            with open(os.path.join(sdd, name), 'w', encoding='utf-8') as fh:
+                fh.write(body)
+        return wt, plan
+
+    def test_run_directory_holds_plan_ledger_and_every_report(self):
+        """AC6: the notes outlive the worktree."""
+        wt, plan = self._workspace()
+        self.append('start', slug='demo', branch='b', worktree=wt,
+                    plan=plan, stage='SHIP')
+
+        dest = factory_run.preserve_workspace(436, registry=self.reg)
+
+        self.assertTrue(dest.endswith('sdd-workspace'))
+        for rel in ('2026-08-15-issue436-demo.md',
+                    os.path.join('workspace', 'progress.md'),
+                    os.path.join('workspace', 'task-1-brief.md'),
+                    os.path.join('workspace', 'task-1-report.md'),
+                    os.path.join('workspace', 'task-2-report.md'),
+                    'manifest.json'):
+            self.assertTrue(os.path.exists(os.path.join(dest, rel)), rel)
+
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        by_name = {e['name']: e for e in manifest['artifacts']}
+        self.assertTrue(by_name['plan']['present'])
+        self.assertTrue(by_name['ledger']['present'])
+        self.assertEqual(by_name['workspace']['count'], 4)
+        self.assertEqual(manifest['issue'], 436)
+
+    def test_explicit_arguments_beat_state(self):
+        """AC6: the caller may pass a worktree and plan the state lacks."""
+        wt, plan = self._workspace()
+        self.append('start', slug='demo', branch='b', stage='SHIP')
+
+        dest = factory_run.preserve_workspace(436, registry=self.reg,
+                                              worktree=wt, plan=plan)
+
+        self.assertTrue(os.path.exists(
+            os.path.join(dest, 'workspace', 'progress.md')))
+
+    def test_missing_artifacts_are_recorded_not_raised(self):
+        """AC7: an incomplete workspace is reported, never raised."""
+        self.append('start', slug='demo', branch='b',
+                    worktree=os.path.join(self.tmp, 'gone'),
+                    plan='docs/plans/nope.md', stage='SHIP')
+
+        dest = factory_run.preserve_workspace(436, registry=self.reg)
+
+        self.assertIsNotNone(dest)
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        by_name = {e['name']: e for e in manifest['artifacts']}
+        self.assertFalse(by_name['plan']['present'])
+        self.assertIn('not found', by_name['plan']['reason'])
+        self.assertFalse(by_name['workspace']['present'])
+        self.assertIn('no SDD workspace', by_name['workspace']['reason'])
+        self.assertFalse(by_name['ledger']['present'])
+
+    def test_no_plan_recorded_is_reported_not_raised(self):
+        """AC7: without a plan there is no workspace name to resolve."""
+        self.append('start', slug='demo', branch='b',
+                    worktree=self.tmp, stage='SHIP')
+
+        dest = factory_run.preserve_workspace(436, registry=self.reg)
+
+        with open(os.path.join(dest, 'manifest.json')) as fh:
+            manifest = json.load(fh)
+        by_name = {e['name']: e for e in manifest['artifacts']}
+        self.assertFalse(by_name['plan']['present'])
+        self.assertFalse(by_name['workspace']['present'])
+
+    def test_unwritable_registry_returns_none_instead_of_raising(self):
+        """AC7: the caller gets None, never an exception."""
+        blocker = os.path.join(self.tmp, 'file.txt')
+        with open(blocker, 'w') as fh:
+            fh.write('not a directory')
+
+        self.assertIsNone(factory_run.preserve_workspace(
+            436, registry=os.path.join(blocker, 'nested')))
+
+
 class TestLogPath(unittest.TestCase):
     """R7 (#450): the layout is owned here; the writing lives in factory_log."""
 

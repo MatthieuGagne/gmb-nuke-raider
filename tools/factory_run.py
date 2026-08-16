@@ -521,3 +521,133 @@ def write_autopsy(issue, registry=None, worktree=None, scenario=None,
     except Exception:
         pass
     return dest
+
+
+# ── Workspace preservation ───────────────────────────────────────────────────
+
+def sdd_workspace_dir(worktree, plan):
+    """The subagent-driven-development workspace for one plan, or None.
+
+    The baseline's ``scripts/sdd-workspace`` resolves this as
+    ``<git rev-parse --show-toplevel>/.superpowers/sdd/<plan basename minus
+    .md>/``. Note the asymmetry with ``registry_root``: the registry hangs off
+    ``--git-common-dir``, the MAIN repo root, while this hangs off the
+    WORKTREE root. Both are computed here from the paths the run already
+    recorded rather than by shelling out to git, which keeps this hermetic
+    under a temporary registry in the tests.
+
+    The legacy flat path ``.superpowers/sdd/progress.md`` — a ledger written
+    before the baseline scoped workspaces per plan — is deliberately not
+    matched: an unscoped ledger may belong to another plan entirely.
+    """
+    if not worktree or not plan:
+        return None
+    slug = os.path.basename(str(plan).replace("/", os.sep))
+    if slug.endswith(".md"):
+        slug = slug[:-3]
+    if not slug or slug in (".", ".."):
+        return None
+    candidate = os.path.join(worktree, ".superpowers", "sdd", slug)
+    return candidate if os.path.isdir(candidate) else None
+
+
+def preserve_workspace(issue, registry=None, worktree=None, plan=None):
+    """Copy a run's own working notes into ``sdd-workspace/``.
+
+    The plan, the subagent-driven-development ledger and every task brief and
+    report live in the worktree and are gitignored (``docs/plans/`` and
+    ``.superpowers/``), so ordinary worktree cleanup destroys the record of why
+    the run made the choices it made (#633 R6). Everything is copied, never
+    referenced, so the notes outlive the worktree — the same contract
+    ``write_autopsy`` keeps for failure evidence.
+
+    Unlike the autopsy this is NOT attempt-scoped: a later attempt's notes
+    replace an earlier attempt's, matching how the publisher treats the plan
+    asset. The journal is the per-attempt record.
+
+    ``worktree`` and ``plan`` default to the run state's values. ``plan`` is
+    repo-relative, resolved against the worktree — the only tree it exists in.
+
+    Best-effort by contract (#633 R7). Every expected artifact is listed in
+    ``manifest.json`` as present or absent-with-reason, a missing artifact is
+    never an error, and this function never raises: preservation that can fail
+    a run is worse than no preservation. Returns the directory, or None when
+    the registry itself is unusable.
+    """
+    registry = registry or registry_root()
+    try:
+        state = load_state(issue, registry) or new_state(issue)
+        worktree = worktree or state.get("worktree")
+        plan = plan or state.get("plan")
+        dest = os.path.join(run_dir(issue, registry), "sdd-workspace")
+        os.makedirs(dest, exist_ok=True)
+    except Exception:
+        return None
+
+    entries = []
+
+    def record(name, src, rel=None):
+        if not src or not os.path.isfile(src):
+            entries.append({"name": name, "present": False,
+                            "reason": "not found: %s" % (src or "<unset>")})
+            return False
+        rel = rel or os.path.basename(src)
+        try:
+            target = os.path.join(dest, rel)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(src, target)
+            entries.append({"name": name, "present": True, "source": src,
+                            "dest": rel.replace(os.sep, "/")})
+            return True
+        except OSError as exc:
+            entries.append({"name": name, "present": False,
+                            "reason": "copy failed: %s" % exc})
+            return False
+
+    try:
+        plan_src = None
+        if worktree and plan:
+            plan_src = os.path.join(worktree, str(plan).replace("/", os.sep))
+        record("plan", plan_src)
+
+        sdd = sdd_workspace_dir(worktree, plan)
+        if not sdd:
+            entries.append({"name": "workspace", "present": False,
+                            "reason": "no SDD workspace for plan %s under %s"
+                                      % (plan or "<unset>",
+                                         worktree or "<unset>")})
+            entries.append({"name": "ledger", "present": False,
+                            "reason": "no SDD workspace to read it from"})
+        else:
+            copied = 0
+            ledger = False
+            for fname in sorted(os.listdir(sdd)):
+                src = os.path.join(sdd, fname)
+                if not os.path.isfile(src):
+                    continue
+                if record("workspace/%s" % fname, src,
+                          os.path.join("workspace", fname)):
+                    copied += 1
+                    if fname == "progress.md":
+                        ledger = True
+            entries.append({"name": "workspace", "present": copied > 0,
+                            "reason": None if copied else
+                                      "no files under %s" % sdd,
+                            "count": copied})
+            entries.append({"name": "ledger", "present": ledger,
+                            "reason": None if ledger else
+                                      "no progress.md under %s" % sdd})
+    except Exception as exc:
+        entries.append({"name": "assembly", "present": False,
+                        "reason": "aborted: %s" % exc})
+
+    try:
+        with open(os.path.join(dest, "manifest.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump({"schema_version": SCHEMA_VERSION, "issue": int(issue),
+                       "created": timestamp(), "artifacts": entries},
+                      fh, indent=2, sort_keys=True)
+            fh.write("\n")
+    except Exception:
+        pass
+    return dest
