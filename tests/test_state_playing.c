@@ -1,6 +1,12 @@
 #include "unity.h"
 #include "track.h"         /* TRACK_TYPE_RACE, TRACK_TYPE_COMBAT, CHECKPOINT_DIR_* */
 #include "state_playing.h" /* finish_eval, cd_advance */
+#include "../src/config.h"
+#include "player.h"
+
+/* Frame counts derive from the config.h table, never from a hardcoded number (#628). */
+static const uint8_t TURN_FRAMES_T[8] = PLAYER_TURN_FRAMES_TABLE;
+#define TURN_PERIOD  (TURN_FRAMES_T[PLAYER_HANDLING])
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -130,6 +136,25 @@ void test_cd_go_advances_at_45_frames(void) {
     TEST_ASSERT_EQUAL_UINT8(4u, cd_advance(3u, 45u));
 }
 
+/* #628: the facing lags the D-pad, and finish_eval reads facing, not velocity, so
+ * pressing south one frame before the line does NOT arm the finish. A crossing
+ * refused this way costs a whole lap — finish_armed re-arms only on leaving the
+ * tile — which is why the lag is pinned here rather than left to playtest. */
+void test_finish_gate_rejects_a_facing_still_mid_sweep(void) {
+    uint8_t i;
+    player_init(0u);
+    player_set_dir(DIR_R);
+    player_apply_physics(J_DOWN, TILE_ROAD);          /* request south, one frame */
+    TEST_ASSERT_EQUAL_UINT8(0u, finish_eval(TRACK_TYPE_RACE, 1u,
+                                (uint8_t)player_get_dir(), CHECKPOINT_DIR_S, 1u));
+
+    for (i = 1u; i < (uint8_t)(2u * TURN_PERIOD); i++) {
+        player_apply_physics(J_DOWN, TILE_ROAD);      /* R -> RB -> B */
+    }
+    TEST_ASSERT_EQUAL_UINT8(1u, finish_eval(TRACK_TYPE_RACE, 1u,
+                                (uint8_t)player_get_dir(), CHECKPOINT_DIR_S, 1u));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_finish_eval_race_all_conditions_met);
@@ -156,5 +181,6 @@ int main(void) {
     RUN_TEST(test_cd_advances_at_60_frames);
     RUN_TEST(test_cd_go_stays_before_45);
     RUN_TEST(test_cd_go_advances_at_45_frames);
+    RUN_TEST(test_finish_gate_rejects_a_facing_still_mid_sweep);
     return UNITY_END();
 }

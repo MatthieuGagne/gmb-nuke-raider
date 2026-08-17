@@ -9,6 +9,17 @@
 #include "../src/racer.h"
 #include "../src/sprite_pool.h"
 #include "../src/beam.h"
+#include "../src/config.h"
+
+/* Frame counts derive from the config.h table, never from a hardcoded number (#628). */
+static const uint8_t TURN_FRAMES_T[8] = PLAYER_TURN_FRAMES_TABLE;
+#define TURN_PERIOD  (TURN_FRAMES_T[PLAYER_HANDLING])
+
+/* Notches between two facings, the short way round the ring. */
+static uint8_t steps_between(player_dir_t from, player_dir_t to) {
+    uint8_t d = (uint8_t)((uint8_t)((uint8_t)to - (uint8_t)from) & 7u);
+    return (d <= 4u) ? d : (uint8_t)(8u - d);
+}
 
 /* input/prev_input globals defined in tests/mocks/input_globals.c */
 
@@ -198,8 +209,16 @@ void test_gas_diagonal_dpad_applies_diagonal_vector(void) {
     TEST_ASSERT_EQUAL_INT8(-2, player_get_vy());
 }
 
-/* Face south + gas = move south (gear1 accel=2) */
+/* Pressing the opposite direction no longer flips the car in a single frame (#628).
+ * The car comes about through the ring first; only once it faces south does thrust
+ * point south. */
 void test_brake_while_stopped_facing_up_reverses_down(void) {
+    uint8_t i;
+    for (i = 0u; i < (uint8_t)(4u * TURN_PERIOD); i++) {
+        player_apply_physics(J_DOWN, TILE_ROAD);
+    }
+    TEST_ASSERT_EQUAL_INT(DIR_B, player_get_dir());
+    player_reset_vel();
     player_apply_physics(J_DOWN, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT8(0, player_get_vx());
     TEST_ASSERT_EQUAL_INT8(2, player_get_vy());
@@ -280,10 +299,16 @@ void test_brake_while_moving_does_not_reverse(void) {
 
 /* ===== 8-directional facing (issue #133) ============================= */
 
-/* Helper: reset velocity, apply one physics frame, check direction */
+/* Helper: reset velocity, then hold the buttons long enough for the facing to sweep
+ * all the way to `expected`, and check it landed there. The facing no longer snaps
+ * in one frame (#628), so the hold length is derived from the turn table. */
 static void apply_and_check_dir(uint8_t buttons, player_dir_t expected) {
+    uint8_t i;
+    uint8_t frames;
     player_reset_vel();
-    player_apply_physics(buttons, TILE_ROAD);
+    frames = (uint8_t)(steps_between(player_get_dir(), expected) * TURN_PERIOD);
+    if (frames == 0u) frames = 1u;   /* same-direction case still runs a frame */
+    for (i = 0u; i < frames; i++) player_apply_physics(buttons, TILE_ROAD);
     TEST_ASSERT_EQUAL_INT(expected, player_get_dir());
 }
 
@@ -299,8 +324,8 @@ void test_dir_up_left_sets_LT(void)    { apply_and_check_dir(J_UP | J_LEFT,    D
 
 /* AC1: no D-pad held preserves last direction */
 void test_dir_no_dpad_keeps_last(void) {
-    player_apply_physics(J_RIGHT, TILE_ROAD);  /* set facing = R */
-    player_apply_physics(0,       TILE_ROAD);  /* no dpad: keep R */
+    apply_and_check_dir(J_RIGHT, DIR_R);       /* sweep north -> east */
+    player_apply_physics(0, TILE_ROAD);        /* no dpad: keep R */
     TEST_ASSERT_EQUAL_INT(DIR_R, player_get_dir());
 }
 
