@@ -1,0 +1,17 @@
+{
+  "name": "issue-628-handling-sweep",
+  "blocking": true,
+  "watch": ["_player_dir", "_px", "_py"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "advance", "frames": 400},
+    {"action": "assert_memory", "address": "_player_dir", "value": 4, "op": "eq"},
+    {"action": "screenshot", "out": "facing-south-at-start.png"},
+    {"action": "press", "buttons": ["left"], "delay": 4},
+    {"action": "assert_memory", "address": "_player_dir", "value": 6, "op": "ne"},
+    {"action": "screenshot", "out": "mid-sweep.png"},
+    {"action": "press", "buttons": ["left"], "delay": 120},
+    {"action": "assert_memory", "address": "_player_dir", "value": 6, "op": "eq"},
+    {"action": "screenshot", "out": "facing-west.png"}
+  ]
+}
