@@ -37,6 +37,7 @@
       "PowerShell(Set-Content *)",
       "PowerShell(Start-Process *)",
       "PowerShell(Test-Path *)",
+      "PowerShell(Write-Output *)",
       "PowerShell(gh *)",
       "PowerShell(git *)",
       "PowerShell(make *)",
