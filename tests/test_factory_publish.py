@@ -2731,7 +2731,11 @@ class TestSlugAgreement(PublishTestCase):
         return state
 
     def test_plan_slug_delegates_to_the_shared_resolver(self):
-        """R5: no second copy of the recovery logic."""
+        """R6: the title's slug source agrees with the resolver on the PRD-3 shape.
+
+        R5 (no second copy of the recovery logic) is pinned by
+        test_plan_slug_has_no_second_copy_of_the_recovery, not here.
+        """
         state = self.state(
             slug=None,
             plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
