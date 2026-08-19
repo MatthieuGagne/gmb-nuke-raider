@@ -180,6 +180,51 @@ class TestCli(StatusTestCase):
         rows = json.loads(out)
         self.assertEqual({r['issue'] for r in rows}, {436, 437, 999})
 
+    def test_the_slug_column_shows_a_recovered_slug(self):
+        """AC1 at the level the spec states it: through the CLI."""
+        _, out, _ = self.run_cli('--registry', self.reg,
+                                 '--now', NOW.isoformat())
+        self.assertIn('SLUG', out)
+        self.assertNotIn('(no slug)', out)
+
+
+class TestSlugColumn(unittest.TestCase):
+    """#650 R1, R2: the last slug reader goes through the resolver."""
+
+    def test_slug_is_recovered_from_the_plan_filename(self):
+        """AC1."""
+        row = factory_status._row(
+            {'issue': 650, 'slug': None,
+             'plan': 'docs/plans/2026-08-18-issue650-plan-path-normalizer.md'},
+            factory_run.parse_now('2026-08-18T12:00:00+00:00'))
+        self.assertEqual(row['slug'], 'plan-path-normalizer')
+
+    def test_an_explicit_slug_still_wins(self):
+        row = factory_status._row(
+            {'issue': 650, 'slug': 'explicit',
+             'plan': 'docs/plans/2026-08-18-issue650-plan-path-normalizer.md'},
+            factory_run.parse_now('2026-08-18T12:00:00+00:00'))
+        self.assertEqual(row['slug'], 'explicit')
+
+    def test_neither_field_keeps_the_short_placeholder(self):
+        """AC2: the column placeholder is '-', not the '(no slug)' literal the
+        PR-body and plan-title renderers print. The table is fixed-width."""
+        row = factory_status._row(
+            {'issue': 650, 'slug': None, 'plan': None},
+            factory_run.parse_now('2026-08-18T12:00:00+00:00'))
+        self.assertEqual(row['slug'], '-')
+        self.assertNotEqual(row['slug'], factory_run.FALLBACK_SLUG)
+
+    def test_the_rendered_table_shows_the_recovered_slug(self):
+        """AC1 through the renderer, not only the row dict."""
+        row = factory_status._row(
+            {'issue': 650, 'slug': None,
+             'plan': 'docs/plans/2026-08-18-issue650-plan-path-normalizer.md'},
+            factory_run.parse_now('2026-08-18T12:00:00+00:00'))
+        table = factory_status.render_table([row], 'registry')
+        self.assertIn('plan-path-normalizer', table)
+        self.assertNotIn('(no slug)', table)
+
 
 class TestHtmlIsGone(StatusTestCase):
     def test_no_html_symbols_remain(self):
