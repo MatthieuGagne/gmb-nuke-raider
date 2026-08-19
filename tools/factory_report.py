@@ -117,7 +117,7 @@ def render(state):
     out = [
         '## Summary',
         '',
-        'Factory run for issue #%d — %s.' % (issue, state.get('slug') or '(no slug)'),
+        'Factory run for issue #%d — %s.' % (issue, factory_run.run_slug(state)),
         '',
         '- Attempt: %d' % int(state.get('attempt') or 1),
         '- Stage reached: %s' % (state.get('stage') or '(none)'),
