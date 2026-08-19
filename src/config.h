@@ -24,7 +24,23 @@
 #define PLAYER_FRICTION   1u
 
 /* Player vehicle stats — reserved for future systems; values are tunable placeholders */
-#define PLAYER_HANDLING  3   /* Turning/handling system (not yet implemented) */
+
+/* PLAYER_HANDLING — turning responsiveness (#628). Legal range 0-7: 0 is the heaviest
+ * car, 7 the sharpest. The value indexes PLAYER_TURN_FRAMES_TABLE to get the number of
+ * frames the car spends per 45 degree facing step. Every entry in that table is at
+ * least 1, so no legal value locks the car to a single facing. Higher turns faster.
+ * The shipping value is a playtesting question, not a code one. */
+#define PLAYER_HANDLING  3
+
+/* Handling -> frames per 45 degree facing step. A lookup table, not arithmetic: the
+ * SM83 has no divide instruction. Read by src/player.c and by the turn tests, which
+ * derive their frame counts from it rather than hardcoding them. */
+#define PLAYER_TURN_FRAMES_TABLE { 8u, 7u, 6u, 5u, 4u, 3u, 2u, 1u }
+
+#if (PLAYER_HANDLING) < 0 || (PLAYER_HANDLING) > 7
+#error "PLAYER_HANDLING must be 0-7 (it indexes PLAYER_TURN_FRAMES_TABLE in src/config.h)"
+#endif
+
 #define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
 #define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
 
