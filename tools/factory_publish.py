@@ -706,24 +706,12 @@ def read_plan(state):
 def _plan_slug(state):
     """The run's slug for the plan issue title.
 
-    ``state["slug"]`` is the intended source but nothing in the factory
-    currently emits it — ``stages.md`` step 3 records only worktree and
-    branch — so the plan filename is the fallback. PRD-3 fixes the filename
-    as ``YYYY-MM-DD-issue<N>-<slug>.md``, which makes the slug recoverable
-    without inventing a second naming convention.
+    Delegates to ``factory_run.run_slug`` so this title and the PR body's
+    Summary line derive the slug from one code path and cannot disagree for
+    one run (#641 R5, R6). The recovery rules -- explicit ``state["slug"]``,
+    then the PRD-3 plan filename, then a fallback -- live there.
     """
-    slug = state.get("slug")
-    if slug:
-        return slug
-    plan = state.get("plan")
-    if plan:
-        stem = os.path.splitext(os.path.basename(plan))[0]
-        match = re.match(r"^\d{4}-\d{2}-\d{2}-issue\d+-(.+)$", stem)
-        if match:
-            return match.group(1)
-        if stem:
-            return stem
-    return "(no slug)"
+    return factory_run.run_slug(state)
 
 
 def render_plan_title(state):

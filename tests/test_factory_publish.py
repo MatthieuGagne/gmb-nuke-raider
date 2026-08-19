@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from contextlib import redirect_stderr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
@@ -2704,3 +2705,61 @@ class PublicationIsOtherwiseUnchangedTests(PlanRunTestCase):
         self.assertTrue([w for w in result.warnings if 'not uploaded' in w])
         self.assertEqual(factory_publish.exit_code(result),
                          factory_publish.EXIT_DEGRADED)
+
+
+class TestSlugAgreement(PublishTestCase):
+    """#641 R5-R6: one resolver behind both renderers."""
+
+    def test_plan_slug_has_no_second_copy_of_the_recovery(self):
+        """R5: the delegation itself, not merely its result.
+
+        Every agreement test below passes against the *current* _plan_slug,
+        because the old and new recovery agree on all four inputs. Only this
+        test can go red for a re-duplicated copy of the logic.
+        """
+        with mock.patch.object(factory_run, 'run_slug',
+                               return_value='SENTINEL') as patched:
+            self.assertEqual(
+                factory_publish._plan_slug({'slug': 'x', 'plan': None}),
+                'SENTINEL')
+        patched.assert_called_once()
+
+    def state(self, **overrides):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state.update(overrides)
+        return state
+
+    def test_plan_slug_delegates_to_the_shared_resolver(self):
+        """R5: no second copy of the recovery logic."""
+        state = self.state(
+            slug=None,
+            plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
+        self.assertEqual(factory_publish._plan_slug(state),
+                         factory_run.run_slug(state))
+
+    def test_title_and_body_agree_for_one_run(self):
+        """AC2 and AC6: the same state renders the same slug on both surfaces."""
+        state = self.state(
+            issue=641, slug=None,
+            plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
+        self.assertEqual(factory_publish.render_plan_title(state),
+                         'plan: factory-pr-slug (#641)')
+        self.assertIn('Factory run for issue #641 — factory-pr-slug.',
+                      factory_report.render(state))
+
+    def test_they_agree_on_a_non_matching_plan_filename(self):
+        """AC5 on both surfaces."""
+        state = self.state(issue=641, slug=None, plan='docs/plans/notes.md')
+        self.assertEqual(factory_publish.render_plan_title(state),
+                         'plan: notes (#641)')
+        self.assertIn('Factory run for issue #641 — notes.',
+                      factory_report.render(state))
+
+    def test_they_agree_when_the_state_carries_neither_field(self):
+        """AC4 on both surfaces — neither renderer raises."""
+        state = self.state(issue=641, slug=None, plan=None)
+        self.assertEqual(factory_publish.render_plan_title(state),
+                         'plan: (no slug) (#641)')
+        self.assertIn('Factory run for issue #641 — (no slug).',
+                      factory_report.render(state))
