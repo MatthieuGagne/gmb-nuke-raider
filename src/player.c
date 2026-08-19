@@ -30,6 +30,15 @@ DBG_STATIC uint8_t downshift_timer; /* hysteresis counter for downshift */
 static const uint8_t GEAR_MAX_SPEED[3] = {GEAR1_MAX_SPEED, GEAR2_MAX_SPEED, GEAR3_MAX_SPEED};
 static const uint8_t GEAR_ACCEL[3]     = {GEAR1_ACCEL, GEAR2_ACCEL, GEAR3_ACCEL};
 
+/* Handling -> frames per 45 degree facing step (#628). A lookup indexed by the
+ * stat, never a divide — the SM83 has no divide instruction. */
+static const uint8_t TURN_FRAMES[8] = PLAYER_TURN_FRAMES_TABLE;
+
+/* Frames the current turn request has been held. Zeroed on a completed step, on a
+ * request that already matches the facing, and by player_init / player_set_dir.
+ * Not zeroed by player_reset_vel, which owns velocity and gear, not facing. */
+DBG_STATIC uint8_t turn_timer;
+
 DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
 DBG_STATIC uint8_t player_flicker_tick;
 DBG_STATIC player_dir_t player_dir = DIR_T;
@@ -165,6 +174,7 @@ void player_init(uint8_t tile_base) BANKED {
     current_gear    = 0u;
     downshift_timer = 0u;
     player_dir = DIR_T;
+    turn_timer = 0u;
     player_flicker_tick = 0u;
     s_player_dead = 0u;
     SHOW_SPRITES;
@@ -337,15 +347,45 @@ static player_dir_t decode_dir(uint8_t buttons) {
     return player_dir;
 }
 
+/* Rotate player_dir one 45 degree notch toward the requested direction, the short
+ * way round the eight-direction ring, at most once every TURN_FRAMES[PLAYER_HANDLING]
+ * frames. The D-pad is sampled only while it is held, so letting go mid-sweep leaves
+ * the facing where it reached and stops the rotation. */
+static void turn_toward_request(uint8_t buttons) {
+    uint8_t req;
+    uint8_t diff;
+
+    if (!(buttons & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) return;
+
+    req  = (uint8_t)decode_dir(buttons);
+    diff = (uint8_t)((uint8_t)(req - (uint8_t)player_dir) & 7u);
+    if (diff == 0u) {
+        turn_timer = 0u;
+        return;
+    }
+
+    turn_timer++;
+    if (turn_timer >= TURN_FRAMES[PLAYER_HANDLING]) {
+        turn_timer = 0u;
+        /* diff 1-4 turns clockwise, 5-7 counter-clockwise. The 180 degree tie
+         * (diff == 4) always goes clockwise so a half turn is reproducible.
+         * The mask keeps the result in 0-7: values 8-15 are turret-only and would
+         * index past DIR_DX/DY, DIR_TILE_* and HITBOX_*, all of which are 8 wide. */
+        player_dir = (player_dir_t)((diff <= 4u)
+                        ? (uint8_t)(((uint8_t)player_dir + 1u) & 7u)
+                        : (uint8_t)(((uint8_t)player_dir + 7u) & 7u));
+    }
+}
+
 player_dir_t player_get_dir(void) BANKED { return player_dir; }
-void player_set_dir(player_dir_t dir) BANKED { player_dir = dir; }
+void player_set_dir(player_dir_t dir) BANKED { player_dir = dir; turn_timer = 0u; }
 int8_t player_dir_dx(player_dir_t dir) BANKED { return DIR_DX[dir]; }
 int8_t player_dir_dy(player_dir_t dir) BANKED { return DIR_DY[dir]; }
 
 void player_apply_physics(uint8_t buttons, TileType terrain) BANKED {
     uint8_t gas;
 
-    player_dir = decode_dir(buttons);
+    turn_toward_request(buttons);
     gas = (terrain != TILE_OIL && (buttons & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) ? 1u : 0u;
 
     /* Gear-reset-on-oil stays here (gear state is the caller's). */

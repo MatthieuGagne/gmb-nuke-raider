@@ -54,6 +54,7 @@ void test_oil_does_not_increase_vx(void) {
     int8_t entry_vx;
     uint8_t i;
 
+    player_set_dir(DIR_R);
     /* Build up speed on road */
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);
@@ -71,6 +72,7 @@ void test_oil_does_not_increase_vx(void) {
 void test_oil_preserves_velocity_without_input(void) {
     int8_t entry_vx;
 
+    player_set_dir(DIR_R);
     player_apply_physics(J_RIGHT | J_A, TILE_ROAD);  /* gear1: vx=2 */
     entry_vx = player_get_vx();   /* 2 — within gear1 max so oil gear-reset won't clamp */
 
