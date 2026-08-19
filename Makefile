@@ -202,6 +202,18 @@ $(TARGET): src/dialog_data.c
 $(OBJ_DIR)/%.o: src/%.c | $(OBJ_DIR)
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -c -o $@ $<
 
+# A #define edit changes values compiled into every object that reaches this
+# header, directly or through one of the nine headers that include it. Without
+# this, make sees no .c file newer than its .o, relinks stale objects, exits 0
+# and hands back a ROM that does not carry the edit -- which reads as "the
+# change did not work" (#612 R5).
+#
+# This rebuilds all 52 objects, not only the ~40 that reach config.h. Exact
+# per-object dependencies would need generated depfiles from lcc; the extra
+# precision saves about a fifth of a rebuild, and a silently ignored tuning
+# edit costs a debugging session.
+$(OBJS): src/config.h
+
 $(TARGET): $(OBJS) | $(BUILD_DIR) bank-check
 	$(LCC) $(CFLAGS) $(ROMFLAGS) -o $@ $(OBJS) -Wl-klib/hUGEDriver/gbdk -Wl-lhUGEDriver.lib
 	python tools/emit_manifest.py \

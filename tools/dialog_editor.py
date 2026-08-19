@@ -37,7 +37,8 @@ Keys:
 """
 # The curses TUI is POSIX-only — CPython ships _curses on POSIX only. Import it
 # lazily so the pure helpers stay importable, and unit-testable, on Windows.
-# Same guard as tools/balancer.py's termios/tty guard.
+# The rule is docs/dev-workflow.md section 4; balancer.py was the other example
+# until #612 retired it.
 try:
     import curses
 except ImportError:  # pragma: no cover - platform dependent
