@@ -14,10 +14,10 @@ import dialog_editor as ed
 class TestPosixOnlyImport(unittest.TestCase):
     """The TUI is POSIX-only; the pure helpers must import anywhere.
 
-    Same guard as tools/balancer.py's termios/tty guard (PR #439). Without it
-    the whole module — and therefore this whole test file — errors at import
-    on Windows, which is how tests/test_dialog_editor.py stayed out of the
-    tool suite (#441).
+    The rule is docs/dev-workflow.md section 4 (PR #439); balancer.py was the
+    other example until #612 retired it. Without the guard the whole module —
+    and therefore this whole test file — errors at import on Windows, which is
+    how tests/test_dialog_editor.py stayed out of the tool suite (#441).
     """
 
     def test_module_exposes_a_curses_guard(self):

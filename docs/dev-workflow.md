@@ -219,7 +219,7 @@ ungated for four months (#441).
 
 **POSIX-only imports must be guarded.** `curses`, `termios` and `tty` do not exist on Windows.
 Import them in a `try/except ImportError` that binds the name to `None`, and check for `None` at
-the TUI entry point — see `tools/balancer.py` and `tools/dialog_editor.py`. An unguarded import
+the TUI entry point — see `tools/dialog_editor.py`. An unguarded import
 takes the whole module out of the suite: the module errors at import, and on a green-looking run
 that reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exist to catch this.
 
