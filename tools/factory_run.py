@@ -391,7 +391,7 @@ def run_slug(state):
         return str(slug)
     plan = fields.get("plan")
     if plan:
-        base = str(plan).replace("\\", "/").rsplit("/", 1)[-1]
+        base = os.path.basename(normalize_plan_path(plan))
         stem = os.path.splitext(base)[0]
         match = _PLAN_STEM_RE.match(stem)
         if match:
@@ -399,6 +399,27 @@ def run_slug(state):
         if stem:
             return stem
     return FALLBACK_SLUG
+
+
+def normalize_plan_path(plan):
+    """A recorded plan path with separators normalized for this platform.
+
+    ``state["plan"]`` is recorded repo-relative, and which separator it
+    carries depends on the machine the run happened on. The idiom this
+    replaces substituted in the opposite direction -- forward slash to
+    ``os.sep`` -- which is a no-op on POSIX, where the two are already the
+    same character. A backslash-spelled path therefore passed through whole
+    and the caller silently failed to find the file (#650 R3).
+
+    Separators only. Stem extraction stays with each caller, because
+    ``sdd_workspace_dir`` strips a trailing ``.md`` while ``run_slug`` uses
+    ``splitext`` -- folding those together would change one of them.
+
+    ``normpath`` also collapses dot segments and strips trailing separators,
+    so a malformed path resolves differently than it used to. No caller
+    produces one.
+    """
+    return os.path.normpath(str(plan).replace("\\", "/"))
 
 
 def append_event(issue, kind, registry=None, **fields):
@@ -576,7 +597,7 @@ def sdd_workspace_dir(worktree, plan):
     """
     if not worktree or not plan:
         return None
-    slug = os.path.basename(str(plan).replace("/", os.sep))
+    slug = os.path.basename(normalize_plan_path(plan))
     if slug.endswith(".md"):
         slug = slug[:-3]
     if not slug or slug in (".", ".."):
@@ -641,7 +662,7 @@ def preserve_workspace(issue, registry=None, worktree=None, plan=None):
     try:
         plan_src = None
         if worktree and plan:
-            plan_src = os.path.join(worktree, str(plan).replace("/", os.sep))
+            plan_src = os.path.join(worktree, normalize_plan_path(plan))
         record("plan", plan_src)
 
         sdd = sdd_workspace_dir(worktree, plan)
