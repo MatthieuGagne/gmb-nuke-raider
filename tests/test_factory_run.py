@@ -653,5 +653,60 @@ class TestSmoketestDir(unittest.TestCase):
         self.assertIsNone(factory_run.main_root_of(None))
 
 
+class TestRunSlug(unittest.TestCase):
+    """#641 R1-R3: one shared slug resolver."""
+
+    def test_explicit_slug_wins_over_the_plan_filename(self):
+        """AC3."""
+        state = {'slug': 'explicit',
+                 'plan': 'docs/plans/2026-08-18-issue641-from-filename.md'}
+        self.assertEqual(factory_run.run_slug(state), 'explicit')
+
+    def test_slug_is_recovered_from_a_prd3_plan_filename(self):
+        """AC1 at the resolver level."""
+        state = {'slug': None,
+                 'plan': 'docs/plans/2026-08-18-issue641-factory-pr-slug.md'}
+        self.assertEqual(factory_run.run_slug(state), 'factory-pr-slug')
+
+    def test_a_non_matching_plan_filename_yields_its_stem(self):
+        """AC5 at the resolver level."""
+        state = {'slug': None, 'plan': 'docs/plans/notes.md'}
+        self.assertEqual(factory_run.run_slug(state), 'notes')
+
+    def test_neither_field_yields_the_fallback(self):
+        """AC4 at the resolver level."""
+        self.assertEqual(factory_run.run_slug({'slug': None, 'plan': None}),
+                         factory_run.FALLBACK_SLUG)
+        self.assertEqual(factory_run.FALLBACK_SLUG, '(no slug)')
+
+    def test_an_empty_state_never_raises(self):
+        """R3: missing fields, not merely empty ones."""
+        self.assertEqual(factory_run.run_slug({}), factory_run.FALLBACK_SLUG)
+        self.assertEqual(factory_run.run_slug(None), factory_run.FALLBACK_SLUG)
+
+    def test_empty_strings_fall_through_rather_than_render(self):
+        """R3: an empty field is not a slug."""
+        self.assertEqual(factory_run.run_slug({'slug': '', 'plan': ''}),
+                         factory_run.FALLBACK_SLUG)
+
+    def test_a_malformed_plan_value_never_raises(self):
+        """R3: a non-string field must not reach os.path unconverted."""
+        self.assertEqual(factory_run.run_slug({'slug': None, 'plan': 42}), '42')
+
+    def test_a_new_state_resolves_to_the_fallback(self):
+        """The real state shape, not a hand-built dict."""
+        self.assertEqual(factory_run.run_slug(factory_run.new_state(641)),
+                         factory_run.FALLBACK_SLUG)
+
+    def test_a_windows_plan_path_yields_the_slug(self):
+        """The orchestrator records a repo-relative path; a run recorded on
+        Windows may carry backslashes. Asserts the literal, not that the two
+        spellings agree -- an agreement assertion is satisfied by ntpath on
+        Windows and so would never bite the defect it exists for."""
+        win = {'slug': None,
+               'plan': 'docs\\plans\\2026-08-18-issue641-factory-pr-slug.md'}
+        self.assertEqual(factory_run.run_slug(win), 'factory-pr-slug')
+
+
 if __name__ == '__main__':
     unittest.main()

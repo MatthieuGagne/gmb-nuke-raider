@@ -184,5 +184,52 @@ class PlanReviewFindingsTests(ReportTestCase):
                       'upload.', body)
 
 
+class TestSummarySlug(ReportTestCase):
+    """#641 R4: the Summary line goes through the shared resolver."""
+
+    def body(self, **overrides):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        state = factory_run.load_state(440, reg)
+        state.update(overrides)
+        return factory_report.render(state)
+
+    def test_slug_is_recovered_from_the_plan_filename(self):
+        """AC1."""
+        body = self.body(
+            slug=None,
+            plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
+        self.assertIn('Factory run for issue #440 — factory-pr-slug.', body)
+        self.assertNotIn('(no slug)', body)
+
+    def test_an_explicit_slug_is_preferred(self):
+        """AC3."""
+        body = self.body(
+            slug='observability',
+            plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
+        self.assertIn('Factory run for issue #440 — observability.', body)
+
+    def test_a_state_with_neither_field_renders_without_raising(self):
+        """AC4."""
+        body = self.body(slug=None, plan=None)
+        self.assertIn('Factory run for issue #440 — (no slug).', body)
+
+    def test_a_non_matching_plan_filename_renders_its_stem(self):
+        """AC5."""
+        body = self.body(slug=None, plan='docs/plans/notes.md')
+        self.assertIn('Factory run for issue #440 — notes.', body)
+
+    def test_the_summary_renders_the_spec_example_verbatim(self):
+        """AC1's literal sentence, on a bare state dict.
+
+        Asserts the literal rather than ``assertIn(run_slug(state), body)``,
+        which compares the resolver to itself through an unanchored substring
+        test that any short return value would satisfy.
+        """
+        state = {'issue': 641, 'slug': None,
+                 'plan': 'docs/plans/2026-08-18-issue641-factory-pr-slug.md'}
+        self.assertIn('Factory run for issue #641 — factory-pr-slug.',
+                      factory_report.render(state))
+
+
 if __name__ == '__main__':
     unittest.main()
