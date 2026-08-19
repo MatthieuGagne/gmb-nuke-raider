@@ -181,10 +181,19 @@ class TestCli(StatusTestCase):
         self.assertEqual({r['issue'] for r in rows}, {436, 437, 999})
 
     def test_the_slug_column_shows_a_recovered_slug(self):
-        """AC1 at the level the spec states it: through the CLI."""
+        """AC1 at the level the spec states it: through the CLI.
+
+        Every shared fixture carries an explicit ``slug``, so asserting
+        against them proves nothing about the fallback. This run is added
+        here because it is the only shape that reaches it: a ``plan`` and
+        no ``slug``. The path and the expected column value are AC1's own.
+        """
+        factory_run.append_event(
+            650, 'start', registry=self.reg,
+            plan='docs/plans/2026-08-18-issue641-factory-pr-slug.md')
         _, out, _ = self.run_cli('--registry', self.reg,
                                  '--now', NOW.isoformat())
-        self.assertIn('SLUG', out)
+        self.assertIn('factory-pr-slug', out)
         self.assertNotIn('(no slug)', out)
 
 
