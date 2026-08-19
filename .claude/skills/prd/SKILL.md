@@ -5,7 +5,7 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
-Always invoke the `grill-with-docs` skill — it will surface requirements, acceptance criteria, scope, and GB hardware constraints. Once the grilling is satisfied, proceed to drafting.
+The grill step is user-invoked: `grill-with-docs` carries `disable-model-invocation`, so ask the user to run `/grill-with-docs` — it surfaces requirements, acceptance criteria, scope, and GB hardware constraints. Once the grilling is satisfied (or the user skips it), proceed to drafting.
 
 ---
 
