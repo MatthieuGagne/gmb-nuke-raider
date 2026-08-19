@@ -26,6 +26,7 @@ Exit codes:
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,12 @@ EVENT_KINDS = ("start", "stage", "gate", "decision", "retry", "scenario",
 REGISTRY_DIRNAME = ".factory"
 STATE_FILE = "state.json"
 JOURNAL_FILE = "journal.jsonl"
+
+FALLBACK_SLUG = "(no slug)"
+
+# PRD-3 fixes the plan filename as ``YYYY-MM-DD-issue<N>-<slug>.md``, which
+# makes the slug recoverable without inventing a second naming convention.
+_PLAN_STEM_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-issue\d+-(.+)$")
 
 _clock = None
 
@@ -365,6 +372,33 @@ def ordered_gates(state):
     return [gate for _, gate in sorted(
         enumerate(gates),
         key=lambda pair: (rank.get(pair[1].get("stage"), len(rank)), pair[0]))]
+
+
+def run_slug(state):
+    """The run's slug, for any renderer that names the run (#641 R1).
+
+    ``state["slug"]`` is the intended source but nothing in the factory
+    currently emits it -- ``stages.md`` step 3 records only worktree and
+    branch -- so the plan filename is the fallback. Both renderers call this,
+    so the PR body and the plan issue title cannot disagree for one run (R6).
+
+    Never raises: a missing, empty or malformed field falls through to the
+    next source and finally to ``FALLBACK_SLUG`` (R3).
+    """
+    fields = state or {}
+    slug = fields.get("slug")
+    if slug:
+        return str(slug)
+    plan = fields.get("plan")
+    if plan:
+        base = str(plan).replace("\\", "/").rsplit("/", 1)[-1]
+        stem = os.path.splitext(base)[0]
+        match = _PLAN_STEM_RE.match(stem)
+        if match:
+            return match.group(1)
+        if stem:
+            return stem
+    return FALLBACK_SLUG
 
 
 def append_event(issue, kind, registry=None, **fields):
