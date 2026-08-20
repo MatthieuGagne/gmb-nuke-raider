@@ -67,9 +67,9 @@ artifact is recorded in `manifest.json` and never raised, so preservation cannot
 that has already opened its pull request. Terminal failure keeps its own bundle —
 `write_autopsy` — and the two do not overlap.
 
-## Every command goes through the stage-log helper
+## Every stage command goes through the stage-log helper
 
-No stage runs a command directly. Every one is wrapped:
+A stage's work commands are wrapped — builds, tests, git operations, scenario runs:
 
 ```
 python tools/factory_log.py --stage <STAGE> --issue <N> [--attempt <k>] -- <argv...>
@@ -95,6 +95,13 @@ Two consequences to plan around. Add `--stream` after `--issue` when the orchest
 marks every such invocation. And while a command is running the console is silent, so a wrapped
 command that hangs or is killed prints nothing: tail
 `.factory/runs/issue-<N>/logs/<STAGE>.log`, whose path is fixed by the stage and issue you passed.
+
+**Who wraps what.** The orchestrator wraps every command it runs itself, in every stage —
+BUILD included. Most of BUILD's commands are run by dispatched implementers rather than by the
+orchestrator, and each subagent wraps its own: its brief carries `--issue <N>`, because
+`NUKE_FACTORY_RUN` does not cross a dispatch. Registry and publisher bookkeeping —
+`factory_event.py`, `factory_publish.py`, `factory_status.py` — is never wrapped, in any stage;
+it writes its own record. `references/stages.md` names BUILD's wrapped commands exactly (#654).
 
 ## Recording state
 

@@ -84,3 +84,28 @@ class TestStagesWrapTheirCommands(unittest.TestCase):
         self.assertIn('A dispatched implementer** wraps its own', body)
         self.assertIn('python tools/factory_log.py --stage BUILD --issue <N> --',
                       body)
+
+
+class TestSkillAndStagesAgree(unittest.TestCase):
+    """#654 R5/AC5: one document must not contradict the other."""
+
+    def test_the_rule_does_not_claim_more_than_stages_delivers(self):
+        """The exact sentence #654 names as wrong."""
+        self.assertNotIn('No stage runs a command directly',
+                         flat(read(SKILL_MD)))
+
+    def test_the_rule_names_who_wraps_what(self):
+        body = flat(read(SKILL_MD))
+        self.assertIn('Who wraps what', body)
+        self.assertIn('does not cross a dispatch', body)
+
+    def test_bookkeeping_is_declared_unwrapped(self):
+        """stages.md shows factory_event.py bare in every stage; say so.
+
+        Not `assertIn('factory_event.py', ...)`: SKILL.md's '## Recording
+        state' section already names that file eight times, so the bare
+        substring is green before the edit and proves nothing.
+        """
+        body = flat(read(SKILL_MD))
+        self.assertIn('Registry and publisher bookkeeping', body)
+        self.assertIn('is never wrapped, in any stage', body)
