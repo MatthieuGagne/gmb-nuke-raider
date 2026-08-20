@@ -308,9 +308,14 @@ class TestFailureSection(PublishTestCase):
         with open(path, 'wb') as fh:
             fh.write(b'tests/test_factory_run.py .. FAIL\n'
                      b'AssertionError: expected 3, got 4\n')
-        factory_run.write_autopsy(
+        dest = factory_run.write_autopsy(
             441, registry=reg,
             worktree=factory_run.load_state(441, reg)['worktree'])
+
+        # AC4 is a claim about a bundle AND a tail, so assert both. Without
+        # the manifest assertion the write_autopsy call is decorative: the
+        # tail is read straight from the registry and does not need it.
+        self.assertTrue(os.path.isfile(os.path.join(dest, 'manifest.json')))
         body = self.failed_body(reg)
         self.assertNotIn('no stage log captured', body)
         self.assertIn('AssertionError: expected 3, got 4', body)
