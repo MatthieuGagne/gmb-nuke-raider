@@ -8,6 +8,9 @@
   clean-build authority, sdld whole-module linking, HOME-bank ordering
 - [[config-h-patterns]] — table macros vs compound literals, `#if`/`#error` range
   guards, config.h is not a Makefile dependency
+- [[banked-call-optimization]] — cutting bank-trampoline cost in hot loops: lazy
+  caching of loop-invariant BANKED accessors, single-call block detection, safe SoA
+  hoisting, verified int8 thrust headroom
 
 ## Engine Architecture
 
