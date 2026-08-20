@@ -428,6 +428,18 @@ class TestAutopsy(JournalTestCase):
         with open(path, 'rb') as fh:
             self.assertIn(b'Error 1', fh.read())
 
+        # Two-directional on purpose. 'The source still exists' alone would
+        # pass on a write_autopsy that did nothing at all, so also assert the
+        # bundle holds no copy: #450 puts stage logs in the registry, and a
+        # duplicate inside the bundle is the other way to get this wrong.
+        copied = []
+        for root, _dirs, names in os.walk(dest):
+            for name in names:
+                with open(os.path.join(root, name), 'rb') as fh:
+                    if b'make: *** [test] Error 1' in fh.read():
+                        copied.append(name)
+        self.assertEqual(copied, [])
+
     def test_the_autopsy_manifest_never_claims_the_stage_log(self):
         """#654 AC4: no manifest entry promises a log the bundle omits."""
         self.append('start', slug='obs', branch='b', worktree='/w',
