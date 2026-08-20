@@ -80,6 +80,23 @@ def condition(state, elapsed, worktree_exists):
     return "active"
 
 
+def _column_slug(state):
+    """The run's slug for the fixed-width SLUG column (#650 R1, R2).
+
+    Shares the resolver with the PR body and the plan issue title, so a run
+    whose slug is recoverable from its plan filename stops showing as '-'.
+    The fallback stays the one-character placeholder rather than
+    ``factory_run.FALLBACK_SLUG``: this is a table column, and '(no slug)'
+    would widen it by eight characters for a run that has nothing to show.
+
+    A state carrying the fallback string as an explicit slug collapses to the
+    placeholder too. That is only reachable through hand-written state, and
+    both spellings mean the same thing, so the collision is left alone.
+    """
+    slug = factory_run.run_slug(state)
+    return "-" if slug == factory_run.FALLBACK_SLUG else slug
+
+
 def _row(state, now):
     worktree = state.get("worktree")
     exists = bool(worktree) and os.path.isdir(worktree)
@@ -87,7 +104,7 @@ def _row(state, now):
     gates = factory_run.ordered_gates(state)
     return {
         "issue": state["issue"],
-        "slug": state.get("slug") or "-",
+        "slug": _column_slug(state),
         "branch": state.get("branch") or "-",
         "plan": state.get("plan"),
         "attempt": int(state.get("attempt") or 1),

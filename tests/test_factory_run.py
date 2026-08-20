@@ -525,6 +525,29 @@ class TestPreserveWorkspace(JournalTestCase):
         self.assertIsNone(factory_run.preserve_workspace(
             436, registry=os.path.join(blocker, 'nested')))
 
+    def test_preserve_workspace_routes_through_the_normalizer(self):
+        """R4, asserting the call rather than the result -- see the reasoning
+        on test_sdd_workspace_dir_routes_through_the_normalizer."""
+        wt, planrel = self._workspace()
+        self.append('start', slug='demo', branch='b', worktree=wt,
+                    plan=planrel, stage='SHIP')
+        with mock.patch.object(factory_run, 'normalize_plan_path',
+                               wraps=factory_run.normalize_plan_path) as spy:
+            factory_run.preserve_workspace(436, registry=self.reg)
+        self.assertTrue(spy.called)
+
+    def test_a_backslash_spelled_plan_path_is_still_copied(self):
+        """AC4: the plan is found whatever separator the run recorded."""
+        wt, planrel = self._workspace()
+        self.append('start', slug='demo', branch='b', worktree=wt,
+                    plan=planrel, stage='SHIP')
+        plan = planrel.replace('/', '\\')
+        dest = factory_run.preserve_workspace(436, registry=self.reg, plan=plan)
+        with open(os.path.join(dest, 'manifest.json'), encoding='utf-8') as fh:
+            manifest = json.load(fh)
+        entry = [a for a in manifest['artifacts'] if a['name'] == 'plan'][0]
+        self.assertTrue(entry['present'], entry.get('reason'))
+
 
 class TestLogPath(unittest.TestCase):
     """R7 (#450): the layout is owned here; the writing lives in factory_log."""
@@ -706,6 +729,100 @@ class TestRunSlug(unittest.TestCase):
         win = {'slug': None,
                'plan': 'docs\\plans\\2026-08-18-issue641-factory-pr-slug.md'}
         self.assertEqual(factory_run.run_slug(win), 'factory-pr-slug')
+
+
+class TestNormalizePlanPath(unittest.TestCase):
+    """#650 R3: one separator idiom, not three."""
+
+    def test_a_forward_slash_path_survives(self):
+        self.assertEqual(
+            factory_run.normalize_plan_path('docs/plans/2026-08-18-issue650-x.md'),
+            os.path.join('docs', 'plans', '2026-08-18-issue650-x.md'))
+
+    def test_a_backslash_path_becomes_native(self):
+        """The defect: the old idiom was a no-op on POSIX, so this passed
+        through whole and every caller then failed to find the file."""
+        self.assertEqual(
+            factory_run.normalize_plan_path('docs\\plans\\2026-08-18-issue650-x.md'),
+            os.path.join('docs', 'plans', '2026-08-18-issue650-x.md'))
+
+    def test_both_spellings_agree(self):
+        self.assertEqual(
+            factory_run.normalize_plan_path('docs\\plans\\x.md'),
+            factory_run.normalize_plan_path('docs/plans/x.md'))
+
+    def test_a_non_string_never_raises(self):
+        self.assertEqual(factory_run.normalize_plan_path(42), '42')
+
+    def test_the_old_idiom_is_gone_from_the_module(self):
+        """AC5. Reads the source rather than the imported module: the point is
+        that no second idiom remains in the file, not that one call works."""
+        with open(factory_run.__file__, encoding='utf-8') as fh:
+            source = fh.read()
+        self.assertNotIn('replace("/", os.sep)', source)
+
+
+class TestNormalizerCallers(unittest.TestCase):
+    """#650 R4, R5: the three readers all go through it."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_run_slug_is_unchanged_by_the_rewire(self):
+        """R5 changes how run_slug gets its basename, never what it returns."""
+        self.assertEqual(
+            factory_run.run_slug({'slug': None,
+                                  'plan': 'docs/plans/2026-08-18-issue650-x.md'}),
+            'x')
+        self.assertEqual(
+            factory_run.run_slug({'slug': None,
+                                  'plan': 'docs\\plans\\2026-08-18-issue650-x.md'}),
+            'x')
+        self.assertEqual(factory_run.run_slug({'slug': None, 'plan': None}),
+                         factory_run.FALLBACK_SLUG)
+
+    def test_sdd_workspace_dir_finds_a_backslash_spelled_plan(self):
+        """AC3, asserted against a literal on both spellings -- not by
+        comparing the two calls to each other, which agrees vacuously when
+        both return None."""
+        want = os.path.join(self.tmp, '.superpowers', 'sdd', '2026-08-18-issue650-x')
+        os.makedirs(want)
+        self.assertEqual(
+            factory_run.sdd_workspace_dir(
+                self.tmp, 'docs/plans/2026-08-18-issue650-x.md'), want)
+        self.assertEqual(
+            factory_run.sdd_workspace_dir(
+                self.tmp, 'docs\\plans\\2026-08-18-issue650-x.md'), want)
+
+    def test_sdd_workspace_dir_still_strips_only_md(self):
+        """The normalizer handles separators, not stems: a non-.md plan keeps
+        its extension here, unlike run_slug's splitext."""
+        want = os.path.join(self.tmp, '.superpowers', 'sdd', 'notes.txt')
+        os.makedirs(want)
+        self.assertEqual(
+            factory_run.sdd_workspace_dir(self.tmp, 'docs/plans/notes.txt'), want)
+
+    def test_sdd_workspace_dir_routes_through_the_normalizer(self):
+        """R4. On Windows the RESULT is identical with or without the rewire,
+        because ntpath splits both separators -- so assert the call, not the
+        value. Without this, an implementer could add normalize_plan_path,
+        skip both call sites, and see green on the only platform this runs on.
+        """
+        os.makedirs(os.path.join(self.tmp, '.superpowers', 'sdd', 'x'))
+        with mock.patch.object(factory_run, 'normalize_plan_path',
+                               wraps=factory_run.normalize_plan_path) as spy:
+            factory_run.sdd_workspace_dir(self.tmp, 'docs/plans/x.md')
+        self.assertTrue(spy.called)
+
+    def test_run_slug_routes_through_the_normalizer(self):
+        """R5, same reasoning as the test above."""
+        with mock.patch.object(factory_run, 'normalize_plan_path',
+                               wraps=factory_run.normalize_plan_path) as spy:
+            factory_run.run_slug({'slug': None, 'plan': 'docs/plans/x.md'})
+        self.assertTrue(spy.called)
 
 
 if __name__ == '__main__':
