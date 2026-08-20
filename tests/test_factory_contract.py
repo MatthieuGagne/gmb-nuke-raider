@@ -126,3 +126,24 @@ class TestSkillAndStagesAgree(unittest.TestCase):
         publisher = [ln for ln in wrapped if 'factory_publish.py' in ln]
         self.assertEqual(len(publisher), 1, publisher)
         self.assertIn('--open-pr', publisher[0])
+
+
+class TestFactoryModeCarriesTheObligation(unittest.TestCase):
+    """#654 R1: the actor that runs most of BUILD's commands is told to wrap."""
+
+    def factory_mode(self):
+        return section(read(SDD_OVERLAY), 'Factory mode', level='### ')
+
+    def test_factory_mode_exists(self):
+        self.assertIsNotNone(self.factory_mode())
+
+    def test_the_checkpoint_commands_are_wrapped(self):
+        body = flat(self.factory_mode())
+        for command in ('git fetch origin', 'git merge origin/master',
+                        'make clean', 'make memory-check'):
+            self.assertIn('LOG BUILD -- %s' % command, body)
+
+    def test_the_implementer_is_given_the_wrapper_and_the_issue_number(self):
+        body = flat(self.factory_mode())
+        self.assertIn('factory_log.py --stage BUILD --issue', body)
+        self.assertIn('does not cross a dispatch', body)
