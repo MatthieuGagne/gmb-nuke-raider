@@ -405,6 +405,41 @@ class TestAutopsy(JournalTestCase):
                                side_effect=RuntimeError('not a git repository')):
             self.assertIsNone(factory_run.write_autopsy(436))
 
+    def test_a_build_failure_leaves_the_stage_log_readable(self):
+        """#654 AC4: the bundle references the registry log, never consumes it.
+
+        write_autopsy excludes stage logs on purpose (#450) — they are already
+        written straight into the registry. AC4 is met by the log surviving the
+        bundle, not by a second copy of it inside the bundle.
+        """
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self.append('stage', stage='BUILD')
+        self.append('failure', message='make test: 1 failed')
+        path = factory_run.log_path(436, 'BUILD', self.reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'make: *** [test] Error 1\n')
+
+        dest = factory_run.write_autopsy(436, registry=self.reg)
+
+        self.assertIsNotNone(dest)
+        self.assertTrue(os.path.isfile(path))
+        with open(path, 'rb') as fh:
+            self.assertIn(b'Error 1', fh.read())
+
+    def test_the_autopsy_manifest_never_claims_the_stage_log(self):
+        """#654 AC4: no manifest entry promises a log the bundle omits."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='BUILD')
+        self.append('failure', message='make test: 1 failed')
+        dest = factory_run.write_autopsy(436, registry=self.reg)
+        with open(os.path.join(dest, 'manifest.json'), encoding='utf-8') as fh:
+            manifest = json.load(fh)
+        self.assertEqual(
+            [e for e in manifest['artifacts']
+             if 'log' in e['name'].lower()], [])
+
 
 class TestPreserveWorkspace(JournalTestCase):
     """R6/R7: a successful run keeps its own working notes."""
