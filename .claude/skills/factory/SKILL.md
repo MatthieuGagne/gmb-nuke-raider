@@ -100,8 +100,10 @@ command that hangs or is killed prints nothing: tail
 BUILD included. Most of BUILD's commands are run by dispatched implementers rather than by the
 orchestrator, and each subagent wraps its own: its brief carries `--issue <N>`, because
 `NUKE_FACTORY_RUN` does not cross a dispatch. Registry and publisher bookkeeping —
-`factory_event.py`, `factory_publish.py`, `factory_status.py` — is never wrapped, in any stage;
-it writes its own record. `references/stages.md` names BUILD's wrapped commands exactly (#654).
+`factory_event.py`, `factory_status.py`, and `factory_publish.py`'s `--run-start`,
+`--stage-completed` and `--terminal` calls — is not wrapped: it writes its own record. The one
+publisher call that is wrapped is SHIP's `--open-pr`, because the run reads the PR URL it
+prints. `references/stages.md` names BUILD's wrapped commands exactly (#654).
 
 ## Recording state
 

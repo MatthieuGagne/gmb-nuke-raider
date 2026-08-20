@@ -108,4 +108,21 @@ class TestSkillAndStagesAgree(unittest.TestCase):
         """
         body = flat(read(SKILL_MD))
         self.assertIn('Registry and publisher bookkeeping', body)
-        self.assertIn('is never wrapped, in any stage', body)
+        self.assertIn('The one publisher call that is wrapped is SHIP', body)
+
+    def test_the_bookkeeping_exemption_matches_stages_md(self):
+        """AC5, mechanically: the claim is checked, not taken on trust.
+
+        A prose claim about what gets wrapped is exactly what #654 found
+        wrong, so this one is verified against the other document instead of
+        being read for plausibility.
+        """
+        wrapped = [line.strip() for line in read(STAGES_MD).splitlines()
+                   if 'LOG ' in line and ' -- ' in line]
+        self.assertEqual(
+            [ln for ln in wrapped if 'factory_event.py' in ln], [])
+        self.assertEqual(
+            [ln for ln in wrapped if 'factory_status.py' in ln], [])
+        publisher = [ln for ln in wrapped if 'factory_publish.py' in ln]
+        self.assertEqual(len(publisher), 1, publisher)
+        self.assertIn('--open-pr', publisher[0])
