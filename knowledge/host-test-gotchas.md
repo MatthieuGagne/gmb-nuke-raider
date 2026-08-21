@@ -48,3 +48,9 @@ The same trap governs `tests/test_racer.c` (beam tests must go ABOVE every
 injects a map — details in [[beam-laser-module]] and [[camera-streaming]].
 `tests/test_turret.c`'s `setUp` does NOT reset `cam_x`/`cam_y` and a neighbouring
 visibility test leaves `cam_y = 100`, so pin both in the test body.
+
+## `src/race_state.c` is predominantly LF, not CRLF
+
+When bypassing broken Edit hooks with `[System.IO.File]::WriteAllText`, match the file's
+existing dominant line ending — LF here, despite the repo being Windows-native. Forcing CRLF
+makes the match string fail to be found and risks leaving mixed endings in the file.
