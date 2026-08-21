@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_publish
@@ -250,6 +251,61 @@ class TestStageLogsSection(ReportTestCase):
                       'not recoverable.',
                       factory_report.render({'issue': 489,
                                              'unlogged': ['BUILD']}))
+
+
+# A `sys.addaudithook` hook can never be removed once installed, so the hook
+# itself is permanent and deliberately inert: it records only while `_AUDITING`
+# is on, which exactly one test turns on and turns off again in a `finally`.
+# Every other test in the process pays one flag read per audited operation.
+_AUDITED = ('open', 'os.stat', 'os.listdir', 'subprocess.Popen')
+_AUDIT_EVENTS = []
+_AUDITING = False
+
+
+def _audit_hook(event, _args):
+    if _AUDITING and event in _AUDITED:
+        _AUDIT_EVENTS.append(event)
+
+
+class TestRenderReadsNoFilesystem(ReportTestCase):
+    """#489: ``render`` is a pure function of state, enforced not asserted.
+
+    The design depends on it — ``unlogged_stages`` takes no registry because
+    several callers render a hand-built dict with nothing on disk — but a
+    reviewer who inserted an ``open()`` inside ``render`` found every test in
+    this file still green. This one traps the syscalls instead of trusting the
+    prose.
+    """
+
+    def test_render_opens_stats_and_spawns_nothing(self):
+        """The audit hook alone would leave one hole: CPython raises no
+        ``os.stat`` audit event in practice (verified on 3.13), and stat is
+        exactly how a probe like ``factory_run.log_captured`` reads the
+        registry — ``os.path.getsize`` resolves ``os.stat`` at call time. So
+        the hook covers ``open``, ``os.listdir`` and ``subprocess.Popen``, and
+        a recording wrapper covers ``os.stat``.
+        """
+        global _AUDITING
+        state = {'issue': 489, 'unlogged': ['VERIFY', 'GATE']}
+        factory_report.render(state)  # warm any lazy import first
+        sys.addaudithook(_audit_hook)
+        del _AUDIT_EVENTS[:]
+        stats = []
+        real_stat = os.stat
+
+        def recording_stat(*args, **kwargs):
+            stats.append(args)
+            return real_stat(*args, **kwargs)
+
+        _AUDITING = True
+        try:
+            with mock.patch.object(os, 'stat', recording_stat):
+                body = factory_report.render(state)
+        finally:
+            _AUDITING = False
+        self.assertEqual(_AUDIT_EVENTS, [])
+        self.assertEqual(stats, [])
+        self.assertIn('## Stage logs', body)
 
 
 class TestSummarySlug(ReportTestCase):

@@ -725,9 +725,9 @@ Only `start`, `stage`, and `retry` move `state["stage"]`. A `gate` event carries
 field recording where that gate ran, but it does not advance the run — a run can show gate
 results for BUILD while its stage is still GATE.
 
-A **retry** clears this attempt's gates, scenarios, failure, and finish marker. Decisions and
-permission events accumulate across the whole run: both are evidence about the run, not about
-one pass.
+A **retry** clears this attempt's gates, scenarios, unlogged stages, failure, and finish marker.
+Decisions and permission events accumulate across the whole run: both are evidence about the
+run, not about one pass.
 
 ### Run conditions
 

@@ -351,6 +351,10 @@ class InterruptedChild:
 
 
 class TestFailOpen(LogTestCase):
+    """#489 AC4 is pinned here: the helper must stay fail-open and return the
+    child's exit code verbatim, so nothing about capturing a log — or failing
+    to — can change whether a stage passes."""
+
     EXIT7 = "import sys; sys.exit(7)"
 
     def test_unwritable_destination_still_runs_and_warns_once(self):

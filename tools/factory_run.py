@@ -311,9 +311,13 @@ def apply_event(state, event):
         # whole run: both are evidence about the run, not about one pass.
         state["gates"] = []
         state["scenarios"] = []
-        # Same reasoning for the unlogged stages (#489): a new attempt re-runs
-        # the stage and re-writes its log, so last attempt's omission says
-        # nothing about this one.
+        # Same reasoning for the unlogged stages (#489): last attempt's
+        # omission says nothing about this one, and carrying it forward would
+        # misreport the attempt now running. Not because the log is rewritten
+        # -- factory_log.py opens it with `open(path, "ab")` and `log_path`
+        # has no attempt component, so attempt 1's bytes stay on disk and keep
+        # the log non-empty. That is the known limit of this record: a stage
+        # that ran wrapped once and unwrapped on a retry is not flagged.
         state["unlogged"] = []
         state["failure"] = None
         state["finished"] = None

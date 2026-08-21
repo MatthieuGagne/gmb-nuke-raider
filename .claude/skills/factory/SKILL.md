@@ -105,6 +105,29 @@ orchestrator, and each subagent wraps its own: its brief carries `--issue <N>`, 
 publisher call that is wrapped is SHIP's `--open-pr`, because the run reads the PR URL it
 prints. `references/stages.md` names BUILD's wrapped commands exactly (#654).
 
+### A stage that ran unwrapped is reported, not fatal
+
+An unwrapped stage is a **reportable degradation, never a run failure** (#489). The publisher's
+exit code 1 keeps exactly the meaning it has below, and `factory_log.py` stays fail-open: the
+child's exit code is what the run gates on, and no bookkeeping outcome can fail a run.
+
+What changed is that the omission is no longer prose alone. `factory_run` stamps the stage on the
+transition event that **leaves** it, and the stage is then named by
+`python tools/factory_status.py` — in the table's trailing summary line and in its `--json` rows —
+by the PR body `factory_report.py` renders, and by the run issue. An **empty** log counts as no
+log everywhere it is read: the upload path and the failure section's log tail alike.
+
+Two limits, plainly:
+
+1. A run recorded **before** this change reports nothing. The fact is captured at transition time
+   and is never reconstructed afterwards, because every renderer is a pure function of run state
+   and none of them reads the filesystem.
+2. A **retried** stage that runs unwrapped on a later attempt is **not** flagged.
+   `tools/factory_log.py` opens the stage log in append mode and `factory_run.log_path` has no
+   attempt component, so attempt 1's bytes keep the log non-empty. A `retry` event still clears
+   the recorded stages, because carrying an earlier attempt's omission forward would misreport
+   the current one.
+
 ## Recording state
 
 State is written only through `tools/factory_event.py`:
