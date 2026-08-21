@@ -97,6 +97,24 @@ def decision_lines(decision, bullet="- "):
 PLAN_REVIEW_MARKER = "finding"
 
 
+# The wording for the stages that left no log (#489). Module level and
+# %s-templated because the run issue renders the identical sentence: the two
+# records must not drift apart, the same reason ``decision_lines`` is shared.
+# The substring "no stage log captured" is deliberately absent -- the publish
+# tests use it as a sentinel for the opposite condition.
+#
+# One unwrapped line, like every other prose line these two renderers emit.
+# A literal newline mid-sentence would leave the note spilling into the run
+# issue's Stage logs table instead of standing as its own paragraph. GFM does
+# parse a table that interrupts a paragraph, so nothing is lost when it
+# happens — the one line is what keeps the two blocks separate, and the
+# renderer should not depend on the lenient reading. "Those commands", not
+# "Those stages", so the sentence still reads when exactly one stage is named.
+UNLOGGED_STAGES_NOTE = (
+    'No log was captured for: %s. Those commands ran outside '
+    '`tools/factory_log.py`, so their output is not recoverable.')
+
+
 def partition_decisions(state):
     """``(findings, decisions)`` for *state*, each in journal order (#530 R3).
 
@@ -134,6 +152,13 @@ def render(state):
                                       _cell(g.get('result'))) for g in gates]
     else:
         out.append('| - | _no gates recorded_ | - |')
+
+    # Conditional, like the permission table: on a fully logged run the
+    # section would say nothing, and an empty heading reads as a defect.
+    unlogged = factory_run.unlogged_stages(state)
+    if unlogged:
+        out += ['', '## Stage logs', '',
+                UNLOGGED_STAGES_NOTE % ', '.join(unlogged)]
 
     out += ['', '## Decisions made', '']
     # Findings stay in the run record (#530 R3, AC3).

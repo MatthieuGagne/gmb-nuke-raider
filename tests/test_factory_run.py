@@ -872,5 +872,162 @@ class TestNormalizerCallers(unittest.TestCase):
         self.assertTrue(spy.called)
 
 
+class TestUnloggedStages(JournalTestCase):
+    """#489: a stage that ran without factory_log.py leaves a mark in state.
+
+    The condition is stamped by the writer on the transition event that leaves
+    the stage, so every renderer stays a pure function of state.
+    """
+
+    def _log(self, stage, payload=b'captured\n', issue=436):
+        path = factory_run.log_path(issue, stage, self.reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(payload)
+        return path
+
+    # ── the projection field ────────────────────────────────────────────
+
+    def test_new_state_starts_with_an_empty_unlogged_list(self):
+        self.assertEqual(factory_run.new_state(489)['unlogged'], [])
+
+    def test_leaving_a_stage_with_no_log_records_it(self):
+        """AC: GATE ran unwrapped, so leaving GATE names GATE."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self.append('stage', stage='PLAN')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['GATE'])
+
+    def test_leaving_a_stage_whose_log_was_captured_records_nothing(self):
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self._log('GATE')
+        self.append('stage', stage='PLAN')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'], [])
+
+    def test_a_zero_byte_log_counts_as_no_log(self):
+        """An empty file is what a helper that never ran leaves behind."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self._log('GATE', payload=b'')
+        self.append('stage', stage='PLAN')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['GATE'])
+
+    def test_finish_stamps_the_stage_the_run_ends_in(self):
+        """Without this the last stage of a run could never be reported."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self._log('GATE')
+        self.append('stage', stage='SHIP')
+        self.append('finish', result='shipped')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['SHIP'])
+
+    def test_failure_stamps_the_stage_the_run_died_in(self):
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='BUILD')
+        self.append('failure', message='boom')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['BUILD'])
+
+    def test_re_entering_the_same_stage_stamps_nothing(self):
+        """A stage event naming the current stage is not leaving it."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='BUILD')
+        self.append('stage', stage='BUILD')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'], [])
+
+    def test_a_stage_left_twice_is_recorded_once(self):
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self.append('stage', stage='PLAN')      # leaves GATE
+        self.append('stage', stage='GATE')      # leaves PLAN
+        self.append('stage', stage='BUILD')     # leaves GATE again
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['GATE', 'PLAN'])
+
+    def test_retry_clears_the_unlogged_list(self):
+        """A new attempt re-runs the stage and re-writes its log."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self.append('stage', stage='BUILD')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'],
+                         ['GATE'])
+        self.append('retry', attempt=2, stage='GATE')
+        self.assertEqual(factory_run.load_state(436, self.reg)['unlogged'], [])
+
+    def test_replay_agrees_with_the_incremental_projection(self):
+        """The stamp lives on the event, so rebuild cannot disagree."""
+        self.append('start', slug='obs', branch='b', worktree='/w',
+                    stage='GATE')
+        self._log('GATE')
+        self.append('stage', stage='PLAN')
+        self.append('stage', stage='BUILD')
+        self.append('stage', stage='VERIFY')
+        self.append('finish', result='shipped')
+
+        incremental = factory_run.load_state(436, self.reg)
+        replayed = factory_run.rebuild_state(
+            436, factory_run.read_journal(436, self.reg))
+        self.assertEqual(incremental['unlogged'], ['PLAN', 'BUILD', 'VERIFY'])
+        self.assertEqual(incremental, replayed)
+
+    # ── log_captured ────────────────────────────────────────────────────
+
+    def test_log_captured_is_false_for_an_absent_file(self):
+        self.assertFalse(factory_run.log_captured(436, 'BUILD', self.reg))
+
+    def test_log_captured_is_false_for_a_zero_byte_file(self):
+        self._log('BUILD', payload=b'')
+        self.assertFalse(factory_run.log_captured(436, 'BUILD', self.reg))
+
+    def test_log_captured_is_true_for_a_non_empty_file(self):
+        self._log('BUILD', payload=b'make: ok\n')
+        self.assertTrue(factory_run.log_captured(436, 'BUILD', self.reg))
+
+    def test_log_captured_never_raises_on_a_nonsense_registry(self):
+        blocker = os.path.join(self.tmp, 'file-not-dir')
+        with open(blocker, 'w') as fh:
+            fh.write('not a directory')
+        self.assertFalse(
+            factory_run.log_captured(436, 'BUILD', os.path.join(blocker, 'x')))
+
+    # ── unlogged_stages ─────────────────────────────────────────────────
+
+    def test_unlogged_stages_renders_in_canonical_order(self):
+        state = {'unlogged': ['SHIP', 'GATE', 'BUILD']}
+        self.assertEqual(factory_run.unlogged_stages(state),
+                         ['GATE', 'BUILD', 'SHIP'])
+
+    def test_unlogged_stages_sorts_unknown_stages_last(self):
+        state = {'unlogged': ['WEIRD', 'SHIP', 'GATE']}
+        self.assertEqual(factory_run.unlogged_stages(state),
+                         ['GATE', 'SHIP', 'WEIRD'])
+
+    def test_unlogged_stages_is_empty_when_the_field_is_absent(self):
+        self.assertEqual(factory_run.unlogged_stages({'issue': 650}), [])
+
+    def test_unlogged_stages_does_not_raise_on_a_bare_dict(self):
+        """Landed tests call renderers with a hand-built partial state."""
+        self.assertEqual(
+            factory_run.unlogged_stages({'issue': 650, 'slug': None}), [])
+
+    def test_unlogged_stages_reads_nothing_from_disk(self):
+        """A renderer that stats the filesystem stops being pure."""
+        with mock.patch.object(factory_run, 'log_captured',
+                               side_effect=AssertionError('read the disk')):
+            self.assertEqual(factory_run.unlogged_stages({'unlogged': ['GATE']}),
+                             ['GATE'])
+
+    # ── fixture guard ───────────────────────────────────────────────────
+
+    def test_the_shipped_fixture_run_is_fully_logged(self):
+        """A fixture edit that writes a log too late must fail loudly here."""
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        self.assertEqual(factory_run.load_state(440, reg)['unlogged'], [])
+
+
 if __name__ == '__main__':
     unittest.main()

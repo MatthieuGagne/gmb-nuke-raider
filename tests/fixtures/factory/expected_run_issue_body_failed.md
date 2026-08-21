@@ -23,6 +23,8 @@ no stage log captured
 
 ### Stage logs
 
+No log was captured for: GATE, BUILD. Those commands ran outside `tools/factory_log.py`, so their output is not recoverable.
+
 _No stage logs published yet._
 
 <!-- factory-publish v1 — regenerated on every publish; manual edits are overwritten -->

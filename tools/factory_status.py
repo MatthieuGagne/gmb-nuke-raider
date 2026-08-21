@@ -14,6 +14,11 @@ so they are never collapsed into one word.
 Terminal runs (complete, failed) outrank both: a finished run legitimately
 outlives its worktree and must not be reported as stale.
 
+Missing logs are reported separately from the conditions (#489): a stage that
+ran without a captured log says nothing about whether the run is healthy, only
+that the evidence for what it did was never written down. It is named in a
+trailing summary line, never in a column.
+
 Usage:
     python3 tools/factory_status.py
     python3 tools/factory_status.py --json
@@ -115,6 +120,7 @@ def _row(state, now):
         "elapsed_text": _elapsed_text(elapsed),
         "condition": condition(state, elapsed, exists),
         "gates": gates,
+        "unlogged_stages": factory_run.unlogged_stages(state),
         "gates_pass": sum(1 for g in gates if g.get("result") == "pass"),
         "gates_fail": sum(1 for g in gates if g.get("result") == "fail"),
         "decisions": state.get("decisions") or [],
@@ -181,6 +187,18 @@ def render_table(rows, registry):
     if stale:
         out.append("stale worktrees: %s"
                    % ", ".join("#%d" % r["issue"] for r in stale))
+
+    # A run whose stage produced no log is not unhealthy enough to change its
+    # condition -- it shipped or it did not -- but the evidence for what it did
+    # is gone, so the table names it rather than leaving the gap invisible
+    # (#489). No fixed-width column: on a healthy run the list is empty, and a
+    # column would widen every row to render nothing.
+    unlogged = [r for r in rows if r.get("unlogged_stages")]
+    if unlogged:
+        out.append("unlogged stages: %s"
+                   % ", ".join("#%d %s" % (r["issue"],
+                                           " ".join(r["unlogged_stages"]))
+                               for r in unlogged))
     return "\n".join(out) + "\n"
 
 

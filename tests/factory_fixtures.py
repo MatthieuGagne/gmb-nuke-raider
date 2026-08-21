@@ -87,6 +87,24 @@ def _png(path):
     return path
 
 
+def _stage_log(reg, issue, stage):
+    """Write ``logs/<STAGE>.log`` the way factory_log.py would (#489).
+
+    Distinct bytes per stage on purpose: the publisher's run registry must hold
+    no two files with the same sha256, and five identical `make: ok` logs would
+    trip that check.
+
+    Call this BEFORE the event that leaves *stage*. append_event judges the
+    stage it is leaving at the moment of the transition, so a log written after
+    that event is written too late to be seen.
+    """
+    path = factory_run.log_path(issue, stage, reg)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'wb') as fh:
+        fh.write(('%s: ok\n' % stage).encode('utf-8'))
+    return path
+
+
 def build_registry(tmpdir):
     """Three runs covering the dashboard's three interesting conditions.
 
@@ -150,18 +168,26 @@ def build_registry(tmpdir):
 
 
 def build_shipped_run(tmpdir):
-    """One complete, successful run (issue 440). Returns the registry root."""
+    """One complete, successful run (issue 440). Returns the registry root.
+
+    This is the HEALTHY run: every stage's log is captured, so its state
+    carries no unlogged stages (#489). ``build_registry`` and
+    ``build_failed_run`` stay log-free on purpose — they are the fixtures that
+    demonstrate the missing-log conditions.
+    """
     reg = os.path.join(tmpdir, 'registry-shipped')
     reset = pinned_clock(START)
     try:
         ev = lambda kind, **kw: factory_run.append_event(
             440, kind, registry=reg, **kw)
+        log = lambda stage: _stage_log(reg, 440, stage)
         ev('start', slug='observability', branch='worktree-obs-440',
            worktree=_worktree(tmpdir, 440),
            plan='docs/plans/2026-07-26-issue440-demo.md', stage='GATE')
         ev('gate', stage='GATE', gate='spec lint', result='pass')
         ev('decision',
            text='Journal is the source of truth; state.json is a projection.')
+        log('GATE')
         ev('stage', stage='PLAN')
         ev('gate', stage='PLAN', gate='plan self-review', result='pass')
         ev('decision', finding=True,
@@ -169,6 +195,7 @@ def build_shipped_run(tmpdir):
            rationale='A worktree is deleted after the run, and a file path '
                      'into it stops resolving. A data URI keeps the evidence '
                      'inside the page.')
+        log('PLAN')
         ev('stage', stage='BUILD')
         ev('gate', stage='BUILD', gate='make test-tools', result='pass')
         ev('decision',
@@ -176,10 +203,13 @@ def build_shipped_run(tmpdir):
            rationale='A second copy in the run registry costs disk for the '
                      'life of the run. The upload already proves the bytes '
                      'are identical.')
+        log('BUILD')
         ev('stage', stage='VERIFY')
         ev('scenario', scenario='reach-race', result='pass')
+        log('VERIFY')
         ev('stage', stage='SHIP')
         ev('gate', stage='SHIP', gate='smoketest confirmed', result='pass')
+        log('SHIP')
         ev('finish', result='shipped')
     finally:
         reset()

@@ -284,6 +284,23 @@ class TestFailureSection(PublishTestCase):
         self.assertIn('line 499', body)
         self.assertNotIn('line 100\n', body)
 
+    def test_a_zero_byte_log_reads_as_no_log_at_all(self):
+        """#489 R1: 'absent or empty' is one condition, so both render alike.
+
+        A zero-byte log otherwise renders an empty ``<details>`` block with an
+        empty code fence inside the same body whose Stage logs section says no
+        log was captured — two sections of one issue contradicting each other.
+        """
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        path = factory_run.log_path(441, 'BUILD', reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'')
+        body = self.failed_body(reg)
+        self.assertIn('no stage log captured', body)
+        self.assertIsNone(re.search(r'^````\s*\n\s*````$', body,
+                                    re.MULTILINE))
+
     def test_undecodable_bytes_do_not_raise(self):
         reg = factory_fixtures.build_failed_run(self.tmp)
         path = factory_run.log_path(441, 'BUILD', reg)
@@ -1401,6 +1418,22 @@ class TestAssetUpload(PublishTestCase):
         self.assertFalse(self.publish_log('SHIP', FakeGh(), warnings))
         self.assertEqual(len(warnings), 1)
 
+    def test_an_empty_log_is_treated_as_no_log_at_all(self):
+        """#489: a zero-byte log is no more evidence than a missing one.
+
+        Exactly one warning, the same sentence an absent log already gets:
+        a helper that was never really run leaves a zero-byte file behind,
+        and uploading it would publish an empty asset as if it were output.
+        """
+        self.write_log('BUILD', b'')
+        fake = FakeGh()
+        warnings = []
+        self.assertFalse(self.publish_log('BUILD', fake, warnings))
+        self.assertEqual(fake.argv_for('release upload'), [])
+        self.assertEqual(self.publish['uploaded'], [])
+        self.assertEqual(len(warnings), 1)
+        self.assertIn('no stage log captured for BUILD', warnings[0])
+
     def test_credential_shaped_log_is_withheld_and_named(self):
         """AC6."""
         self.write_log('BUILD', b'token ghp_' + b'A' * 36 + b'\n')
@@ -1458,6 +1491,59 @@ class TestAssetUpload(PublishTestCase):
             self.state, self.publish, [], registry=self.reg, runner=fake)
         self.assertEqual(self.publish['withheld'], {})
         self.assertEqual(len(names), 5)
+
+
+class TestUnloggedStagesInTheRunIssue(PublishTestCase):
+    """#489 AC3: the run issue names the stages that left no log.
+
+    The wording is ``factory_report.UNLOGGED_STAGES_NOTE`` verbatim — the PR
+    body and the run issue must not drift apart — and it is prose, not a
+    table cell, so it is asserted as a whole line.
+    """
+
+    def body(self, issue, reg, publish=None):
+        state = factory_run.load_state(issue, reg)
+        publish = publish or factory_publish.new_publish_state(issue)
+        return factory_publish.render_body(state, publish, registry=reg,
+                                           now=factory_fixtures.FIXED_NOW)
+
+    def note(self, stages='GATE, BUILD'):
+        return factory_report.UNLOGGED_STAGES_NOTE % stages
+
+    def test_the_note_names_the_unlogged_stages(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        body = self.body(441, reg)
+        self.assertIn('### Stage logs', body)
+        self.assertIn(self.note(), body)
+
+    def test_a_blank_line_separates_the_note_from_the_table_header(self):
+        """The blank line keeps the note its own paragraph and the table its
+        own block. GFM does parse a table that interrupts a paragraph, so the
+        table was never at risk — the separation is style the renderer commits
+        to, and this test is what keeps it committed."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        publish = factory_publish.new_publish_state(441)
+        publish['uploaded'].append('issue-441-attempt-1-BUILD.log')
+        lines = self.body(441, reg, publish).splitlines()
+        index = lines.index(self.note())
+        self.assertEqual(lines[index + 1], '')
+        self.assertEqual(lines[index + 2], '| Stage | Attempt | Log |')
+
+    def test_the_placeholder_also_sits_below_a_blank_line(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        lines = self.body(441, reg).splitlines()
+        index = lines.index(self.note())
+        self.assertEqual(lines[index + 1], '')
+        self.assertEqual(lines[index + 2], '_No stage logs published yet._')
+
+    def test_a_fully_logged_run_carries_no_note(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        publish = factory_publish.new_publish_state(440)
+        publish['uploaded'].append('issue-440-attempt-1-BUILD.log')
+        body = self.body(440, reg, publish)
+        self.assertIn('### Stage logs', body)
+        self.assertNotIn('No log was captured for', body)
+        self.assertNotIn('no stage log captured', body)
 
 
 class PlanRunTestCase(PublishTestCase):

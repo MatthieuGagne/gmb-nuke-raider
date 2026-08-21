@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import factory_publish
@@ -182,6 +183,129 @@ class PlanReviewFindingsTests(ReportTestCase):
         self.assertIn('Journal is the source of truth', body)
         self.assertIn('The publisher deletes the temporary copy after each '
                       'upload.', body)
+
+
+class TestStageLogsSection(ReportTestCase):
+    """#489 AC3: the PR body names the stages that captured no log."""
+
+    def test_unlogged_stages_are_named_in_canonical_order(self):
+        state = {'issue': 489, 'unlogged': ['VERIFY', 'GATE', 'BUILD']}
+        body = factory_report.render(state)
+        self.assertIn('## Stage logs', body)
+        self.assertIn('No log was captured for: GATE, BUILD, VERIFY.', body)
+
+    def test_the_section_sits_between_gate_results_and_decisions(self):
+        state = {'issue': 489, 'unlogged': ['BUILD']}
+        body = factory_report.render(state)
+        self.assertLess(body.index('## Gate results'), body.index('## Stage logs'))
+        self.assertLess(body.index('## Stage logs'), body.index('## Decisions made'))
+
+    def test_the_failed_fixture_run_names_its_unlogged_stages(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        state = factory_run.load_state(441, reg)
+        self.assertEqual(factory_run.unlogged_stages(state), ['GATE', 'BUILD'])
+        self.assertIn('No log was captured for: GATE, BUILD.',
+                      factory_report.render(state))
+
+    def test_no_section_when_every_stage_logged(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        body = factory_report.render(factory_run.load_state(440, reg))
+        self.assertNotIn('## Stage logs', body)
+
+    def test_no_section_for_an_empty_list(self):
+        self.assertNotIn('## Stage logs',
+                         factory_report.render({'issue': 489, 'unlogged': []}))
+
+    def test_no_section_when_the_key_is_absent(self):
+        self.assertNotIn('## Stage logs', factory_report.render({'issue': 489}))
+
+    def test_a_bare_state_dict_does_not_raise(self):
+        self.assertIn('Closes #489', factory_report.render({'issue': 489}))
+
+    def test_the_sentence_avoids_the_publish_sentinel_substring(self):
+        """tests/test_factory_publish.py asserts this substring is absent."""
+        body = factory_report.render({'issue': 489, 'unlogged': ['BUILD']})
+        self.assertNotIn('no stage log captured', body)
+        self.assertNotIn('no stage log captured',
+                         factory_report.UNLOGGED_STAGES_NOTE)
+
+    def test_the_wording_lives_in_a_shared_module_level_constant(self):
+        rendered = factory_report.UNLOGGED_STAGES_NOTE % 'BUILD, VERIFY'
+        self.assertIn(rendered, factory_report.render(
+            {'issue': 489, 'unlogged': ['VERIFY', 'BUILD']}))
+
+    def test_the_note_is_one_unwrapped_line(self):
+        """The run issue puts a table under it, and the note stays one line so
+        it reads as its own paragraph above that table. GFM parses a table that
+        interrupts a paragraph either way — this pins the shape, not a rescue
+        from a parser that would drop the table."""
+        self.assertNotIn('\n', factory_report.UNLOGGED_STAGES_NOTE)
+        body = factory_report.render({'issue': 489, 'unlogged': ['BUILD']})
+        self.assertIn(factory_report.UNLOGGED_STAGES_NOTE % 'BUILD',
+                      body.splitlines())
+
+    def test_the_sentence_reads_for_a_single_stage(self):
+        """'Those commands', not 'Those stages': one stage is the common case."""
+        self.assertIn('No log was captured for: BUILD. Those commands ran '
+                      'outside `tools/factory_log.py`, so their output is '
+                      'not recoverable.',
+                      factory_report.render({'issue': 489,
+                                             'unlogged': ['BUILD']}))
+
+
+# A `sys.addaudithook` hook can never be removed once installed, so the hook
+# itself is permanent and deliberately inert: it records only while `_AUDITING`
+# is on, which exactly one test turns on and turns off again in a `finally`.
+# Every other test in the process pays one flag read per audited operation.
+_AUDITED = ('open', 'os.stat', 'os.listdir', 'subprocess.Popen')
+_AUDIT_EVENTS = []
+_AUDITING = False
+
+
+def _audit_hook(event, _args):
+    if _AUDITING and event in _AUDITED:
+        _AUDIT_EVENTS.append(event)
+
+
+class TestRenderReadsNoFilesystem(ReportTestCase):
+    """#489: ``render`` is a pure function of state, enforced not asserted.
+
+    The design depends on it — ``unlogged_stages`` takes no registry because
+    several callers render a hand-built dict with nothing on disk — but a
+    reviewer who inserted an ``open()`` inside ``render`` found every test in
+    this file still green. This one traps the syscalls instead of trusting the
+    prose.
+    """
+
+    def test_render_opens_stats_and_spawns_nothing(self):
+        """The audit hook alone would leave one hole: CPython raises no
+        ``os.stat`` audit event in practice (verified on 3.13), and stat is
+        exactly how a probe like ``factory_run.log_captured`` reads the
+        registry — ``os.path.getsize`` resolves ``os.stat`` at call time. So
+        the hook covers ``open``, ``os.listdir`` and ``subprocess.Popen``, and
+        a recording wrapper covers ``os.stat``.
+        """
+        global _AUDITING
+        state = {'issue': 489, 'unlogged': ['VERIFY', 'GATE']}
+        factory_report.render(state)  # warm any lazy import first
+        sys.addaudithook(_audit_hook)
+        del _AUDIT_EVENTS[:]
+        stats = []
+        real_stat = os.stat
+
+        def recording_stat(*args, **kwargs):
+            stats.append(args)
+            return real_stat(*args, **kwargs)
+
+        _AUDITING = True
+        try:
+            with mock.patch.object(os, 'stat', recording_stat):
+                body = factory_report.render(state)
+        finally:
+            _AUDITING = False
+        self.assertEqual(_AUDIT_EVENTS, [])
+        self.assertEqual(stats, [])
+        self.assertIn('## Stage logs', body)
 
 
 class TestSummarySlug(ReportTestCase):
