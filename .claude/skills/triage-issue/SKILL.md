@@ -93,6 +93,12 @@ If the fix requires multiple cycles (multiple functions to change), repeat the R
 
 ## Step 5: Create GitHub Issue
 
+**First, decide the repo.** Per `CLAUDE.md`'s **Routing.** rule, a bug is filed in the repo whose
+tracked files the fix changes — the module named in the Root Cause above decides it. A fix under
+the Garage tool files with `-R MatthieuGagne/nuke-raiders-garage`; anything in the game ROM, its
+assets or its tooling files here. A bug that needs a fix in both repos becomes **two** issues,
+one per repo, cross-linked.
+
 Create the issue using `gh`:
 
 ```bash
@@ -121,6 +127,41 @@ gh issue create --title "fix: <one-line description>" --body "$(cat <<'EOF'
 EOF
 )"
 ```
+
+## Step 6: Add the Issue to the Board
+
+A bug that is not on the "Nuke Raider — Documents" board is invisible to it, and one with no
+`Status` is invisible to anyone reading the board for what is in flight. These are four
+commands, not a convention. Resolve **every field id and option id by name** — option ids are
+regenerated whenever the field's option set is edited. The project id
+(`PVT_kwHOAv4a5M4BepB5`) is a stable constant and is written literally.
+
+```sh
+# a. add the issue to the project, capturing the new item id
+gh project item-add 3 --owner MatthieuGagne --url <issue URL> --format json
+```
+
+```sh
+# b. resolve the Type field id + its Bug option id, and the Status field id
+#    + its Todo option id — one call, both fields
+gh project field-list 3 --owner MatthieuGagne --format json
+```
+
+```sh
+# c. set Type = Bug on the item created in (a)
+gh project item-edit --id <item id from a> --project-id PVT_kwHOAv4a5M4BepB5 \
+  --field-id <Type field id from b> --single-select-option-id <Bug option id from b>
+```
+
+```sh
+# d. set Status = Todo on the same item
+gh project item-edit --id <item id from a> --project-id PVT_kwHOAv4a5M4BepB5 \
+  --field-id <Status field id from b> --single-select-option-id <Todo option id from b>
+```
+
+`Type = Bug` follows `CLAUDE.md`'s title-prefix table: this skill's issues are `fix:`-titled.
+
+## Step 7: Report the Issue URL
 
 Report the issue URL to the user.
 
