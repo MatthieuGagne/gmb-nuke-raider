@@ -238,7 +238,8 @@ what makes the pair legible.
 **Sub-issues.** An epic's child is wired as a **native** GitHub sub-issue at creation. A
 body-text reference such as `Refines #432` is not enough: the board's Epics view groups on the
 `Parent issue` field, and only native wiring populates it. The API takes the child's numeric
-**node id**, not its issue number, and works cross-repo under one owner:
+REST `id` — not its `node_id` and not its issue number — and works cross-repo under one owner.
+The id is read from the **child's own** repo; the POST goes to the **epic's** repo:
 
 ```sh
 child_id=$(gh api repos/MatthieuGagne/gmb-nuke-raider/issues/<child> --jq .id)

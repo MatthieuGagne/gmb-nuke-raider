@@ -99,10 +99,37 @@ the Garage tool files with `-R MatthieuGagne/nuke-raiders-garage`; anything in t
 assets or its tooling files here. A bug that needs a fix in both repos becomes **two** issues,
 one per repo, cross-linked.
 
-Create the issue using `gh`:
+Create the issue using `gh`, with the repo decided above:
 
 ```bash
+# same repo:
 gh issue create --title "fix: <one-line description>" --body "$(cat <<'EOF'
+## Symptom
+<what fails, how to reproduce>
+
+## Root Cause
+- **Module:** `src/<module>.c`
+- **Bank:** N
+- **Location:** `<function>` (~line N)
+- **Cause:** <one sentence>
+
+## TDD Fix Plan
+<paste the RED-GREEN cycle(s) from Step 4>
+
+## Acceptance Criteria
+- [ ] Failing test added that demonstrates the bug
+- [ ] Fix makes the test pass
+- [ ] All other tests still pass
+- [ ] Clean ROM build succeeds
+- [ ] Smoketest in Emulicious confirms fix
+
+## Notes
+<!-- Any additional context, related issues, or follow-up items -->
+EOF
+)"
+
+# Garage:
+gh issue create -R MatthieuGagne/nuke-raiders-garage --title "fix: <one-line description>" --body "$(cat <<'EOF'
 ## Symptom
 <what fails, how to reproduce>
 
