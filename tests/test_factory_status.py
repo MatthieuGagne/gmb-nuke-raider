@@ -180,6 +180,17 @@ class TestCli(StatusTestCase):
         rows = json.loads(out)
         self.assertEqual({r['issue'] for r in rows}, {436, 437, 999})
 
+    def test_json_carries_the_unlogged_stages(self):
+        """#489: the machine-readable rendering names them too, so a caller
+        never has to re-derive them from the journal."""
+        code, out, _ = self.run_cli('--registry', self.reg, '--json',
+                                    '--now', NOW.isoformat())
+        self.assertEqual(code, 0)
+        rows = {r['issue']: r for r in json.loads(out)}
+        self.assertEqual(rows[436]['unlogged_stages'], ['BUILD'])
+        self.assertEqual(rows[437]['unlogged_stages'], ['GATE'])
+        self.assertEqual(rows[999]['unlogged_stages'], [])
+
     def test_the_slug_column_shows_a_recovered_slug(self):
         """AC1 at the level the spec states it: through the CLI.
 
@@ -233,6 +244,61 @@ class TestSlugColumn(unittest.TestCase):
         table = factory_status.render_table([row], 'registry')
         self.assertIn('plan-path-normalizer', table)
         self.assertNotIn('(no slug)', table)
+
+
+class TestUnloggedStages(StatusTestCase):
+    """#489: the dashboard names the stages that ran without a captured log.
+
+    The value is read from the run's own state, never re-derived by stat'ing
+    the registry, so a row built from a hand-written dict reports what that
+    dict recorded instead of what happens to be on disk.
+    """
+
+    def rows_from(self, reg):
+        return {r['issue']: r for r in factory_status.collect(reg, now=NOW)}
+
+    def test_a_fully_logged_run_reports_nothing_unlogged(self):
+        rows = self.rows_from(factory_fixtures.build_shipped_run(self.tmp))
+        self.assertEqual(rows[440]['unlogged_stages'], [])
+
+    def test_a_log_free_run_names_its_stages_in_canonical_order(self):
+        rows = self.rows_from(factory_fixtures.build_failed_run(self.tmp))
+        self.assertEqual(rows[441]['unlogged_stages'], ['GATE', 'BUILD'])
+
+    def test_every_row_carries_the_field(self):
+        rows = self.rows()
+        self.assertEqual(rows[436]['unlogged_stages'], ['BUILD'])
+        self.assertEqual(rows[437]['unlogged_stages'], ['GATE'])
+        self.assertEqual(rows[999]['unlogged_stages'], [])
+
+    def test_a_bare_state_still_builds_a_row(self):
+        """``_row`` keeps its two-argument signature and tolerates a state
+        with no ``unlogged`` key at all."""
+        row = factory_status._row(
+            {'issue': 650, 'slug': None},
+            factory_run.parse_now('2026-08-18T12:00:00+00:00'))
+        self.assertEqual(row['unlogged_stages'], [])
+
+    def test_the_table_ends_with_a_line_naming_the_runs_and_stages(self):
+        table = factory_status.render_table(
+            factory_status.collect(self.reg, now=NOW), self.reg)
+        line = table.rstrip('\n').splitlines()[-1]
+        self.assertTrue(line.startswith('unlogged stages:'), line)
+        self.assertIn('#436 BUILD', line)
+        self.assertIn('#437 GATE', line)
+        self.assertNotIn('#999', line)
+
+    def test_the_line_is_absent_when_every_stage_was_logged(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        table = factory_status.render_table(
+            factory_status.collect(reg, now=NOW), reg)
+        self.assertNotIn('unlogged stages', table)
+
+    def test_no_fixed_width_column_is_added_for_it(self):
+        """A per-stage column would widen every row for a field that is empty
+        on a healthy run; the summary line carries it instead."""
+        self.assertNotIn('unlogged_stages',
+                         [key for _, key in factory_status._COLUMNS])
 
 
 class TestHtmlIsGone(StatusTestCase):
