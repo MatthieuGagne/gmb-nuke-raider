@@ -104,10 +104,12 @@ PLAN_REVIEW_MARKER = "finding"
 # tests use it as a sentinel for the opposite condition.
 #
 # One unwrapped line, like every other prose line these two renderers emit.
-# A literal newline mid-sentence would make the run issue's Stage logs table
-# interrupt a paragraph, and GitHub Flavored Markdown then refuses to parse
-# the table at all. "Those commands", not "Those stages", so the sentence
-# still reads when exactly one stage is named.
+# A literal newline mid-sentence would leave the note spilling into the run
+# issue's Stage logs table instead of standing as its own paragraph. GFM does
+# parse a table that interrupts a paragraph, so nothing is lost when it
+# happens — the one line is what keeps the two blocks separate, and the
+# renderer should not depend on the lenient reading. "Those commands", not
+# "Those stages", so the sentence still reads when exactly one stage is named.
 UNLOGGED_STAGES_NOTE = (
     'No log was captured for: %s. Those commands ran outside '
     '`tools/factory_log.py`, so their output is not recoverable.')

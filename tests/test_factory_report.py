@@ -234,8 +234,10 @@ class TestStageLogsSection(ReportTestCase):
             {'issue': 489, 'unlogged': ['VERIFY', 'BUILD']}))
 
     def test_the_note_is_one_unwrapped_line(self):
-        """The run issue puts a table under it, and GFM will not parse a
-        table that interrupts a paragraph."""
+        """The run issue puts a table under it, and the note stays one line so
+        it reads as its own paragraph above that table. GFM parses a table that
+        interrupts a paragraph either way — this pins the shape, not a rescue
+        from a parser that would drop the table."""
         self.assertNotIn('\n', factory_report.UNLOGGED_STAGES_NOTE)
         body = factory_report.render({'issue': 489, 'unlogged': ['BUILD']})
         self.assertIn(factory_report.UNLOGGED_STAGES_NOTE % 'BUILD',

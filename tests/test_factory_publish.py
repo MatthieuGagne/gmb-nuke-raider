@@ -284,6 +284,23 @@ class TestFailureSection(PublishTestCase):
         self.assertIn('line 499', body)
         self.assertNotIn('line 100\n', body)
 
+    def test_a_zero_byte_log_reads_as_no_log_at_all(self):
+        """#489 R1: 'absent or empty' is one condition, so both render alike.
+
+        A zero-byte log otherwise renders an empty ``<details>`` block with an
+        empty code fence inside the same body whose Stage logs section says no
+        log was captured — two sections of one issue contradicting each other.
+        """
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        path = factory_run.log_path(441, 'BUILD', reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'')
+        body = self.failed_body(reg)
+        self.assertIn('no stage log captured', body)
+        self.assertIsNone(re.search(r'^````\s*\n\s*````$', body,
+                                    re.MULTILINE))
+
     def test_undecodable_bytes_do_not_raise(self):
         reg = factory_fixtures.build_failed_run(self.tmp)
         path = factory_run.log_path(441, 'BUILD', reg)
@@ -1500,7 +1517,10 @@ class TestUnloggedStagesInTheRunIssue(PublishTestCase):
         self.assertIn(self.note(), body)
 
     def test_a_blank_line_separates_the_note_from_the_table_header(self):
-        """GFM refuses to parse a table that interrupts a paragraph."""
+        """The blank line keeps the note its own paragraph and the table its
+        own block. GFM does parse a table that interrupts a paragraph, so the
+        table was never at risk — the separation is style the renderer commits
+        to, and this test is what keeps it committed."""
         reg = factory_fixtures.build_failed_run(self.tmp)
         publish = factory_publish.new_publish_state(441)
         publish['uploaded'].append('issue-441-attempt-1-BUILD.log')

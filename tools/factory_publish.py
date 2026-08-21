@@ -390,8 +390,9 @@ def _section_stage_logs(ctx):
 
     # The note is prose and never a cell: _cell escapes '|' but not a newline,
     # so a sentence routed through it would corrupt the row silently. The
-    # blank line after it is load-bearing — GitHub Flavored Markdown refuses
-    # to parse a table that interrupts a paragraph (#489).
+    # blank line after it keeps the note a paragraph of its own and the table a
+    # block of its own (#489). It is style, not a parser requirement — GFM does
+    # parse a table that interrupts a paragraph — but do not rely on that.
     unlogged = factory_run.unlogged_stages(ctx["state"])
     if unlogged:
         return [factory_report.UNLOGGED_STAGES_NOTE % ", ".join(unlogged),
@@ -445,8 +446,15 @@ def log_tail(issue, stage, registry=None, lines=LOG_TAIL_LINES):
     is binary end-to-end (#450) and a run issue must never be the reason a
     failure cannot be read. Only the tail is read off disk — a build log can be
     megabytes and the body budget is 60k.
+
+    "There is none" means absent *or* empty, and ``factory_run.log_captured``
+    is the single definition of that (#489 R1). Deciding it here rather than in
+    the caller keeps one rule in one place: a zero-byte log otherwise tails to
+    ``''``, which is not None, so the caller would render an empty ``<details>``
+    block with an empty code fence in the same body whose Stage logs section
+    says the stage left no log.
     """
-    if not stage:
+    if not stage or not factory_run.log_captured(issue, stage, registry):
         return None
     try:
         path = factory_run.log_path(issue, stage, registry)
