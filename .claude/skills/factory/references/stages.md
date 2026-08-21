@@ -11,9 +11,10 @@ number. Pass `--attempt <k>` on every retry.
 
 `LOG <STAGE> --stream -- <cmd>` is the same wrapper with `--stream` added before the `--`.
 
-Eight invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
+Nine invocations below carry `--stream`: the orchestrator parses their stdout, and the helper is
 quiet on success without it (#529). They are GATE's `spec_lint --json`, PLAN's
-`trace.py --check --plans-only`, both `smoketest_headless --json` runs, `factory_cache.py`,
+`trace.py --check --plans-only`, BUILD's post-dispatch `git log --oneline -1` verification (the
+controller reads the SHA it prints), both `smoketest_headless --json` runs, `factory_cache.py`,
 VERIFY's evidence scenario, SHIP's `factory_publish --open-pr`, and SHIP's `preserve_workspace`
 call. VERIFY's is stated as a rule
 rather than a literal command line because step 6's scenario is composed ad hoc — there is no
@@ -129,15 +130,37 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 ## BUILD
 
 1. Append the stage event: `--kind stage --field stage=BUILD`.
-2. Run `subagent-driven-development` in **factory mode** (its overlay's `### Factory mode`
-   subsection replaces the batch-boundary Emulicious pause with the headless gate).
+2. `LOG BUILD -- git log --oneline -1` — the head BUILD starts from. It is unconditional and it
+   is BUILD's first wrapped command, so `logs/BUILD.log` exists and is non-empty from the moment
+   the stage opens, however the stage ends (#654).
+3. **Who wraps what inside BUILD.** BUILD is not exempt from the stage-log rule; it is the one
+   stage whose commands are run by two different actors, so the rule names both.
+   - **The controller** wraps every command it runs itself with `LOG BUILD --`: step 2 above,
+     the `git log --oneline -1` verification the `subagent-driven-development` overlay mandates
+     after **every** implementer dispatch, and each command of the batch-boundary headless
+     checkpoint. The checkpoint's command list is stated once, in that overlay's
+     `### Factory mode`, and is not copied here. The **verification** carries `--stream` —
+     `LOG BUILD --stream -- git log --oneline -1` — because its whole purpose is that the
+     controller reads the SHA; step 2's copy does not, because nothing reads it.
+   - **A dispatched implementer** wraps its own `make`, `make test` and `git commit` with
+     `python tools/factory_log.py --stage BUILD --issue <N> --`. The obligation and the issue
+     number reach it through its brief: `NUKE_FACTORY_RUN` does not cross a dispatch, so a
+     subagent that is not told the number cannot write to the run's log.
+   - **Registry and publisher bookkeeping is not wrapped** — `factory_event.py`,
+     `factory_publish.py` — exactly as in every other stage.
+4. Run `subagent-driven-development` in **factory mode** (its overlay's `### Factory mode`
+   subsection replaces the batch-boundary Emulicious pause with the headless gate, and states
+   the implementer's wrapping obligation).
    - All existing GB hard gates fire unchanged: `bank-pre-write`, `gbdk-expert`,
      `bank-post-build`, `gb-c-optimizer`.
    - Every host-testable acceptance criterion gets a `make test` case.
    - A README task is added when user-visible behavior changes.
-3. **Retry budget: 2 attempts per task.** On the second attempt append
-   `--kind retry --field stage=BUILD --attempt <k>` first. Exhausted → terminal failure.
-4. **A ruling that makes the plan stale is written into the plan file, in the same step that
+   - **Every implementer brief carries the run's issue number** and the wrapping rule from
+     step 3.
+5. **Retry budget: 2 attempts per task.** On the second attempt append
+   `--kind retry --field stage=BUILD --attempt <k>` first, and pass `--attempt <k>` to every
+   `LOG BUILD` call for that attempt. Exhausted → terminal failure.
+6. **A ruling that makes the plan stale is written into the plan file, in the same step that
    records it.** Task briefs are extracted from the plan once, at dispatch time, so a ruling
    that amends a fact a later task's brief states never reaches that task unless the plan
    itself changes. Record the `decision` event **and** edit the plan file before dispatching
@@ -145,13 +168,14 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    call, so the amendment reaches GitHub with no extra command. In run #590 three implementers
    corrected the controller about facts their briefs stated and later rulings had falsified —
    the controller was handing out text it had itself ruled false.
-5. Commits: tool choice is free (#441 voided the old PowerShell-routing premise — repository
+7. Commits: tool choice is free (#441 voided the old PowerShell-routing premise — repository
    hooks fire for every actor). Give every commit an explicit **300 s timeout**: the
    `pre-commit` hook runs the whole tool suite, which is past the 120 s default, and a
    default-timeout call is killed mid-hook. This is a ceiling, not a measurement — if a commit
-   ever exceeds it, that is the signal, not a number to bump.
+   ever exceeds it, that is the signal, not a number to bump. Wrapping a commit in `LOG BUILD`
+   does not change that budget: the helper adds a pipe, not work.
    **Never `--no-verify`.**
-6. `python tools/factory_publish.py --issue <N> --stage-completed BUILD`
+8. `python tools/factory_publish.py --issue <N> --stage-completed BUILD`
 
 ## VERIFY
 

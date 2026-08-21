@@ -1,0 +1,20 @@
+{
+  "name": "issue-654-rom-unaffected",
+  "blocking": false,
+  "watch": ["_hp", "_px", "_py"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "advance", "frames": 180},
+    {"action": "screenshot", "out": "race-reached.png"},
+
+    {"action": "press", "buttons": ["down", "a"], "delay": 120},
+    {"action": "assert_live", "symbols": ["_py"], "screen": true, "frames": 60},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "screenshot", "out": "driving.png"},
+
+    {"action": "advance", "frames": 240},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "screenshot", "out": "still-racing.png"}
+  ]
+}

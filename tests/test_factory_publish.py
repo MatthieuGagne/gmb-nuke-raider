@@ -300,6 +300,27 @@ class TestFailureSection(PublishTestCase):
             now=factory_fixtures.FIXED_NOW)
         self.assertNotIn('### Failure', body)
 
+    def test_a_build_failure_renders_real_command_output(self):
+        """#654 AC3/AC4: the tail replaces the placeholder once a log exists."""
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        path = factory_run.log_path(441, 'BUILD', reg)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as fh:
+            fh.write(b'tests/test_factory_run.py .. FAIL\n'
+                     b'AssertionError: expected 3, got 4\n')
+        dest = factory_run.write_autopsy(
+            441, registry=reg,
+            worktree=factory_run.load_state(441, reg)['worktree'])
+
+        # AC4 is a claim about a bundle AND a tail, so assert both. Without
+        # the manifest assertion the write_autopsy call is decorative: the
+        # tail is read straight from the registry and does not need it.
+        self.assertTrue(os.path.isfile(os.path.join(dest, 'manifest.json')))
+        body = self.failed_body(reg)
+        self.assertNotIn('no stage log captured', body)
+        self.assertIn('AssertionError: expected 3, got 4', body)
+        self.assertIn('lossy excerpt', body)
+
 
 class TestWorktreeIsNotLeaked(PublishTestCase):
     """Q1b: the run issue is public, so the path is published repo-relative."""
@@ -2703,6 +2724,27 @@ class PublicationIsOtherwiseUnchangedTests(PlanRunTestCase):
         result, _fake = self.run_publish(
             **{'release upload': (1, '', 'HTTP 502')})
         self.assertTrue([w for w in result.warnings if 'not uploaded' in w])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_DEGRADED)
+
+    def test_a_build_log_on_disk_produces_no_missing_log_warning(self):
+        """#654 AC2: the exact string the spec names, not a warning count."""
+        result, _fake = self.run_publish()
+        self.assertEqual(
+            [w for w in result.warnings if 'no stage log captured' in w], [])
+        self.assertEqual(factory_publish.exit_code(result),
+                         factory_publish.EXIT_OK)
+
+    def test_removing_the_build_log_brings_the_warning_back(self):
+        """#654 AC2, negative control: the assertion above can fail.
+
+        Without this, the pin above would pass on a publisher that could not
+        emit the warning at all.
+        """
+        os.remove(factory_run.log_path(440, 'BUILD', self.reg))
+        result, _fake = self.run_publish()
+        self.assertTrue(
+            [w for w in result.warnings if 'no stage log captured' in w])
         self.assertEqual(factory_publish.exit_code(result),
                          factory_publish.EXIT_DEGRADED)
 

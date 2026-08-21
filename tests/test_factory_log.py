@@ -490,5 +490,66 @@ class TestCli(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class TestBuildLogInTheRegistry(unittest.TestCase):
+    """#654 AC1: repeated BUILD commands accumulate in the run's registry.
+
+    ``TestAutopsySourceIntact`` already covers one registry-resolved command.
+    AC1 is about a stage's worth of them: BUILD is wrapped by two actors, so
+    its log is written over and over, from working directories that are not
+    the main tree.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.reg = os.path.join(self.tmp, 'registry')
+        self.elsewhere = os.path.join(self.tmp, 'worktree')
+        os.makedirs(self.elsewhere)
+        self.env = mock.patch.dict(
+            os.environ, {'NUKE_FACTORY_REGISTRY': self.reg})
+        self.env.start()
+        self.reset = factory_fixtures.pinned_clock()
+
+    def tearDown(self):
+        self.reset()
+        self.env.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_build(self, text):
+        console = io.BytesIO()
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = factory_log.run_logged(
+                child("import sys; sys.stdout.write(sys.argv[1])", text),
+                stage='BUILD', issue=654, cwd=self.elsewhere, console=console)
+        return code, err.getvalue()
+
+    def expected_path(self):
+        return factory_run.log_path(654, 'BUILD', self.reg)
+
+    def test_a_build_command_writes_a_non_empty_log(self):
+        code, err = self.run_build('compiling\n')
+        self.assertEqual(code, 0)
+        self.assertNotIn('factory-log: WARNING:', err)
+        path = self.expected_path()
+        self.assertTrue(os.path.isfile(path))
+        self.assertGreater(os.path.getsize(path), 0)
+        with open(path, 'rb') as fh:
+            body = fh.read()
+        self.assertIn(b'compiling', body)
+        # The one thing cwd= changes: where the header says the command ran.
+        self.assertIn(b'cwd: ' + os.path.abspath(self.elsewhere).encode(),
+                      body)
+
+    def test_repeated_build_commands_accumulate_in_one_log(self):
+        """VERIFY's six wrapped commands share one log; BUILD's must too."""
+        self.run_build('first\n')
+        self.run_build('second\n')
+        with open(self.expected_path(), 'rb') as fh:
+            body = fh.read()
+        self.assertIn(b'first', body)
+        self.assertIn(b'second', body)
+        self.assertEqual(body.count(b'===== factory-log stage=BUILD'), 4)
+
+
 if __name__ == '__main__':
     unittest.main()
