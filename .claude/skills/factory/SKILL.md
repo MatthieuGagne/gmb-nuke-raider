@@ -120,8 +120,10 @@ log everywhere it is read: the upload path and the failure section's log tail al
 Two limits, plainly:
 
 1. A run recorded **before** this change reports nothing. The fact is captured at transition time
-   and is never reconstructed afterwards, because every renderer is a pure function of run state
-   and none of them reads the filesystem.
+   and is never reconstructed afterwards, because the renderers that name unlogged stages —
+   `factory_report.render` and `factory_status._row` — are pure functions of run state and never
+   stat the registry. The failure section's log tail does read the registry; it is the exception,
+   not the rule the other two follow.
 2. A **retried** stage that runs unwrapped on a later attempt is **not** flagged.
    `tools/factory_log.py` opens the stage log in append mode and `factory_run.log_path` has no
    attempt component, so attempt 1's bytes keep the log non-empty. A `retry` event still clears
