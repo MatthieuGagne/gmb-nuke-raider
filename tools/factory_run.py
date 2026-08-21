@@ -179,6 +179,21 @@ def log_path(issue, stage, registry=None):
     return os.path.join(run_dir(issue, registry), "logs", "%s.log" % stage)
 
 
+def log_captured(issue, stage, registry=None):
+    """True when *stage* left a non-empty log in the registry (#489).
+
+    A zero-byte file reads the same as no file at all: that is what a helper
+    that was never actually run leaves behind, and an empty log is no more
+    evidence than a missing one. Every ``OSError`` — absent file, a directory
+    where a file was expected, an unreadable path — reads as False, because a
+    bookkeeping probe must never be able to fail the run it is describing.
+    """
+    try:
+        return os.path.getsize(log_path(issue, stage, registry)) > 0
+    except OSError:
+        return False
+
+
 def run_issue(env=None):
     """Issue number from ``NUKE_FACTORY_RUN``, or None when not a factory run.
 
@@ -211,6 +226,7 @@ def new_state(issue):
         "decisions": [],
         "scenarios": [],
         "permissions": [],
+        "unlogged": [],
         "failure": None,
         "finished": None,
         "updated": None,
@@ -243,6 +259,14 @@ def apply_event(state, event):
     ts = event.get("ts")
     if event.get("attempt") is not None:
         state["attempt"] = event["attempt"]
+
+    # Kind-independent on purpose (#489): the projection folds whatever the
+    # writer stamped, so a future event kind that also ends a stage needs no
+    # change here. ``setdefault`` keeps a state.json written before this field
+    # existed loadable — every reader uses ``.get``, so SCHEMA_VERSION stays 1.
+    left_unlogged = event.get("unlogged_stage")
+    if left_unlogged and left_unlogged not in state.setdefault("unlogged", []):
+        state["unlogged"].append(left_unlogged)
 
     if kind == "start":
         for field in ("slug", "branch", "worktree", "plan", "pr"):
@@ -287,6 +311,10 @@ def apply_event(state, event):
         # whole run: both are evidence about the run, not about one pass.
         state["gates"] = []
         state["scenarios"] = []
+        # Same reasoning for the unlogged stages (#489): a new attempt re-runs
+        # the stage and re-writes its log, so last attempt's omission says
+        # nothing about this one.
+        state["unlogged"] = []
         state["failure"] = None
         state["finished"] = None
         state["stage"] = event.get("stage") or state["stage"]
@@ -374,6 +402,25 @@ def ordered_gates(state):
         key=lambda pair: (rank.get(pair[1].get("stage"), len(rank)), pair[0]))]
 
 
+def unlogged_stages(state):
+    """Stages that ran without a captured log, in canonical order (#489).
+
+    A pure function of *state*: no registry argument, no filesystem access,
+    ``.get`` for every field. Several landed tests call the renderers that use
+    this with a bare hand-built dict and no registry on disk, so a stat here
+    would turn every one of those into a lie about what the run recorded.
+
+    Stages the schema does not know sort last rather than being dropped, the
+    same contract ``ordered_gates`` keeps: an unrecognised stage is a reporting
+    problem, not a reason to hide evidence.
+    """
+    rank = {stage: i for i, stage in enumerate(STAGES)}
+    stages = (state or {}).get("unlogged") or []
+    return [stage for _, stage in sorted(
+        enumerate(stages),
+        key=lambda pair: (rank.get(pair[1], len(rank)), pair[0]))]
+
+
 def run_slug(state):
     """The run's slug, for any renderer that names the run (#641 R1).
 
@@ -452,6 +499,31 @@ def append_event(issue, kind, registry=None, **fields):
              "attempt": int(attempt) if attempt is not None
                         else state["attempt"]}
     event.update({k: v for k, v in fields.items() if v is not None})
+
+    # #489: stamp the stage this event LEAVES when that stage produced no
+    # captured log. ``state["stage"]`` is still the stage current before the
+    # event is applied, which is exactly the stage whose logging can now be
+    # judged: the transition is the moment the fact becomes knowable.
+    #
+    # Stamped by the writer rather than derived when a surface renders, for
+    # three reasons. The publisher may not write the journal at all (ADR 472
+    # AC2, pinned by test_the_journal_is_never_written_by_publishing), so it
+    # cannot record what it discovers. The orchestrator is the very actor #489
+    # says cannot be trusted to remember to record it, so asking it again at
+    # publish time re-opens the hole. And a renderer that reads the filesystem
+    # stops being a pure function of state — several landed tests call
+    # factory_report.render(state) and factory_status._row(state, now) with a
+    # hand-built dict and no registry on disk.
+    #
+    # This is the only filesystem read in the writer and it happens once per
+    # transition, not once per event.
+    if kind in ("stage", "finish", "failure"):
+        leaving = state.get("stage")
+        # Re-entering a stage is not leaving it: a `stage` event naming the
+        # current stage transitions nowhere and must stamp nothing.
+        if leaving and not (kind == "stage" and event.get("stage") == leaving) \
+                and not log_captured(issue, leaving, registry):
+            event["unlogged_stage"] = leaving
 
     with open(os.path.join(directory, JOURNAL_FILE), "a",
               encoding="utf-8") as fh:
