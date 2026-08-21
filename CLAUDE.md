@@ -223,6 +223,30 @@ expressed on the board via `Type`.
 Exception: `CONTEXT.md` (repo root) — the glossary is the only design artifact versioned
 in-repo, merged via PR. **Decisions are ADRs filed as `adr`-labeled GitHub issues.**
 
+**These conventions govern both repositories** — gmb-nuke-raider and nuke-raiders-garage.
+The two repos share one document board: every document issue from either is added to the
+"Nuke Raider — Documents" project (project 3), and the label set, the `Type` table, `Status`
+and the ADR rules in this section apply identically in both. A convention written here is not
+a game-repo convention; it is the convention.
+
+**Routing.** An issue is filed in the repo whose tracked files it changes — the game ROM, its
+assets and its tooling in `gmb-nuke-raider`; the Garage desktop tool in `nuke-raiders-garage`.
+Work that spans both becomes **one issue per repo**, cross-linked in each body, never one
+issue whose implementation edits two repos. Both halves go on the board, because the board is
+what makes the pair legible.
+
+**Sub-issues.** An epic's child is wired as a **native** GitHub sub-issue at creation. A
+body-text reference such as `Refines #432` is not enough: the board's Epics view groups on the
+`Parent issue` field, and only native wiring populates it. The API takes the child's numeric
+REST `id` — not its `node_id` and not its issue number — and works cross-repo under one owner.
+The id is read from the **child's own** repo; the POST goes to the **epic's** repo:
+
+```sh
+child_id=$(gh api repos/MatthieuGagne/gmb-nuke-raider/issues/<child> --jq .id)
+gh api -X POST repos/MatthieuGagne/gmb-nuke-raider/issues/<parent>/sub_issues \
+  -F sub_issue_id=$child_id
+```
+
 **An ADR's key is the issue number of the work item being worked when the decision was taken** —
 not a counter, and — except in the no-work-item case below — not the ADR issue's own number. The
 work item is the PRD, bug or chore issue being implemented, never a run log, a review, or

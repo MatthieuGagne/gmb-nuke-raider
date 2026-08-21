@@ -41,13 +41,28 @@ One sentence: what this feature does and why it matters for the game.
    `CONTEXT.md` defines (`docs/dev-workflow.md` §10). A PRD is a bound surface — rewriting it after
    it is filed costs an edit and a notification.
 
-2. **Create a GitHub issue** with the full PRD content as the body, labeled `prd`:
+2. **Decide which repo the PRD belongs to.** Per `CLAUDE.md`'s **Routing.** rule, a PRD is filed
+   in the repo whose tracked files it changes. List the files the implementation will touch:
+
+   - all under this repo → file here, no `-R` flag needed;
+   - all under the Garage tool → file with `-R MatthieuGagne/nuke-raiders-garage`;
+   - **both** → stop and write **two** PRDs, one per repo, each scoped to its own files and
+     cross-linked to the other in its body. Never file one PRD whose implementation edits two
+     repos.
+
+   The chosen repo is fixed for the life of the issue. Record it — every later `gh` command in
+   these steps needs it, and `## Updating an Existing PRD` below needs it too.
+
+3. **Create a GitHub issue** with the full PRD content as the body, labeled `prd`:
    ```sh
+   # same repo:
    gh issue create --title "feat: <feature name>" --label prd --body "<PRD content>"
+   # Garage:
+   gh issue create -R MatthieuGagne/nuke-raiders-garage --title "feat: <feature name>" --label prd --body "<PRD content>"
    ```
    Capture the issue number and URL from the output.
 
-3. **Add the issue to the "Nuke Raider — Documents" project, then set `Type = PRD` and
+4. **Add the issue to the "Nuke Raider — Documents" project, then set `Type = PRD` and
    `Status = Todo`.** These are four commands, not a convention — a PRD that is not on the board
    is invisible to the board, and one with no `Status` is invisible to anyone reading the board
    for what is in flight. Resolve **every field id and option id by name**; option ids are
@@ -82,7 +97,36 @@ One sentence: what this feature does and why it matters for the game.
    A factory run moves that `Status` to `In Progress` when it starts
    (`factory_publish.py --run-start`) and back to `Todo` if the run fails.
 
-4. Report the issue URL to the user.
+5. **If this PRD refines an epic, wire it as a native sub-issue.** Per `CLAUDE.md`'s
+   **Sub-issues.** rule, a body-text `Refines #<epic>` line does not populate the board's
+   `Parent issue` field — only native wiring does, and the Epics view groups on it. The API
+   takes the child's numeric REST `id` — not its `node_id` and not its issue number:
+
+   ```sh
+   child_id=$(gh api repos/<owner>/<child repo>/issues/<new PRD number> --jq .id)
+   gh api -X POST repos/<owner>/<epic repo>/issues/<epic number>/sub_issues \
+     -F sub_issue_id=$child_id
+   ```
+
+   The child id is read from the **PRD's own** repo; the POST goes to the **epic's** repo — the
+   two can differ. Wiring works cross-repo under one owner, so a Garage PRD may be wired to a
+   game-repo epic. Verify by running the same summary command **twice** — once before the POST
+   and once after — and confirming the total rose by one:
+
+   ```sh
+   gh api repos/<owner>/<epic repo>/issues/<epic number> --jq .sub_issues_summary.total
+   ```
+
+   A count alone cannot catch a child id resolved from the wrong repo, so also confirm the new
+   PRD's own number appears in the epic's sub-issue list:
+
+   ```sh
+   gh api repos/<owner>/<epic repo>/issues/<epic number>/sub_issues --jq '.[].number'
+   ```
+
+   If the PRD refines no epic, skip this step.
+
+6. Report the issue URL to the user.
 
 ## Updating an Existing PRD
 
@@ -90,8 +134,12 @@ When updating a PRD (e.g., after a new brainstorming session or scope change):
 
 - **Always use `gh issue edit`** to rewrite the issue body directly — never add a comment:
   ```sh
+  # same repo:
   gh issue edit <N> --repo MatthieuGagne/gmb-nuke-raider --body "<full updated PRD content>"
+  # Garage:
+  gh issue edit <N> --repo MatthieuGagne/nuke-raiders-garage --body "<full updated PRD content>"
   ```
+  Use the repo chosen at step 2 — a PRD never moves repos.
 - The issue body is the single source of truth — it must always reflect the current design.
 
 ## Important
