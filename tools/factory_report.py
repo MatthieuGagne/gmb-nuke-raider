@@ -97,6 +97,16 @@ def decision_lines(decision, bullet="- "):
 PLAN_REVIEW_MARKER = "finding"
 
 
+# The wording for the stages that left no log (#489). Module level and
+# %s-templated because the run issue renders the identical sentence: the two
+# records must not drift apart, the same reason ``decision_lines`` is shared.
+# The substring "no stage log captured" is deliberately absent -- the publish
+# tests use it as a sentinel for the opposite condition.
+UNLOGGED_STAGES_NOTE = (
+    'No log was captured for: %s. Those stages ran commands outside\n'
+    '`tools/factory_log.py`, so their output is not recoverable.')
+
+
 def partition_decisions(state):
     """``(findings, decisions)`` for *state*, each in journal order (#530 R3).
 
@@ -134,6 +144,13 @@ def render(state):
                                       _cell(g.get('result'))) for g in gates]
     else:
         out.append('| - | _no gates recorded_ | - |')
+
+    # Conditional, like the permission table: on a fully logged run the
+    # section would say nothing, and an empty heading reads as a defect.
+    unlogged = factory_run.unlogged_stages(state)
+    if unlogged:
+        out += ['', '## Stage logs', '',
+                UNLOGGED_STAGES_NOTE % ', '.join(unlogged)]
 
     out += ['', '## Decisions made', '']
     # Findings stay in the run record (#530 R3, AC3).

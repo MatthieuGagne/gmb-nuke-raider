@@ -184,6 +184,56 @@ class PlanReviewFindingsTests(ReportTestCase):
                       'upload.', body)
 
 
+class TestStageLogsSection(ReportTestCase):
+    """#489 AC3: the PR body names the stages that captured no log."""
+
+    def test_unlogged_stages_are_named_in_canonical_order(self):
+        state = {'issue': 489, 'unlogged': ['VERIFY', 'GATE', 'BUILD']}
+        body = factory_report.render(state)
+        self.assertIn('## Stage logs', body)
+        self.assertIn('No log was captured for: GATE, BUILD, VERIFY.', body)
+
+    def test_the_section_sits_between_gate_results_and_decisions(self):
+        state = {'issue': 489, 'unlogged': ['BUILD']}
+        body = factory_report.render(state)
+        self.assertLess(body.index('## Gate results'), body.index('## Stage logs'))
+        self.assertLess(body.index('## Stage logs'), body.index('## Decisions made'))
+
+    def test_the_failed_fixture_run_names_its_unlogged_stages(self):
+        reg = factory_fixtures.build_failed_run(self.tmp)
+        state = factory_run.load_state(441, reg)
+        self.assertEqual(factory_run.unlogged_stages(state), ['GATE', 'BUILD'])
+        self.assertIn('No log was captured for: GATE, BUILD.',
+                      factory_report.render(state))
+
+    def test_no_section_when_every_stage_logged(self):
+        reg = factory_fixtures.build_shipped_run(self.tmp)
+        body = factory_report.render(factory_run.load_state(440, reg))
+        self.assertNotIn('## Stage logs', body)
+
+    def test_no_section_for_an_empty_list(self):
+        self.assertNotIn('## Stage logs',
+                         factory_report.render({'issue': 489, 'unlogged': []}))
+
+    def test_no_section_when_the_key_is_absent(self):
+        self.assertNotIn('## Stage logs', factory_report.render({'issue': 489}))
+
+    def test_a_bare_state_dict_does_not_raise(self):
+        self.assertIn('Closes #489', factory_report.render({'issue': 489}))
+
+    def test_the_sentence_avoids_the_publish_sentinel_substring(self):
+        """tests/test_factory_publish.py asserts this substring is absent."""
+        body = factory_report.render({'issue': 489, 'unlogged': ['BUILD']})
+        self.assertNotIn('no stage log captured', body)
+        self.assertNotIn('no stage log captured',
+                         factory_report.UNLOGGED_STAGES_NOTE)
+
+    def test_the_wording_lives_in_a_shared_module_level_constant(self):
+        rendered = factory_report.UNLOGGED_STAGES_NOTE % 'BUILD, VERIFY'
+        self.assertIn(rendered, factory_report.render(
+            {'issue': 489, 'unlogged': ['VERIFY', 'BUILD']}))
+
+
 class TestSummarySlug(ReportTestCase):
     """#641 R4: the Summary line goes through the shared resolver."""
 

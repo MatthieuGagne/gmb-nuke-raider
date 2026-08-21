@@ -13,6 +13,11 @@ Factory run for issue #441 — autopsy-demo.
 | GATE | spec lint | pass |
 | BUILD | make test | fail |
 
+## Stage logs
+
+No log was captured for: GATE, BUILD. Those stages ran commands outside
+`tools/factory_log.py`, so their output is not recoverable.
+
 ## Decisions made
 
 - Autopsy assembly is best-effort; a missing artifact is never an error.
