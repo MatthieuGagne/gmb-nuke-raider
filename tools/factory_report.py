@@ -102,8 +102,14 @@ PLAN_REVIEW_MARKER = "finding"
 # records must not drift apart, the same reason ``decision_lines`` is shared.
 # The substring "no stage log captured" is deliberately absent -- the publish
 # tests use it as a sentinel for the opposite condition.
+#
+# One unwrapped line, like every other prose line these two renderers emit.
+# A literal newline mid-sentence would make the run issue's Stage logs table
+# interrupt a paragraph, and GitHub Flavored Markdown then refuses to parse
+# the table at all. "Those commands", not "Those stages", so the sentence
+# still reads when exactly one stage is named.
 UNLOGGED_STAGES_NOTE = (
-    'No log was captured for: %s. Those stages ran commands outside\n'
+    'No log was captured for: %s. Those commands ran outside '
     '`tools/factory_log.py`, so their output is not recoverable.')
 
 

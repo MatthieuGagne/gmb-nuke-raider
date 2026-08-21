@@ -383,9 +383,20 @@ def _section_stage_logs(ctx):
         attempt, stage = parsed
         rows.append((stage, attempt, "withheld — %s" % reason))
     if not rows:
-        return ["_No stage logs published yet._"]
-    rows.sort(key=lambda r: (_stage_rank(r[0]), r[1]))
-    return _table(("Stage", "Attempt", "Log"), rows)
+        out = ["_No stage logs published yet._"]
+    else:
+        rows.sort(key=lambda r: (_stage_rank(r[0]), r[1]))
+        out = _table(("Stage", "Attempt", "Log"), rows)
+
+    # The note is prose and never a cell: _cell escapes '|' but not a newline,
+    # so a sentence routed through it would corrupt the row silently. The
+    # blank line after it is load-bearing — GitHub Flavored Markdown refuses
+    # to parse a table that interrupts a paragraph (#489).
+    unlogged = factory_run.unlogged_stages(ctx["state"])
+    if unlogged:
+        return [factory_report.UNLOGGED_STAGES_NOTE % ", ".join(unlogged),
+                ""] + out
+    return out
 
 
 def _section_permissions(ctx):
@@ -1349,7 +1360,11 @@ def publish_stage_log(state, publish, stage, warnings, registry=None,
         return True
 
     src = factory_run.log_path(issue, stage, registry)
-    if not os.path.isfile(src):
+    # A zero-byte log takes the same fail-open branch as an absent one (#489):
+    # that is what a helper that was never actually run leaves behind, and an
+    # empty asset published as if it were output is worse than no asset. One
+    # warning either way — the sentence is the same, so the count is too.
+    if not factory_run.log_captured(issue, stage, registry):
         _warn(warnings, "no stage log captured for %s (%s)" % (stage, src))
         return False
 

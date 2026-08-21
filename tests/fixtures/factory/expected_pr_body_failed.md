@@ -15,8 +15,7 @@ Factory run for issue #441 — autopsy-demo.
 
 ## Stage logs
 
-No log was captured for: GATE, BUILD. Those stages ran commands outside
-`tools/factory_log.py`, so their output is not recoverable.
+No log was captured for: GATE, BUILD. Those commands ran outside `tools/factory_log.py`, so their output is not recoverable.
 
 ## Decisions made
 

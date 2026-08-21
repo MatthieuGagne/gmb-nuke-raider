@@ -233,6 +233,22 @@ class TestStageLogsSection(ReportTestCase):
         self.assertIn(rendered, factory_report.render(
             {'issue': 489, 'unlogged': ['VERIFY', 'BUILD']}))
 
+    def test_the_note_is_one_unwrapped_line(self):
+        """The run issue puts a table under it, and GFM will not parse a
+        table that interrupts a paragraph."""
+        self.assertNotIn('\n', factory_report.UNLOGGED_STAGES_NOTE)
+        body = factory_report.render({'issue': 489, 'unlogged': ['BUILD']})
+        self.assertIn(factory_report.UNLOGGED_STAGES_NOTE % 'BUILD',
+                      body.splitlines())
+
+    def test_the_sentence_reads_for_a_single_stage(self):
+        """'Those commands', not 'Those stages': one stage is the common case."""
+        self.assertIn('No log was captured for: BUILD. Those commands ran '
+                      'outside `tools/factory_log.py`, so their output is '
+                      'not recoverable.',
+                      factory_report.render({'issue': 489,
+                                             'unlogged': ['BUILD']}))
+
 
 class TestSummarySlug(ReportTestCase):
     """#641 R4: the Summary line goes through the shared resolver."""
