@@ -275,3 +275,91 @@ Then `python tools/factory_publish.py --issue <N> --terminal`. The run issue car
 reason, worktree path, and an inline ~100-line tail of the failing stage's log — explicitly
 marked as a lossy excerpt, with the byte-exact whole file in the release assets. When the
 stage-log helper fail-opened, the tail reads *"no stage log captured"*.
+
+---
+
+## Stage-log mechanics and publication internals
+
+Moved from `SKILL.md` — the operating detail behind its stage-log and publisher rules.
+
+### Quiet success (#529)
+
+A passing wrapped command prints one line, not its output:
+
+```
+factory-log: ok stage=VERIFY exit=0 bytes=12043 lines=118 log=<path> cmd: make
+```
+
+Nothing is lost — the complete, byte-exact output is in the stage log named on that line, which
+is what the autopsy bundle and the published log assets read. A command that **fails** still
+prints everything, unchanged, because that is where every line matters.
+
+Two consequences to plan around. Add `--stream` after `--issue` when the orchestrator has to
+*read* the command's stdout — a `--json` payload, a printed path or URL; the stage sequences
+above mark every such invocation. And while a command is running the console is silent, so a
+wrapped command that hangs or is killed prints nothing: tail
+`.factory/runs/issue-<N>/logs/<STAGE>.log`, whose path is fixed by the stage and issue you passed.
+
+### Helper exit codes
+
+The helper is fail-open — it returns the child's exit code verbatim, so gate on that exit code
+exactly as if the helper were not there. `127` means the command could not be spawned; `2` means
+the helper itself was misused. A `factory-log: WARNING:` line on stderr means the log was not
+captured; the run continues.
+
+### Who wraps what (#654)
+
+The orchestrator wraps every command it runs itself, in every stage — BUILD included. Most of
+BUILD's commands are run by dispatched implementers rather than by the orchestrator, and each
+subagent wraps its own: its brief carries `--issue <N>`, because `NUKE_FACTORY_RUN` does not
+cross a dispatch. Registry and publisher bookkeeping — `factory_event.py`, `factory_status.py`,
+and `factory_publish.py`'s `--run-start`, `--stage-completed` and `--terminal` calls — is not
+wrapped: it writes its own record. The one publisher call that is wrapped is SHIP's `--open-pr`,
+because the run reads the PR URL it prints. The BUILD sequence above names BUILD's wrapped
+commands exactly.
+
+### A stage that ran unwrapped is reported, not fatal (#489)
+
+An unwrapped stage is a **reportable degradation, never a run failure**. The publisher's exit
+code 1 keeps exactly the meaning it has in `SKILL.md`'s *Publication cadence*, and
+`factory_log.py` stays fail-open: the child's exit code is what the run gates on, and no
+bookkeeping outcome can fail a run.
+
+What changed is that the omission is no longer prose alone. `factory_run` stamps the stage on the
+transition event that **leaves** it, and the stage is then named by
+`python tools/factory_status.py` — in the table's trailing summary line and in its `--json` rows —
+by the PR body `factory_report.py` renders, and by the run issue. An **empty** log counts as no
+log everywhere it is read: the upload path and the failure section's log tail alike.
+
+Two limits, plainly:
+
+1. A run recorded **before** this change reports nothing. The fact is captured at transition time
+   and is never reconstructed afterwards, because the renderers that name unlogged stages —
+   `factory_report.render` and `factory_status._row` — are pure functions of run state and never
+   stat the registry. The failure section's log tail does read the registry; it is the exception,
+   not the rule the other two follow.
+2. A **retried** stage that runs unwrapped on a later attempt is **not** flagged.
+   `tools/factory_log.py` opens the stage log in append mode and `factory_run.log_path` has no
+   attempt component, so attempt 1's bytes keep the log non-empty. A `retry` event still clears
+   the recorded stages, because carrying an earlier attempt's omission forward would misreport
+   the current one.
+
+### Publication internals
+
+`--run-start` does exactly one thing: put the spec issue on the Documents board and set its
+`Status = In Progress`, so the board shows what the factory is working on while it works on it.
+It creates no run issue and never sets `Type` — classification stays with the human and with
+`/prd`. At terminal the run issue goes to `Status = Done`, and a **failed** run puts the spec
+back to `Todo`; a successful one leaves it `In Progress`, because the PR is open and the merge
+is what finishes the spec. Known limitation: a retried run's dashboard issue is reopened but
+keeps `Status = Done` while it is live — the `In Progress` write happens only when the run issue
+first joins the board, not on every reopen.
+
+The publisher owns three GitHub objects per run: the **run issue** (`Type = Log`, the execution
+record), the **plan issue** (`Type = Plan`, created at PLAN completion and re-synced on every
+later publish — #514; full mechanics in *PLAN* step 7 above), and the **PR** at SHIP. The plan
+issue is never closed by the publisher; the PR body closes it on merge. A dry run and a terminal
+failure both leave it open on purpose.
+
+The run issue and the PR body do not repeat each other (#530). The decision record sits on one
+of them and the other links to it. Plan-review findings sit on the run issue alone.

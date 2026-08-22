@@ -20,26 +20,11 @@ You are the sprite pipeline expert for the Nuke Raider Game Boy Color game. You 
 
 ---
 
-## GBDK Sprite API
+## GBDK Sprite API, CGB Palettes, VBlank Timing
 
-```c
-/* Load tile data into VRAM (do this during VBlank or with display off) */
-set_sprite_data(first_tile_idx, n_tiles, data_ptr);  /* NOT set_sprite_tile_data */
+Hardware/API detail (sprite API signatures, OAM registers, PPU modes, CGB palette registers, VBlank timing) is the **`gbdk-expert`** agent's domain — consult it rather than relying on a summary here. The project-specific traps live in the Common Mistakes table below, plus one not in the table:
 
-/* Assign a VRAM tile to an OAM slot */
-set_sprite_tile(oam_slot, tile_idx);
-
-/* Position a sprite (OAM coordinate system — see below) */
-move_sprite(oam_slot, oam_x, oam_y);
-
-/* Mode and visibility */
-SPRITES_8x8;    /* LCDC bit 2 = 0; call before loading sprite data */
-SPRITES_8x16;   /* LCDC bit 2 = 1; tile bit 0 is ignored; top=tile&0xFE, bot=tile|0x01 */
-SHOW_SPRITES;   /* LCDC bit 1 = 1 */
-HIDE_SPRITES;   /* LCDC bit 1 = 0 */
-```
-
-**Wrong name:** `set_sprite_tile_data` does NOT exist. Use `set_sprite_data`.
+**Banked tile data — loader.c rule:** `set_sprite_data` / `set_bkg_data` calls that load banked tile data must be made from bank-0 code (via `loader.c` wrappers), not from within BANKED callers.
 
 ---
 
@@ -91,31 +76,6 @@ clear_sprites_from(slot);        /* clear slot..MAX_SPRITES-1 */
 **OAM budget (MAX_SPRITES = 40):**
 - Player: 2 slots (top half + bottom half in 8×8 mode)
 - Remaining 38 for enemies, projectiles, HUD sprites
-
----
-
-## CGB Palettes for Sprites
-
-- Use `set_sprite_palette(pal_nb, n_palettes, pal_data)` or `OCPD` registers
-- 8 OBJ palettes (0–7), 4 colors each, 5-bit RGB: `RGB(r, g, b)` (values 0–31)
-- **Color index 0 is always transparent** — usable sprite colors: indices 1, 2, 3
-- OAM attribute byte bits 2–0 select CGB palette (0–7)
-- Cannot write OCPD during PPU Mode 3 — update during VBlank only
-
----
-
-## VBlank Timing
-
-`set_sprite_data` writes to VRAM — **must be called during VBlank or with display off**.
-
-```c
-wait_vbl_done();                          /* wait for VBlank */
-set_sprite_data(0, n, tile_data_array);   /* VRAM write — safe in VBlank */
-```
-
-`move_sprite` writes to OAM shadow buffer (GBDK copies it via DMA) — safe anytime.
-
-**Banked tile data — loader.c rule:** `set_sprite_data` / `set_bkg_data` calls that load banked tile data must be made from bank-0 code (via `loader.c` wrappers), not from within BANKED callers.
 
 ---
 

@@ -181,119 +181,19 @@ Both scripts must exit 0 and the build must produce zero errors before treating 
 
 ## Reference
 
-### hUGEDriver v6.1.3 API
+### hUGEDriver API & hardware registers — read at source
 
-```c
-#include "hUGEDriver.h"
-
-void hUGE_init(const hUGESong_t *song);        // init driver with song; call inside __critical
-void hUGE_dosound(void);                        // advance one tick; call once per VBL
-void hUGE_mute_channel(enum hUGE_channel_t ch, enum hUGE_mute_t mute);
-void hUGE_set_position(unsigned char pattern);  // jump to pattern index in order table
-void hUGE_reset_wave(void);                     // force wave channel reload (sets current_wave=100)
-
-extern volatile unsigned char hUGE_current_wave;
-extern volatile unsigned char hUGE_mute_mask;
-
-// Channels: HT_CH1=0, HT_CH2=1, HT_CH3=2, HT_CH4=3
-// Mute:     HT_CH_PLAY=0, HT_CH_MUTE=1
-```
-
----
-
-### hUGESong_t Struct
+For the driver API (`hUGE_init`, `hUGE_dosound`, `hUGE_mute_channel`, `hUGE_set_position`, `hUGE_reset_wave`, `hUGE_current_wave`, `hUGE_mute_mask`, channel/mute enums) and the `hUGESong_t` struct layout, read `lib/hUGEDriver/include/hUGEDriver.h` directly. For APU register bit layouts (NR10–NR52, FF10–FF3F), consult pandocs — do not rely on memory.
 
 > **`order_cnt` is a byte-offset count, not a pattern count.** The driver reads `*order_cnt` as the total byte length of the order table, because `current_order` advances by 2 per pattern. Correct value: `n_patterns × 2`. Example: 68 patterns → `order_cnt = 136`. The regression test `test_music_data_order_cnt_is_136` in `tests/test_music.c` catches this automatically after any re-export.
 
-```c
-typedef struct hUGESong_t {
-    unsigned char tempo;
-    const unsigned char * order_cnt;       // pointer to byte-offset count: n_patterns × 2
-    const unsigned char ** order1;         // CH1 pattern order table
-    const unsigned char ** order2;         // CH2 pattern order table
-    const unsigned char ** order3;         // CH3 pattern order table
-    const unsigned char ** order4;         // CH4 pattern order table
-    const hUGEDutyInstr_t * duty_instruments;
-    const hUGEWaveInstr_t * wave_instruments;
-    const hUGENoiseInstr_t * noise_instruments;
-    const hUGERoutine_t ** routines;       // NULL if no custom routines
-    const unsigned char * waves;           // 256-byte wave table
-} hUGESong_t;
-```
+**APU enable (required before `hUGE_init`):** `NR52_REG = 0x80;` (APU power) then `NR51_REG = 0xFF; NR50_REG = 0x77;` (full routing/volume).
 
----
+### Playback Control Notes (project-specific)
 
-### APU Enable (required before hUGE_init)
-
-```c
-NR52_REG = 0x80;  // bit7=1: enable APU
-NR51_REG = 0xFF;  // route all 4 channels to both speakers
-NR50_REG = 0x77;  // max master volume: left=7, right=7
-```
-
----
-
-### Playback Control Patterns
-
-#### Pause / Resume
-
-```c
-// Pause — stop advancing song position AND silence all channels
-__critical { remove_VBL(hUGE_dosound); }
-hUGE_mute_channel(HT_CH1, HT_CH_MUTE);
-hUGE_mute_channel(HT_CH2, HT_CH_MUTE);
-hUGE_mute_channel(HT_CH3, HT_CH_MUTE);
-hUGE_mute_channel(HT_CH4, HT_CH_MUTE);
-
-// Resume
-hUGE_mute_channel(HT_CH1, HT_CH_PLAY);
-hUGE_mute_channel(HT_CH2, HT_CH_PLAY);
-hUGE_mute_channel(HT_CH3, HT_CH_PLAY);
-hUGE_mute_channel(HT_CH4, HT_CH_PLAY);
-__critical { add_VBL(hUGE_dosound); }
-```
-
-> **Project note:** This project calls `music_tick()` from the main loop (not `add_VBL`). For the main-loop pattern, add a `music_paused` flag and check it in `music_tick()` to skip `hUGE_dosound` when paused.
->
-> Muting alone (without stopping the VBL/tick) silences audio but the driver still advances position. Use both mute + stop-tick if you need the song to resume from the same position.
-
-#### Song Switching
-
-`music_start()` is already implemented in `src/music.c`. Its pattern for reference:
-```c
-// 1. Mute all channels to silence immediately
-hUGE_mute_channel(HT_CH1, HT_CH_MUTE); /* ... all four channels */
-
-// 2. Store the new song's bank
-current_song_bank = bank;  // VBL wrapper reads this to SET_BANK before hUGE_dosound
-
-// 3. Init the new song inside __critical with manual bank switch
-__critical {
-    uint8_t _saved_bank = CURRENT_BANK;
-    SWITCH_ROM(bank);
-    hUGE_init(song);
-    SWITCH_ROM(_saved_bank);
-}
-
-// 4. Unmute all channels
-hUGE_mute_channel(HT_CH1, HT_CH_PLAY); /* ... all four channels */
-```
-
-#### Volume Fading
-
-No built-in API. Manipulate NR50/NR51 directly each frame:
-```c
-// volume: 0..7 (decrement/increment each frame for a fade)
-NR50_REG = AUDVOL_VOL_LEFT(volume) | AUDVOL_VOL_RIGHT(volume);
-// NR50 = 0 is still slightly audible — set NR51 = 0 to fully silence
-NR51_REG = (volume != 0) ? 0xFF : 0x00;
-```
-
-#### Position Jump
-
-```c
-hUGE_set_position(pattern_index);  // jump to pattern_index in the order table
-```
+- **Pause/resume:** this project calls `music_tick()` from the main loop (not `add_VBL`) — pause via a `music_paused` flag checked in `music_tick()`, plus muting all four channels. Muting alone silences audio but the driver still advances position; use both mute + stop-tick to resume from the same position.
+- **Song switching:** `music_start()` in `src/music.c` is the canonical pattern — mute all channels, store `current_song_bank` (the VBL wrapper reads it to `SET_BANK` before `hUGE_dosound`), `hUGE_init` inside `__critical` with a manual `SWITCH_ROM(bank)` / restore, then unmute. Follow it; don't reinvent.
+- **Volume fading:** no built-in API — step NR50 each frame. NR50 = 0 is still slightly audible; set `NR51 = 0` to fully silence.
 
 ---
 
@@ -313,30 +213,7 @@ hUGE_set_position(pattern_index);  // jump to pattern_index in the order table
 
 ---
 
-### APU Hardware Reference
-
-#### Register Map (FF10–FF3F) — name → purpose
-
-```
-NR10 FF10  CH1 sweep (pace/negate/shift)      NR30 FF1A  CH3 DAC enable (bit7)
-NR11 FF11  CH1 duty + length load             NR31 FF1B  CH3 length load
-NR12 FF12  CH1 volume envelope                NR32 FF1C  CH3 volume (00/01/10/11 = 0/100/50/25%)
-NR13 FF13  CH1 period low (write-only)        NR33 FF1D  CH3 period low (write-only)
-NR14 FF14  CH1 trigger/len-en/period-high     NR34 FF1E  CH3 trigger/len-en/period-high
-NR21 FF16  CH2 duty + length load             NR41 FF20  CH4 length load
-NR22 FF17  CH2 volume envelope                NR42 FF21  CH4 volume envelope
-NR23 FF18  CH2 period low (write-only)        NR43 FF22  CH4 clock shift/LFSR width/divisor
-NR24 FF19  CH2 trigger/len-en/period-high     NR44 FF23  CH4 trigger/len-en
-
-NR50 FF24  master volume (left/right, 7=max)
-NR51 FF25  panning (upper nibble=left, lower=right, per channel)
-NR52 FF26  APU power (bit7); channel-active flags (read-only bits 0-3)
-FF30–FF3F  Wave RAM: 16 bytes = 32 four-bit samples (high nibble first)
-```
-
-Trigger bit is bit7 of NRx4; length-enable is bit6. Consult a full APU reference for exact bit positions when writing registers directly.
-
-#### CH3 Wave RAM — Safe Access Rules
+### CH3 Wave RAM — Safe Access Rules
 
 **DMG hardware only:** Re-triggering CH3 while it is actively reading Wave RAM corrupts the first 4 bytes of Wave RAM.
 
@@ -375,14 +252,7 @@ When called with a prompt starting with **"implement this task: …"**, act as t
 **Behavior in implementation mode:**
 1. Read the full task text and identify all files to create or modify.
 2. Invoke the `bank-pre-write` skill (HARD GATE) before writing any `src/*.c` or `src/*.h` file. Verify `bank-manifest.json` has an entry for every new music file.
-3. Execute the pipeline from Scenario 1:
-   - Export from hUGETracker (hUGEDriver v6.1.3 format)
-   - Add `#pragma bank 255`, `#include <gb/gb.h>`, `#include "banking.h"`, and `BANKREF(name)` to the exported `.c` file
-   - Rename the exported `const hUGESong_t` variable to match the `BANKREF` name
-   - Run `python tools/music_song_validate.py src/music_data.c` — fix all errors before continuing
-   - Update `src/music_data.h` with `BANKREF_EXTERN` and `extern const hUGESong_t` declarations
-   - Wire `src/music.c` calls (`SET_BANK`, `hUGE_init`) in `music_init()`
-   - Run `python tools/music_wire_check.py` — fix all errors before continuing
+3. Execute the full pipeline from **Scenario 1** (steps 1–8), running both validators (`music_song_validate.py`, `music_wire_check.py`) and fixing all errors before continuing past each.
 4. Build the ROM (`make` → PASS).
 5. Invoke the `bank-post-build` skill (HARD GATE) after a successful build.
 6. Commit.

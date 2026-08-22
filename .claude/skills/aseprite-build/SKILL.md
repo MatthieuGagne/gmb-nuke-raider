@@ -27,7 +27,7 @@ On success: confirm the PNG was written (no output = success for Aseprite batch 
 
 On failure: show the error output. Common causes: wrong file path, unsupported color mode (must be indexed, 4 colours), dimensions not a multiple of 8.
 
-After export, run the `track-build` skill (or `build` skill) to regenerate the game ROM from the updated PNG.
+After export, run the `build` skill to regenerate the game ROM from the updated PNG.
 
 ## After editing tileset.aseprite — sync turret.png
 
