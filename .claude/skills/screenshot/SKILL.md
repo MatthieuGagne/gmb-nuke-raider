@@ -153,8 +153,6 @@ val = pyboy.memory[0xC373]   # address from .map grep
 
 **CRITICAL:** `window='null'` is the correct headless flag. Do NOT pass `cgb_mode=True` — it raises `KeyError: Unknown keyword argument`.
 
-### Combined workflow
-
-1. Use `screenshot.py` with `wait_memory` steps to navigate to the exact game state
-2. Then read multiple adjacent WRAM bytes directly from `pyboy.memory[addr]`
-3. Compare values against expected to confirm/rule out hypotheses without opening Emulicious
+Combine the two: navigate with `screenshot.py` `wait_memory` steps, then read adjacent WRAM
+bytes via `pyboy.memory[addr]`. For a full headless diagnosis — navigate, read, iterate
+hypotheses — dispatch the `pyboy-debug` agent instead of scripting it here.

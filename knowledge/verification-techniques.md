@@ -1,5 +1,5 @@
 ---
-summary: Prove-it-bites verification techniques — gcc -Wconversion pre-SDCC truncation audit, neuter-the-function red/green diff, flip-header-on-disk constant-drift test, bytearray mutation for parity tests
+summary: Prove-it-bites verification techniques — gcc -Wconversion pre-SDCC truncation audit, neuter-the-function red/green diff, flip-header-on-disk constant-drift test, bytearray mutation for parity tests, two-ROM differential runtime test (did my change cause this bug)
 tags: [verification, testing, prove-it-bites, gcc, wconversion, audit, technique]
 ---
 
@@ -43,6 +43,23 @@ the header afterward. This is the concrete technique behind "prove it bites" for
 test whose only job is comparing two parsed values that agree today by construction.
 The compile-time variant (flip a guarded constant and check the `#error` fires) is in
 [[config-h-patterns]].
+
+## Two-ROM differential test (did this change cause the runtime bug?)
+
+Never conclude from code inspection that a runtime bug is fixed, or that a change caused
+or avoided it — #390 was closed on inspection alone and was still live in the next
+smoketest. To decide "did this change cause the bug, or is it pre-existing", build both
+ROMs — the change in its worktree, and a `master` baseline via
+`git worktree add --detach <path> origin/master` — then dispatch the `pyboy-debug` agent
+to apply the **same scripted button input** to both headless and compare the relevant
+WRAM series frame-by-frame (e.g. `rs_laps[0]` / `rs_cp_next[0]` for player lap counting,
+PLAYER_SLOT=0). Identical trajectories under identical input exonerate the change: the
+bug is pre-existing.
+
+Two traps: WRAM static addresses shift between builds whenever a new `.c` is added, so
+resolve symbols **per build**, never reuse an address across ROMs; and only player state
+is input-locked (deterministic under identical input) — free-running AI shows a harmless
+few-frame phase skew, which is not a finding. Live instance: [[track2-position-bug]].
 
 ## Mutate in-memory copies, never the real artifact
 

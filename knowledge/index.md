@@ -47,7 +47,7 @@
 - [[host-test-gotchas]] — `make test` timeouts, dangling map pointer, test ordering,
   Windows binary-lock retries
 - [[verification-techniques]] — prove-it-bites: gcc `-Wconversion` audit, neutered
-  functions, flip-header tests, bytearray mutation
+  functions, flip-header tests, bytearray mutation, two-ROM differential runtime test
 - [[trace-py-stdlib-shadow]] — `tools/trace.py` shadows the stdlib `trace` module
 - [[test-tools-gate-history]] — the months-red unenforced `make test-tools` gate and
   its #441 fix (discovery over enumeration)

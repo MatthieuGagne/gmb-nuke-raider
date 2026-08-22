@@ -285,18 +285,9 @@ Fields that cannot be determined **must emit `null`** — do not omit the field,
   "symptom": "race ends after 1 lap instead of 3; finish tile triggers immediately on lap 1",
   "registers": [],
   "stack_trace": null,
-  "hypothesis": "Unit test passes but ROM behavior wrong. _rs_cp_next reads 0 when the finish tile fires on lap 1, meaning the checkpoint gate was never checked before the finish-tile handler ran. The finish tile AABB overlaps with CP3's hitbox boundary — player on the low race line hits the finish tile before triggering CP3, so _rs_cp_next never advances to 4 (all-clear) and the finish handler accepts cp_next=0 as valid.",
-  "memory_snapshot": {
-    "_active_lap_count": 1,
-    "_rs_cp_next": 0,
-    "_px": 96,
-    "_py": 50,
-    "_hp": 3,
-    "_current_race_id": 2,
-    "_cam_scx_shadow": 0,
-    "_cam_scy_shadow": 48
-  },
-  "screenshots_taken": ["build/pyboy-debug-001.png", "build/pyboy-debug-002.png"],
+  "hypothesis": "Unit test passes but ROM behavior wrong. _rs_cp_next reads 0 when the finish tile fires on lap 1 — the finish handler accepts cp_next=0 as valid because CP3 was never triggered on the low race line.",
+  "memory_snapshot": { "_active_lap_count": 1, "_rs_cp_next": 0, "_hp": 3 },
+  "screenshots_taken": ["build/pyboy-debug-001.png"],
   "unit_tests_run": ["test_checkpoint"],
   "confidence": "high"
 }

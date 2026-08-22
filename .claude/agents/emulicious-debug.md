@@ -47,75 +47,13 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 
 ## VS Code Step-Through Debugger
 
-### Setup
-
-1. Install "Emulicious Debugger" extension in VS Code (Ctrl+Shift+X → search "Emulicious Debugger")
-2. In VS Code preferences, set the Emulicious executable path to the jar location given in `CLAUDE.local.md`
-3. Create `.vscode/launch.json`:
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "emulicious-debugger",
-            "request": "launch",
-            "name": "Launch in Emulicious",
-            "program": "${workspaceFolder}/build/nuke-raider.gb",
-            "port": 58870,
-            "stopOnEntry": true
-        }
-    ]
-}
-```
-
-4. Build with `-debug` flag to generate `.map`/`.noi` files (enables source-level debugging):
-   ```sh
-   make  # add -debug to LCCFLAGS in Makefile if needed; GBDK_HOME is set in ~/.claude/settings.json
-   ```
-
-### Debugger Controls
-
-| Action       | Effect                                    |
-|--------------|-------------------------------------------|
-| Play         | Run until breakpoint or exception         |
-| Step Over    | Next line                                 |
-| Step Into    | Enter function                            |
-| Step Out     | Exit function, pause after return         |
-| Step Back    | Reverse one line                          |
-| Reverse      | Run backward to previous breakpoint       |
-| Restart      | Reload ROM                                |
-| Stop         | Disconnect                                |
-
-**Breakpoints:** click left of line number (red dot). Variables panel shows locals when paused; hover to inspect values.
+Setup (human-operated, one line): install the "Emulicious Debugger" VS Code extension, point it at the jar path from `CLAUDE.local.md`, add an `emulicious-debugger` launch config (`program: build/nuke-raider.gb`, `port: 58870`), and build with `-debug` in LCCFLAGS so `.map`/`.noi` files enable source-level debugging. It supports breakpoints, step over/into/out, and reverse stepping.
 
 ---
 
 ## Inspection Tools (Emulicious UI)
 
-| Tool              | Use for                                                      |
-|-------------------|--------------------------------------------------------------|
-| Memory Editor     | Inspect/edit WRAM/VRAM/registers live                        |
-| Tile Viewer       | Confirm tile data loaded correctly into VRAM                 |
-| Tilemap Viewer    | Inspect background map — verify scrolling/wrapping           |
-| Sprite Viewer     | Check OAM positions, tile assignments, palette               |
-| Palette Viewer    | Verify CGB palette colors                                    |
-| RAM Watch         | Watch specific memory addresses change each frame            |
-| RAM Search        | Find addresses holding a target value (useful for variables) |
-| Profiler          | Identify frame-time hotspots                                 |
-| Coverage Analyzer | Color-coded: yellow=frequent, green=moderate, red=heavy      |
-
----
-
-## Tracer
-
-Records executed instructions for visualizing control flow. In Emulicious:
-- Open debugger → enable Tracer
-- Define optional condition expression to limit what's traced
-- Results shown inline; integrate with Coverage for frequency heatmap
-- Navigate trace: **Ctrl+Left / Ctrl+Right**
-
-Useful for: confirming which code path runs, finding dead code, verifying interrupt timing.
+Memory Editor (live WRAM/VRAM/registers) · Tile Viewer (VRAM tile data) · Tilemap Viewer (BG map/scrolling) · Sprite Viewer (OAM/palette) · Palette Viewer (CGB colors) · RAM Watch (addresses per frame) · RAM Search (find value holders) · Profiler (frame-time hotspots) · Coverage Analyzer (execution heatmap) · Tracer (instruction trace with optional condition — confirms which code path runs, dead code, interrupt timing).
 
 ---
 
