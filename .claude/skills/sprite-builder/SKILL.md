@@ -162,10 +162,7 @@ Document the OAM layout comment at the top of `config.h` so the budget stays aud
 ```sh
 make
 ```
-Then launch via **PowerShell tool** (Bash exits silently on Windows):
-```powershell
-Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
-```
+Then launch via **PowerShell tool** using the emulator launch command in `CLAUDE.local.md` (Bash exits silently on Windows).
 
 Check:
 - Sprite appears at correct position

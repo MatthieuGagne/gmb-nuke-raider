@@ -22,7 +22,7 @@ Authoritative copy with rationale lives in [`docs/dev-workflow.md`](../docs/dev-
 - OAM: 40 sprites total (player = 2; budget the rest for enemies/projectiles/HUD)
 - VRAM: 192 tiles (DMG bank 0) + 192 (CGB bank 1 for color variants)
 - WRAM: 8 KB — large arrays must be global or `static`, never local
-- ROM: MBC5, 512 KB = 32 banks — auto-sized by makebin (`-yo A`), recorded in cartridge header byte `0x148`, and read from there by `bank_post_build.py`. **Not** declared by `-Wm-ya32`: `-ya` is makebin's RAM bank count and that value is discarded. Assets are tagged for banking, and `-autobank` spills code past bank 0 into the autobank pool, banks 1-29 (state code lives in banks 2-3). Two banks are pinned by hand instead: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590)
+- ROM: MBC5, 512 KB = 32 banks — auto-sized by makebin (`-yo A`), recorded in cartridge header byte `0x148`, and read from there by `tools/bank_post_build.py`. **Not** declared by `-Wm-ya32`: `-ya` is makebin's RAM bank count and that value is discarded. Assets are tagged for banking, and `-autobank` spills code past bank 0 into the autobank pool, banks 1-29 (state code lives in banks 2-3). Two banks are pinned by hand instead: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590)
 
 ## GBDK / SDCC constraints
 

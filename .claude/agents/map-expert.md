@@ -15,8 +15,7 @@ You are the map pipeline expert for the Nuke Raider Game Boy Color game. You han
 
 - **ROM:** `build/nuke-raider.gb`
 - **Build:** `make`
-- **Map source of truth:** `assets/maps/track.tmx` and `assets/maps/overmap.tmx` — never edit generated files directly
-- **Map dimensions:** 40×36 tiles (W×H)
+- **Map source of truth:** `assets/maps/track*.tmx` and `assets/maps/overmap.tmx` — never edit generated files directly (dimensions are per-map — read them from the TMX)
 
 ---
 
@@ -28,7 +27,7 @@ The Makefile runs the full track pipeline automatically. Manual invocations for 
 |------|---------|-------|
 | `png_to_tiles.py` | see Makefile | Invoked with `--rotation-manifest`, `--tsx`, `--id-map-out`, `--meta-header-out`; do not invoke manually for tracks |
 | `tmx_to_c.py` | see Makefile | Invoked with `--id-map` for tracks, `--emit-rotation-manifest` first pass |
-| `tmx_to_array_c.py` | `python tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h` | Overmap only |
+| `overmap_to_c.py` | `python tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c` | Overmap only |
 
 **Test:** `python -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
 
@@ -36,22 +35,7 @@ The Makefile runs the full track pipeline automatically. Manual invocations for 
 
 ## Tileset Tile Indices & Types
 
-Tiles are defined in `assets/maps/track.tsx` (Tiled tileset file). Current tileset (`tileset.png`) is 9×2 tiles (9 columns, 2 rows = 18 base tiles). Types assigned via TSX `<property name="type">`.
-
-| Tiled tile ID | C index | Type | Notes |
-|--------------|---------|------|-------|
-| 0 | 0 | TILE_WALL | Outer boundary / off-track |
-| 1 | 2 | TILE_ROAD | |
-| 2 | 4 | TILE_ROAD | |
-| 3 | 6 | TILE_SAND | |
-| 4 | 8 | TILE_OIL | |
-| 5 | 10 | TILE_BOOST | |
-| 6 | 12 | TILE_FINISH | |
-| 7 | 14 | TILE_ROAD | |
-| 8 | 16 | TILE_ROAD | |
-| 9 | 1 | TILE_ROAD | Row 2 tiles start here |
-| 10 | 3 | TILE_WALL | |
-| 11–17 | 5,7,9,11,13,15,17 | TILE_ROAD | Row 2, columns 2–8 |
+Tiles are defined in `assets/maps/track.tsx` (Tiled tileset file); types assigned via TSX `<property name="type">`. Read the current geometry from `track.tsx` (`tilecount`/`columns` — 27 tiles, 9×3 as of this writing) and the generated `src/track_tileset_meta.h` for the authoritative tile-ID → C-index → type mapping. The table is deliberately not duplicated here — it rots.
 
 > **Tiled tile ID ≠ C array index for multi-row tilesets.** `encode_2bpp` writes tiles **column-major** (outer loop = column, inner loop = row). For a W×H-tile tileset, C index `i` → col = `i // H`, row = `i % H`. The `base_remap` field in `build/track_tile_id_map.json` stores the row-major→column-major translation and is applied automatically by `tmx_to_c.py`.
 
@@ -82,11 +66,11 @@ Step 3: `tmx_to_c.py --id-map` converts each TMX → `src/track*_map.c` using th
 **Overmap pipeline (separate converter):**
 ```
 assets/maps/overmap_tiles.aseprite  →  (Aseprite export)  →  assets/maps/overmap_tiles.png
-assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py  →  src/overmap_tiles.c
-assets/maps/overmap.tmx  →  tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h  →  src/overmap_map.c
+assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py --bank 255  →  src/overmap_tiles.c  (array `overmap_tile_data`)
+assets/maps/overmap.tmx  →  tools/overmap_to_c.py  →  src/overmap_map.c
 ```
 
-Note: the overmap uses `tmx_to_array_c.py` (not `tmx_to_c.py`) and takes `config.h` as an extra arg.
+Note: the overmap uses `overmap_to_c.py` (not `tmx_to_c.py`). Both outputs are checked into git; `make` regenerates them when sources change (Makefile rules `src/overmap_tiles.c`, `src/overmap_map.c`).
 
 ---
 
@@ -109,14 +93,14 @@ On any error in the steps below, follow the **Self-Correction Policy** section.
    ```bash
    aseprite -b assets/maps/overmap_tiles.aseprite --save-as assets/maps/overmap_tiles.png
    ```
-2. **Convert tileset to tiles:**
+2. **Convert tileset to tiles** — `make src/overmap_tiles.c`, which runs:
    ```bash
-   python tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tiles
+   python tools/png_to_tiles.py --bank 255 assets/maps/overmap_tiles.png src/overmap_tiles.c overmap_tile_data
    ```
 3. **Paint map in Tiled** — open `assets/maps/overmap.tmx`, update the layer as needed (CSV encoding).
-4. **Convert map** (note: different converter and extra `config.h` arg):
+4. **Convert map** (note: different converter) — `make src/overmap_map.c`, which runs:
    ```bash
-   python tools/tmx_to_array_c.py assets/maps/overmap.tmx src/overmap_map.c overmap_map config.h
+   python tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c
    ```
 5. **Wire into game** — `extern`-declare generated symbols; load tile data then tilemap during VBlank.
 6. **OAM sprites on the map** — delegate to the **`sprite-expert`** agent if needed.

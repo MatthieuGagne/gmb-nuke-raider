@@ -174,14 +174,7 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 - **Palette index 0 is always transparent in OBJ mode** — use indices 1–3 for visible sprite pixels
 - Export: File → Export As → PNG, or `make export-sprites` to batch-export all sources
 
-**All assets in the project that use this pipeline:**
-
-| Asset | Source | PNG | Generated C |
-|-------|--------|-----|-------------|
-| Player car | `assets/sprites/player_car.aseprite` | `assets/sprites/player_car.png` | `src/player_sprite.c` |
-| Overmap car (2 frames: up + left) | `assets/sprites/overmap_car.aseprite` | `assets/sprites/overmap_car.png` (16×8 sheet) | `src/overmap_car_sprite.c` |
-| Track tileset (7 tiles: wall/road/dashes/sand/oil/boost/finish) | `assets/maps/tileset.aseprite` | `assets/maps/tileset.png` | `src/track_tiles.c` |
-| Overmap tiles (4 tiles: blank/road/hub/dest) | `assets/maps/overmap_tiles.aseprite` | `assets/maps/overmap_tiles.png` | `src/overmap_tiles.c` |
+**All assets in the project that use this pipeline:** see the `png_to_tiles.py` rules in the `Makefile` — the authoritative, always-current list (player/overmap cars, turret, bullet, explosion, NPC portraits, dialog assets, track + overmap tilesets, …). Deliberately not duplicated here — a hand-maintained table rots.
 
 **Aseprite CLI export (single-frame sprites):**
 ```sh

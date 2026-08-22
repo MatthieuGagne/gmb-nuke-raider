@@ -12,7 +12,7 @@ You are a Game Boy Color runtime debugger for the Nuke Raider game. You diagnose
 ## Project Context
 
 - **ROM:** `build/nuke-raider.gb`
-- **Launch:** PowerShell tool — `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru` (Bash exits silently on Windows)
+- **Launch:** machine-specific — use the emulator launch command in `CLAUDE.local.md`, via the **PowerShell tool** (`Start-Process`; bare `java -jar` via Bash exits silently on Windows)
 - **Build:** `make` (GBDK_HOME is set via the machine settings tier, `~/.claude/settings.json` env block)
 
 ---
@@ -50,8 +50,7 @@ EMU_printf("cam_y=%u py=%u\n", cam_y, py);
 ### Setup
 
 1. Install "Emulicious Debugger" extension in VS Code (Ctrl+Shift+X → search "Emulicious Debugger")
-2. In VS Code preferences, set the Emulicious executable path to:
-   `C:\Tools\Emulicious\Emulicious.jar`
+2. In VS Code preferences, set the Emulicious executable path to the jar location given in `CLAUDE.local.md`
 3. Create `.vscode/launch.json`:
 
 ```json
@@ -147,7 +146,7 @@ romusage build/nuke-raider.cdb -a
 
 ## GBC-Specific Diagnostic Hints
 
-**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — `find_wram_sym_from_map` only works for non-static globals. Two ways to reach a `static` WRAM variable:
+**Static WRAM symbol lookup:** SDCC does not export `static` file-scope variable names to the `.map` symbol table — the `.map` lists only non-static globals. Two ways to reach a `static` WRAM variable:
 
 - *Preferred when you can rebuild:* export a non-`static` debug global alongside it (e.g. `uint8_t dbg_foo;`), rebuild, then `grep "dbg_foo" build/nuke-raider.map` to get its address and read it via `pyboy.memory[addr]`. See the `screenshot` skill's "Headless WRAM Read" pattern for the full workflow.
 - *When you only have a getter and cannot add a debug global:* disassemble the getter function from the ROM binary (`.noi` from `make build-debug`) to locate the `LD A,(nn)` opcode and extract the WRAM address. Formula: `bank = noi_addr >> 16; phys = gb_addr if bank == 0 else (bank-1)*0x4000 + gb_addr`.
@@ -161,7 +160,7 @@ romusage build/nuke-raider.cdb -a
 ## Workflow: Debugging a Bug
 
 1. Add `EMU_printf` at the suspect location, rebuild (`make`)
-2. Launch via PowerShell tool: `Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru`
+2. Launch via PowerShell tool with the emulator command from `CLAUDE.local.md`
 3. Observe console output; narrow the problem
 4. Set VS Code breakpoints at suspect line; use Step Over/Into to inspect variables
 5. Use Tilemap/Sprite Viewers to confirm visual state matches logic
