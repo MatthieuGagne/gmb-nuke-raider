@@ -53,7 +53,6 @@
       "Skill(gb-memory-validator)",
       "Skill(grill-with-docs)",
       "Skill(test)",
-      "Skill(track-build)",
       "Skill(update-config)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:doc.mapeditor.org)",
