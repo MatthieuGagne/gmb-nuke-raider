@@ -9,7 +9,7 @@ description: Use when debugging a regression against a known-good historical PR 
 
 - You suspect a regression: something worked in a previous PR but is broken now
 - You want to compare the built ROM from two or more PRs side-by-side in Emulicious
-- The `/debug` skill identifies a "worked in PR X, broken now" hypothesis
+- A debug session (`emulicious-debug` / `pyboy-debug` agent) identifies a "worked in PR X, broken now" hypothesis
 
 ## Usage
 
@@ -51,10 +51,7 @@ Ask the user: "Which PR's ROM would you like to launch first?"
 
 Then open it in Emulicious **from the worktree directory** so the path resolves correctly. Use the **PowerShell tool** (Bash exits silently on Windows):
 
-```powershell
-# Set-Location to the worktree directory first if needed
-Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
-```
+Use the emulator launch command in `CLAUDE.local.md` (`Set-Location` to the worktree directory first if needed).
 
 Repeat for any additional ROMs the user wants to test.
 

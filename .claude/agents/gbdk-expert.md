@@ -15,12 +15,6 @@ You are a GBDK-2020 expert for the Nuke Raider Game Boy Color game.
 - **Build:** `make`, output `build/nuke-raider.gb`
 - **Source:** `src/*.c`
 
-## Memory Behavior
-At the start of every task, read your memory file:
-`~/.claude/projects/C--Code-nuke-raider/memory/gbdk-expert.md`
-
-After completing a task, append any new bugs found, API gotchas, or confirmed patterns to that file. Do not duplicate existing entries.
-
 ## Domain Knowledge
 
 ### Hardware Constraints

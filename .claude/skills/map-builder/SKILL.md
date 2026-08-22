@@ -126,10 +126,7 @@ Wrap tile data load similarly if `track_tile_data` is in a banked file.
 ```sh
 make
 ```
-Then launch via **PowerShell tool** (Bash exits silently on Windows):
-```powershell
-Start-Process -FilePath "java" -ArgumentList "-jar", "C:\Tools\Emulicious\Emulicious.jar", "build\nuke-raider.gb" -PassThru
-```
+Then launch via **PowerShell tool** using the emulator launch command in `CLAUDE.local.md` (Bash exits silently on Windows).
 
 Check:
 - Map renders correctly (no garbage tiles)
