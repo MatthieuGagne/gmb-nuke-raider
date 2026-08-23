@@ -265,14 +265,26 @@ def parse_define(path, name):
     return None
 
 
+_DEFINE_LIST_TOKEN = re.compile(r'^\s*(-?(?:0[xX][0-9A-Fa-f]+|\d+))[uU]?\s*$')
+
+
 def parse_define_list(path, name):
     """Extract the integers from `#define NAME { a, b, ... }` in a C source file.
 
-    Returns a list of ints, or None when the define is absent or the file is
-    missing. Trailing `u` suffixes are accepted, exactly as parse_define accepts
-    them for scalars. The `\\s+\\{` is what keeps NAME from matching a longer
-    define's prefix: after a prefix match the next character is part of the
-    longer name, not whitespace."""
+    Returns a list of ints, or None when the define is absent, the file is
+    missing, or any comma-separated token fails to parse. Trailing `u`
+    suffixes are accepted, exactly as parse_define accepts them for scalars;
+    so are `0x` hex literals and a leading `-`. A trailing comma's empty
+    final token is allowed and ignored.
+
+    This tokenises rather than scanning the brace body for digit runs
+    (`re.findall(r'\\d+', ...)`), which silently changes the table's length
+    on hex (`0x08u` -> digits '0','8'), negative (`-1` -> '1', dropping the
+    sign), or commented-out (`/* 7u */` -> '7', counted as a live entry)
+    entries — any of which would shift what PLAYER_HANDLING indexes.
+    The `\\s+\\{` is what keeps NAME from matching a longer define's prefix:
+    after a prefix match the next character is part of the longer name, not
+    whitespace."""
     pat = re.compile(r'#define\s+' + re.escape(name) + r'\s+\{([^}]*)\}')
     try:
         with open(path) as f:
@@ -281,7 +293,23 @@ def parse_define_list(path, name):
         return None
     if m is None:
         return None
-    return [int(tok) for tok in re.findall(r'\d+', m.group(1))]
+    body = re.sub(r'/\*.*?\*/', ' ', m.group(1), flags=re.DOTALL)
+    tokens = body.split(',')
+    # A trailing comma leaves one empty final token — allowed and dropped.
+    if tokens and tokens[-1].strip() == '':
+        tokens = tokens[:-1]
+    values = []
+    for tok in tokens:
+        tm = _DEFINE_LIST_TOKEN.match(tok)
+        if tm is None:
+            return None
+        lit = tm.group(1)
+        neg = lit.startswith('-')
+        if neg:
+            lit = lit[1:]
+        n = int(lit, 16) if lit[:2].lower() == '0x' else int(lit, 10)
+        values.append(-n if neg else n)
+    return values
 
 
 def main():
@@ -292,7 +320,8 @@ def main():
                     help='Track TMX files in order: track.tmx track2.tmx track3.tmx')
     ap.add_argument('--tsx',           required=True)
     ap.add_argument('--config', default='src/config.h',
-                    help='src/config.h — read for HUD_SCANLINE')
+                    help='src/config.h — read for HUD_SCANLINE, PLAYER_HANDLING '
+                         'and PLAYER_TURN_FRAMES_TABLE')
     ap.add_argument('--state-overmap', required=True, dest='state_overmap')
     ap.add_argument('--state-prerace', required=True, dest='state_prerace')
     args = ap.parse_args()

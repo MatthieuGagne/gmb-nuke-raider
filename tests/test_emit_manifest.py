@@ -254,6 +254,42 @@ class TestParseDefine(unittest.TestCase):
         em = self._em()
         self.assertIsNone(em.parse_define_list('does/not/exist.h', 'TABLE'))
 
+    def test_parse_list_reads_hex_tokens(self):
+        """{ 0x08u, 0x07u } is two entries, not four — re.findall(r'\\d+', ...)
+        would split each hex literal's digits into separate matches."""
+        em = self._em()
+        path = self._write_c("#define TABLE { 0x08u, 0x07u }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 7])
+        os.unlink(path)
+
+    def test_parse_list_reads_negative_tokens(self):
+        """{ -1, 2 } must keep the sign — a digit-run scan drops it and reads 1."""
+        em = self._em()
+        path = self._write_c("#define TABLE { -1, 2 }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [-1, 2])
+        os.unlink(path)
+
+    def test_parse_list_ignores_commented_out_entries(self):
+        """{ 8u, /* 7u */ 6u } is two live entries — the commented-out one must
+        not be counted, or the table's length (and everything it indexes)
+        silently shifts."""
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, /* 7u */ 6u }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 6])
+        os.unlink(path)
+
+    def test_parse_list_allows_a_trailing_comma(self):
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, 7u, }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 7])
+        os.unlink(path)
+
+    def test_parse_list_rejects_a_malformed_token(self):
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, seven }\n")
+        self.assertIsNone(em.parse_define_list(path, 'TABLE'))
+        os.unlink(path)
+
 
 class TestCuratedSymbols(unittest.TestCase):
     def _em(self):
@@ -422,9 +458,24 @@ class TestPlayingControls(unittest.TestCase):
                              self._config_h_text()).group(1))
 
     def _config_h_table(self):
+        """Read PLAYER_TURN_FRAMES_TABLE with this test's own tokenizer — split
+        on ',' and strip a trailing 'u'/'U' suffix per token, deliberately NOT
+        emit_manifest.parse_define_list's algorithm. If the oracle and the
+        emitter shared one implementation they would always agree, even when
+        both are wrong (R5): the oracle has to be able to disagree with the
+        emitter for this test to mean anything."""
         body = re.search(r'#define\s+PLAYER_TURN_FRAMES_TABLE\s+\{([^}]*)\}',
                          self._config_h_text()).group(1)
-        return [int(t) for t in re.findall(r'\d+', body)]
+        tokens = [t.strip() for t in body.split(',')]
+        tokens = [t for t in tokens if t]
+        values = [int(t.rstrip('uU')) for t in tokens]
+        self.assertEqual(len(values), 8,
+                         "src/config.h:27-38 documents PLAYER_TURN_FRAMES_TABLE "
+                         "as an 8-entry table")
+        self.assertTrue(all(a > b for a, b in zip(values, values[1:])),
+                        "src/config.h:27-38 documents PLAYER_TURN_FRAMES_TABLE "
+                        "as strictly decreasing")
+        return values
 
     def _player_c_code(self):
         """src/player.c with comments stripped, so a prose mention never counts
@@ -473,17 +524,48 @@ class TestPlayingControls(unittest.TestCase):
                          "flipping PLAYER_HANDLING did not move the emitted value — "
                          "it is not derived from src/config.h")
 
+    def _player_apply_physics_body(self):
+        """Just player_apply_physics()'s body. Matching DIR_DX[player_dir]
+        against the whole file is not a guard: src/player.c's sprite-rendering
+        block indexes the same tables the same way, so a physics function
+        rewritten to thrust along the pressed button would still match."""
+        code = self._player_c_code()
+        m = re.search(r'void\s+player_apply_physics\s*\([^)]*\)[^{]*\{', code)
+        self.assertIsNotNone(m, "player_apply_physics() not found in src/player.c — "
+                                "the parser is broken, not the manifest")
+        # Brace-counted, not a naive `.*?\n}` regex: player_apply_physics() has
+        # nested `{ ... }` blocks of its own, so the first `\n}` is an inner
+        # block's closer, not the function's.
+        i = m.end()
+        depth = 1
+        while i < len(code) and depth > 0:
+            if code[i] == '{':
+                depth += 1
+            elif code[i] == '}':
+                depth -= 1
+            i += 1
+        self.assertEqual(depth, 0,
+                         "unbalanced braces while scanning player_apply_physics() — "
+                         "the parser is broken, not the manifest")
+        return code[m.end():i - 1]
+
     def test_thrust_follows_the_current_facing(self):
         """R2/AC2 — the fact #688 exists for: pressing a direction requests a
         facing, it does not thrust that way until the turn completes. Asserted
-        against src/player.c, not against a literal: player_apply_physics() must
-        call turn_toward_request() and then index DIR_DX/DIR_DY by player_dir.
-        Were the thrust taken from the pressed button instead, the emitted flag
-        would be a lie and this test is what catches it."""
-        code = self._player_c_code()
-        self.assertRegex(code, r'turn_toward_request\s*\(\s*buttons\s*\)')
-        self.assertRegex(code, r'DIR_DX\s*\[\s*player_dir\s*\]')
-        self.assertRegex(code, r'DIR_DY\s*\[\s*player_dir\s*\]')
+        against player_apply_physics()'s body only (not the whole file — see
+        _player_apply_physics_body): the function must call
+        turn_toward_request(buttons) and then index DIR_DX/DIR_DY by
+        player_dir, and by NOTHING ELSE — a rewrite that thrusts along the
+        pressed button (e.g. DIR_DX[decode_dir(buttons)]) must fail here."""
+        body = self._player_apply_physics_body()
+        self.assertRegex(body, r'turn_toward_request\s*\(\s*buttons\s*\)')
+        self.assertRegex(body, r'DIR_DX\s*\[\s*player_dir\s*\]')
+        self.assertRegex(body, r'DIR_DY\s*\[\s*player_dir\s*\]')
+        subscripts = set(re.findall(r'DIR_D[XY]\s*\[\s*([^\]]+?)\s*\]', body))
+        self.assertEqual(subscripts, {'player_dir'},
+                         "DIR_DX/DIR_DY indexed by something other than player_dir "
+                         "inside player_apply_physics() — thrust no longer follows "
+                         "the car's facing")
         facing = _run_main()['controls']['playing']['facing']
         self.assertIs(facing['thrust_follows_facing'], True)
 
