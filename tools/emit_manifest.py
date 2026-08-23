@@ -304,10 +304,18 @@ def main():
             'cancel':          'b',
             'cursor_to_start': pr_rows
         },
+        # A D-pad direction requests a facing, not an instant thrust direction:
+        # the car turns one 45-degree notch every TURN_FRAMES[PLAYER_HANDLING]
+        # frames, and player_apply_physics() thrusts along the car's CURRENT
+        # facing, so thrust follows the pressed direction only once the turn
+        # completes. It still gates gas on J_UP|J_DOWN|J_LEFT|J_RIGHT, and
+        # decode_dir() resolves eight facings, diagonals included (reached by
+        # pressing two directions at once). There is no accelerate button —
+        # J_A fires (#684). tests/test_emit_manifest.py asserts this block
+        # against src/player.c.
         'playing':  {
-            'accelerate': 'a',
-            'fire':        'a',
-            'steer':       ['left', 'right']
+            'drive': ['up', 'down', 'left', 'right'],
+            'fire':  'a'
         }
     }
 

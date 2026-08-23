@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import sys
 import unittest
 import tempfile
@@ -15,6 +16,45 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 def _repo(*parts):
     return os.path.join(_ROOT, *parts)
+
+
+# #684 — manifest button names, as emitted, mapped to the GBDK joypad tokens
+# src/player.c would have to reference to handle them.
+_BUTTON_TO_J = {
+    'a':      'J_A',
+    'b':      'J_B',
+    'up':     'J_UP',
+    'down':   'J_DOWN',
+    'left':   'J_LEFT',
+    'right':  'J_RIGHT',
+    'start':  'J_START',
+    'select': 'J_SELECT',
+}
+
+
+# #684 — the source files that read buttons in the playing state. state_playing.c
+# reads none today; scanning it anyway is what keeps that a checked fact rather
+# than an assumption, so a pause or menu button added there cannot leave the
+# manifest silently incomplete.
+_PLAYING_BUTTON_SOURCES = ('player.c', 'state_playing.c')
+
+
+def _buttons_handled_by_player_c():
+    """Buttons the playing-state button sources actually read, comments stripped.
+
+    Scans every file in _PLAYING_BUTTON_SOURCES (union of matches). Comments are
+    stripped from each so a prose mention of a button never counts as a handler.
+    A token showing up here means it is *mentioned* in these files — not that the
+    code path reading it is reachable."""
+    handled = set()
+    for filename in _PLAYING_BUTTON_SOURCES:
+        with open(_repo('src', filename), encoding='utf-8') as fh:
+            code = fh.read()
+        code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
+        code = re.sub(r'//[^\n]*', ' ', code)
+        handled |= {btn for btn, tok in _BUTTON_TO_J.items()
+                    if re.search(r'\b' + tok + r'\b', code)}
+    return handled
 
 
 def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
@@ -320,6 +360,67 @@ class TestTrackDescription(unittest.TestCase):
         t1 = manifest['tracks']['1']
         self.assertEqual(len(t1['solid_grid']), t1['size_tiles']['h'])
         self.assertEqual(len(t1['solid_grid'][0]), t1['size_tiles']['w'])
+
+
+class TestPlayingControls(unittest.TestCase):
+    """#684 — the manifest must describe the controls src/player.c implements."""
+
+    def test_playing_has_no_accelerate_key(self):
+        playing = _run_main()['controls']['playing']
+        self.assertNotIn('accelerate', playing,
+                         "there is no accelerate button; src/player.c maps J_A to fire")
+
+    def test_playing_drive_covers_all_four_directions(self):
+        playing = _run_main()['controls']['playing']
+        self.assertIn('drive', playing,
+                      "no drive key — the D-pad control the manifest must name")
+        self.assertEqual(sorted(playing['drive']),
+                         ['down', 'left', 'right', 'up'])
+
+    def test_playing_fire_is_a(self):
+        self.assertEqual(_run_main()['controls']['playing']['fire'], 'a')
+
+    def test_no_two_playing_controls_share_one_button(self):
+        """One physical button, one meaning. 'accelerate' and 'fire' were both
+        'a', which is what made the old block internally inconsistent."""
+        playing = _run_main()['controls']['playing']
+        self.assertTrue(playing, "controls.playing is empty — the assertion below is vacuous")
+        pressed = []
+        for spec in playing.values():
+            pressed.extend(spec if isinstance(spec, list) else [spec])
+        self.assertCountEqual(pressed, set(pressed),
+                              f"a button is claimed by two controls: {sorted(pressed)}")
+
+    def test_playing_controls_match_the_buttons_player_c_handles(self):
+        """The manifest and src/player.c must name the same button set — in both
+        directions. Values that are neither str nor list are not button specs and
+        are skipped: controls['prerace']['cursor_to_start'] is an int, so this
+        dict family demonstrably carries non-button values."""
+        handled = _buttons_handled_by_player_c()
+        self.assertIn('a', handled,
+                      "src/player.c parse found no J_A — the helper is broken, "
+                      "not the manifest")
+        playing = _run_main()['controls']['playing']
+        self.assertTrue(playing, "controls.playing is empty — the assertion below is vacuous")
+
+        claimed_by = {}
+        for name, spec in playing.items():
+            if isinstance(spec, str):
+                buttons = [spec]
+            elif isinstance(spec, list):
+                buttons = spec
+            else:
+                continue
+            for button in buttons:
+                claimed_by.setdefault(button, name)
+
+        emitted = set(claimed_by)
+        unhandled = {b: claimed_by[b] for b in sorted(emitted - handled)}
+        unnamed = sorted(handled - emitted)
+        self.assertEqual(emitted, handled,
+                         f"controls.playing and src/player.c disagree — "
+                         f"emitted but not handled {unhandled}; "
+                         f"handled but not emitted {unnamed}")
 
 
 if __name__ == '__main__':
