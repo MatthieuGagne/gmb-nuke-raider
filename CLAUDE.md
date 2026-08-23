@@ -95,6 +95,16 @@ tools bypass every hook** (#572) — run builds and pushes through the shell too
 Full setup, the remaining missing gates, and why the two harnesses' hook anchors must not be
 copied between files: @docs/pi-harness.md
 
+### omp harness
+
+Running under omp (`omp`, the oh-my-pi fork of Pi)? `.omp/` wires it: agents in `.omp/agents/`
+(omp skips `.claude/agents` and `.pi/agents` by design), hooks as TS factories in
+`.omp/hooks/pre/`, and `.omp/AGENTS.md`, whose `@../CLAUDE.md` import is the only reason this
+file reaches an omp session at all. Skills need no wiring — `.claude/skills/` loads natively.
+Three gates weaken or vanish: **the post-build bank/memory check reports but cannot block**,
+**skill overlays never inject**, and **`tools.approvalMode` defaults to `yolo`**, which is
+weaker than either other harness. Full detail: [`docs/omp-harness.md`](docs/omp-harness.md).
+
 ## Debugging Rules
 
 - **Shifted crash ≠ known issue**: If a fix moves a crash from time X to time Y (e.g. 24s → 33s), do NOT treat it as the same known bug. Investigate whether it is a different root cause before closing the loop.
