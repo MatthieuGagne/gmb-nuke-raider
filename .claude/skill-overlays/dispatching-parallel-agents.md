@@ -1,13 +1,15 @@
 ---
 name: dispatching-parallel-agents
-baseline: superpowers@6.2.0
+baseline: superpowers@6.3.0
 ---
 
 Project (Nuke Raider) additions and overrides for the baseline dispatching-parallel-agents
 skill. On conflict, this overlay wins — but an override earns that only by stating what the
 baseline cannot know. Every section carries a `**Why:**` line (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.2.0` read and compared on 2026-08-02 (#527 R6).
+**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
+6.3.0's `SKILL.md` is **byte-identical** to 6.2.0's, so every section below was re-checked
+against unchanged text and none was absorbed upstream.
 
 ## Project additions
 
@@ -53,7 +55,7 @@ unfamiliar territory, STOP and dispatch an Explore agent instead.
 | `pyboy-debug` | Headless automated diagnosis, no GUI, no-interaction alternative to `emulicious-debug` |
 | `Explore` | Any exploration > 2 files or open-ended search |
 
-Banking questions go to the `bank-pre-write` / `bank-post-build` **skills**, not an agent.
+Banking questions go to the `bank-pre-write` / `post-build-gates` **skills**, not an agent.
 
 ### Verify subagent claims against version control
 

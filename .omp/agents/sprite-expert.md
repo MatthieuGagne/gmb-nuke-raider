@@ -1,6 +1,6 @@
 ---
 name: sprite-expert
-description: 'Autonomous sprite agent: creates, modifies, and troubleshoots sprites end-to-end — Aseprite pipeline, png_to_tiles, OAM management, CGB palettes, and full execution checklist with self-correction retry loop. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments.'
+description: 'Sprite pipeline expert for Nuke Raider — Aseprite pipeline, png_to_tiles, OAM slot allocation, CGB palettes. Consultation mode by default: answers, reviews and points at the right file without editing. Implementation mode: dispatch with "implement this task: <task text>" to run the pipeline and write files end-to-end. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments.'
 tools: read, write, edit, grep, glob, bash
 ---
 

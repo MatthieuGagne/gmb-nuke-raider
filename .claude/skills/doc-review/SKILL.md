@@ -11,6 +11,21 @@ Replace the full `writing-plans` → `executing-plans` pipeline for PRDs whose s
 
 **Announce at start:** "I'm using the doc-review skill."
 
+## What counts as doc-only
+
+*Qualifies:* `*.md`, `*.txt`, `*.json` (except `bank-manifest.json`), and any file under
+`.claude/skills/` or `.claude/agents/`.
+
+*Conservative rule:* if ANY `.c` or `.h` file is touched in the same session, the **full workflow
+applies** — no exceptions.
+
+*Gates skipped:* `bank-pre-write`, `gbdk-expert` consultation, the post-build bank validation and
+memory-budget check, and the TDD red/green cycle.
+
+*Gates kept:* the clean ROM build and the smoketest — the full sequence still applies (fetch +
+merge `origin/master`, clean build, launch ROM, user confirms). Only the post-build gate
+invocations are skipped.
+
 ---
 
 ## Step 1 — Scope Gate (HARD STOP if failed)
@@ -50,7 +65,7 @@ Branch naming convention: `feat/<short-description>`.
 
 Proceed directly to editing — no spec-review agent, no quality-review agent.
 
-Follow the **abbreviated doc-only step sequence** from `CLAUDE.md`:
+Follow the **abbreviated doc-only step sequence** (defined here — this skill owns it):
 
 1. Edit the doc file(s) identified in Step 1
 2. Fetch + merge: `git fetch origin && git merge origin/master`

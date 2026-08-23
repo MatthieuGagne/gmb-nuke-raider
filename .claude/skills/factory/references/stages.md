@@ -152,7 +152,7 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
    subsection replaces the batch-boundary Emulicious pause with the headless gate, and states
    the implementer's wrapping obligation).
    - All existing GB hard gates fire unchanged: `bank-pre-write`, `gbdk-expert`,
-     `bank-post-build`, `gb-c-optimizer`.
+     `post-build-gates`, `gb-c-optimizer`.
    - Every host-testable acceptance criterion gets a `make test` case.
    - A README task is added when user-visible behavior changes.
    - **Every implementer brief carries the run's issue number** and the wrapping rule from
@@ -275,6 +275,47 @@ Then `python tools/factory_publish.py --issue <N> --terminal`. The run issue car
 reason, worktree path, and an inline ~100-line tail of the failing stage's log — explicitly
 marked as a lossy excerpt, with the byte-exact whole file in the release assets. When the
 stage-log helper fail-opened, the tail reads *"no stage log captured"*.
+
+---
+
+## Event cookbook — `tools/factory_event.py`
+
+Moved from `SKILL.md`. State is written **only** through this helper; kinds outside
+`factory_run.EVENT_KINDS` are refused, and `state.json` / `journal.jsonl` are never written by
+any other means. The stage sequences above name the event each step must append; this is the
+one-line form of each kind.
+
+```
+python tools/factory_event.py --issue <N> --kind stage    --field stage=BUILD
+python tools/factory_event.py --issue <N> --kind gate     --field stage=VERIFY --field gate=memory-check --field result=pass
+python tools/factory_event.py --issue <N> --kind decision --field "text=<the ruling, one sentence>" --field "rationale=<the reasoning, 1-3 sentences>"
+python tools/factory_event.py --issue <N> --kind scenario --field scenario=generic-smoke --field result=pass --field blocking=true
+python tools/factory_event.py --issue <N> --kind retry    --field stage=BUILD --attempt 2
+python tools/factory_event.py --issue <N> --kind failure  --field "message=<stage>: <reason>"
+python tools/factory_event.py --issue <N> --kind finish   --field result=shipped
+```
+
+`start` carries the run's identity rather than a stage result — see *Run start* and *PLAN*
+above for its two forms (`worktree`/`branch`/`stage`, then `plan`).
+
+---
+
+## Retry budgets
+
+Moved from `SKILL.md`. Each budget is also stated at the stage that owns it, above.
+
+| What | Budget | On exhaustion |
+|------|--------|---------------|
+| BUILD task | 2 attempts | Terminal failure |
+| Blocking generic smoketest | 1 differential-guided diagnostic/fix attempt | Terminal failure |
+| Evidence scenario | 1 fix attempt | PR ships with a prominent FAILED section |
+| Memory budget FAIL | 0 | Abort immediately |
+
+The smoketest diagnostic starts from the **differential report** — the first WRAM divergence
+against the reference ROM — never from code inspection. Provision the reference lazily with
+`python tools/factory_cache.py`. A `verdict` of `scenario-invalid` in
+`build/smoketest/<name>/results.json` means the scenario is wrong, not the game: downgrade to a
+scenario fix. **Read the verdict from the JSON — the exit code does not distinguish it.**
 
 ---
 

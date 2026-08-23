@@ -91,20 +91,10 @@ mechanics and publication internals*.
 
 ## Recording state
 
-State is written only through `tools/factory_event.py`:
-
-```
-python tools/factory_event.py --issue <N> --kind stage    --field stage=BUILD
-python tools/factory_event.py --issue <N> --kind gate     --field stage=VERIFY --field gate=memory-check --field result=pass
-python tools/factory_event.py --issue <N> --kind decision --field "text=<the ruling, one sentence>" --field "rationale=<the reasoning, 1-3 sentences>"
-python tools/factory_event.py --issue <N> --kind scenario --field scenario=generic-smoke --field result=pass --field blocking=true
-python tools/factory_event.py --issue <N> --kind retry    --field stage=BUILD --attempt 2
-python tools/factory_event.py --issue <N> --kind failure  --field "message=<stage>: <reason>"
-python tools/factory_event.py --issue <N> --kind finish   --field result=shipped
-```
-
-Kinds outside `factory_run.EVENT_KINDS` are refused. Do not write `state.json` or
-`journal.jsonl` by any other means.
+State is written **only** through `tools/factory_event.py`. Kinds outside
+`factory_run.EVENT_KINDS` are refused; never write `state.json` or `journal.jsonl` by any other
+means. The exact invocation for every kind is in `references/stages.md` under *Event cookbook*,
+and each stage sequence there names the event that step must append.
 
 ## Publication cadence
 
@@ -163,23 +153,25 @@ Neither length is enforced. Never drop a decision, or pad a rationale to fill th
 
 ## Retry budgets
 
-| What | Budget | On exhaustion |
-|------|--------|---------------|
-| BUILD task | 2 attempts | Terminal failure |
-| Blocking generic smoketest | 1 differential-guided diagnostic/fix attempt | Terminal failure |
-| Evidence scenario | 1 fix attempt | PR ships with a prominent FAILED section |
-| Memory budget FAIL | 0 | Abort immediately |
+Every budget — BUILD 2 attempts, blocking smoketest 1 differential-guided attempt, evidence
+scenario 1 attempt, memory FAIL 0 — is in `references/stages.md` under *Retry budgets*, and
+restated at the stage that owns it. Two rules that must not be forgotten: a memory-budget FAIL
+aborts immediately with no retry, and the smoketest diagnostic starts from the **differential
+report** (the first WRAM divergence against the reference ROM), never from code inspection.
 
-The smoketest diagnostic starts from the **differential report** — the first WRAM divergence
-against the reference ROM — never from code inspection. Provision the reference lazily:
+## The smoketest gate, under a factory run
+
+`CLAUDE.md`'s smoketest gate is six steps, and a factory run changes exactly one thing about it.
+Steps 4-5 — the Emulicious launch and the human visual confirmation — are replaced by the
+blocking headless smoketest:
 
 ```
-python tools/factory_cache.py
+python tools/smoketest_headless.py --scenario generic-smoke --json
 ```
 
-A `verdict` of `scenario-invalid` in `build/smoketest/<name>/results.json` means the scenario is
-wrong, not the game: downgrade to a scenario fix. **Read the verdict from the JSON — the exit
-code does not distinguish it.**
+Steps 1-3 (fetch + merge `origin/master`, clean build, `make memory-check`) and step 6 (README +
+push + PR) are unchanged, and a memory-budget FAIL still aborts the run. This substitution applies
+**only** while `NUKE_FACTORY_RUN` is set; every manual session keeps the human gate verbatim.
 
 ## Safety rails — never
 

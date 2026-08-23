@@ -1,8 +1,11 @@
 # Worktree Cleanup — Fallback Ladders
 
-The detailed cleanup sequence for Step 7. Run after merge confirmation (Option 1) or immediately after discard confirmation (Option 3).
+The detailed cleanup sequence. Run after merge confirmation (menu option 1, "push and create a
+PR"), or immediately after a discard the user asked for by typing `discard`. Discard is **not**
+a menu option — the overlay presents exactly two — so nothing below is reachable by a user
+merely picking from the menu.
 
-## After merge confirmation (Option 1 only)
+## After merge confirmation (menu option 1 only)
 
 Only run after the user explicitly confirms the PR was merged — **never preemptively**.
 
@@ -29,12 +32,19 @@ Always `cd` first — if the session CWD is inside the worktree and the director
 cd C:/Code/nuke-raider
 GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove <worktree-path>
 ```
-If that fails (e.g. dirty working tree), use `--force` and warn the user:
+**If it is refused with `contains modified or untracked files`, do NOT `--force`.** That
+refusal means those files exist nowhere else. Follow the baseline (superpowers@6.3.0): show
+what is at stake and ask.
 ```bash
-GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
-# Warn: "Worktree had uncommitted changes — removed with --force."
+GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git -C <worktree-path> status --porcelain -uall
 ```
-If `--force` also fails (directory already deleted from disk, stale git ref), clean up manually:
+Present the file list with three options — (1) commit them to the branch, (2) move them to
+`C:/Code/nuke-raider`, (3) delete them (unrecoverable) — carry out the choice, then remove the
+worktree. `--force` here is authorized only by option 3, or by the discard path below where the
+user has already typed `discard`.
+
+If removal fails **mechanically** instead (directory already deleted from disk, stale git ref —
+`is not a working tree`), no data is at risk; clean up manually:
 ```bash
 rm -rf <worktree-path>
 GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree prune
@@ -49,10 +59,12 @@ GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree 
 
 Report: "Worktree at `<path>` removed and pruned."
 
-## Immediately after discard confirmation (Option 3)
+## Immediately after a typed `discard`
 
-Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user types 'discard'. Skip Step 6b if already at main repo root.
+Run the same Step 6a → 6b → 6c → 6d sequence immediately after the user types `discard`. Skip
+Step 6b if already at main repo root. This is the one path where `--force` needs no further
+question: the typed word already authorized the loss.
 
-## Option 2: Keep As-Is
+## Menu option 2: Keep As-Is
 
 **Do NOT run cleanup.** Report: "Keeping branch `<name>`. Worktree preserved at `<path>`."
