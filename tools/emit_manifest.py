@@ -304,10 +304,14 @@ def main():
             'cancel':          'b',
             'cursor_to_start': pr_rows
         },
+        # A D-pad direction sets facing AND applies thrust in that direction:
+        # player_apply_physics() gates gas on J_UP|J_DOWN|J_LEFT|J_RIGHT, and
+        # decode_dir() resolves eight facings, diagonals included. There is no
+        # accelerate button — J_A fires (#684). tests/test_emit_manifest.py
+        # asserts this block against src/player.c.
         'playing':  {
-            'accelerate': 'a',
-            'fire':        'a',
-            'steer':       ['left', 'right']
+            'drive': ['up', 'down', 'left', 'right'],
+            'fire':  'a'
         }
     }
 

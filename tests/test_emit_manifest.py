@@ -322,5 +322,35 @@ class TestTrackDescription(unittest.TestCase):
         self.assertEqual(len(t1['solid_grid'][0]), t1['size_tiles']['w'])
 
 
+class TestPlayingControls(unittest.TestCase):
+    """#684 — the manifest must describe the controls src/player.c implements."""
+
+    def test_playing_has_no_accelerate_key(self):
+        playing = _run_main()['controls']['playing']
+        self.assertNotIn('accelerate', playing,
+                         "there is no accelerate button; src/player.c maps J_A to fire")
+
+    def test_playing_drive_covers_all_four_directions(self):
+        playing = _run_main()['controls']['playing']
+        self.assertIn('drive', playing,
+                      "no drive key — the D-pad control the manifest must name")
+        self.assertEqual(sorted(playing['drive']),
+                         ['down', 'left', 'right', 'up'])
+
+    def test_playing_fire_is_a(self):
+        self.assertEqual(_run_main()['controls']['playing']['fire'], 'a')
+
+    def test_no_two_playing_controls_share_one_button(self):
+        """One physical button, one meaning. 'accelerate' and 'fire' were both
+        'a', which is what made the old block internally inconsistent."""
+        playing = _run_main()['controls']['playing']
+        self.assertTrue(playing, "controls.playing is empty — the assertion below is vacuous")
+        pressed = []
+        for spec in playing.values():
+            pressed.extend(spec if isinstance(spec, list) else [spec])
+        self.assertCountEqual(pressed, set(pressed),
+                              f"a button is claimed by two controls: {sorted(pressed)}")
+
+
 if __name__ == '__main__':
     unittest.main()
