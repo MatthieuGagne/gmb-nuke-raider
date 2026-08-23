@@ -1,5 +1,12 @@
 # Log
 
+- 2026-08-22 — `/optimize-context` memory-store pass: moved the #390 war story (the
+  #394/#401 "RESOLVED" claims and the #144 exoneration) out of
+  `project_track2_position_still_live` into [[verification-techniques]] as the live
+  instance of the two-ROM differential test; that also retires the page's previously
+  dangling link to a never-written `track2-position-bug` page. The memory shrank to the
+  live claim.
+
 - 2026-08-21 — `/optimize-context` audit: migrated the two-ROM differential runtime test
   recipe out of the memory store into [[verification-techniques]]; the memory shrank to a
   pointer.

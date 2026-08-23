@@ -1,11 +1,15 @@
 ---
 name: bank-pre-write
-description: Hard gate — invoke before writing any src/*.c or src/*.h file. Validates bank manifest, pragma, and SET_BANK safety.
+description: "Reference for the pre-write bank gate — bank manifest entry, `#pragma bank`, SET_BANK/SWITCH_ROM safety, BANKED placement. IT NORMALLY FIRES AUTOMATICALLY: tools/bank_check_hook.py runs it as a PreToolUse `Write|Edit` hook on `src/*`. Read this to understand or fix a block it reported, or when writing `src/*.c` / `src/*.h` somewhere the hook does not fire (e.g. a Pi `pwsh-*` background job)."
 ---
 
 # Bank Pre-Write Gate
 
-**STOP.** Before writing or editing any `src/*.c` or `src/*.h` file, run the checks below. For `.c` files: all 5 checks apply. For `.h` files: Checks 3, 4, and 5 apply (headers carry no `#pragma bank`; the manifest covers `.c` files only).
+The `bank-pre-write` PreToolUse hook (`tools/bank_check_hook.py`) enforces these checks on every
+`src/*` write; `tools/bank_check.py` re-checks at build time. The rules below are what it
+enforces — apply them while writing so the gate does not block you.
+
+Before writing or editing any `src/*.c` or `src/*.h` file, run the checks below. For `.c` files: all 5 checks apply. For `.h` files: Checks 3, 4, and 5 apply (headers carry no `#pragma bank`; the manifest covers `.c` files only).
 
 ## Check 1 — Manifest entry exists
 

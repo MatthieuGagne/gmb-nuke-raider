@@ -1,5 +1,5 @@
 ---
-summary: Prove-it-bites verification techniques — gcc -Wconversion pre-SDCC truncation audit, neuter-the-function red/green diff, flip-header-on-disk constant-drift test, bytearray mutation for parity tests, two-ROM differential runtime test (did my change cause this bug)
+summary: Prove-it-bites verification techniques — gcc -Wconversion pre-SDCC truncation audit, neuter-the-function red/green diff, flip-header-on-disk constant-drift test, bytearray mutation for parity tests, two-ROM differential runtime test (did my change cause this bug), the #390 Track-2 lap-counting case
 tags: [verification, testing, prove-it-bites, gcc, wconversion, audit, technique]
 ---
 
@@ -59,7 +59,24 @@ bug is pre-existing.
 Two traps: WRAM static addresses shift between builds whenever a new `.c` is added, so
 resolve symbols **per build**, never reuse an address across ROMs; and only player state
 is input-locked (deterministic under identical input) — free-running AI shows a harmless
-few-frame phase skew, which is not a finding. Live instance: [[track2-position-bug]].
+few-frame phase skew, which is not a finding.
+
+### Live instance: the Track-2 lap-counting bug (#390)
+
+The technique's origin case, and a worked example of both verdicts it can return.
+
+- #390 (race position / lap counting on Track 2) was closed on code inspection alone; the
+  next smoketest showed a player lap still not counting, forcing a reopen (2026-06-09).
+- The "RESOLVED" claims attached to the PR #394 / #401 race fixes (Manhattan tiebreaker,
+  CP3 geometry) did **not** fully fix runtime behaviour. The surviving symptom is a player
+  lap not registering when the driven line skips a checkpoint — the CP-skip /
+  checkpoint-coverage family, not the directional tiebreak #390 originally described.
+- The differential test **exonerated** the `enemy_common` extraction (patrol PR1, #144):
+  under identical scripted input, player `rs_laps[0]` / `rs_cp_next[0]` trajectories were
+  frame-for-frame identical to `master`, proving the drop pre-existing.
+- #390 was then closed again per user decision after a re-test did not reproduce the drop
+  on the line driven. It is race-line-dependent, so it may resurface; the live claim is
+  carried in the memory store (`project_track2_position_still_live`).
 
 ## Mutate in-memory copies, never the real artifact
 

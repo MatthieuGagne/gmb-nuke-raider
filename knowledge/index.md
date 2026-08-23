@@ -48,6 +48,7 @@
   Windows binary-lock retries
 - [[verification-techniques]] — prove-it-bites: gcc `-Wconversion` audit, neutered
   functions, flip-header tests, bytearray mutation, two-ROM differential runtime test
+  (with the #390 Track-2 lap-counting case)
 - [[trace-py-stdlib-shadow]] — `tools/trace.py` shadows the stdlib `trace` module
 - [[test-tools-gate-history]] — the months-red unenforced `make test-tools` gate and
   its #441 fix (discovery over enumeration)

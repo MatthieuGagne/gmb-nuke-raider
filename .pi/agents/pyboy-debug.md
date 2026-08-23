@@ -1,6 +1,6 @@
 ---
 name: pyboy-debug
-description: "TRIGGER when: automated headless diagnosis needed, no GUI available, want a no-interaction alternative to emulicious-debug. Accepts a bug description; boots the ROM via PyBoy, reads memory + screenshots, runs unit tests, iterates at least 2 rounds, produces a structured diagnostic. DO NOT TRIGGER when: step-through breakpoints are needed (use emulicious-debug) or compile errors (use gbdk-expert)."
+description: "TRIGGER when: automated headless diagnosis needed, no GUI available, want a no-interaction alternative to emulicious-debug. Accepts a bug description; boots the ROM headlessly, reads memory + screenshots, runs unit tests, iterates at least 2 rounds, produces a structured diagnostic. DO NOT TRIGGER when: step-through breakpoints are needed (use emulicious-debug) or compile errors (use gbdk-expert)."
 tools: read, write, grep, find, ls, bash
 systemPromptMode: append
 inheritProjectContext: true

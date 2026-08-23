@@ -188,7 +188,7 @@ When executing a plan task that creates or modifies `src/*.c`/`src/*.h`, dispatc
 2. Invoke `bank-pre-write` skill (hard gate)
 3. Write minimal implementation → `make test` → PASS
 4. `make` → ROM builds
-5. Invoke `bank-post-build` skill (hard gate)
+5. Read the post-build gate output (hard gate — fires automatically after `make`)
 6. Run refactor checkpoint: "Does this generalize, or hard-coded for N=1?"
 7. Commit
 
@@ -345,7 +345,7 @@ would not be caught by this test at all.
 | Gate | When | Skill |
 |------|------|-------|
 | `bank-pre-write` | Before writing any `src/*.c` or `src/*.h` | `bank-pre-write` skill |
-| `bank-post-build` | After successful ROM build, before smoketest | `bank-post-build` skill |
+| post-build gates | After successful ROM build, before smoketest | fires automatically via `tools/post_build_hook.py`; `post-build-gates` skill is the fallback reference |
 
 Every `src/*.c` file must have an entry in `bank-manifest.json` before it is written.
 `bank_check.py` (a Makefile dependency) enforces this at build time.
@@ -608,7 +608,7 @@ Before pushing and creating a PR, verify all of the following:
 
 - [ ] `make test` passes (zero failures)
 - [ ] `make test-tools` passes (tool suite — also enforced by the `pre-commit` repository hook)
-- [ ] `bank-post-build` skill passes (no FAIL banks)
+- [ ] `make bank-post-build` passes (no FAIL banks)
 - [ ] `make memory-check` passes (no FAIL/ERROR budgets)
 - [ ] Smoketest in Emulicious confirmed by user
 - [ ] `git fetch origin && git merge origin/master` merged from latest master

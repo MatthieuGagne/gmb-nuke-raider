@@ -1,31 +1,42 @@
 ---
 name: brainstorming
-baseline: superpowers@6.2.0
+baseline: superpowers@6.3.0
 ---
 
 Project (Nuke Raider) additions and overrides for the baseline brainstorming skill. On conflict,
 this overlay wins — but an override earns that only by stating what the baseline cannot know
 (#527 R7). This file has no `###` sections; each override bullet carries its own `**Why:**`.
 
-**Baseline audit:** content of `superpowers@6.2.0` read and compared on 2026-08-02 (#527 R6).
+**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
+6.3.0 restructured the skill around three paths (**spike / bounded / architectural**), each with
+its own checklist and its own terminal state. The bullets below are written against that
+structure.
 
 ## Overrides (do NOT follow the baseline here)
 
 - **No design document is written.** Where the baseline says to save a spec or design doc (e.g. under `docs/superpowers/specs/`), skip it entirely. This project's design artifacts are **PRDs as GitHub issues only** — no local design files. A brainstorm's output is the Resolved / Unresolved / Deferred summary and nothing else.
-  **Why:** the baseline's checklist steps 6 and 8 write and then review a spec file. Here that
-  artifact is a GitHub issue filed by `/prd`; writing it locally too would create a second
-  source of truth that nothing keeps in sync.
-- **Brainstorming ends at that summary.** Do NOT auto-invoke `writing-plans` (or any planning skill) as a terminal state. The project outer loop inserts `/prd` and a separate planning session between brainstorm and plan. The user invokes the next step when they are ready.
-  **Why:** the baseline is explicit that "the terminal state is invoking writing-plans". This
-  project's outer loop puts `/prd` and a session boundary in between — the baseline cannot see a
-  loop that spans sessions.
-- **Never offer the visual companion.** Skip every baseline instruction to offer, open, or use it — including the just-in-time offer.
+  **Why:** the baseline's Architectural checklist steps 6 and 8 write and then review a spec
+  file. Here that artifact is a GitHub issue filed by `/prd`; writing it locally too would
+  create a second source of truth that nothing keeps in sync. (Spike and bounded already write
+  no spec, so this bullet binds the architectural path only.)
+- **Every path ends at the Resolved / Unresolved / Deferred summary.** Do NOT auto-invoke
+  `writing-plans` (or any planning skill), and do NOT roll from an approved design straight into
+  implementation. The project outer loop inserts `/prd` and a separate planning session between
+  brainstorm and plan. The user invokes the next step when they are ready.
+  **Why:** 6.3.0 made terminal states path-bound — architectural ends at `writing-plans`, and
+  **bounded ends at "implement directly through the normal development workflow; no plan
+  document"**. That second one is new in 6.3.0 and is the one that would misfire here: this
+  project has no path from brainstorm to code that skips `/prd` and a planning session. The
+  baseline cannot see a loop that spans sessions, so it collapses one that must not collapse.
+  Classifying the request as spike/bounded/architectural is still useful and still worth saying
+  out loud — it right-sizes the questions. It just does not change where brainstorming stops.
+- **Never offer the visual companion.** Skip every baseline instruction to offer, open, or use it — including the just-in-time offer (Architectural checklist step 2).
   **Why:** its server scripts are bash-only and unsupported on this Windows setup, so accepting
   the offer would fail after the user said yes. Environment, not preference.
 - **Grilling uses `grill-with-docs`, not `grill-me`.** `grill-me` does not exist in this project. Whenever the design needs stress-testing, invoke the `grill-with-docs` skill. It must not re-invoke brainstorming — continue only once its summary is produced.
-  **Why:** this is an addition rather than a correction — the 6.2.0 baseline names no grilling
-  step at all. It is recorded here because habit and older baselines reach for `grill-me`, which
-  would silently do nothing.
+  **Why:** this is an addition rather than a correction — the 6.3.0 baseline names no grilling
+  step at all (re-confirmed by search, as at 6.2.0). It is recorded here because habit and older
+  baselines reach for `grill-me`, which would silently do nothing.
 - **Design gaps found during self-review are raised as questions to the user — never silently fixed in the spec.** If your own review of the design surfaces a gap, ambiguity, or contradiction, put it to the user as an open question. Quietly patching it hides a decision the user needed to make.
   **Why:** this directly overrides the baseline's Spec Self-Review, which says of an ambiguity
   "pick one and make it explicit" and "fix any issues inline". That is right for a spec file the

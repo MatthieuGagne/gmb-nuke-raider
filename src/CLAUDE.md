@@ -2,6 +2,26 @@
 
 Authoritative copy with rationale lives in [`docs/dev-workflow.md`](../docs/dev-workflow.md) §4.
 
+## Architecture
+
+`src/main.c` is the entry point and game loop. It contains **only**: frame timing
+(`wait_vbl_done()`), input polling (`joypad()`), and state machine dispatch. No game logic lives
+inline in `main.c`. If a state handler grows beyond ~10 lines, extract it to a module.
+
+Each game system lives in `src/<system>.c` + `src/<system>.h`. Asset source files (sprites, tiles,
+music) live under `assets/` and must be converted to C data arrays before use. Converted headers go
+in `src/`. All `.c` files in `src/` are automatically compiled by the Makefile.
+
+There is **no `STATE_*` enum**. A state is a `const State` value (`src/state_manager.h`) holding a
+bank plus `enter`/`update`/`exit` function pointers; the modules are `state_title`, `state_overmap`,
+`state_hub`, `state_prerace`, `state_playing`, `state_results`, `state_game_over`. `main.c` boots
+with `state_push(&state_title, BANK(state_title))`.
+
+## ROM Header
+
+Current flags: `-Wm-yc` (CGB compatible, runs on DMG+GBC), `-Wm-yt25` (MBC5), `-Wm-yn"NUKERAIDER"`.
+To target GBC-only (access extra VRAM bank, 8 BG/OBJ palettes): swap `-Wm-yc` for `-Wm-yC`.
+
 ## Scalability Conventions (every feature, no matter how small)
 
 - **Module structure:** each system gets its own `.c`/`.h` pair. New-module checklist: public API in `.h`, all state `static` in `.c`, `tests/test_<system>.c` written first (TDD), `gb-c-optimizer` review before merge — dispatched by the controller after the commit (#633 R5).
@@ -23,9 +43,9 @@ Three legal transitions (defined in `src/state_manager.c`, `STACK_MAX = 2`):
 
 | Call | Effect | Use when |
 |------|--------|----------|
-| `state_push(next, args)` | depth +1 | Entering a sub-state (e.g. overmap → prerace) |
-| `state_pop()` | depth -1 | Returning to the previous state (e.g. game_over → overmap) |
-| `state_replace(next, args)` | depth unchanged | Lateral swap at the same level (e.g. prerace → playing) |
+| `state_push(const State *s, uint8_t bank)` | depth +1 | Entering a sub-state (e.g. overmap → prerace) |
+| `state_pop(void)` | depth -1 | Returning to the previous state (e.g. game_over → overmap) |
+| `state_replace(const State *s, uint8_t bank)` | depth unchanged | Lateral swap at the same level (e.g. prerace → playing) |
 
 **WARNING: `state_replace` never reduces stack depth.** Using it to "go back" is a silent bug — the stack leaks one slot per navigation cycle. With `STACK_MAX = 2`, a leaked slot means the next `state_push` silently no-ops (push skipped, no error, no crash).
 
@@ -51,10 +71,12 @@ Racers are solid to the player (`corner_active_racer` in `player.c` `corners_pas
 
 ## Memory budgets
 
-- OAM: 40 sprites total (player = 2; budget the rest for enemies/projectiles/HUD)
+- OAM: hardware cap is 40 sprites, but the pool is `MAX_SPRITES = 32` (`src/config.h`). Player
+  claims slots 0-3 (16x16 quad: TL/BL/TR/BR), `DIALOG_ARROW_OAM_SLOT = 4` is fixed; budget the
+  rest for projectiles (≤8), turrets (≤8) and the lazy racer pool
 - VRAM: 192 tiles (DMG bank 0) + 192 (CGB bank 1 for color variants)
 - WRAM: 8 KB — large arrays must be global or `static`, never local
-- ROM: MBC5, 512 KB = 32 banks — auto-sized by makebin (`-yo A`), recorded in cartridge header byte `0x148`, and read from there by `tools/bank_post_build.py`. **Not** declared by `-Wm-ya32`: `-ya` is makebin's RAM bank count and that value is discarded. Assets are tagged for banking, and `-autobank` spills code past bank 0 into the autobank pool, banks 1-29 (state code lives in banks 2-3). Two banks are pinned by hand instead: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590)
+- ROM: MBC5, 512 KB = 32 banks — auto-sized by makebin (an lcc-internal behaviour; there is no `-yo` flag in the Makefile to grep for), recorded in cartridge header byte `0x148`, and read from there by `tools/bank_post_build.py`. **Not** declared by `-Wm-ya32`: `-ya` is makebin's RAM bank count and that value is discarded. Assets are tagged for banking, and `-autobank` spills code past bank 0 into the autobank pool, banks 1-29 (state code lives in banks 2-3). Two banks are pinned by hand instead: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590)
 
 ## GBDK / SDCC constraints
 
