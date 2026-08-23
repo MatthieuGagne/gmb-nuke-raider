@@ -226,6 +226,30 @@ class TestParseDefine(unittest.TestCase):
         self.assertIsNone(em.parse_define(path, 'PR_CONFIG_ROWS'))
         os.unlink(path)
 
+    def test_parse_list_reads_a_brace_table(self):
+        em = self._em()
+        path = self._write_c(
+            "#define PLAYER_TURN_FRAMES_TABLE { 8u, 7u, 6u, 5u, 4u, 3u, 2u, 1u }\n")
+        self.assertEqual(em.parse_define_list(path, 'PLAYER_TURN_FRAMES_TABLE'),
+                         [8, 7, 6, 5, 4, 3, 2, 1])
+        os.unlink(path)
+
+    def test_parse_list_missing_returns_none(self):
+        em = self._em()
+        path = self._write_c("/* no define */\n")
+        self.assertIsNone(em.parse_define_list(path, 'MISSING'))
+        os.unlink(path)
+
+    def test_parse_list_does_not_match_prefix(self):
+        em = self._em()
+        path = self._write_c("#define TABLE_EXTRA { 9u }\n")
+        self.assertIsNone(em.parse_define_list(path, 'TABLE'))
+        os.unlink(path)
+
+    def test_parse_list_missing_file_returns_none(self):
+        em = self._em()
+        self.assertIsNone(em.parse_define_list('does/not/exist.h', 'TABLE'))
+
 
 class TestCuratedSymbols(unittest.TestCase):
     def _em(self):

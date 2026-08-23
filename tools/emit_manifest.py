@@ -265,6 +265,25 @@ def parse_define(path, name):
     return None
 
 
+def parse_define_list(path, name):
+    """Extract the integers from `#define NAME { a, b, ... }` in a C source file.
+
+    Returns a list of ints, or None when the define is absent or the file is
+    missing. Trailing `u` suffixes are accepted, exactly as parse_define accepts
+    them for scalars. The `\\s+\\{` is what keeps NAME from matching a longer
+    define's prefix: after a prefix match the next character is part of the
+    longer name, not whitespace."""
+    pat = re.compile(r'#define\s+' + re.escape(name) + r'\s+\{([^}]*)\}')
+    try:
+        with open(path) as f:
+            m = pat.search(f.read())
+    except FileNotFoundError:
+        return None
+    if m is None:
+        return None
+    return [int(tok) for tok in re.findall(r'\d+', m.group(1))]
+
+
 def main():
     ap = argparse.ArgumentParser(description='Emit build/game-manifest.json')
     ap.add_argument('--noi',           required=True)
