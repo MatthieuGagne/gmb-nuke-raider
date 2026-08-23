@@ -17,6 +17,35 @@ def _repo(*parts):
     return os.path.join(_ROOT, *parts)
 
 
+# #684 — manifest button names, as emitted, mapped to the GBDK joypad tokens
+# src/player.c would have to reference to handle them.
+_BUTTON_TO_J = {
+    'a':      'J_A',
+    'b':      'J_B',
+    'up':     'J_UP',
+    'down':   'J_DOWN',
+    'left':   'J_LEFT',
+    'right':  'J_RIGHT',
+    'start':  'J_START',
+    'select': 'J_SELECT',
+}
+
+
+def _buttons_handled_by_player_c():
+    """Buttons src/player.c actually reads, comments stripped.
+
+    src/player.c is the only button handler in the playing state — src/state_playing.c
+    reads no buttons, it calls player_update(). Comments are stripped so a prose
+    mention of a button never counts as a handler."""
+    import re
+    with open(_repo('src', 'player.c'), encoding='utf-8') as fh:
+        code = fh.read()
+    code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
+    code = re.sub(r'//[^\n]*', ' ', code)
+    return {btn for btn, tok in _BUTTON_TO_J.items()
+            if re.search(r'\b' + tok + r'\b', code)}
+
+
 def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
     """Run emit_manifest.main() against the repo's real assets and return the
     parsed manifest. The module's only driver, so a broken payload key fails
@@ -350,6 +379,37 @@ class TestPlayingControls(unittest.TestCase):
             pressed.extend(spec if isinstance(spec, list) else [spec])
         self.assertCountEqual(pressed, set(pressed),
                               f"a button is claimed by two controls: {sorted(pressed)}")
+
+    def test_playing_controls_match_the_buttons_player_c_handles(self):
+        """The manifest and src/player.c must name the same button set — in both
+        directions. Values that are neither str nor list are not button specs and
+        are skipped: controls['prerace']['cursor_to_start'] is an int, so this
+        dict family demonstrably carries non-button values."""
+        handled = _buttons_handled_by_player_c()
+        self.assertIn('a', handled,
+                      "src/player.c parse found no J_A — the helper is broken, "
+                      "not the manifest")
+        playing = _run_main()['controls']['playing']
+        self.assertTrue(playing, "controls.playing is empty — the assertion below is vacuous")
+
+        claimed_by = {}
+        for name, spec in playing.items():
+            if isinstance(spec, str):
+                buttons = [spec]
+            elif isinstance(spec, list):
+                buttons = spec
+            else:
+                continue
+            for button in buttons:
+                claimed_by.setdefault(button, name)
+
+        emitted = set(claimed_by)
+        unhandled = {b: claimed_by[b] for b in sorted(emitted - handled)}
+        unnamed = sorted(handled - emitted)
+        self.assertEqual(emitted, handled,
+                         f"controls.playing and src/player.c disagree — "
+                         f"emitted but not handled {unhandled}; "
+                         f"handled but not emitted {unnamed}")
 
 
 if __name__ == '__main__':
