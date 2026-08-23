@@ -57,10 +57,13 @@ def _buttons_handled_by_player_c():
     return handled
 
 
-def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
+def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n", config=None):
     """Run emit_manifest.main() against the repo's real assets and return the
     parsed manifest. The module's only driver, so a broken payload key fails
-    here instead of passing silently."""
+    here instead of passing silently.
+
+    `config` overrides the src/config.h the emitter reads — #688 uses it to flip
+    PLAYER_HANDLING and prove the emitted turn cost tracks the input."""
     import emit_manifest
     f = tempfile.NamedTemporaryFile(mode='w', suffix='.noi', delete=False)
     f.write(noi_text)
@@ -73,6 +76,7 @@ def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
                     _repo('assets', 'maps', 'track2.tmx'),
                     _repo('assets', 'maps', 'track3.tmx'),
         '--tsx', _repo('assets', 'maps', 'track.tsx'),
+        '--config', config or _repo('src', 'config.h'),
         '--state-overmap', _repo('src', 'state_overmap.c'),
         '--state-prerace', _repo('src', 'state_prerace.c'),
     ]
@@ -224,6 +228,66 @@ class TestParseDefine(unittest.TestCase):
         em = self._em()
         path = self._write_c("#define PR_CONFIG_ROWS_EXTRA 99u\n")
         self.assertIsNone(em.parse_define(path, 'PR_CONFIG_ROWS'))
+        os.unlink(path)
+
+    def test_parse_list_reads_a_brace_table(self):
+        em = self._em()
+        path = self._write_c(
+            "#define PLAYER_TURN_FRAMES_TABLE { 8u, 7u, 6u, 5u, 4u, 3u, 2u, 1u }\n")
+        self.assertEqual(em.parse_define_list(path, 'PLAYER_TURN_FRAMES_TABLE'),
+                         [8, 7, 6, 5, 4, 3, 2, 1])
+        os.unlink(path)
+
+    def test_parse_list_missing_returns_none(self):
+        em = self._em()
+        path = self._write_c("/* no define */\n")
+        self.assertIsNone(em.parse_define_list(path, 'MISSING'))
+        os.unlink(path)
+
+    def test_parse_list_does_not_match_prefix(self):
+        em = self._em()
+        path = self._write_c("#define TABLE_EXTRA { 9u }\n")
+        self.assertIsNone(em.parse_define_list(path, 'TABLE'))
+        os.unlink(path)
+
+    def test_parse_list_missing_file_returns_none(self):
+        em = self._em()
+        self.assertIsNone(em.parse_define_list('does/not/exist.h', 'TABLE'))
+
+    def test_parse_list_reads_hex_tokens(self):
+        """{ 0x08u, 0x07u } is two entries, not four — re.findall(r'\\d+', ...)
+        would split each hex literal's digits into separate matches."""
+        em = self._em()
+        path = self._write_c("#define TABLE { 0x08u, 0x07u }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 7])
+        os.unlink(path)
+
+    def test_parse_list_reads_negative_tokens(self):
+        """{ -1, 2 } must keep the sign — a digit-run scan drops it and reads 1."""
+        em = self._em()
+        path = self._write_c("#define TABLE { -1, 2 }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [-1, 2])
+        os.unlink(path)
+
+    def test_parse_list_ignores_commented_out_entries(self):
+        """{ 8u, /* 7u */ 6u } is two live entries — the commented-out one must
+        not be counted, or the table's length (and everything it indexes)
+        silently shifts."""
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, /* 7u */ 6u }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 6])
+        os.unlink(path)
+
+    def test_parse_list_allows_a_trailing_comma(self):
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, 7u, }\n")
+        self.assertEqual(em.parse_define_list(path, 'TABLE'), [8, 7])
+        os.unlink(path)
+
+    def test_parse_list_rejects_a_malformed_token(self):
+        em = self._em()
+        path = self._write_c("#define TABLE { 8u, seven }\n")
+        self.assertIsNone(em.parse_define_list(path, 'TABLE'))
         os.unlink(path)
 
 
@@ -380,6 +444,174 @@ class TestPlayingControls(unittest.TestCase):
     def test_playing_fire_is_a(self):
         self.assertEqual(_run_main()['controls']['playing']['fire'], 'a')
 
+    # --- #688: turn latency and the eight-facing input model ---
+
+    def _config_h_text(self):
+        with open(_repo('src', 'config.h'), encoding='utf-8') as fh:
+            return fh.read()
+
+    def _config_h_handling(self):
+        """Read PLAYER_HANDLING straight out of src/config.h, with this test's
+        own parser. Calling emit_manifest's parser here would compare the
+        emitter to itself and pass no matter what config.h says."""
+        return int(re.search(r'#define\s+PLAYER_HANDLING\s+(\d+)',
+                             self._config_h_text()).group(1))
+
+    def _config_h_table(self):
+        """Read PLAYER_TURN_FRAMES_TABLE with this test's own tokenizer — split
+        on ',' and strip a trailing 'u'/'U' suffix per token, deliberately NOT
+        emit_manifest.parse_define_list's algorithm. If the oracle and the
+        emitter shared one implementation they would always agree, even when
+        both are wrong (R5): the oracle has to be able to disagree with the
+        emitter for this test to mean anything."""
+        body = re.search(r'#define\s+PLAYER_TURN_FRAMES_TABLE\s+\{([^}]*)\}',
+                         self._config_h_text()).group(1)
+        tokens = [t.strip() for t in body.split(',')]
+        tokens = [t for t in tokens if t]
+        values = [int(t.rstrip('uU')) for t in tokens]
+        self.assertEqual(len(values), 8,
+                         "src/config.h:27-38 documents PLAYER_TURN_FRAMES_TABLE "
+                         "as an 8-entry table")
+        self.assertTrue(all(a > b for a, b in zip(values, values[1:])),
+                        "src/config.h:27-38 documents PLAYER_TURN_FRAMES_TABLE "
+                        "as strictly decreasing")
+        return values
+
+    def _player_c_code(self):
+        """src/player.c with comments stripped, so a prose mention never counts
+        as an implemented fact — the same discipline
+        _buttons_handled_by_player_c() uses."""
+        with open(_repo('src', 'player.c'), encoding='utf-8') as fh:
+            code = fh.read()
+        code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
+        return re.sub(r'//[^\n]*', ' ', code)
+
+    def test_turn_cost_equals_the_config_h_table_entry(self):
+        """R1/R5/AC1 — the emitted frames-per-notch is PLAYER_TURN_FRAMES_TABLE
+        indexed by PLAYER_HANDLING, not a number typed into the emitter."""
+        expected = self._config_h_table()[self._config_h_handling()]
+        facing = _run_main()['controls']['playing']['facing']
+        self.assertEqual(facing['turn_frames_per_45_deg'], expected)
+        self.assertEqual(facing['frames_per_180_deg'], 4 * expected)
+
+    def test_turn_cost_follows_a_changed_player_handling(self):
+        """AC3 — flip the input, not read the code. A copy of src/config.h with
+        PLAYER_HANDLING moved one step must emit that neighbouring table entry.
+
+        The flip target is derived from the current value, never hardcoded:
+        src/config.h:28-32 says the shipped value is a playtesting question, and
+        a hardcoded target would collide with it the day it is retuned — failing
+        the whole pre-commit suite for a reason unrelated to the emitter.
+        PLAYER_TURN_FRAMES_TABLE is strictly decreasing, so adjacent entries
+        always differ and the assertion below stays meaningful."""
+        table = self._config_h_table()
+        flipped_idx = (self._config_h_handling() + 1) % len(table)
+        expected = table[flipped_idx]
+        self.assertNotEqual(expected, table[self._config_h_handling()],
+                            "the flip must change the value or it proves nothing")
+        flipped, n = re.subn(r'(#define\s+PLAYER_HANDLING\s+)\d+',
+                             r'\g<1>' + str(flipped_idx), self._config_h_text(), count=1)
+        self.assertEqual(n, 1, "PLAYER_HANDLING not found in src/config.h")
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False,
+                                        encoding='utf-8')
+        f.write(flipped)
+        f.close()
+        try:
+            facing = _run_main(config=f.name)['controls']['playing']['facing']
+        finally:
+            os.unlink(f.name)
+        self.assertEqual(facing['turn_frames_per_45_deg'], expected,
+                         "flipping PLAYER_HANDLING did not move the emitted value — "
+                         "it is not derived from src/config.h")
+
+    def _player_apply_physics_body(self):
+        """Just player_apply_physics()'s body. Matching DIR_DX[player_dir]
+        against the whole file is not a guard: src/player.c's sprite-rendering
+        block indexes the same tables the same way, so a physics function
+        rewritten to thrust along the pressed button would still match."""
+        code = self._player_c_code()
+        m = re.search(r'void\s+player_apply_physics\s*\([^)]*\)[^{]*\{', code)
+        self.assertIsNotNone(m, "player_apply_physics() not found in src/player.c — "
+                                "the parser is broken, not the manifest")
+        # Brace-counted, not a naive `.*?\n}` regex: player_apply_physics() has
+        # nested `{ ... }` blocks of its own, so the first `\n}` is an inner
+        # block's closer, not the function's.
+        i = m.end()
+        depth = 1
+        while i < len(code) and depth > 0:
+            if code[i] == '{':
+                depth += 1
+            elif code[i] == '}':
+                depth -= 1
+            i += 1
+        self.assertEqual(depth, 0,
+                         "unbalanced braces while scanning player_apply_physics() — "
+                         "the parser is broken, not the manifest")
+        return code[m.end():i - 1]
+
+    def test_thrust_follows_the_current_facing(self):
+        """R2/AC2 — the fact #688 exists for: pressing a direction requests a
+        facing, it does not thrust that way until the turn completes. Asserted
+        against player_apply_physics()'s body only (not the whole file — see
+        _player_apply_physics_body): the function must call
+        turn_toward_request(buttons) and then index DIR_DX/DIR_DY by
+        player_dir, and by NOTHING ELSE — a rewrite that thrusts along the
+        pressed button (e.g. DIR_DX[decode_dir(buttons)]) must fail here."""
+        body = self._player_apply_physics_body()
+        self.assertRegex(body, r'turn_toward_request\s*\(\s*buttons\s*\)')
+        self.assertRegex(body, r'DIR_DX\s*\[\s*player_dir\s*\]')
+        self.assertRegex(body, r'DIR_DY\s*\[\s*player_dir\s*\]')
+        subscripts = set(re.findall(r'DIR_D[XY]\s*\[\s*([^\]]+?)\s*\]', body))
+        self.assertEqual(subscripts, {'player_dir'},
+                         "DIR_DX/DIR_DY indexed by something other than player_dir "
+                         "inside player_apply_physics() — thrust no longer follows "
+                         "the car's facing")
+        facing = _run_main()['controls']['playing']['facing']
+        self.assertIs(facing['thrust_follows_facing'], True)
+
+    def test_facing_count_matches_the_direction_tables(self):
+        """R2/AC2 — eight facings is src/player.c's DIR_DX/DIR_DY width, not a
+        number typed into the emitter. Narrow the ring in player.c and this fails."""
+        code = self._player_c_code()
+        widths = [int(w) for w in re.findall(r'DIR_D[XY]\s*\[\s*(\d+)\s*\]\s*=', code)]
+        self.assertEqual(len(widths), 2,
+                         "DIR_DX/DIR_DY declarations not found — the parser is broken, "
+                         "not the manifest")
+        self.assertEqual(set(widths), {8}, "the direction tables disagree on width")
+        self.assertEqual(_run_main()['controls']['playing']['facing']['count'], widths[0])
+
+    def test_diagonals_match_decode_dir(self):
+        """R2/AC2 — the four two-button combos are exactly decode_dir()'s
+        two-button branches (src/player.c:338-341), lowercased. Add or remove a
+        diagonal in player.c and this fails."""
+        combos = re.findall(
+            r'\(\s*buttons\s*&\s*J_(\w+)\s*\)\s*&&\s*\(\s*buttons\s*&\s*J_(\w+)\s*\)',
+            self._player_c_code())
+        self.assertEqual(len(combos), 4,
+                         "decode_dir() no longer has four two-button branches — "
+                         "the manifest's diagonal set must follow it")
+        expected = {frozenset((a.lower(), b.lower())) for a, b in combos}
+        playing = _run_main()['controls']['playing']
+        diagonals = playing['facing']['diagonals']
+        self.assertEqual(len(diagonals), 4)
+        emitted = set()
+        for name, combo in diagonals.items():
+            self.assertEqual(len(combo), 2,
+                             f"{name} must be two drive directions held together")
+            for button in combo:
+                self.assertIn(button, playing['drive'],
+                              f"{name} names {button!r}, which is not a drive direction")
+            emitted.add(frozenset(combo))
+        self.assertEqual(emitted, expected,
+                         "controls.playing.facing.diagonals and decode_dir() disagree")
+
+    def test_the_facing_block_is_not_a_button_spec(self):
+        """R3 — the new value is a dict. A bare string would be read as a
+        one-button spec by test_playing_controls_match_the_buttons_player_c_handles
+        and would break the emitted-vs-handled equality."""
+        facing = _run_main()['controls']['playing']['facing']
+        self.assertIsInstance(facing, dict)
+
     def test_no_two_playing_controls_share_one_button(self):
         """One physical button, one meaning. 'accelerate' and 'fire' were both
         'a', which is what made the old block internally inconsistent."""
@@ -387,7 +619,12 @@ class TestPlayingControls(unittest.TestCase):
         self.assertTrue(playing, "controls.playing is empty — the assertion below is vacuous")
         pressed = []
         for spec in playing.values():
-            pressed.extend(spec if isinstance(spec, list) else [spec])
+            if isinstance(spec, str):
+                pressed.append(spec)
+            elif isinstance(spec, list):
+                pressed.extend(spec)
+            # anything else is not a button spec — controls['playing']['facing']
+            # is a dict, exactly as controls['prerace']['cursor_to_start'] is an int
         self.assertCountEqual(pressed, set(pressed),
                               f"a button is claimed by two controls: {sorted(pressed)}")
 
