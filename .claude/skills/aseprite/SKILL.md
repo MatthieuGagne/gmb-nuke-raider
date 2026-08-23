@@ -1,9 +1,13 @@
 ---
 name: aseprite
-description: Use when running Aseprite from the command line, exporting sprites or sprite sheets, using --batch mode, working with Aseprite layers/tags/frames, scripting Aseprite, or looking up any aseprite CLI flag.
+description: "Use when running Aseprite from the command line, exporting sprites or sprite sheets, using --batch mode, working with Aseprite layers/tags/frames, scripting Aseprite, or looking up any aseprite CLI flag. Also covers exporting .aseprite sources to PNG before a game build — \"build the aseprite\", \"export the tileset\", or an edited .aseprite whose PNG needs regenerating."
 ---
 
 # Aseprite Reference
+
+Full flag tables (core, sprite sheet, filtering, filename variables, image manipulation,
+padding, scripting, introspection) are in **`references/flags.md`** — read it when you need a
+flag this file does not name.
 
 ## Invocation Pattern
 
@@ -13,198 +17,60 @@ Always use `--batch` for non-interactive use. Without it, the GUI launches.
 aseprite --batch <input.aseprite> [options]
 ```
 
-**Order matters:** options apply to the most recently opened file. Put filters (--layer, --tag) *before* --save-as or --sheet.
+**Order matters:** options apply to the most recently opened file. Put filters (`--layer`,
+`--tag`) *before* `--save-as` or `--sheet`. `--split-layers` / `--split-tags` must precede the
+input filename.
 
----
-
-## Core Flags
-
-| Flag | Effect |
-|------|--------|
-| `-b, --batch` | Run headless — no GUI. Required for scripts and CI. |
-| `-p, --preview` | Dry-run: print what would happen, write nothing. |
-| `-v, --verbose` | Log details to `aseprite.log`. |
-| `--debug` | Write `DebugOutput.txt` to desktop. |
-| `--version` | Print version and exit. |
-| `-?, --help` | List all CLI flags. |
-
----
-
-## Export: Single File
+## Export: single file
 
 ```sh
-# Export all frames as a PNG sequence (frame001.png, frame002.png, …)
-aseprite --batch sprite.aseprite --save-as output.png
-
-# Export as GIF
-aseprite --batch sprite.aseprite --save-as output.gif
-
-# Scale 2×
+aseprite --batch sprite.aseprite --save-as output.png     # PNG
+aseprite --batch sprite.aseprite --save-as output.gif     # GIF
 aseprite --batch sprite.aseprite --scale 2 --save-as output.png
 ```
 
-`--save-as <filename>` — exports the current sprite. When the sprite has multiple frames, Aseprite appends a zero-padded frame number automatically (e.g., `frame001.png`).
+`--save-as <filename>` exports the current sprite. **With multiple frames Aseprite writes
+numbered files** (`output1.png`, `output2.png`, …) — not a sheet. Use `--sheet` for multi-frame
+sources, or `--oneframe` if you only want frame 0.
 
-**NOT a valid flag:** `--export-type` — use `--save-as` with the desired extension instead.
+**NOT a valid flag:** `--export-type` — use `--save-as` with the desired extension.
 
----
-
-## Export: Sprite Sheet
-
-```sh
-aseprite --batch sprite.aseprite \
-  --sheet sheet.png \
-  --data sheet.json \
-  --format json-hash \
-  --sheet-type packed
-```
-
-| Flag | Values / Notes |
-|------|----------------|
-| `--sheet <file>` | Output PNG for the atlas |
-| `--data <file>` | Output JSON metadata |
-| `--format` | `json-hash` (default) or `json-array` |
-| `--sheet-type` | `horizontal` · `vertical` · `rows` · `columns` · `packed` |
-| `--sheet-width <px>` | Fix atlas width; height expands as needed |
-| `--sheet-height <px>` | Fix atlas height; width expands as needed |
-| `--sheet-pack` | Enable packing algorithm (same as `--sheet-type packed`) |
-| `--merge-duplicates` | Deduplicate identical frames in the atlas |
-| `--ignore-empty` | Skip empty frames/layers |
-| `--export-tileset` | Export tilesets from visible tilemap layers |
-
----
-
-## Layer & Frame Filtering
-
-Apply these **before** `--save-as` or `--sheet`:
+## Nuke Raider pipeline
 
 ```sh
-# Export only "Outline" layer
-aseprite --batch sprite.aseprite --layer "Outline" --save-as out.png
+# All sources at once (preferred)
+make export-sprites
 
-# Export frames tagged "Run"
-aseprite --batch sprite.aseprite --tag "Run" --save-as run.png
-
-# Export frames 2–5 (0-based)
-aseprite --batch sprite.aseprite --frame-range 2,5 --save-as out.png
-
-# Split each tag into its own file  (use {tag} in filename)
-aseprite --batch sprite.aseprite --split-tags --save-as frames_{tag}.png
-```
-
-| Flag | Effect |
-|------|--------|
-| `--layer <name>` | Export one layer only |
-| `--all-layers` | Include hidden layers |
-| `--ignore-layer <name>` | Exclude a layer |
-| `--tag <name>` | Export frames within this animation tag |
-| `--frame-range from,to` | Export frame range (0-based inclusive) |
-| `--split-layers` | Each visible layer → separate file (must precede input filename) |
-| `--split-tags` | Each animation tag → separate file |
-| `--split-slices` | Each slice → separate file |
-| `--split-grid` | Each grid cell → separate file in sheet |
-
----
-
-## Filename Format Variables
-
-Used with `--filename-format` and `--tagname-format`:
-
-| Variable | Expands to |
-|----------|-----------|
-| `{title}` | Sprite filename without extension |
-| `{tag}` | Current animation tag name |
-| `{layer}` | Layer name |
-| `{frame}` | Frame number (zero-padded) |
-| `{frames}` | Total frame count |
-| `{framenum}` | Frame number (no padding) |
-
-```sh
-aseprite --batch sprite.aseprite --split-tags \
-  --filename-format "{title}_{tag}_{frame}.png" \
-  --save-as out.png
-```
-
----
-
-## Image Manipulation
-
-| Flag | Effect |
-|------|--------|
-| `--scale <factor>` | Resize (e.g., `--scale 2`) |
-| `--color-mode <mode>` | Convert: `rgb` · `grayscale` · `indexed` |
-| `--dithering-algorithm` | `none` · `ordered` · `old` |
-| `--dithering-matrix` | `bayer8x8` · `bayer4x4` · `bayer2x2` |
-| `--palette <file>` | Apply palette before export |
-| `--trim` | Remove empty border pixels |
-| `--trim-sprite` | Trim entire sprite bounds |
-| `--trim-by-grid` | Trim to grid boundaries |
-| `--crop x,y,w,h` | Export only this rect |
-| `--extrude` | Duplicate edge pixels outward by 1px |
-| `--slice <name>` | Export only the area of a named slice |
-| `--oneframe` | Load only the first frame |
-
----
-
-## Padding (for sprite sheets)
-
-| Flag | Effect |
-|------|--------|
-| `--border-padding <px>` | Padding around the whole sheet |
-| `--shape-padding <px>` | Gap between frames |
-| `--inner-padding <px>` | Padding inside each frame border |
-
----
-
-## Scripting
-
-```sh
-# Run a Lua script
-aseprite --batch --script my_script.lua
-
-# Pass parameters to the script
-aseprite --batch sprite.aseprite --script process.lua --script-param key=value
-```
-
-In the Lua script, read params via `app.params["key"]`.
-
-The `--shell` flag opens an interactive Lua REPL (not useful in CI).
-
----
-
-## Introspection
-
-```sh
-# List layers (also adds to JSON if --data is present)
-aseprite --batch sprite.aseprite --list-layers
-
-# List tags with frame ranges
-aseprite --batch sprite.aseprite --list-tags
-
-# List slices
-aseprite --batch sprite.aseprite --list-slices
-
-# List layers with group hierarchy
-aseprite --batch sprite.aseprite --list-layer-hierarchy
-```
-
----
-
-## Nuke Raider Pipeline
-
-```sh
-# Export a sprite to PNG (used by make export-sprites)
+# Single sprite
 aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.png
 
-# Batch-export all sprites
-make export-sprites
+# Tileset
+aseprite --batch assets/maps/tileset.aseprite --save-as assets/maps/tileset.png
 ```
 
+Aseprite batch mode prints nothing on success — confirm by checking the PNG was written. On
+failure, show the error output; the usual causes are a wrong path, a non-indexed color mode, or
+dimensions that are not a multiple of 8.
+
 PNG requirements for `png_to_tiles.py` downstream:
+
 - Indexed color (color type 3), 4-color palette, dimensions multiples of 8
 - Do **not** pass `--color-mode` unless you need to force conversion
 
----
+After exporting, run the `build` skill to regenerate the ROM from the updated PNG.
+
+### After editing `tileset.aseprite` — sync `turret.png`
+
+`assets/sprites/turret.png` is extracted from the tileset (tile index 8, col 8 row 0). It has no
+`.aseprite` source of its own. When `tileset.aseprite` changes the turret tile, sync it before
+building:
+
+```sh
+py -c "from PIL import Image; Image.open('assets/maps/tileset.png').crop((64,0,72,8)).save('assets/sprites/turret.png')"
+```
+
+(One line on purpose — worktree-isolated sessions refuse shell heredocs.) Then `make`
+auto-regenerates `src/turret_sprite.c` from the updated PNG.
 
 ## Common Mistakes
 
@@ -214,11 +80,11 @@ PNG requirements for `png_to_tiles.py` downstream:
 | Omitting `--batch` | GUI launches; script hangs |
 | Filters after `--save-as` | Filters must come *before* `--save-as` / `--sheet` |
 | `--split-tags` after input | `--split-layers` / `--split-tags` must precede the input filename |
-| Expecting single PNG for multi-frame | Aseprite auto-appends frame numbers; use `--oneframe` if you want frame 0 only |
-
----
+| Expecting single PNG for multi-frame | Aseprite auto-appends frame numbers; use `--sheet`, or `--oneframe` for frame 0 only |
 
 ## Cross-References
 
-- **`sprite-expert`** — Nuke Raider sprite pipeline, OAM API, indexed palette setup
-- **`map-expert`** — Background tileset export pipeline
+- **`references/flags.md`** — the complete CLI flag tables
+- **`sprite-expert`** agent — Nuke Raider sprite pipeline, OAM API, indexed palette setup,
+  the Makefile override rule needed for multi-frame sprites
+- **`map-expert`** agent — Background tileset export pipeline

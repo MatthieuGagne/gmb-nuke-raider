@@ -122,13 +122,24 @@ But the pay's good."
 
 # 4. Player Controls
 
-D-Pad: Steering  
-A: Accelerate  
-B: Brake / Reverse  
-Select: Fire weapon  
-Start: Pause  
+**As implemented** (authoritative — `src/player.c`):
 
-Optional: A+B = Boost
+| Input | Effect |
+|---|---|
+| D-Pad | **Facing AND gas simultaneously** — a direction sets the car's facing and applies thrust in that direction |
+| A | **Fire weapon** (`player.c:200`) — CANNON spawns a travelling bullet, LASER fires an instantaneous cardinal-only beam. Auto-repeats while held |
+
+**There is no separate gas button, and A is not accelerate.** No handler exists for B, Select or
+Start during play. Consequences that bind design and tooling:
+
+- Directional sprite art must cover all 8 directions the player can face.
+- Do NOT design features that require holding a direction without moving.
+- Do NOT reassign movement to A/B — that breaks the control contract and requires a plan revision.
+- Any headless scenario or manifest that drives the car must press a **D-pad direction**. Pressing
+  the button labelled "accelerate" fires the weapon instead and produces useless evidence.
+
+*Aspirational, not implemented:* B = brake/reverse, Select = fire, Start = pause, A+B = boost.
+Treat these as unbuilt until a handler exists in `src/player.c`.
 
 ---
 

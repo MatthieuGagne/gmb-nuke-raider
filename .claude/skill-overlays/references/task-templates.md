@@ -2,6 +2,33 @@
 
 Copy the appropriate template for each task in the plan.
 
+## Hard Gate Sequence (the C-file sequence in summary)
+
+Every task that touches `src/*.c` or `src/*.h` MUST follow this exact sequence — no exceptions.
+The template below is this same sequence expanded; the table is the at-a-glance form the plan's
+prose refers to.
+
+| Step | Action |
+|------|--------|
+| 1 | Write failing test (`make test` → FAIL) |
+| 2 | Invoke `bank-pre-write` skill (HARD GATE) |
+| 3 | Invoke `gbdk-expert` agent (HARD GATE) |
+| 4 | Write minimal implementation |
+| 5 | Run tests (`make test` → PASS) |
+| 6 | Build ROM (`make` → PASS) |
+| 7 | Read the post-build gate output (HARD GATE — fires automatically) |
+| 8 | Refactor checkpoint ("breaks when N > 1?") |
+| 9 | Commit |
+| 10 | **Controller, not the implementer** — dispatch the `gb-c-optimizer` agent on the committed diff (HARD GATE). Whatever it reports or edits goes through the task review's fix loop, which commits it before the review is dispatched. |
+
+Steps 2 and 7 name gates that also fire automatically as PreToolUse/PostToolUse hooks; the plan
+records them so the implementer knows what must have **reported**. Step 10 is the one step an
+implementer does not perform — it is listed because the plan must show the whole sequence, and
+because an implementer that sees it listed knows the gate exists and is not being skipped
+(#633 R5).
+
+Non-C tasks (markdown, Python, JSON, assets): write → verify → commit. No bank gates.
+
 ## C-File Task Template
 
 Use this template for any task that creates or modifies `src/*.c` or `src/*.h`:
@@ -62,9 +89,11 @@ Expected: PASS
 Invoke the `build` skill (or run: `make`).
 Expected: ROM produced at `build/nuke-raider.gb`, zero errors.
 
-**Step 8: HARD GATE — bank-post-build**
+**Step 8: HARD GATE — post-build gates**
 
-Invoke the `bank-post-build` skill. Verify bank placements and ROM budgets are within limits.
+`tools/post_build_hook.py` runs `make bank-post-build` then `make memory-check` automatically after
+a non-clean `make`. Read those verdicts — do not re-run them. Verify bank placements and ROM/memory
+budgets are within limits; any FAIL blocks. `post-build-gates` is the fallback reference skill.
 
 **Step 9: Refactor checkpoint**
 

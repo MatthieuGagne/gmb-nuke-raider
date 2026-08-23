@@ -7,15 +7,21 @@ Project (Nuke Raider) additions and overrides for the baseline grill-with-docs s
 conflict, this overlay wins — but an override earns that only by stating what the baseline
 cannot know (#527 R7).
 
-**Baseline audit:** content of `grill-with-docs@2026-07-26` read and compared on 2026-08-02
-(#527 R6). This baseline is **not** a superpowers skill, so the injection hook's version canary
-never fires for it — the audit is the only check it gets.
+**Baseline audit:** content of `grill-with-docs@2026-07-26` re-read and compared on 2026-08-22
+(#527 R6).
 
-**What the baseline actually is:** a thin wrapper installed at `~/.claude/skills/grill-with-docs/` (from `mattpocock/skills`, `skills/engineering/grill-with-docs`). Its `SKILL.md` body is one sentence — run a `/grilling` session using the `/domain-modeling` skill. Both dependencies are installed alongside it (`~/.claude/skills/grilling/`, `~/.claude/skills/domain-modeling/`); if either is missing the wrapper is inert, so reinstall rather than improvising. It is marked `disable-model-invocation: true`, so it runs only when the user invokes it explicitly.
+**This pin is date-based and human-verified — the hook cannot check it.** The baseline is **not**
+a superpowers skill, so `tools/skill_overlay_hook.py` skips its version canary outright
+(`canary_note` returns early for any `baseline:` whose plugin is not `superpowers`). Nothing will
+ever warn that this overlay has drifted. The date above therefore means: on that date a human
+opened the files below and confirmed the claims. Re-verify by hand, or the pin says nothing.
+
+**What the baseline actually is** (re-confirmed on disk 2026-08-22): a thin wrapper installed at `~/.claude/skills/grill-with-docs/` (from `mattpocock/skills`, `skills/engineering/grill-with-docs`). Its `SKILL.md` is 7 lines — frontmatter plus a one-sentence body: run a `/grilling` session using the `/domain-modeling` skill. Both dependencies are still installed alongside it (`~/.claude/skills/grilling/SKILL.md`, `~/.claude/skills/domain-modeling/SKILL.md`); if either is missing the wrapper is inert, so reinstall rather than improvising. It is still marked `disable-model-invocation: true`, so it runs only when the user invokes it explicitly — which is why a model-driven session never reaches the ADR step on its own.
 
 Because the wrapper delegates everything, `CONTEXT-FORMAT.md` and `ADR-FORMAT.md` live in
-`~/.claude/skills/domain-modeling/`, not in `grill-with-docs/`. Everything below is therefore an
-addition to a one-line baseline, not a correction of it.
+`~/.claude/skills/domain-modeling/` — both confirmed present on 2026-08-22 — not in
+`grill-with-docs/`. Everything below is therefore an addition to a one-line baseline, not a
+correction of it.
 
 ## Project additions
 

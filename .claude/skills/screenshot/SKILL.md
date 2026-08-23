@@ -39,7 +39,14 @@ py tools/screenshot.py \
   [--out  build/screenshot.png]            # default: build/screenshot.png (worktree-safe)
   [--steps     '[...]']                    # inline JSON steps
   [--steps-file path/to/steps.json]        # steps from file (avoids shell-quoting issues)
+  [--noi  build/nuke-raider.noi]            # default: auto-resolved; second symbol source
+  [--manifest build/game-manifest.json]     # default: auto-resolved; symbol + navigation data
+  [--library tools/scenarios]               # default: auto-resolved; dir a scenario `include` resolves against
 ```
+
+Symbols are resolved from all three of `--manifest`, `--noi` and `--map`
+(`pyboy_scenario.load_symbols`). `--library` only matters when a steps file uses the scenario
+`include` mechanism.
 
 ## Navigation Steps (JSON array)
 

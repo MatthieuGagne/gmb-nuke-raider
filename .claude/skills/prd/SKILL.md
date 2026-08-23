@@ -5,6 +5,11 @@ description: Use when creating a new PRD for a feature — creates a GitHub issu
 
 ## Before You Begin
 
+**Read [`docs/document-conventions.md`](../../../docs/document-conventions.md) first.** It is the
+authoritative source for issue routing between the two repositories, native sub-issue wiring, the
+ADR key/lifecycle/citation rules, the project `Type` table and the `Idea` swimlane. It is no
+longer auto-loaded into every session, so this skill is responsible for pulling it in.
+
 The grill step is user-invoked: `grill-with-docs` carries `disable-model-invocation`, so ask the user to run `/grill-with-docs` — it surfaces requirements, acceptance criteria, scope, and GB hardware constraints. Once the grilling is satisfied (or the user skips it), proceed to drafting.
 
 ---

@@ -1,6 +1,6 @@
 ---
 name: gbdk-expert
-description: 'Use this agent for GBDK-2020 API questions AND C implementation tasks. Consultation mode: ask about hardware registers, sprite/tile/palette setup, CGB palettes, VBlank timing, interrupt handling, compilation errors. Implementation mode: dispatch with "implement this task: <task text>" to write .c/.h code applying all project constraints. Banking questions go to bank-pre-write or bank-post-build skills. Examples: "how do I set up CGB palettes", "implement this task: add foo module", "why is my sprite flickering".'
+description: 'Use this agent for GBDK-2020 API questions AND C implementation tasks. Consultation mode: ask about hardware registers, sprite/tile/palette setup, CGB palettes, VBlank timing, interrupt handling, compilation errors. Implementation mode: dispatch with "implement this task: <task text>" to write .c/.h code applying all project constraints. Banking questions go to the bank-pre-write skill and the automatic post-build gates. Examples: "how do I set up CGB palettes", "implement this task: add foo module", "why is my sprite flickering".'
 tools: read, write, edit, grep, glob, bash
 ---
 

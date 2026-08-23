@@ -1,6 +1,6 @@
 ---
 name: gb-c-optimizer
-description: Use this agent when reviewing C files for Game Boy performance or ROM/RAM size, on ROM size questions, when code uses malloc/stdlib, when checking for GBDK-specific anti-patterns, or when optimizing hot paths. In post-implementation contexts (executing-plans, subagent-driven-development), applies fixes directly; in plan-phase contexts (writing-plans), reports issues only. Examples: "review main.c for optimizations", "why is my ROM too large", "is this loop efficient on GBC", "check for anti-patterns in src/".
+description: "Reviews C for Game Boy performance, ROM/RAM size, and GBDK anti-patterns — and owns the project's canonical GB C anti-pattern list. Dispatch with \"review only: <target>\" to get a report with no edits, or \"review and fix: <target>\" to apply the fixes in place. With neither phrase it reports only. Use on ROM size questions, code using malloc/stdlib, hot-path optimization, or a post-implementation diff review. Examples: \"review only: src/main.c\", \"review and fix: the diff in HEAD\", \"why is my ROM too large\"."
 tools: read, edit, grep, find, ls, bash
 systemPromptMode: append
 inheritProjectContext: true

@@ -1,13 +1,17 @@
 ---
 name: finishing-a-development-branch
-baseline: superpowers@6.2.0
+baseline: superpowers@6.3.0
 ---
 
 Project (Nuke Raider) additions and overrides for the baseline finishing-a-development-branch
 skill. On conflict, this overlay wins — but an override earns that only by stating what the
 baseline cannot know (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.2.0` read and compared on 2026-08-02 (#527 R6).
+**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
+6.3.0's only change here: a new block on **refused worktree removal** — when
+`git worktree remove` reports `contains modified or untracked files`, never `--force` on your
+own initiative; show the `git status --porcelain -uall` output and offer commit / move / delete.
+`### Cleanup failure recovery` below now defers to it.
 
 ## Overrides (do NOT follow the baseline here)
 
@@ -129,8 +133,7 @@ Always create a PR after pushing a branch — no need to ask. PR body:
 ## Test Plan
 - [ ] make test passes
 - [ ] Emulicious smoketest confirmed by user
-- [ ] bank budgets reported clean
-- [ ] gb-memory-validator: no FAIL budgets
+- [ ] post-build gates reported clean: no FAIL banks, no FAIL/ERROR memory budgets
 
 Closes #N
 ```
@@ -142,11 +145,17 @@ Closes #N
 **Why:** every trap below is Windows- or `EnterWorktree`-specific. The baseline's two-command
 cleanup assumes a POSIX shell and a worktree it owns.
 
-Full ladders are in `.claude/skill-overlays/references/cleanup.md`. The three recurring traps:
+Full ladders are in `.claude/skill-overlays/references/cleanup.md`. The three recurring traps —
+all **mechanical** failures, distinct from the baseline's `contains modified or untracked files`
+refusal, which is a *content* refusal and is handled by the baseline's ask-first block, not here:
 
 - Bash blocked with "Path does not exist" after merge → the session is inside an active `EnterWorktree`; use `ExitWorktree(action="remove", discard_changes=true)` first.
 - `git worktree remove` fails with "Unable to read current working directory" → `cd C:/Code/nuke-raider` before any `git worktree remove`.
 - `git worktree remove --force` fails with "is not a working tree" → the directory is already gone; fall back to `rm -rf <path> && git worktree prune`.
+
+**`--force` is never this overlay's idea.** The only `--force` below is the discard path, where
+the user has already typed `discard` and authorized the loss. For any other refusal, follow the
+baseline: show the file list and ask.
 
 To discard a branch — **only after the user has typed `discard`**, per the baseline — remove the worktree first, then delete the branch from the main repo:
 ```powershell

@@ -5,7 +5,7 @@ under Claude Code none of this applies.
 
 `.pi/settings.json` exposes the same project skills and agents to the Pi coding agent
 (`pi`), so a session started there is not flying blind. It wires `skills: ["../.claude/skills"]`
-(all 18 project skills), the `pi-subagents` and `@hsingjui/pi-hooks` packages, and the four
+(the whole project skills directory), the `pi-subagents` and `@hsingjui/pi-hooks` packages, and the four
 portable hooks with Pi's lowercase tool matchers (`bash|powershell`, `write|edit`). `.pi/agents/*.md` are
 thin wrappers: each carries Pi-native frontmatter and tells the child to read the matching
 `.claude/agents/<name>.md` and follow it, so persona text lives in exactly one place.

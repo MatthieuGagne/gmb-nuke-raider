@@ -19,5 +19,5 @@ command: `tmx_to_c.py --emit-rotation-manifest` (scan TMXs for rotated tiles) �
 (`tileset.png` → `src/track_tiles.c` + `src/track_tileset_meta.h`) → `tmx_to_c.py --id-map`
 (each `.tmx` → `src/track*_map.c`) → `lcc` compile and link.
 
-If the tileset was edited in Aseprite, run the `aseprite-build` skill first to export the PNG
+If the tileset was edited in Aseprite, run the `aseprite` skill first to export the PNG
 (it also covers syncing `turret.png` when the turret tile changed), then build.

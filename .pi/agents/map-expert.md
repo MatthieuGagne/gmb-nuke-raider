@@ -1,6 +1,6 @@
 ---
 name: map-expert
-description: "Use when creating a new map, editing an existing map, or running the map conversion pipeline for Nuke Raider — executes end-to-end autonomously. Also use for: Tiled TMX format, GID decoding, Python pipeline (tmx_to_c, png_to_tiles), or GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes)."
+description: "Map pipeline expert for Nuke Raider — Tiled TMX format, GID decoding, the tmx_to_c / png_to_tiles / overmap_to_c pipeline, and GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes). Consultation mode by default: answers and points at the right file without editing. Implementation mode: dispatch with \"implement this task: <task text>\" to create or edit a map and run the conversion pipeline end-to-end."
 tools: read, write, edit, grep, find, ls, bash
 systemPromptMode: append
 inheritProjectContext: true
