@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import sys
 import unittest
 import tempfile
@@ -31,19 +32,29 @@ _BUTTON_TO_J = {
 }
 
 
-def _buttons_handled_by_player_c():
-    """Buttons src/player.c actually reads, comments stripped.
+# #684 — the source files that read buttons in the playing state. state_playing.c
+# reads none today; scanning it anyway is what keeps that a checked fact rather
+# than an assumption, so a pause or menu button added there cannot leave the
+# manifest silently incomplete.
+_PLAYING_BUTTON_SOURCES = ('player.c', 'state_playing.c')
 
-    src/player.c is the only button handler in the playing state — src/state_playing.c
-    reads no buttons, it calls player_update(). Comments are stripped so a prose
-    mention of a button never counts as a handler."""
-    import re
-    with open(_repo('src', 'player.c'), encoding='utf-8') as fh:
-        code = fh.read()
-    code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
-    code = re.sub(r'//[^\n]*', ' ', code)
-    return {btn for btn, tok in _BUTTON_TO_J.items()
-            if re.search(r'\b' + tok + r'\b', code)}
+
+def _buttons_handled_by_player_c():
+    """Buttons the playing-state button sources actually read, comments stripped.
+
+    Scans every file in _PLAYING_BUTTON_SOURCES (union of matches). Comments are
+    stripped from each so a prose mention of a button never counts as a handler.
+    A token showing up here means it is *mentioned* in these files — not that the
+    code path reading it is reachable."""
+    handled = set()
+    for filename in _PLAYING_BUTTON_SOURCES:
+        with open(_repo('src', filename), encoding='utf-8') as fh:
+            code = fh.read()
+        code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
+        code = re.sub(r'//[^\n]*', ' ', code)
+        handled |= {btn for btn, tok in _BUTTON_TO_J.items()
+                    if re.search(r'\b' + tok + r'\b', code)}
+    return handled
 
 
 def _run_main(noi_text="DEF _rs_laps 0xC1A4\nDEF _rs_cp_next 0xC1A8\n"):
