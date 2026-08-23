@@ -36,11 +36,6 @@ The manifest provides:
 - `navigation` — `travel_frames_per_tile` and direction sequences to reach each track from the overmap
 - `tracks` — spawn positions, checkpoints, waypoints per track ID
 
-> **TODO(upstream):** `manifest["controls"]["playing"]["accelerate"]` is a **phantom control**.
-> `tools/emit_manifest.py:308` hardcodes it to `'a'`, but `src/player.c:200` maps `J_A` to FIRE and
-> movement is D-pad only — pressing it shoots instead of driving. Do not use `accelerate`; drive
-> with a D-pad direction. The manifest emitter needs fixing (out of this agent's scope).
-
 ## Driving the ROM — use the scenario harness
 
 **Do not hand-roll a PyBoy script.** `tools/pyboy_scenario.py` already owns everything a one-off
