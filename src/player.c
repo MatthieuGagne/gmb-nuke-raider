@@ -39,6 +39,12 @@ static const uint8_t TURN_FRAMES[8] = PLAYER_TURN_FRAMES_TABLE;
  * Not zeroed by player_reset_vel, which owns velocity and gear, not facing. */
 DBG_STATIC uint8_t turn_timer;
 
+/* The facing the D-pad is currently asking for, latched by turn_toward_request()
+ * every frame. Equals player_dir whenever no direction is held, so a released
+ * D-pad expresses no intent. Read by state_playing's finish gate (#646), which
+ * admits a crossing whose facing is one notch short of the finish direction. */
+DBG_STATIC uint8_t turn_request;
+
 DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */
 DBG_STATIC uint8_t player_flicker_tick;
 DBG_STATIC player_dir_t player_dir = DIR_T;
@@ -175,6 +181,7 @@ void player_init(uint8_t tile_base) BANKED {
     downshift_timer = 0u;
     player_dir = DIR_T;
     turn_timer = 0u;
+    turn_request = (uint8_t)DIR_T;   /* matches player_dir set on the line above (#646) */
     player_flicker_tick = 0u;
     s_player_dead = 0u;
     SHOW_SPRITES;
@@ -355,9 +362,13 @@ static void turn_toward_request(uint8_t buttons) {
     uint8_t req;
     uint8_t diff;
 
-    if (!(buttons & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) return;
+    if (!(buttons & (J_UP | J_DOWN | J_LEFT | J_RIGHT))) {
+        turn_request = (uint8_t)player_dir;   /* nothing held: no intent (#646) */
+        return;
+    }
 
     req  = (uint8_t)decode_dir(buttons);
+    turn_request = req;                       /* #646: the finish gate reads this */
     diff = (uint8_t)((uint8_t)(req - (uint8_t)player_dir) & 7u);
     if (diff == 0u) {
         turn_timer = 0u;
@@ -378,7 +389,8 @@ static void turn_toward_request(uint8_t buttons) {
 }
 
 player_dir_t player_get_dir(void) BANKED { return player_dir; }
-void player_set_dir(player_dir_t dir) BANKED { player_dir = dir; turn_timer = 0u; }
+player_dir_t player_get_requested_dir(void) BANKED { return (player_dir_t)turn_request; }
+void player_set_dir(player_dir_t dir) BANKED { player_dir = dir; turn_timer = 0u; turn_request = (uint8_t)dir; }
 int8_t player_dir_dx(player_dir_t dir) BANKED { return DIR_DX[dir]; }
 int8_t player_dir_dy(player_dir_t dir) BANKED { return DIR_DY[dir]; }
 

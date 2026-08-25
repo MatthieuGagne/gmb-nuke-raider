@@ -763,6 +763,32 @@ void test_player_not_blocked_when_racer_inactive(void) {
     TEST_ASSERT_GREATER_THAN_INT16(40, player_get_x());
 }
 
+/* #646: the finish gate reads the requested facing, so the request must be
+ * latched every frame the D-pad is held — not only on the frame a notch lands. */
+void test_requested_dir_tracks_a_held_dpad(void) {
+    player_init(0u);
+    player_set_dir(DIR_R);
+    player_apply_physics(J_DOWN, TILE_ROAD);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)DIR_B, (uint8_t)player_get_requested_dir());
+    /* Still latched mid-sweep, before the notch is due. */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)DIR_R, (uint8_t)player_get_dir());
+}
+
+void test_requested_dir_collapses_to_facing_when_dpad_released(void) {
+    player_init(0u);
+    player_set_dir(DIR_R);
+    player_apply_physics(J_DOWN, TILE_ROAD);
+    player_apply_physics(0, TILE_ROAD);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)player_get_dir(), (uint8_t)player_get_requested_dir());
+}
+
+void test_requested_dir_decodes_a_diagonal(void) {
+    player_init(0u);
+    player_set_dir(DIR_T);
+    player_apply_physics(J_DOWN | J_RIGHT, TILE_ROAD);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)DIR_RB, (uint8_t)player_get_requested_dir());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_player_init_sets_start_position);
@@ -853,5 +879,8 @@ int main(void) {
     RUN_TEST(test_player_blocked_by_racer);
     RUN_TEST(test_player_takes_racer_ram_damage);
     RUN_TEST(test_player_not_blocked_when_racer_inactive);
+    RUN_TEST(test_requested_dir_tracks_a_held_dpad);
+    RUN_TEST(test_requested_dir_collapses_to_facing_when_dpad_released);
+    RUN_TEST(test_requested_dir_decodes_a_diagonal);
     return UNITY_END();
 }
