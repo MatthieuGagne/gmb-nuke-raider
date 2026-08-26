@@ -51,20 +51,68 @@ static const uint8_t cd_hi[4] = {
 };
 
 
+/* Facings that admit a crossing, one bitmask per CHECKPOINT_DIR_*, bit k = DIR k.
+ * The same three-of-eight sets the if-chain held before #646, unchanged. An
+ * unrecognised finish direction gates nothing, exactly as the old chain's
+ * fall-through did. */
+static uint8_t finish_dir_mask(uint8_t finish_dir) {
+    if      (finish_dir == CHECKPOINT_DIR_N) return (uint8_t)((1u << DIR_T) | (1u << DIR_RT) | (1u << DIR_LT));
+    else if (finish_dir == CHECKPOINT_DIR_S) return (uint8_t)((1u << DIR_B) | (1u << DIR_RB) | (1u << DIR_LB));
+    else if (finish_dir == CHECKPOINT_DIR_E) return (uint8_t)((1u << DIR_R) | (1u << DIR_RT) | (1u << DIR_RB));
+    else if (finish_dir == CHECKPOINT_DIR_W) return (uint8_t)((1u << DIR_L) | (1u << DIR_LT) | (1u << DIR_LB));
+    return 0xFFu;
+}
+
+/* The facing this car is UNAMBIGUOUSLY turning to next, or cur when there is none.
+ * Follows turn_toward_request() in src/player.c — diff 1-3 clockwise, 5-7
+ * counter-clockwise — with one deliberate divergence: the 180 degree tie (diff == 4)
+ * returns cur instead of player.c's clockwise step. A half turn is not a correction
+ * toward the line, and crediting it would let a car pressing the exact opposite of
+ * its facing score a lap, or pop a combat map. See the plan for #646.
+ * Mirrored rather than called: player.c and state_playing.c both autobank to 255, but
+ * SDCC still emits the BANKED far-call trampoline for any BANKED callee regardless of
+ * whether caller and callee share a physical bank, so calling turn_toward_request()
+ * would cost the same trampoline as a real cross-bank call — not worth it for a pure
+ * ring step. test_finish_eval_notch_step_matches_the_facing_player_c_turns_to drives
+ * the real turn and pins the two against each other for all 64 pairs. */
+static uint8_t dir_step_toward(uint8_t cur, uint8_t req) {
+    uint8_t diff = (uint8_t)((uint8_t)(req - cur) & 7u);
+    if (diff == 0u || diff == 4u) return cur;
+    return (diff < 4u) ? (uint8_t)((cur + 1u) & 7u) : (uint8_t)((cur + 7u) & 7u);
+}
+
 #ifndef __SDCC
 uint8_t
 #else
 static uint8_t
 #endif
 finish_eval(uint8_t map_type, uint8_t armed,
-            uint8_t pdir,
+            uint8_t pdir, uint8_t req_dir,
             uint8_t finish_dir,
             uint8_t cps_cleared) {
+    uint8_t mask;
+    uint8_t cur;
+    uint8_t next;
+
     if (!armed) return 0u;
-    if      (finish_dir == CHECKPOINT_DIR_N) { if (pdir != DIR_T  && pdir != DIR_RT && pdir != DIR_LT) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_S) { if (pdir != DIR_B  && pdir != DIR_RB && pdir != DIR_LB) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_E) { if (pdir != DIR_R  && pdir != DIR_RT && pdir != DIR_RB) return 0u; }
-    else if (finish_dir == CHECKPOINT_DIR_W) { if (pdir != DIR_L  && pdir != DIR_LT && pdir != DIR_LB) return 0u; }
+
+    /* The gate reads facing, never velocity — a racer-zeroed velocity must not cost
+     * a lap (#382). #646: the finish band is 1-3 frames deep at racing speed (see the
+     * plan's dwell table) while a 45 degree notch costs
+     * PLAYER_TURN_FRAMES_TABLE[PLAYER_HANDLING] = 5 frames, so a car correcting onto
+     * the straight is sampled exactly once, one notch short, and loses the whole lap.
+     * Admit the facing it is about to reach as well. One notch only: a car pointing
+     * back up the track is two or more notches out and is still refused. */
+    mask = finish_dir_mask(finish_dir);
+    /* The mask is 8 wide, so the facing is masked to 0-7 before it indexes a bit.
+     * This is a widening the old if-chain did not have: it compared pdir raw, so a
+     * turret-only value (8-15) was refused for every direction, where 12 & 7 now
+     * reads as DIR_B. Unreachable — player_get_dir() only ever returns 0-7 — but it
+     * is not the byte-for-byte equivalence the rest of this gate keeps. */
+    cur  = (uint8_t)(pdir & 7u);
+    next = dir_step_toward(cur, (uint8_t)(req_dir & 7u));
+    if (!(mask & (uint8_t)(1u << cur)) && !(mask & (uint8_t)(1u << next))) return 0u;
+
     if (map_type == TRACK_TYPE_COMBAT) return 1u;
     return cps_cleared;
 }
@@ -225,12 +273,18 @@ static void update(void) {
          * - tile-type check replaces hardcoded Y-row
          * - finish_armed debounces: clears on entry, re-arms on exit
          * - pdir check: player facing direction, not velocity — racer-zeroed velocity never blocks detection
+         * - #646: the facing one notch further along the current turn also admits the
+         *   crossing, so a late correction onto the straight keeps its lap
          * - race_state_all_cp_cleared() gate: all CPs must be crossed in order */
         ct = track_tile_type((int16_t)(px + 4), (int16_t)(py + 4));
         if (ct == TILE_FINISH) {
             uint8_t cps_ok = race_state_all_cp_cleared(PLAYER_SLOT);
+            /* Requested facing read only here: keeps the BANKED trampoline off the
+             * per-frame path (#646). */
+            uint8_t req_dir = (uint8_t)player_get_requested_dir();
             if (finish_eval(active_map_type_cache, finish_armed,
-                            pdir, finish_dir_cache,
+                            pdir, req_dir,
+                            finish_dir_cache,
                             cps_ok)) {
                 finish_armed = 0u;
                 if (active_map_type_cache == TRACK_TYPE_COMBAT) {
