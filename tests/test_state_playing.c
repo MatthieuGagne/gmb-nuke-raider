@@ -173,13 +173,22 @@ void test_finish_eval_one_notch_short_from_the_other_side_is_credited(void) {
     TEST_ASSERT_EQUAL_UINT8(1u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_L, DIR_B, CHECKPOINT_DIR_S, 1u));
 }
 
+/* The one-notch widening is direction-agnostic; this pins it for a non-south finish.
+ * Correcting from north toward an east finish: facing DIR_T, requesting DIR_R, the
+ * next notch is DIR_RT, which is in the east set, so the lap is credited. */
+void test_finish_eval_one_notch_short_east_is_credited(void) {
+    TEST_ASSERT_EQUAL_UINT8(1u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_T, DIR_R, CHECKPOINT_DIR_E, 1u));
+}
+
 /* Two notches short is still refused — the latch is one notch, not a free pass. */
 void test_finish_eval_two_notches_short_is_refused(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_RT, DIR_B, CHECKPOINT_DIR_S, 1u));
 }
 
 /* R2: facing opposite the finish direction is refused even while pressing toward
- * the line. diff == 4 steps clockwise to DIR_RT, which is not in the south set. */
+ * the line. diff == 4 is the 180 degree tie, so dir_step_toward returns cur (DIR_T)
+ * unchanged instead of stepping; DIR_T is not in the south set, so both the current
+ * and next facing are refused. */
 void test_finish_eval_wrong_way_intent_refused(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, finish_eval(TRACK_TYPE_RACE, 1u, DIR_T, DIR_B, CHECKPOINT_DIR_S, 1u));
 }
@@ -277,6 +286,7 @@ int main(void) {
     RUN_TEST(test_finish_gate_credits_a_facing_still_mid_sweep);
     RUN_TEST(test_finish_eval_one_notch_short_is_credited);
     RUN_TEST(test_finish_eval_one_notch_short_from_the_other_side_is_credited);
+    RUN_TEST(test_finish_eval_one_notch_short_east_is_credited);
     RUN_TEST(test_finish_eval_two_notches_short_is_refused);
     RUN_TEST(test_finish_eval_wrong_way_intent_refused);
     RUN_TEST(test_finish_eval_half_turn_grants_no_notch);

@@ -69,9 +69,12 @@ static uint8_t finish_dir_mask(uint8_t finish_dir) {
  * returns cur instead of player.c's clockwise step. A half turn is not a correction
  * toward the line, and crediting it would let a car pressing the exact opposite of
  * its facing score a lap, or pop a combat map. See the plan for #646.
- * Mirrored rather than called: player.c is a different bank and a pure ring step is
- * not worth a trampoline. test_finish_eval_notch_step_matches_the_facing_player_c_
- * turns_to drives the real turn and pins the two against each other for all 64 pairs. */
+ * Mirrored rather than called: player.c and state_playing.c both autobank to 255, but
+ * SDCC still emits the BANKED far-call trampoline for any BANKED callee regardless of
+ * whether caller and callee share a physical bank, so calling turn_toward_request()
+ * would cost the same trampoline as a real cross-bank call — not worth it for a pure
+ * ring step. test_finish_eval_notch_step_matches_the_facing_player_c_turns_to drives
+ * the real turn and pins the two against each other for all 64 pairs. */
 static uint8_t dir_step_toward(uint8_t cur, uint8_t req) {
     uint8_t diff = (uint8_t)((uint8_t)(req - cur) & 7u);
     if (diff == 0u || diff == 4u) return cur;
