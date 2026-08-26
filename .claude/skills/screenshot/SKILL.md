@@ -17,7 +17,7 @@ Before writing any navigation steps, read `build/game-manifest.json`. It contain
 
 - `navigation.overmap_to_track` — BFS tile-direction paths from hub_spawn to each track entry; multiply `len(path) * travel_frames_per_tile` for frame delays
 - `navigation.overmap_to_hub` — paths to city hubs
-- `controls` — button mappings per state; `prerace.cursor_to_start` gives the exact DOWN-press count to reach the START row
+- `controls` — button mappings per state; `prerace.cursor_to_start` gives the exact DOWN-press count to reach the START row; `playing.facing` describes the 8-facing turn model — `ring` is the facing order indexed by the car's facing byte (`_player_dir`, a `DBG_STATIC` symbol resolvable only from the debug ROM's `.noi`, not listed under `symbols`), `turn_frames_per_45_deg` the per-notch turn cost, and `turn_advances_only_while_held` warns that a tapped direction stops turning the moment it is released
 - `tracks` — per-track spawn pixel coords, racer waypoints, checkpoint rects
 - `symbols` — WRAM addresses for key debugging state (`_cam_scx_shadow`, `_px`, `_py`, `_hp`, `_active_lap_count`, `_rs_laps`, `_rs_cp_next`, etc.)
 

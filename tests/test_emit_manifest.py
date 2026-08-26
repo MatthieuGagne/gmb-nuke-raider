@@ -686,6 +686,25 @@ class TestPlayingControls(unittest.TestCase):
         self.assertEqual(diagonal_labels, set(facing['diagonals']),
                          "ring diagonal labels and the diagonals block disagree")
 
+    def test_the_screenshot_skill_names_the_facing_fields(self):
+        """#694 — the file that tells an agent what the manifest holds must name
+        the facing block and its fields, spelled exactly as emitted. Misspell a
+        key in the bullet (or rename one in the emitter) and this fails."""
+        with open(_repo('.claude', 'skills', 'screenshot', 'SKILL.md'),
+                  encoding='utf-8') as fh:
+            bullets = [ln for ln in fh if ln.lstrip().startswith('- `controls`')]
+        self.assertEqual(len(bullets), 1,
+                         "the screenshot skill's `controls` bullet was not found "
+                         "exactly once — the parser is broken, or the file moved")
+        bullet = bullets[0]
+        self.assertIn('playing.facing', bullet)
+        facing = _run_main()['controls']['playing']['facing']
+        for key in ('ring', 'turn_frames_per_45_deg', 'turn_advances_only_while_held'):
+            self.assertIn('`' + key + '`', bullet,
+                          f"the bullet does not name {key}")
+            self.assertIn(key, facing,
+                          f"the bullet names {key}, which the manifest does not emit")
+
     def test_the_facing_block_is_not_a_button_spec(self):
         """R3 — the new value is a dict. A bare string would be read as a
         one-button spec by test_playing_controls_match_the_buttons_player_c_handles
