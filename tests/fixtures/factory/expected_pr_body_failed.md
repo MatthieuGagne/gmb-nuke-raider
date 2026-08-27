@@ -2,6 +2,7 @@
 
 Factory run for issue #441 — autopsy-demo.
 
+- Lane: factory
 - Attempt: 1
 - Stage reached: BUILD
 - Outcome: failed

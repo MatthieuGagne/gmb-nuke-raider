@@ -355,5 +355,36 @@ class TestSummarySlug(ReportTestCase):
                       factory_report.render(state))
 
 
+class LaneLineTest(unittest.TestCase):
+    """#698 follow-up: the PR body is the other place a human reads run
+    attribution, so it names the lane beside the attempt."""
+
+    def test_a_gauntlet_run_names_its_lane(self):
+        self.assertIn('- Lane: gauntlet',
+                      factory_report.render({'issue': 698,
+                                             'lane': 'gauntlet'}))
+
+    def test_a_default_run_names_the_factory_lane(self):
+        self.assertIn('- Lane: factory',
+                      factory_report.render({'issue': 698,
+                                             'lane': 'factory'}))
+
+    def test_a_state_written_before_the_field_existed_defaults(self):
+        """SCHEMA_VERSION stays 1, so a pre-#698 state.json loads with no
+        lane key at all; render() must default rather than raise."""
+        body = factory_report.render({'issue': 698})
+        self.assertIn('- Lane: %s' % factory_run.DEFAULT_LANE, body)
+
+    def test_an_explicit_null_lane_still_defaults(self):
+        self.assertIn('- Lane: factory',
+                      factory_report.render({'issue': 698, 'lane': None}))
+
+    def test_the_lane_sits_above_the_attempt(self):
+        """Run identity reads before run progress, and the two golden PR
+        bodies pin that order -- this states it where a reader will look."""
+        body = factory_report.render({'issue': 698, 'lane': 'gauntlet'})
+        self.assertLess(body.index('- Lane:'), body.index('- Attempt:'))
+
+
 if __name__ == '__main__':
     unittest.main()

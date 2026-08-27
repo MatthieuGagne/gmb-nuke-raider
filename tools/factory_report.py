@@ -137,6 +137,11 @@ def render(state):
         '',
         'Factory run for issue #%d — %s.' % (issue, factory_run.run_slug(state)),
         '',
+        # Which factory ran this (#698). Same `.get(...) or DEFAULT_LANE`
+        # the status table uses: SCHEMA_VERSION stays 1, so a state.json
+        # written before the field existed loads without it, and several
+        # landed tests call render() with a hand-built dict.
+        '- Lane: %s' % (state.get('lane') or factory_run.DEFAULT_LANE),
         '- Attempt: %d' % int(state.get('attempt') or 1),
         '- Stage reached: %s' % (state.get('stage') or '(none)'),
         '- Outcome: %s' % _outcome(state),
