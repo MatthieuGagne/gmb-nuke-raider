@@ -44,6 +44,14 @@ STAGES = ("GATE", "PLAN", "BUILD", "VERIFY", "SHIP")
 EVENT_KINDS = ("start", "stage", "gate", "decision", "retry", "scenario",
                "permission", "failure", "finish")
 
+# Which factory ran this issue (#698). Attribution only: R4 keeps run
+# directories, worktrees, branch names, publishing and the ROM cache shared, so
+# nothing else in this module reads it. Same shape as EVENT_KINDS above, and
+# validated in append_event with the same `x not in TUPLE` idiom -- no call
+# site passes `lane` today, so the new guard costs no existing caller anything.
+LANES = ("factory", "gauntlet")
+DEFAULT_LANE = "factory"
+
 REGISTRY_DIRNAME = ".factory"
 STATE_FILE = "state.json"
 JOURNAL_FILE = "journal.jsonl"
@@ -215,6 +223,7 @@ def new_state(issue):
     return {
         "schema_version": SCHEMA_VERSION,
         "issue": int(issue),
+        "lane": DEFAULT_LANE,
         "slug": None,
         "branch": None,
         "worktree": None,
@@ -267,6 +276,15 @@ def apply_event(state, event):
     left_unlogged = event.get("unlogged_stage")
     if left_unlogged and left_unlogged not in state.setdefault("unlogged", []):
         state["unlogged"].append(left_unlogged)
+
+    # Kind-independent for the same reason as unlogged_stage above (#698): the
+    # lane is a fact about the run, not about one event kind, and a lane
+    # stamped on a `stage` event that silently failed to stick would be worse
+    # than no field at all. `if event.get("lane")` rather than a plain
+    # assignment, so an event without the field leaves the recorded lane alone
+    # instead of clobbering it to None.
+    if event.get("lane"):
+        state["lane"] = event["lane"]
 
     if kind == "start":
         for field in ("slug", "branch", "worktree", "plan", "pr"):
@@ -489,6 +507,10 @@ def append_event(issue, kind, registry=None, **fields):
     if kind not in EVENT_KINDS:
         raise ValueError("unknown event kind: %r (expected one of %s)"
                          % (kind, ", ".join(EVENT_KINDS)))
+    lane = fields.get("lane")
+    if lane is not None and lane not in LANES:
+        raise ValueError("unknown lane: %r (expected one of %s)"
+                         % (lane, ", ".join(LANES)))
     registry = registry or registry_root()
     directory = run_dir(issue, registry)
     os.makedirs(directory, exist_ok=True)
