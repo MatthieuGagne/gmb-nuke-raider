@@ -325,11 +325,16 @@ class TestUnloggedStages(StatusTestCase):
         ``'unlogged_stages'``: ``_gates`` and ``_perm`` show that a column can
         be added under a computed key, and a match on that one literal would
         not see a column called ``_unlogged``.
+
+        LANE joined the tuple in #698 -- a deliberate column for a field that
+        is set on every run. That is what pinning the tuple is for: the
+        addition had to be made here on purpose.
         """
         self.assertEqual(
             factory_status._COLUMNS,
-            (('ISSUE', 'issue'), ('STAGE', 'stage'), ('CONDITION', 'condition'),
-             ('ATT', 'attempt'), ('GATES', '_gates'), ('PERM', '_perm'),
+            (('ISSUE', 'issue'), ('LANE', 'lane'), ('STAGE', 'stage'),
+             ('CONDITION', 'condition'), ('ATT', 'attempt'),
+             ('GATES', '_gates'), ('PERM', '_perm'),
              ('ELAPSED', 'elapsed_text'), ('SLUG', 'slug')))
 
 
@@ -348,6 +353,62 @@ class TestHtmlIsGone(StatusTestCase):
     def test_nothing_writes_status_html(self):
         factory_run.append_event(436, 'stage', registry=self.reg, stage='SHIP')
         self.assertFalse(os.path.exists(os.path.join(self.reg, 'status.html')))
+
+
+class TestLaneColumn(StatusTestCase):
+    """#698 R3: the lane is on both renderings."""
+
+    def run_cli(self, *args):
+        proc = subprocess.run([sys.executable, SCRIPT] + list(args),
+                              capture_output=True, text=True)
+        return proc.returncode, proc.stdout, proc.stderr
+
+    def test_every_row_carries_the_lane(self):
+        self.assertEqual(self.rows()[436]['lane'], 'factory')
+
+    def test_a_gauntlet_run_reports_its_lane(self):
+        """AC1, through collect() rather than a hand-built dict."""
+        factory_run.append_event(700, 'start', registry=self.reg,
+                                 lane='gauntlet')
+        rows = {r['issue']: r for r in factory_status.collect(self.reg, now=NOW)}
+        self.assertEqual(rows[700]['lane'], 'gauntlet')
+
+    def test_a_state_written_before_the_field_existed_defaults(self):
+        """`lane` is absent from every state.json already on disk, and
+        SCHEMA_VERSION stays 1, so the reader must default rather than KeyError."""
+        row = factory_status._row({'issue': 698}, NOW)
+        self.assertEqual(row['lane'], factory_run.DEFAULT_LANE)
+
+    def test_an_explicit_null_lane_still_defaults(self):
+        row = factory_status._row({'issue': 698, 'lane': None}, NOW)
+        self.assertEqual(row['lane'], 'factory')
+
+    def test_the_table_has_a_lane_column(self):
+        self.assertIn(('LANE', 'lane'), factory_status._COLUMNS)
+
+    def test_the_rendered_table_shows_the_lane(self):
+        """AC1's text half, built from collect() rather than a hand-made row --
+        a hand-made row cannot catch a regression on the collect() side, and
+        AC1 is stated about a run, not about a dict."""
+        factory_run.append_event(700, 'start', registry=self.reg,
+                                 lane='gauntlet')
+        rows = factory_status.collect(self.reg, now=NOW)
+        table = factory_status.render_table(rows, self.reg)
+        self.assertIn('LANE', table.splitlines()[0])
+        line = [l for l in table.splitlines() if l.startswith('700')][0]
+        self.assertIn('gauntlet', line)
+
+    def test_json_mode_carries_the_lane(self):
+        """AC1's second surface: the machine-readable rendering, through the
+        CLI, so a caller never re-derives the lane from the journal."""
+        factory_run.append_event(700, 'start', registry=self.reg,
+                                 lane='gauntlet')
+        code, out, _ = self.run_cli('--registry', self.reg, '--json',
+                                    '--now', NOW.isoformat())
+        self.assertEqual(code, 0)
+        rows = {r['issue']: r for r in json.loads(out)}
+        self.assertEqual(rows[700]['lane'], 'gauntlet')
+        self.assertEqual(rows[436]['lane'], 'factory')
 
 
 def _snapshot(root):

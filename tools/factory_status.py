@@ -109,6 +109,10 @@ def _row(state, now):
     gates = factory_run.ordered_gates(state)
     return {
         "issue": state["issue"],
+        # #698: `or DEFAULT_LANE`, not a bare .get -- SCHEMA_VERSION stays 1,
+        # so every state.json written before this field existed loads without
+        # it, and several landed tests call _row with a hand-built dict.
+        "lane": state.get("lane") or factory_run.DEFAULT_LANE,
         "slug": _column_slug(state),
         "branch": state.get("branch") or "-",
         "plan": state.get("plan"),
@@ -156,9 +160,9 @@ def collect(registry=None, now=None):
 
 # ── Terminal ─────────────────────────────────────────────────────────────────
 
-_COLUMNS = (("ISSUE", "issue"), ("STAGE", "stage"), ("CONDITION", "condition"),
-            ("ATT", "attempt"), ("GATES", "_gates"), ("PERM", "_perm"),
-            ("ELAPSED", "elapsed_text"), ("SLUG", "slug"))
+_COLUMNS = (("ISSUE", "issue"), ("LANE", "lane"), ("STAGE", "stage"),
+            ("CONDITION", "condition"), ("ATT", "attempt"), ("GATES", "_gates"),
+            ("PERM", "_perm"), ("ELAPSED", "elapsed_text"), ("SLUG", "slug"))
 
 
 def render_table(rows, registry):

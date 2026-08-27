@@ -1029,5 +1029,101 @@ class TestUnloggedStages(JournalTestCase):
         self.assertEqual(factory_run.load_state(440, reg)['unlogged'], [])
 
 
+class LaneTest(unittest.TestCase):
+    """#698: the run's lane is per-run identity on the projection."""
+
+    def test_lanes_are_a_two_name_vocabulary(self):
+        self.assertEqual(factory_run.LANES, ('factory', 'gauntlet'))
+
+    def test_the_default_lane_is_factory(self):
+        self.assertEqual(factory_run.DEFAULT_LANE, 'factory')
+        self.assertIn(factory_run.DEFAULT_LANE, factory_run.LANES)
+
+    def test_new_state_starts_in_the_default_lane(self):
+        self.assertEqual(factory_run.new_state(698)['lane'],
+                         factory_run.DEFAULT_LANE)
+
+    def test_a_start_event_can_set_the_lane(self):
+        state = factory_run.new_state(698)
+        factory_run.apply_event(state, {'kind': 'start', 'ts': 'T',
+                                        'lane': 'gauntlet'})
+        self.assertEqual(state['lane'], 'gauntlet')
+
+    def test_any_event_kind_can_carry_the_lane(self):
+        """Kind-independent on purpose: a lane stamped on a `stage` event that
+        silently did not stick would be worse than no field at all."""
+        state = factory_run.new_state(698)
+        factory_run.apply_event(state, {'kind': 'stage', 'ts': 'T',
+                                        'stage': 'BUILD', 'lane': 'gauntlet'})
+        self.assertEqual(state['lane'], 'gauntlet')
+
+    def test_an_event_without_a_lane_leaves_it_alone(self):
+        state = factory_run.new_state(698)
+        state['lane'] = 'gauntlet'
+        factory_run.apply_event(state, {'kind': 'stage', 'ts': 'T',
+                                        'stage': 'BUILD'})
+        self.assertEqual(state['lane'], 'gauntlet')
+
+    def test_the_lane_survives_a_replay(self):
+        events = [{'kind': 'start', 'ts': 'T', 'lane': 'gauntlet'},
+                  {'kind': 'stage', 'ts': 'T', 'stage': 'BUILD'}]
+        self.assertEqual(factory_run.rebuild_state(698, events)['lane'],
+                         'gauntlet')
+
+    def test_schema_version_is_unchanged(self):
+        """A state.json written before `lane` existed must stay loadable."""
+        self.assertEqual(factory_run.SCHEMA_VERSION, 1)
+
+    def test_append_event_refuses_an_unknown_lane(self):
+        """R2: refused the way an unknown kind is refused -- in the library,
+        so a direct append_event call cannot write a lane the vocabulary does
+        not contain."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        with self.assertRaises(ValueError) as caught:
+            factory_run.append_event(698, 'start', registry=tmp,
+                                     lane='sideshow')
+        self.assertIn('sideshow', str(caught.exception))
+
+    def test_append_event_accepts_a_known_lane(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        factory_run.append_event(698, 'start', registry=tmp, lane='gauntlet')
+        self.assertEqual(factory_run.load_state(698, tmp)['lane'], 'gauntlet')
+
+    def test_append_event_heals_a_lane_less_state_on_disk(self):
+        """A state.json written before #698 has no `lane` key at all, and
+        apply_event never adds one on its own -- only the `setdefault` in
+        apply_event heals it. Build such a state by hand, append a real event
+        through the library, and require `state["lane"]` to be present by
+        subscript, matching how shipped callers use `load_state`."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        directory = factory_run.run_dir(698, tmp)
+        os.makedirs(directory, exist_ok=True)
+        journal_event = {'ts': 'T', 'issue': 698, 'kind': 'start',
+                         'attempt': 1}
+        with open(factory_run.journal_path(698, tmp), 'w',
+                 encoding='utf-8') as fh:
+            fh.write(json.dumps(journal_event, sort_keys=True) + '\n')
+        lane_less_state = {
+            'schema_version': factory_run.SCHEMA_VERSION,
+            'issue': 698, 'slug': None, 'branch': None, 'worktree': None,
+            'plan': None, 'pr': None, 'attempt': 1, 'stage': None,
+            'gates': [], 'decisions': [], 'scenarios': [], 'permissions': [],
+            'unlogged': [], 'failure': None, 'finished': None,
+            'updated': 'T', 'event_count': 1,
+        }
+        self.assertNotIn('lane', lane_less_state)
+        with open(factory_run.state_path(698, tmp), 'w',
+                 encoding='utf-8') as fh:
+            json.dump(lane_less_state, fh)
+
+        factory_run.append_event(698, 'stage', registry=tmp, stage='BUILD')
+
+        self.assertEqual(factory_run.load_state(698, tmp)['lane'],
+                         factory_run.DEFAULT_LANE)
+
+
 if __name__ == '__main__':
     unittest.main()

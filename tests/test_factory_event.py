@@ -113,6 +113,70 @@ class MainTest(unittest.TestCase):
                                        '--registry', self.registry])
         self.assertEqual(code, 2)
 
+    def test_lane_flag_lands_on_the_event(self):
+        code = factory_event.main(['--issue', '461', '--kind', 'start',
+                                   '--lane', 'gauntlet',
+                                   '--registry', self.registry])
+        self.assertEqual(code, 0)
+        self.assertEqual(self._journal()[0]['lane'], 'gauntlet')
+
+    def test_lane_flag_reaches_the_run_state(self):
+        factory_event.main(['--issue', '461', '--kind', 'start',
+                            '--lane', 'gauntlet',
+                            '--registry', self.registry])
+        state = factory_run.load_state(461, self.registry)
+        self.assertEqual(state['lane'], 'gauntlet')
+
+    def test_the_default_run_is_the_factory_lane(self):
+        """R1: the default is `factory`, and it costs the journal nothing --
+        an omitted --lane writes no lane key at all."""
+        factory_event.main(['--issue', '461', '--kind', 'start',
+                            '--field', 'stage=GATE',
+                            '--registry', self.registry])
+        self.assertNotIn('lane', self._journal()[0])
+        self.assertEqual(factory_run.load_state(461, self.registry)['lane'],
+                         'factory')
+
+    def test_unknown_lane_is_misuse(self):
+        """R2: refused the way an unknown --kind is refused."""
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = factory_event.main(['--issue', '461', '--kind', 'start',
+                                       '--lane', 'sideshow',
+                                       '--registry', self.registry])
+        self.assertEqual(code, 2)
+        self.assertIn('sideshow', err.getvalue())
+        self.assertIn('gauntlet', err.getvalue())
+
+    def test_an_unknown_lane_writes_nothing(self):
+        """The refusal happens before the journal is touched, so a rejected
+        run leaves no half-written event behind."""
+        with redirect_stderr(io.StringIO()):
+            factory_event.main(['--issue', '461', '--kind', 'start',
+                                '--lane', 'sideshow',
+                                '--registry', self.registry])
+        self.assertFalse(os.path.exists(
+            factory_run.journal_path(461, self.registry)))
+
+    def test_an_unknown_lane_passed_as_a_field_is_refused_too(self):
+        """--field is the same door; validating only the flag would leave a
+        bypass that writes an unknown lane straight into state."""
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = factory_event.main(['--issue', '461', '--kind', 'start',
+                                       '--field', 'lane=sideshow',
+                                       '--registry', self.registry])
+        self.assertEqual(code, 2)
+        self.assertIn('sideshow', err.getvalue())
+
+    def test_a_known_lane_passed_as_a_field_is_accepted(self):
+        code = factory_event.main(['--issue', '461', '--kind', 'start',
+                                   '--field', 'lane=gauntlet',
+                                   '--registry', self.registry])
+        self.assertEqual(code, 0)
+        self.assertEqual(factory_run.load_state(461, self.registry)['lane'],
+                         'gauntlet')
+
 
 if __name__ == '__main__':
     unittest.main()

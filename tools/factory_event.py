@@ -6,10 +6,10 @@ library with no CLI (ADR 436) — `factory_status` and `factory_report`
 are read-only surfaces, so nothing could write an event from a skill's prose.
 This is that surface: a thin argv wrapper over `factory_run.append_event`.
 
-It adds no schema of its own. `--kind` is validated against
-`factory_run.EVENT_KINDS` and every `--field` lands in the event verbatim, so
-the vocabulary stays owned by `factory_run` and this file never has to be
-edited when an event grows a field.
+It adds no schema of its own. `--kind` and `--lane` are validated against
+vocabularies owned by `factory_run` (`EVENT_KINDS`, `LANES`); `lane` is the
+one `--field` key that is not passed through verbatim, and every other field
+still lands in the event as-is.
 
 A field value is parsed as JSON when it parses and kept as a string when it
 does not, so `--field blocking=true` records a boolean, `--field count=3` an
@@ -19,7 +19,8 @@ that matters.
 
 Exit codes:
     0  event appended
-    2  misuse (unknown kind, malformed --field, bad --now) or operational error
+    2  misuse (unknown kind, unknown lane, malformed --field, bad --now) or
+       operational error
 """
 import argparse
 import json
@@ -63,6 +64,15 @@ def build_parser():
     parser.add_argument('--field', action='append', default=[],
                         metavar='KEY=VALUE',
                         help='event field; repeatable')
+    # choices is deliberately not used here: argparse's own SystemExit message
+    # would not name the value the way the tests require, and would not cover
+    # the --field lane= door.
+    parser.add_argument('--lane', default=None,
+                        metavar='LANE',
+                        help='which factory ran this issue (one of: %s); '
+                             'default %s'
+                             % (', '.join(factory_run.LANES),
+                                factory_run.DEFAULT_LANE))
     parser.add_argument('--attempt', type=int, default=None,
                         help='attempt number; inherits run state when omitted')
     parser.add_argument('--registry', default=None,
@@ -81,6 +91,21 @@ def main(argv=None):
         fields = parse_fields(args.field)
     except ValueError as exc:
         sys.stderr.write('factory-event: %s\n' % exc)
+        return 2
+
+    # Refuses before --now is parsed and before the registry is reached, so
+    # when both are wrong the lane is the error reported -- and the message
+    # here does not depend on append_event's wording. append_event refuses
+    # the same value independently (#698, factory_run.LANES), so a direct
+    # library call is covered too. Note this runs before --kind is validated,
+    # so `--kind nope --lane sideshow` reports the lane. Both are exit 2; the
+    # ordering is not worth a branch.
+    if args.lane is not None:
+        fields['lane'] = args.lane
+    lane = fields.get('lane')
+    if lane is not None and lane not in factory_run.LANES:
+        sys.stderr.write('factory-event: unknown lane: %r (expected one of %s)\n'
+                         % (lane, ', '.join(factory_run.LANES)))
         return 2
 
     if args.now:
