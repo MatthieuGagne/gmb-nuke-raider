@@ -382,6 +382,21 @@ def main():
                 'turn_frames_per_45_deg': turn_frames,
                 'frames_per_180_deg':     None if turn_frames is None else 4 * turn_frames,
                 'thrust_follows_facing':  True,
+                # #694 — frames_per_180_deg is NOT "press, then wait": the
+                # D-pad is sampled only while held (turn_toward_request()'s
+                # early return in src/player.c), so a tap-then-wait consumer
+                # gets zero rotation. The test asserts this flag against that
+                # guard, so it cannot outlive it.
+                'turn_advances_only_while_held': True,
+                # #694 — entry n is the direction DIR_DX[n]/DIR_DY[n]
+                # (src/player.c) point, so a consumer can turn a _player_dir
+                # byte into a direction. Nested inside `facing` (#688 R3 /
+                # #694 R3): these labels are button names, and a top-level
+                # list of them would be read as a button spec by the
+                # cross-check test. The test derives the expected order from
+                # the C tables, so this literal cannot drift from src/player.c.
+                'ring': ['up', 'up_right', 'right', 'down_right',
+                         'down', 'down_left', 'left', 'up_left'],
                 'diagonals': {
                     'up_right':   ['up', 'right'],
                     'down_right': ['down', 'right'],
