@@ -692,11 +692,20 @@ class TestPlayingControls(unittest.TestCase):
         key in the bullet (or rename one in the emitter) and this fails."""
         with open(_repo('.claude', 'skills', 'screenshot', 'SKILL.md'),
                   encoding='utf-8') as fh:
-            bullets = [ln for ln in fh if ln.lstrip().startswith('- `controls`')]
-        self.assertEqual(len(bullets), 1,
+            lines = fh.readlines()
+        starts = [i for i, ln in enumerate(lines)
+                  if ln.lstrip().startswith('- `controls`')]
+        self.assertEqual(len(starts), 1,
                          "the screenshot skill's `controls` bullet was not found "
                          "exactly once — the parser is broken, or the file moved")
-        bullet = bullets[0]
+        # Join the bullet with any wrapped continuation lines: a reflow with no
+        # content change must not turn this test red (#694 M2).
+        start = starts[0]
+        end = start + 1
+        while end < len(lines) and lines[end].strip() \
+                and not lines[end].lstrip().startswith('- '):
+            end += 1
+        bullet = ' '.join(ln.strip() for ln in lines[start:end])
         self.assertIn('playing.facing', bullet)
         facing = _run_main()['controls']['playing']['facing']
         for key in ('ring', 'turn_frames_per_45_deg', 'turn_advances_only_while_held'):
