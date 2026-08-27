@@ -1091,6 +1091,39 @@ class LaneTest(unittest.TestCase):
         factory_run.append_event(698, 'start', registry=tmp, lane='gauntlet')
         self.assertEqual(factory_run.load_state(698, tmp)['lane'], 'gauntlet')
 
+    def test_append_event_heals_a_lane_less_state_on_disk(self):
+        """A state.json written before #698 has no `lane` key at all, and
+        apply_event never adds one on its own -- only the `setdefault` in
+        apply_event heals it. Build such a state by hand, append a real event
+        through the library, and require `state["lane"]` to be present by
+        subscript, matching how shipped callers use `load_state`."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        directory = factory_run.run_dir(698, tmp)
+        os.makedirs(directory, exist_ok=True)
+        journal_event = {'ts': 'T', 'issue': 698, 'kind': 'start',
+                         'attempt': 1}
+        with open(factory_run.journal_path(698, tmp), 'w',
+                 encoding='utf-8') as fh:
+            fh.write(json.dumps(journal_event, sort_keys=True) + '\n')
+        lane_less_state = {
+            'schema_version': factory_run.SCHEMA_VERSION,
+            'issue': 698, 'slug': None, 'branch': None, 'worktree': None,
+            'plan': None, 'pr': None, 'attempt': 1, 'stage': None,
+            'gates': [], 'decisions': [], 'scenarios': [], 'permissions': [],
+            'unlogged': [], 'failure': None, 'finished': None,
+            'updated': 'T', 'event_count': 1,
+        }
+        self.assertNotIn('lane', lane_less_state)
+        with open(factory_run.state_path(698, tmp), 'w',
+                 encoding='utf-8') as fh:
+            json.dump(lane_less_state, fh)
+
+        factory_run.append_event(698, 'stage', registry=tmp, stage='BUILD')
+
+        self.assertEqual(factory_run.load_state(698, tmp)['lane'],
+                         factory_run.DEFAULT_LANE)
+
 
 if __name__ == '__main__':
     unittest.main()

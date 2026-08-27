@@ -282,7 +282,11 @@ def apply_event(state, event):
     # stamped on a `stage` event that silently failed to stick would be worse
     # than no field at all. `if event.get("lane")` rather than a plain
     # assignment, so an event without the field leaves the recorded lane alone
-    # instead of clobbering it to None.
+    # instead of clobbering it to None. The `setdefault` heals a state.json
+    # written before this field existed, so `state["lane"]` is total for every
+    # re-saved run -- the same self-healing the `unlogged` fold above does,
+    # and the reason SCHEMA_VERSION can stay 1.
+    state.setdefault("lane", DEFAULT_LANE)
     if event.get("lane"):
         state["lane"] = event["lane"]
 

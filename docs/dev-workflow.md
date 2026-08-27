@@ -701,7 +701,7 @@ worktree, so a run stays explainable after its worktree is deleted.
 | `tools/factory_run.py` | Schema owner; **sole writer of run state and the journal**. Library, not a CLI. |
 | `tools/factory_log.py` | **Sole writer of the `logs/` subtree** ([ADR 450](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/470)): tees stage command output into `logs/<STAGE>.log`. |
 | `tools/factory_publish.py` | **Sole writer of the GitHub surfaces** ([ADR 472](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/475)): the run issue, the plan issue, the release assets, the spec-issue comment, the Documents-board item fields on both the spec and run issues, and the pull request. Owns `publish.json`. |
-| `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` is validated against `factory_run.EVENT_KINDS`. |
+| `tools/factory_event.py` | The command-line surface for **writing** an event: a thin wrapper over `factory_run.append_event`. Adds no schema — `--kind` and `--lane` are validated against `factory_run.EVENT_KINDS` and `factory_run.LANES`. |
 | `tools/factory_cache.py` | **Sole writer of `cache/`** (#437 R5): the `origin/master` reference ROM, keyed by commit SHA, filled lazily on the first smoketest failure. |
 | `.claude/skills/factory/` | The orchestrator. Writes nothing itself — it calls the tools above and `factory_publish` at every stage transition, gate result and terminal event. |
 | `tools/factory_status.py` | Read-only terminal dashboard (`--json`). Writes nothing at all. |
@@ -837,8 +837,8 @@ after `--`). On success it prints only a summary line; `--stream` restores the f
 Commands are argv lists — never `shell=True`; a compound command names its shell
 explicitly, as in the `pwsh -NoProfile -Command` example above.
 
-`factory_event` exits `0` when the event is appended and `2` on misuse (unknown kind, malformed
-`--field`, bad `--now`) — it never exits `1`, because a run's content is never this tool's
+`factory_event` exits `0` when the event is appended and `2` on misuse (unknown kind, unknown lane,
+malformed `--field`, bad `--now`) — it never exits `1`, because a run's content is never this tool's
 error. `factory_cache` exits `0` with the ROM path on stdout, `1` when the reference build
 itself failed, and `2` when it could not run.
 
