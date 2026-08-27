@@ -605,6 +605,115 @@ class TestPlayingControls(unittest.TestCase):
         self.assertEqual(emitted, expected,
                          "controls.playing.facing.diagonals and decode_dir() disagree")
 
+    # --- #694: the held-button turn rule and the facing ring order ---
+
+    def _c_function_body(self, name):
+        """Body of one src/player.c function, brace-counted, comments stripped.
+        Same discipline as _player_apply_physics_body: matching a pattern
+        against the whole file is not a guard, because another function could
+        satisfy it."""
+        code = self._player_c_code()
+        m = re.search(r'void\s+' + re.escape(name) + r'\s*\([^)]*\)[^{;]*\{', code)
+        self.assertIsNotNone(m, f"{name}() not found in src/player.c — "
+                                "the parser is broken, not the manifest")
+        i = m.end()
+        depth = 1
+        while i < len(code) and depth > 0:
+            if code[i] == '{':
+                depth += 1
+            elif code[i] == '}':
+                depth -= 1
+            i += 1
+        self.assertEqual(depth, 0,
+                         f"unbalanced braces while scanning {name}() — "
+                         "the parser is broken, not the manifest")
+        return code[m.end():i - 1]
+
+    def test_turn_advances_only_while_held(self):
+        """R1/R6/AC1/AC4 — a turn advances only while a drive direction is
+        HELD: turn_toward_request() opens with an early return when no D-pad
+        bit is set, so a consumer that taps a direction and waits gets zero
+        rotation. The flag is asserted against that guard, not just emitted:
+        delete the guard in src/player.c and this test fails."""
+        body = self._c_function_body('turn_toward_request')
+        guard = re.search(
+            r'if\s*\(\s*!\s*\(\s*buttons\s*&\s*\(\s*J_UP\s*\|\s*J_DOWN\s*\|\s*'
+            r'J_LEFT\s*\|\s*J_RIGHT\s*\)\s*\)\s*\)\s*\{(.*?)\}',
+            body, re.DOTALL)
+        self.assertIsNotNone(guard,
+                             "turn_toward_request() no longer guards on a held "
+                             "D-pad direction — the manifest's held-button flag "
+                             "must follow src/player.c")
+        self.assertRegex(guard.group(1), r'\breturn\s*;',
+                         "the no-direction guard no longer returns early — a "
+                         "turn would advance without a held direction")
+        facing = _run_main()['controls']['playing']['facing']
+        self.assertIs(facing['turn_advances_only_while_held'], True)
+
+    def _dir_table(self, name):
+        """DIR_DX or DIR_DY initializer values, parsed with this test's own
+        tokenizer — deliberately NOT emit_manifest machinery. The emitted ring
+        is a literal, so this oracle reading src/player.c is what lets the two
+        disagree (the R5 discipline #688's tests established)."""
+        m = re.search(r'\b' + re.escape(name) + r'\s*\[\s*8\s*\]\s*=\s*\{([^}]*)\}',
+                      self._player_c_code())
+        self.assertIsNotNone(m, f"{name}[8] not found in src/player.c — "
+                                "narrowed, renamed, or the parser is broken")
+        values = [int(t.strip()) for t in m.group(1).split(',') if t.strip()]
+        self.assertEqual(len(values), 8, f"{name} is not 8 entries wide")
+        return values
+
+    def test_ring_order_matches_the_direction_tables(self):
+        """R2/R5/AC2/AC3 — entry n of the emitted ring is the direction
+        DIR_DX[n]/DIR_DY[n] point, labelled with the names the manifest
+        already uses (drive buttons, diagonals keys). Reorder the tables in
+        src/player.c and this fails; narrow them and _dir_table fails."""
+        dxs = self._dir_table('DIR_DX')
+        dys = self._dir_table('DIR_DY')
+        expected = []
+        for dx, dy in zip(dxs, dys):
+            vert = {-1: 'up', 0: '', 1: 'down'}[dy]
+            horiz = {-1: 'left', 0: '', 1: 'right'}[dx]
+            self.assertTrue(vert or horiz,
+                            "a zero-vector ring entry is not a direction")
+            expected.append(vert + '_' + horiz if vert and horiz else vert + horiz)
+        facing = _run_main()['controls']['playing']['facing']
+        self.assertEqual(facing['ring'], expected,
+                         "controls.playing.facing.ring and DIR_DX/DIR_DY disagree")
+        self.assertEqual(len(facing['ring']), facing['count'],
+                         "ring length and count disagree inside one facing block")
+        diagonal_labels = {n for n in facing['ring'] if '_' in n}
+        self.assertEqual(diagonal_labels, set(facing['diagonals']),
+                         "ring diagonal labels and the diagonals block disagree")
+
+    def test_the_screenshot_skill_names_the_facing_fields(self):
+        """#694 — the file that tells an agent what the manifest holds must name
+        the facing block and its fields, spelled exactly as emitted. Misspell a
+        key in the bullet (or rename one in the emitter) and this fails."""
+        with open(_repo('.claude', 'skills', 'screenshot', 'SKILL.md'),
+                  encoding='utf-8') as fh:
+            lines = fh.readlines()
+        starts = [i for i, ln in enumerate(lines)
+                  if ln.lstrip().startswith('- `controls`')]
+        self.assertEqual(len(starts), 1,
+                         "the screenshot skill's `controls` bullet was not found "
+                         "exactly once — the parser is broken, or the file moved")
+        # Join the bullet with any wrapped continuation lines: a reflow with no
+        # content change must not turn this test red (#694 M2).
+        start = starts[0]
+        end = start + 1
+        while end < len(lines) and lines[end].strip() \
+                and not lines[end].lstrip().startswith('- '):
+            end += 1
+        bullet = ' '.join(ln.strip() for ln in lines[start:end])
+        self.assertIn('playing.facing', bullet)
+        facing = _run_main()['controls']['playing']['facing']
+        for key in ('ring', 'turn_frames_per_45_deg', 'turn_advances_only_while_held'):
+            self.assertIn('`' + key + '`', bullet,
+                          f"the bullet does not name {key}")
+            self.assertIn(key, facing,
+                          f"the bullet names {key}, which the manifest does not emit")
+
     def test_the_facing_block_is_not_a_button_spec(self):
         """R3 — the new value is a dict. A bare string would be read as a
         one-button spec by test_playing_controls_match_the_buttons_player_c_handles
