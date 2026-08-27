@@ -19,7 +19,8 @@ that matters.
 
 Exit codes:
     0  event appended
-    2  misuse (unknown kind, malformed --field, bad --now) or operational error
+    2  misuse (unknown kind, unknown lane, malformed --field, bad --now) or
+       operational error
 """
 import argparse
 import json
@@ -63,6 +64,13 @@ def build_parser():
     parser.add_argument('--field', action='append', default=[],
                         metavar='KEY=VALUE',
                         help='event field; repeatable')
+    parser.add_argument('--lane', default=None,
+                        choices=None,
+                        metavar='LANE',
+                        help='which factory ran this issue (one of: %s); '
+                             'default %s'
+                             % (', '.join(factory_run.LANES),
+                                factory_run.DEFAULT_LANE))
     parser.add_argument('--attempt', type=int, default=None,
                         help='attempt number; inherits run state when omitted')
     parser.add_argument('--registry', default=None,
@@ -81,6 +89,20 @@ def main(argv=None):
         fields = parse_fields(args.field)
     except ValueError as exc:
         sys.stderr.write('factory-event: %s\n' % exc)
+        return 2
+
+    # Before the clock and the registry are touched, so a refused lane leaves
+    # no half-written run behind. append_event refuses the same value too
+    # (#698, factory_run.LANES); this guard exists so the CLI names the
+    # offending value itself and so --lane is covered as well as --field.
+    # Note it runs before --kind is validated, so `--kind nope --lane sideshow`
+    # reports the lane. Both are exit 2; the ordering is not worth a branch.
+    if args.lane is not None:
+        fields['lane'] = args.lane
+    lane = fields.get('lane')
+    if lane is not None and lane not in factory_run.LANES:
+        sys.stderr.write('factory-event: unknown lane: %r (expected one of %s)\n'
+                         % (lane, ', '.join(factory_run.LANES)))
         return 2
 
     if args.now:
