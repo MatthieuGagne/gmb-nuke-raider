@@ -2,6 +2,7 @@
 
 Factory run for issue #440 — observability.
 
+- Lane: factory
 - Attempt: 1
 - Stage reached: SHIP
 - Outcome: shipped
