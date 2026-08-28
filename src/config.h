@@ -16,7 +16,7 @@
  * Arrays initialized from these in player.c: GEAR_MAX_SPEED[3], GEAR_ACCEL[3]. */
 #define GEAR1_MAX_SPEED        2u
 #define GEAR1_ACCEL            2u
-#define GEAR2_MAX_SPEED        4u
+#define GEAR2_MAX_SPEED        5u
 #define GEAR2_ACCEL            1u
 #define GEAR3_MAX_SPEED        6u
 #define GEAR3_ACCEL            1u
