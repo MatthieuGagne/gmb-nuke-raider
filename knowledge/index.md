@@ -26,6 +26,12 @@
   cooldown, armor tier, per-weapon damage cache, loadout seeding order
 - [[state-hub-shop]] — vendor shop sub-state in bank-0 `state_hub.c`, dialog_to_c
   generated-table bank placement (`hub_data.c` vs `dialog_data.c`)
+- [[race-position-winding-track]] — raw Y coordinate is not a valid "who is ahead"
+  metric on track2; section-aware comparison and waypoint progress scores
+- [[player-waypoint-thresholds]] — player waypoint detection needs a looser threshold
+  than the racer's on track2
+- [[ram-damage-flush-contact]] — strict AABB overlap misses "from behind" ram damage;
+  `enemy_ram_overlap()`'s reach-margin fix
 
 ## Assets & Loader
 

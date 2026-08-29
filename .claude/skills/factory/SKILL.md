@@ -58,12 +58,9 @@ Exact command sequences are in `references/stages.md` — follow them literally.
 | VERIFY | fetch+merge, clean build, memory check, blocking smoketest, evidence scenario | memory FAIL aborts immediately; smoketest gets 1 differential-guided fix attempt |
 | SHIP | Push, open the PR with the reporter body, preserve the run's working notes | `pre-push` runs `make clean && make` |
 
-**SHIP preserves the run's working notes.** The plan, the SDD ledger and every task brief and
-report live only in gitignored worktree paths (`docs/plans/`, `.superpowers/`), so
-`factory_run.preserve_workspace` copies them into `.factory/runs/issue-<N>/sdd-workspace/` at
-SHIP. Best-effort by contract: a missing artifact is a `manifest.json` line, never an error, so
-preservation cannot fail a run that has opened its pull request. Terminal failure keeps its own
-bundle — `write_autopsy` — and the two do not overlap.
+**SHIP preserves the run's working notes** into `.factory/runs/issue-<N>/sdd-workspace/`,
+best-effort. Full mechanics: `references/stages.md` under *SHIP: preserving the run's working
+notes*.
 
 ## Every stage command goes through the stage-log helper
 
@@ -140,16 +137,8 @@ An unmarked ruling stays a decision, so a forgotten marker costs nothing.
 
 ## How to write a decision, a failure, and a PR summary
 
-Plain English: short sentences, active voice, simple tense, concrete verbs. Use the term
-`CONTEXT.md` defines. **A `failure` message that quotes tool output keeps that output verbatim** —
-simplifying it falsifies it.
-
-A `decision` event carries two fields:
-
-- `text` — the ruling, one sentence. This is what a reader skims.
-- `rationale` — the reasoning, one to three sentences. This renders inside a collapsed block.
-
-Neither length is enforced. Never drop a decision, or pad a rationale to fill the cap.
+Plain English, active voice, verbatim tool output in failures. Field-by-field template:
+`references/stages.md` under *How to write a decision, a failure, and a PR summary*.
 
 ## Retry budgets
 
@@ -161,17 +150,10 @@ report** (the first WRAM divergence against the reference ROM), never from code 
 
 ## The smoketest gate, under a factory run
 
-`CLAUDE.md`'s smoketest gate is six steps, and a factory run changes exactly one thing about it.
-Steps 4-5 — the Emulicious launch and the human visual confirmation — are replaced by the
-blocking headless smoketest:
-
-```
-python tools/smoketest_headless.py --scenario generic-smoke --json
-```
-
-Steps 1-3 (fetch + merge `origin/master`, clean build, `make memory-check`) and step 6 (README +
-push + PR) are unchanged, and a memory-budget FAIL still aborts the run. This substitution applies
-**only** while `NUKE_FACTORY_RUN` is set; every manual session keeps the human gate verbatim.
+A factory run replaces the human Emulicious launch/confirm steps with a blocking headless
+smoketest (`smoketest_headless.py --scenario generic-smoke --json`); the rest of the six-step
+gate is unchanged. Full detail: `references/stages.md` under *The smoketest gate, under a
+factory run*.
 
 ## Safety rails — never
 

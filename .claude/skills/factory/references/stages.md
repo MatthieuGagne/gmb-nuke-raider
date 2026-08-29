@@ -404,3 +404,45 @@ failure both leave it open on purpose.
 
 The run issue and the PR body do not repeat each other (#530). The decision record sits on one
 of them and the other links to it. Plan-review findings sit on the run issue alone.
+
+---
+
+## How to write a decision, a failure, and a PR summary
+
+Plain English: short sentences, active voice, simple tense, concrete verbs. Use the term
+`CONTEXT.md` defines. **A `failure` message that quotes tool output keeps that output verbatim** —
+simplifying it falsifies it.
+
+A `decision` event carries two fields:
+
+- `text` — the ruling, one sentence. This is what a reader skims.
+- `rationale` — the reasoning, one to three sentences. This renders inside a collapsed block.
+
+Neither length is enforced. Never drop a decision, or pad a rationale to fill the cap.
+
+---
+
+## SHIP: preserving the run's working notes
+
+The plan, the SDD ledger and every task brief and report live only in gitignored worktree paths
+(`docs/plans/`, `.superpowers/`), so `factory_run.preserve_workspace` copies them into
+`.factory/runs/issue-<N>/sdd-workspace/` at SHIP. Best-effort by contract: a missing artifact is
+a `manifest.json` line, never an error, so preservation cannot fail a run that has opened its
+pull request. Terminal failure keeps its own bundle — `write_autopsy` — and the two do not
+overlap.
+
+---
+
+## The smoketest gate, under a factory run
+
+`CLAUDE.md`'s smoketest gate is six steps, and a factory run changes exactly one thing about it.
+Steps 4-5 — the Emulicious launch and the human visual confirmation — are replaced by the
+blocking headless smoketest:
+
+```
+python tools/smoketest_headless.py --scenario generic-smoke --json
+```
+
+Steps 1-3 (fetch + merge `origin/master`, clean build, `make memory-check`) and step 6 (README +
+push + PR) are unchanged, and a memory-budget FAIL still aborts the run. This substitution applies
+**only** while `NUKE_FACTORY_RUN` is set; every manual session keeps the human gate verbatim.

@@ -12,7 +12,7 @@ store, not here.
 ## Layout
 
 - `*.md` — one concept per page, cross-linked with `[[wikilinks]]`
-- `raw/` — immutable source material (articles, transcripts, data); add-only, never edit
+- `raw/` — immutable source material (articles, transcripts, data); add-only, never edit; created on first use
 - `index.md` — the catalog: EVERY page listed under exactly one category heading
 - `log.md` — chronological log: date, page(s) touched, one-line why
 
@@ -29,8 +29,6 @@ store, not here.
   them instead.
 - Sources go in `raw/` unmodified; wiki pages cite them with a relative link.
 - Append one line to `log.md` on every substantive change.
-- After larger additions, regenerate the graph with `/understand-knowledge`. Its output
-  (`.understand-anything/`) is a derived index — never hand-edit it.
 
 ## Scope test
 
