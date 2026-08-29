@@ -26,12 +26,10 @@ every word earns its place.
 
 Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git` if push fails due to missing credentials.
 
-**Settings tiers:** machine (`~/.claude/settings.json`) holds `env` and any absolute path; repo
-(`.claude/settings.json`, tracked) holds the allowlist, deny list and agent hook wiring —
-repository hooks live in `.githooks/`; scratch (`.claude/settings.local.json`, gitignored) is
-never committed. A matcher naming one shell tool must name both (`Bash|PowerShell`). A session
-approval is either rewritten as a generalized rule in the tracked repo file or discarded — never
-copied in verbatim. Validated by `python tools/allowlist_lint.py`; rationale in
+**Settings tiers:** machine (`~/.claude/settings.json`) / repo (`.claude/settings.json`, tracked)
+/ scratch (`.claude/settings.local.json`, gitignored, never committed). A session approval is
+either rewritten as a generalized rule in the tracked repo file or discarded — never copied in
+verbatim. Validated by `python tools/allowlist_lint.py`; rationale in
 [ADR 441](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/467) and
 [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).
 
@@ -68,21 +66,14 @@ Two things not obvious from frontmatter alone:
 
 ### Pi harness
 
-Running under the Pi agent (`pi`) instead of Claude Code? Two gates are absent there: **skill
-overlays never inject** (read `.claude/skill-overlays/` yourself) and **the `pwsh-*` background-job
-tools bypass every hook** (#572) — run builds and pushes through the shell tool, not a job.
-Full setup, the remaining missing gates, and why the two harnesses' hook anchors must not be
-copied between files: [`docs/pi-harness.md`](docs/pi-harness.md) — read it when running under Pi.
+Running under Pi instead of Claude Code? **The `pwsh-*` background-job tools bypass every
+hook** (#572) — run builds and pushes through the shell tool, not a job. Read
+[`docs/pi-harness.md`](docs/pi-harness.md) for the rest.
 
 ### omp harness
 
-Running under omp (`omp`, the oh-my-pi fork of Pi)? `.omp/` wires it: agents in `.omp/agents/`
-(omp skips `.claude/agents` and `.pi/agents` by design), hooks as TS factories in
-`.omp/hooks/pre/`, and `.omp/AGENTS.md`, whose `@../CLAUDE.md` import is the only reason this
-file reaches an omp session at all. Skills need no wiring — `.claude/skills/` loads natively.
-Three gates weaken or vanish: **the post-build bank/memory check reports but cannot block**,
-**skill overlays never inject**, and **`tools.approvalMode` defaults to `yolo`**, which is
-weaker than either other harness. Full detail: [`docs/omp-harness.md`](docs/omp-harness.md).
+Running under omp (the oh-my-pi fork of Pi)? **`tools.approvalMode` defaults to `yolo`** —
+weaker than either other harness. Read [`docs/omp-harness.md`](docs/omp-harness.md) for the rest.
 
 ## Debugging Rules
 

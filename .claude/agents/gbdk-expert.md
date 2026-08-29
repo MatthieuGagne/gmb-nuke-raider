@@ -60,12 +60,11 @@ One line each (symptom → fix). Distinct hazards — do not collapse.
 - **`(uint8_t)(n << 3u)` overflows for n ≥ 32 → wrong array slot** (256&0xFF=0). Use `((uint16_t)n << 3u)` when the array has >32 entries (e.g. `TRACK_TILE_LUT_LEN=47`). gb-c-optimizer may push uint8_t casts — verify the value range first.
 - **`<<` lower precedence than `+`** → `(uint16_t)tile_idx << 3u + oy` parses as `<< (3+oy)`. Always parenthesize: `((uint16_t)tile_idx << 3u) + oy`.
 - **Chaining two BANKED calls in a ternary → silent register corruption.** SDCC passes the first call's return register straight into the second; the trampoline clobbers it → garbage arg (e.g. `track_tile_type_from_index` returns `TILE_WALL` for road). Adding `EMU_printf` masks it (changes stack frame). Fix: use if/else, never a ternary, when feeding a BANKED return value into another BANKED call.
-- **`static` header fn dereferencing raw WRAM addr segfaults on GCC host tests.** `(volatile uint8_t*)0xDF80` is fine on GBC, crashes on Linux. Wrap fixed-addr writes: `#ifdef __SDCC` real write / `#else` no-op stub.
-- **New GBDK API call in `src/` not mocked** → `make test` "undefined reference". Before committing, grep `tests/mocks/gb/gb.h` for the fn and add a no-op stub if missing.
-- **`loader_load_state()` in `enter()` + test calls `enter()` twice → infinite hang** (double-load asserts `disable_interrupts(); while(1){}`). Grep the test for `enter()` calls outside setUp and prepend `state_X.exit(); loader_reset_bitmap_for_test();`. Run `make test` with `timeout 30` so a hang surfaces as a failure.
 - **BG tilemap garbled → must call `camera_set_tile_base()`.** `track_fill_*` return raw 0-based tile indices, but the loader puts TILE_ASSET_TRACK at slot 143; without the base, entries point at the font (tiles 0–127). Call `camera_set_tile_base(loader_get_slot(TILE_ASSET_TRACK))` before `camera_init()` in `state_playing.enter()`. Any module writing raw tile indices to BG needs the same base.
 - **`set_bkg_attributes(palette 0)` on track BG rows → overlay text invisible.** `camera_init`'s `stream_row_direct` already sets a palette that makes font digits readable; overwriting it with palette 0 can hide them. Don't call `set_bkg_attributes` for overlay tiles on track rows — let the camera's track palette apply.
-- **Hardware register mock declared `static` in header** → each TU gets its own copy (`sfx.c` writes its `NR44_REG`, test reads its own =0). Any register observed from a test must be `extern uint8_t` in the header, defined in `tests/mocks/hardware_regs.c`.
+
+**Test-harness-only gotchas** (mocks, GCC host segfaults, `enter()` double-init, register mocks):
+`.claude/agents/references/test-harness-gotchas.md` — read it when writing or debugging a test.
 
 ## Verification Commands
 After making changes, verify with:

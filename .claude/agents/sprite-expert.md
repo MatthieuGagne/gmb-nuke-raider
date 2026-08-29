@@ -54,11 +54,11 @@ move_sprite(slot, (uint8_t)(sx + 8), (uint8_t)(sy + 16));
 **Common mistake:** using 152 or 136 as max oam_x/oam_y — these cut off ~15px of valid screen area.
 
 **Player render pattern:** the player is a **16×16 quad of four 8×8 sprites**, not a two-slot
-stack. `src/player.c:42` declares `DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */`,
-populated by four `get_sprite()` calls in `player_init()` (`player.c:163-170`). Rendering sets
+stack. `src/player.c` declares `DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */`,
+populated by four `get_sprite()` calls in `player_init()`. Rendering sets
 per-slot tiles from the `DIR_TILE_TL/BL/TR/BR` tables plus a shared `set_sprite_prop(slot, flip)`
-from `DIR_FLIP[player_dir]`, then camera-adjusts one `hw_x`/`hw_y` origin. Read
-`src/player.c:279-292` for the canonical sequence rather than copying a paraphrase.
+from `DIR_FLIP[player_dir]`, then camera-adjusts one `hw_x`/`hw_y` origin. Read the sequence
+around the `hw_x`/`hw_y` assignment in `player.c` for the canonical order rather than copying a paraphrase.
 
 ---
 
@@ -117,24 +117,12 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 
 **All assets in the project that use this pipeline:** see the `png_to_tiles.py` rules in the `Makefile` — the authoritative, always-current list. Deliberately not duplicated here — a hand-maintained table rots.
 
-**Aseprite CLI export (single-frame sprites):**
-```sh
-aseprite --batch assets/sprites/<name>.aseprite --save-as assets/sprites/<name>.png
-```
-Note: `--export-type` is NOT a valid flag. Use `--save-as` with a `.png` extension.
+**Multi-frame sprites — CRITICAL:** the generic Makefile export rule produces numbered files
+(`name1.png`, `name2.png`, …) instead of a sprite sheet for any sprite with more than 1 frame —
+it needs a `--sheet`-based override rule instead.
 
-**Multi-frame sprites — CRITICAL:** `--save-as` with a multi-frame `.aseprite` produces **numbered files** (`name1.png`, `name2.png`, …), NOT a sprite sheet. For any sprite with more than 1 frame, use `--sheet` instead:
-```sh
-aseprite --batch assets/sprites/<name>.aseprite --sheet assets/sprites/<name>.png --sheet-type horizontal
-```
-The generic Makefile rule `assets/sprites/%.png: assets/sprites/%.aseprite` uses `--save-as` and **will produce wrong output** for multi-frame sprites. Add a specific override rule for any multi-frame sprite:
-```makefile
-assets/sprites/<name>.png: assets/sprites/<name>.aseprite
-	aseprite --batch $< --sheet $@ --sheet-type horizontal
-```
-Make's specific rules take precedence over pattern rules for the same target, so placement does not matter.
-
-**REQUIRED — Aseprite CLI:** ALWAYS invoke the **`aseprite`** skill before running any `aseprite` command. It has the complete flag reference.
+**REQUIRED — Aseprite CLI:** ALWAYS invoke the **`aseprite`** skill before running any `aseprite`
+command. It has the complete flag reference, including the multi-frame override recipe above.
 
 ---
 
