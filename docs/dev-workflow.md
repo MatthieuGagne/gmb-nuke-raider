@@ -675,6 +675,21 @@ in branch protection, so it does not block merge. Its regex is a bash mirror of 
 The gate-enforcing workflows are separate: `.github/workflows/build.yml` provides the four
 required status checks listed in §4, "CI-enforced gates". Those *do* block merge.
 
+### Routes to a linked issue
+
+`Closes #N` needs an issue to point at, and not every change starts from one. Two routes are
+sanctioned; both end at the same place, and neither weakens `pr-linked-issue.yml`.
+
+- **A spec issue filed ahead of the work.** The normal route, and the one §3 describes.
+- **A Garage work item filed on demand.** For parameter tuning done in
+  [Garage](https://github.com/MatthieuGagne/nuke-raiders-garage), where the change is a handful
+  of `#define` values and an issue would otherwise be written after the fact. On an explicit
+  action — never on its own, not when it creates a worktree and not when it commits, because
+  most tuning work is abandoned — Garage files a `chore:` issue for the active worktree, writes
+  each changed `#define` into the body with its value at `HEAD` and its new value, boards it
+  with `Type` = `Chore` and `Status` = `Todo`, and puts `Closes #N` on the clipboard for the
+  pull request body.
+
 ---
 
 ## 9. Factory run registry
