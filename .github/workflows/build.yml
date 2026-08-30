@@ -21,9 +21,9 @@ jobs:
 
   # ── Tool suite (Python) — both platforms ─────────────────────────────
   # A separate job from Unit Tests so a unit-suite failure cannot mask a
-  # tool-suite failure, and matrixed so the Windows-only import class (#441,
-  # dialog_editor's curses) is caught by machine. No paths: filter — a filtered
-  # required check never reports and deadlocks the PR.
+  # tool-suite failure, and matrixed so the Windows-only import class (#441, an
+  # unguarded curses/termios/tty import) is caught by machine. No paths: filter
+  # — a filtered required check never reports and deadlocks the PR.
   test-tools:
     name: Tool Tests
     strategy:
