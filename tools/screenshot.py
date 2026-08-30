@@ -43,8 +43,8 @@ def _exit(msg: str) -> None:
 
 # Bind to None rather than exiting: exiting at import time makes the whole
 # module unimportable, which takes build_parser() — and the tests that check
-# the CLI surface — out of reach wherever PyBoy is absent, such as CI. Same
-# guard as tools/dialog_editor.py's curses import; see docs/dev-workflow.md §4.
+# the CLI surface — out of reach wherever PyBoy is absent, such as CI. The rule
+# is docs/dev-workflow.md §4, which cites this file as its worked example.
 try:
     from pyboy import PyBoy
 except ImportError:  # pragma: no cover - optional dependency

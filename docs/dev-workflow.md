@@ -217,11 +217,15 @@ The tool suite **discovers** every `tests/test_*.py`: adding a test module gates
 `Makefile` edit. Nothing is opted in by name, because a hardcoded list is how two modules went
 ungated for four months (#441).
 
-**POSIX-only imports must be guarded.** `curses`, `termios` and `tty` do not exist on Windows.
-Import them in a `try/except ImportError` that binds the name to `None`, and check for `None` at
-the TUI entry point — see `tools/dialog_editor.py`. An unguarded import
-takes the whole module out of the suite: the module errors at import, and on a green-looking run
-that reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exist to catch this.
+**An import that can fail on one platform must be guarded.** `curses`, `termios` and `tty` do
+not exist on Windows; an optional dependency such as PyBoy is absent anywhere it is not
+installed. Import it in a `try/except ImportError` that binds the name to `None`, and check for
+`None` at the entry point that needs it — see `tools/screenshot.py`, which is the pattern in
+full. That example guards an optional dependency rather than a POSIX-only module, because no
+POSIX-only import is left in this repository — the last one went when the curses dialog editor
+was retired (#613). The rule and its reason are unchanged: an unguarded import takes the whole
+module out of the suite, because the module errors at import, and on a green-looking run that
+reads as "not my problem". Both matrix legs of the `Tool Tests` CI job exist to catch this.
 
 ### Gates that run without you
 
