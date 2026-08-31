@@ -1,2 +1,3 @@
 pyboy==2.7.0
 Pillow==12.3.0
+lizard==1.17.31
