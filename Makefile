@@ -46,7 +46,7 @@ TEST_FLAGS   := -Itests/mocks -Itests/unity/src -Isrc -Ilib/hUGEDriver/include -
 TEST_LIB_SRC := $(filter-out src/main.c,$(wildcard src/*.c))
 MOCK_SRCS    := $(wildcard tests/mocks/*.c)
 
-.PHONY: all clean test test-tools hooks smoketest export-sprites bank-check bank-post-build memory-check memory-check-debug tile-check dialog_data build-debug sync-docs
+.PHONY: all clean test test-tools hooks smoketest export-sprites bank-check bank-post-build memory-check memory-check-debug tile-check dialog_data build-debug sync-docs coverage
 
 all: hooks $(TARGET) sync-docs
 
@@ -248,6 +248,40 @@ test: $(TEST_SRCS) | build
 		echo "  RUN build/$$name"; \
 		./build/$$name || exit 1; \
 	done
+
+# Coverage-instrumented host test run (#699). Deliberately not part of `test`:
+# it writes to build/coverage/ so the binaries `make test` produces in build/
+# are untouched, and it has no `|| exit 1` — a run that stopped at the first
+# failing binary would yield partial coverage and understate every CRAP score
+# after the stopping point. Unity, mocks and the test sources are compiled
+# WITHOUT --coverage, so only src/*.c produces gcov data.
+COV_DIR := build/coverage
+COV_OBJ := $(COV_DIR)/obj
+COV_SUP := $(COV_DIR)/support
+
+coverage:
+	rm -rf $(COV_DIR)
+	mkdir -p $(COV_OBJ) $(COV_SUP)
+	@for s in $(TEST_LIB_SRC); do \
+		name=$$(basename $$s .c); \
+		echo "  CC(cov) $$s"; \
+		gcc $(TEST_FLAGS) --coverage -O0 -c $$s -o $(COV_OBJ)/$$name.o || exit 1; \
+	done
+	@for s in $(UNITY_SRC) $(MOCK_SRCS); do \
+		name=$$(basename $$s .c); \
+		echo "  CC  $$s"; \
+		gcc $(TEST_FLAGS) -c $$s -o $(COV_SUP)/$$name.o || exit 1; \
+	done
+	@fail=0; \
+	for f in $(TEST_SRCS); do \
+		name=$$(basename $$f .c); \
+		echo "  CC  $$f"; \
+		gcc $(TEST_FLAGS) -c $$f -o $(COV_DIR)/$$name.o || { fail=1; continue; }; \
+		gcc --coverage $(COV_DIR)/$$name.o $(COV_SUP)/*.o $(COV_OBJ)/*.o -o $(COV_DIR)/$$name || { fail=1; continue; }; \
+		echo "  RUN $(COV_DIR)/$$name"; \
+		./$(COV_DIR)/$$name || fail=1; \
+	done; \
+	exit $$fail
 
 # src/overmap_tiles.c is checked into git so CI works without Python/Aseprite.
 src/overmap_tiles.c: assets/maps/overmap_tiles.png tools/png_to_tiles.py
