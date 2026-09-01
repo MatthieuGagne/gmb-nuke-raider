@@ -295,6 +295,21 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload['violations'], 1)
         self.assertEqual(payload['findings'][0]['function'], 'foo_hairy')
 
+    def test_dot_slash_prefix_is_normalised_and_scored(self):
+        rc = crap_score.main(['--threshold', '8', '--files', './src/foo.c'])
+        self.assertEqual(rc, 1)
+        self.assertIn('foo_hairy', self.out.getvalue())
+
+    def test_unrecognised_files_entry_with_nothing_surviving_is_usage_error(self):
+        rc = crap_score.main(['--threshold', '8', '--files', 'SRC/foo.c'])
+        self.assertEqual(rc, 2)
+        self.assertIn('SRC/foo.c', self.err.getvalue())
+
+    def test_mixed_good_and_bad_files_entries_scores_the_good_one(self):
+        rc = crap_score.main(['--threshold', '8', '--files', 'src/foo.c', 'SRC/foo.c'])
+        self.assertEqual(rc, 1)
+        self.assertIn('SRC/foo.c', self.err.getvalue())
+
 
 class DiffScopeTests(unittest.TestCase):
     DIFF = textwrap.dedent(
