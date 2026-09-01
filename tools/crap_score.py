@@ -264,3 +264,134 @@ def score(files, coverage, complexity, threshold=DEFAULT_THRESHOLD, line_scope=N
             })
     records.sort(key=lambda r: (-r['crap'], r['file'], r['line']))
     return records
+
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import install_hooks  # noqa: E402  (path must be set first)
+
+
+def _scope_from_diff(diff_text):
+    """{'src/foo.c': {11, 12}} — the post-image lines a unified diff touches."""
+    scope = {}
+    current = None
+    for line in diff_text.splitlines():
+        if line.startswith('+++ '):
+            path = line[4:].strip()
+            if path == '/dev/null':
+                current = None
+            else:
+                current = path[2:] if path.startswith('b/') else path
+                scope.setdefault(current, set())
+        elif line.startswith('@@') and current is not None:
+            if '+' not in line:
+                continue
+            # "@@ -10,0 +11,2 @@ int foo_hairy(int a)" -> "11,2"
+            body = line.split('+', 1)[1].split(' ', 1)[0]
+            start, _, count = body.partition(',')
+            try:
+                start = int(start)
+                count = int(count) if count else 1
+            except ValueError:
+                continue
+            scope[current].update(range(start, start + count))
+    return scope
+
+
+def scope_from_commit_range(rev_range, repo_root='.'):
+    # clean_env(): git exports GIT_DIR/GIT_INDEX_FILE into every hook's
+    # environment and they override cwd, so a crap_score invoked from a hook
+    # would otherwise diff the hook's repository, not repo_root (#441).
+    proc = subprocess.run(
+        ['git', 'diff', '--unified=0', rev_range],
+        cwd=repo_root, capture_output=True, text=True, env=install_hooks.clean_env(),
+    )
+    if proc.returncode != 0:
+        raise ToolMissing(
+            f"crap_score: git diff --unified=0 {rev_range} failed in {repo_root} — "
+            f"{proc.stderr.strip()}"
+        )
+    return _scope_from_diff(proc.stdout)
+
+
+def render(records, threshold):
+    over = [r for r in records if r['over']]
+    lines = [f"CRAP threshold {threshold:g} — {len(over)} over threshold "
+             f"of {len(records)} in-scope function(s)"]
+    for r in over:
+        lines.append(
+            f"  {r['file']}:{r['line']}  {r['function']}  "
+            f"complexity={r['complexity']}  coverage={r['coverage'] * 100:.1f}%  "
+            f"crap={r['crap']:.1f}"
+        )
+    if over:
+        lines.append("")
+        lines.append("Fix each by covering its untested branches, or by splitting it into "
+                     "smaller functions. Re-run `make coverage` before re-checking. Note "
+                     "complexity is measured unpreprocessed, so #ifdef __SDCC branches count.")
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog='crap_score.py',
+        description='CRAP score gate for diff-scoped src/*.c functions (#699).',
+    )
+    parser.add_argument('--threshold', type=float, default=DEFAULT_THRESHOLD)
+    parser.add_argument('--files', nargs='+', default=None,
+                        help='repo-relative paths; every function in each file is scored')
+    parser.add_argument('--commit-range', default=None,
+                        help='e.g. origin/master...HEAD; only functions whose span '
+                             'intersects the changed lines are scored')
+    parser.add_argument('--coverage-dir', default=DEFAULT_COVERAGE_DIR)
+    parser.add_argument('--repo-root', default='.')
+    parser.add_argument('--json', action='store_true')
+    args = parser.parse_args(argv)
+
+    if bool(args.files) == bool(args.commit_range):
+        sys.stderr.write(
+            "crap_score: give exactly one scope — --files <paths> or --commit-range <range>. "
+            "Scoring the whole codebase is out of scope by design (#699).\n"
+        )
+        return 2
+
+    line_scope = None
+    try:
+        if args.commit_range:
+            line_scope = scope_from_commit_range(args.commit_range, args.repo_root)
+            files = sorted(line_scope)
+        else:
+            files = list(args.files)
+        files = [f.replace('\\', '/') for f in files]
+        files = [f for f in files if f.startswith('src/') and f.endswith('.c')]
+        scoped = [f for f in files if f not in EXEMPT_FILES]
+        exempt = [f for f in files if f in EXEMPT_FILES]
+        if not scoped:
+            if args.json:
+                print(json.dumps({'threshold': args.threshold, 'scope': [], 'exempt': exempt,
+                                  'findings': [], 'violations': 0}, indent=2))
+            else:
+                print(render([], args.threshold))
+            return 0
+        coverage = collect_coverage(args.coverage_dir, args.repo_root, expected=scoped)
+        complexity = collect_complexity(scoped, args.repo_root)
+    except ToolMissing as exc:
+        sys.stderr.write(str(exc) + "\n")
+        return 2
+
+    records = score(files, coverage, complexity, args.threshold, line_scope)
+    if args.json:
+        print(json.dumps({
+            'threshold': args.threshold,
+            'scope': scoped,
+            'exempt': exempt,
+            'findings': records,
+            'violations': sum(1 for r in records if r['over']),
+        }, indent=2))
+    else:
+        print(render(records, args.threshold))
+    return 1 if any(r['over'] for r in records) else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
