@@ -60,14 +60,13 @@ degradation, never a run failure: note the `factory-publish: WARNING:` line and 
 ## PLAN
 
 1. Append the stage event: `--kind stage --field stage=PLAN`.
-2. Create the worktree. The `git worktree add` is the portable half; entering it is the one
-   Claude-specific step to re-map on migration:
-   ```
-   LOG PLAN -- git worktree add .claude/worktrees/factory-issue-<N> -b factory-issue-<N> origin/master
-   ```
-   Then `EnterWorktree(path=".claude/worktrees/factory-issue-<N>")`.
-   **If the path or branch already exists:** do not delete and do not overwrite. Resume when the
-   registry state matches this issue; otherwise stop with guidance naming the existing path.
+2. Create the worktree through Orca: invoke the `orca-cli` skill (exact commands come from
+   `ORCA skills get orca-cli` — never guess flags), requesting branch `factory-issue-<N>` from
+   `origin/master`. Orca worktrees live under `~\orca\workspaces\<repo>\<name>`. Never use
+   `git worktree add`, the `EnterWorktree` tool, or `.worktrees/`/`.claude/worktrees/`
+   directories.
+   **If the worktree or branch already exists:** do not delete and do not overwrite. Resume when
+   the registry state matches this issue; otherwise stop with guidance naming the existing path.
 3. Record the worktree and branch on the run:
    ```
    python tools/factory_event.py --issue <N> --kind start --field worktree=<abs path> --field branch=factory-issue-<N> --field stage=PLAN

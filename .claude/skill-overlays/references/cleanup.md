@@ -15,15 +15,23 @@ GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree 
 ```
 If not listed, skip removal (already gone).
 
-**Step 6b: Exit the EnterWorktree session if still active**
+**Step 6b: Remove an Orca-managed worktree via the Orca CLI**
 
-If the current session was started with `EnterWorktree` and is still inside this worktree, Claude Code will block all Bash commands once the directory is deleted. Use `ExitWorktree` first — it removes the directory, clears the session CWD, and returns to the main repo:
+Orca-managed worktrees (under `~\orca\workspaces\<repo>\<name>`) are removed through the Orca
+CLI — invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never
+guess flags). If the session CWD is inside the worktree, `cd C:/Code/nuke-raider` first.
+After the Orca removal succeeds, skip to Step 6d — the worktree is already removed.
+
+**Legacy fallback** — only for a pre-Orca worktree that was started with `EnterWorktree` and is
+still the active session context (Claude Code blocks all Bash commands once the directory is
+deleted): use `ExitWorktree` first — it removes the directory, clears the session CWD, and
+returns to the main repo:
 ```
 ExitWorktree(action="remove", discard_changes=true)
 ```
 After `ExitWorktree` returns, skip to Step 6d — the worktree is already removed.
 
-If the session is NOT inside an active `EnterWorktree` context, continue to Step 6c.
+Otherwise (not Orca-managed, no active `EnterWorktree` context), continue to Step 6c.
 
 **Step 6c: cd to main repo root and remove the worktree**
 
