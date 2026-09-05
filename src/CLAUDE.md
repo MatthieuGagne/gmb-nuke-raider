@@ -73,6 +73,14 @@ Canonical race path: `title(0) → overmap(0) → prerace(+1=1) → playing(1) �
 - WRAM: 8 KB — large arrays must be global or `static`, never local
 - ROM: MBC5, 512 KB = 32 banks — auto-sized by makebin (an lcc-internal behaviour; there is no `-yo` flag in the Makefile to grep for), recorded in cartridge header byte `0x148`, and read from there by `tools/bank_post_build.py`. **Not** declared by `-Wm-ya32`: `-ya` is makebin's RAM bank count and that value is discarded. Assets are tagged for banking, and `-autobank` spills code past bank 0 into the autobank pool, banks 1-29 (state code lives in banks 2-3). Two banks are pinned by hand instead: 31 for `src/music_data.c`, 30 for `src/debug.c` (the debug-ROM-only test command mailbox, #590)
 
+## Bank manifest maintenance
+
+Every new `src/*.c` file must have an entry in `bank-manifest.json` **before it is written**. The
+`bank-pre-write` gate (`tools/bank_check_hook.py`) and `tools/bank_check.py` (a Makefile
+dependency) both enforce this. Every banking-related PR must update ALL artifacts:
+`bank-manifest.json`, the `bank-pre-write` and `post-build-gates` skills, `tools/bank_check.py`,
+the `gbdk-expert` agent, and this file (`src/CLAUDE.md`).
+
 ## GBDK / SDCC constraints
 
 - **No compound literals**: SDCC rejects `(const uint16_t[]){...}` — use named `static const` arrays.

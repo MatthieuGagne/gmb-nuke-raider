@@ -16,6 +16,14 @@ Frontmatter translation:
             dropped: PowerShell, WebFetch, Skill, TodoWrite
     color:  dropped
 
+Body translation:
+    The body is copied verbatim, then OMP_ADJUSTMENTS is appended once at the
+    end of every mirror. The canonical bodies are written for Claude Code and
+    name tools omp does not have ("invoke the `bank-pre-write` skill", "use the
+    PowerShell tool"); the appended block tells the omp subagent how to read
+    those instructions with the tools it actually has, in the same wording the
+    hand-written .pi/agents/*.md wrappers use.
+
 Exit codes:
     0  sync completed
     1  operational error (canonical directory missing, or a file failed to parse)
@@ -44,6 +52,29 @@ TOOL_MAP = {
 
 DROPPED_TOOLS = {"PowerShell", "WebFetch", "Skill", "TodoWrite"}
 DROPPED_KEYS = {"color"}
+
+# Appended verbatim to the end of every generated .omp/agents/*.md body. The
+# canonical bodies are written for Claude Code, so they issue instructions omp
+# cannot follow literally; this block re-maps them onto omp's tool set. Wording
+# follows the hand-written .pi/agents/*.md wrappers.
+OMP_ADJUSTMENT_HEADING = "## omp harness adjustments"
+OMP_ADJUSTMENTS = """---
+
+## omp harness adjustments
+
+Everything above is the canonical Claude Code agent file, copied verbatim. Three
+adjustments apply when you follow it under omp:
+
+- **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
+  project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
+  read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
+- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
+  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
+  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
+  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
+  names; your tools are the omp ones in this file's frontmatter above.
+"""
 
 
 def split_frontmatter(text):
@@ -104,7 +135,12 @@ def translate_tools(value):
 
 
 def render(source_text):
-    """Render the omp mirror of one canonical agent file's text."""
+    """Render the omp mirror of one canonical agent file's text.
+
+    The frontmatter is translated to omp's dialect and the body is copied
+    verbatim, with OMP_ADJUSTMENTS appended once at the end so the omp subagent
+    can act on instructions written against Claude Code's tool set.
+    """
     front_lines, body_lines = split_frontmatter(source_text)
     out = ["---"]
     for key, value in parse_frontmatter(front_lines):
@@ -117,7 +153,8 @@ def render(source_text):
         else:
             out.append("%s: %s" % (key, value))
     out.append("---")
-    return "\n".join(out + body_lines)
+    mirrored = "\n".join(out + body_lines).rstrip("\n")
+    return "%s\n\n%s" % (mirrored, OMP_ADJUSTMENTS)
 
 
 def write_if_changed(path, content):

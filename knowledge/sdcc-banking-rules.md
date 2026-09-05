@@ -1,5 +1,5 @@
 ---
-summary: SDCC / GBDK banking calling-convention rules — BANKED trampoline, ternary register-corruption hazard, SWITCH_ROM, #pragma bank 255 autobank, static same-bank helpers, declarations at block start, compound literal rejection
+summary: SDCC / GBDK banking calling-convention rules — BANKED trampoline, ternary register-corruption hazard, SWITCH_ROM, #pragma bank 255 autobank, static same-bank helpers, declarations at block start, compound literal rejection, int8_t zero-store casts
 tags: [gbdk, sdcc, banking, calling-convention, gotcha]
 ---
 
@@ -80,3 +80,10 @@ from the TU's own bank are same-bank and safe (`WEAPON1_DAMAGE_TABLE` read from
 - Watch `uint8_t` overflow when narrowing: use `(uint16_t)n * 8u` for pixel spans, never
   `(uint8_t)(n << 3u)` ([[beam-laser-module]]); cast every `+`/`-` explicitly when
   values are proven ≤ a small bound.
+- Cast zero stores into `int8_t` as `= (int8_t)0`, never a bare `= 0`. SDCC promotes the
+  untyped `0` literal to 16-bit `int` before assignment, so without the cast it may emit a
+  16-bit store instead of an 8-bit one — larger code and inconsistent codegen. Applies to
+  every `int8_t` SoA zero-init and reset (init loops, collision reset blocks, spawn
+  helpers): `racer_vx[i]` / `racer_vy[i]` in `src/racer.c` carry the cast at all ten sites,
+  from the PR #369 `gb-c-optimizer` review. That agent catches the omission automatically,
+  but write it correctly the first time.

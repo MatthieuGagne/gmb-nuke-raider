@@ -1,6 +1,7 @@
 ---
 name: factory
 description: "Use when the user runs /factory <issue#> — drives a PRD issue through GATE, PLAN, BUILD, VERIFY and SHIP unattended, ending at a reviewable PR. Flags: --stage NAME, --resume, --dry-run."
+disable-model-invocation: true
 ---
 
 # Factory Orchestrator
@@ -120,20 +121,9 @@ Note the `factory-publish: WARNING:` lines and carry on. Exit 2 is misuse — fi
 
 ## Decisions
 
-R5 of the epic: mid-run ambiguities are resolved **conservatively** and logged. Conservative
-means: prefer the interpretation that changes least, keeps existing behaviour, and stays inside
-the spec's stated scope. When the spec itself asks you to choose (e.g. "decide which side is
-wrong"), pick the option with the smaller blast radius, record the reasoning, and move on.
-
-Every such call becomes a `decision` event immediately — not at the end. The record goes to one
-surface per run. A run that opens a pull request puts it in the PR body's *Decisions made*
-section, which is the human's entry point at review, and the run issue links to the PR. A run
-that fails opens no pull request, so the run issue keeps the record.
-
-Add `--field finding=true` when the ruling names a defect in the draft plan that you corrected
-before writing code. The run issue then renders it under *Plan review findings* and the PR body
-omits it. A finding shows that plan review works. It is not a fact about the code under review.
-An unmarked ruling stays a decision, so a forgotten marker costs nothing.
+Mid-run ambiguities are resolved **conservatively** and each becomes a `decision` event
+immediately. What "conservative" means, which surface keeps the record, and the
+`--field finding=true` marker: `references/stages.md` under *Decisions*.
 
 ## How to write a decision, a failure, and a PR summary
 
@@ -143,10 +133,8 @@ Plain English, active voice, verbatim tool output in failures. Field-by-field te
 ## Retry budgets
 
 Every budget — BUILD 2 attempts, blocking smoketest 1 differential-guided attempt, evidence
-scenario 1 attempt, memory FAIL 0 — is in `references/stages.md` under *Retry budgets*, and
-restated at the stage that owns it. Two rules that must not be forgotten: a memory-budget FAIL
-aborts immediately with no retry, and the smoketest diagnostic starts from the **differential
-report** (the first WRAM divergence against the reference ROM), never from code inspection.
+scenario 1 attempt, memory FAIL 0 (abort immediately, no retry) — is in `references/stages.md`
+under *Retry budgets*, and restated at the stage that owns it.
 
 ## The smoketest gate, under a factory run
 

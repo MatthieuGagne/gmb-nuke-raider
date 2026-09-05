@@ -1,6 +1,6 @@
 ---
 name: gb-c-optimizer
-description: "Reviews C for Game Boy performance, ROM/RAM size, and GBDK anti-patterns — and owns the project's canonical GB C anti-pattern list. Dispatch with \"review only: <target>\" to get a report with no edits, or \"review and fix: <target>\" to apply the fixes in place. With neither phrase it reports only. Use on ROM size questions, code using malloc/stdlib, hot-path optimization, or a post-implementation diff review. Examples: \"review only: src/main.c\", \"review and fix: the diff in HEAD\", \"why is my ROM too large\"."
+description: "Reviews C for Game Boy performance, ROM/RAM size, and GBDK anti-patterns — and owns the project's canonical GB C anti-pattern list. Dispatch with \"review only: <target>\" to get a report with no edits, or \"review and fix: <target>\" to apply the fixes in place. With neither phrase it reports only. Use on ROM size questions, code using malloc/stdlib, hot-path optimization, or a post-implementation diff review. Examples: \"review only: src/main.c\", \"review and fix: the diff in HEAD\", \"why is my ROM too large\". DO NOT TRIGGER when: writing a new module from a task or plan, or answering a GBDK-2020 API, hardware-register or compile-error question (use gbdk-expert)."
 model: "@smol"
 tools: read, grep, glob, edit, bash
 ---
@@ -74,3 +74,20 @@ what the fix would be — the implementer applies it.
 After making changes, verify with:
 - `/test` skill — run `make test` (host-side unit tests, gcc only)
 - `/build` skill — run `make` (full ROM build)
+
+---
+
+## omp harness adjustments
+
+Everything above is the canonical Claude Code agent file, copied verbatim. Three
+adjustments apply when you follow it under omp:
+
+- **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
+  project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
+  read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
+- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
+  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
+  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
+  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
+  names; your tools are the omp ones in this file's frontmatter above.
