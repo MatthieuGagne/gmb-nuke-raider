@@ -55,7 +55,12 @@ If any risks are found, resolve them or get explicit user confirmation before pr
 
 ## Step 3 — Worktree Check
 
-**HARD STOP:** If you are not inside a git worktree, enter one now using the `using-git-worktrees` skill or `EnterWorktree` tool. Do not proceed until confirmed.
+**HARD STOP:** If you are not inside a git worktree, create one now through Orca: invoke the
+`orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags). Orca
+worktrees live under `~\orca\workspaces\<repo>\<name>`. Never use `git worktree add`, the
+`EnterWorktree` tool, or `.worktrees/`/`.claude/worktrees/` directories. To check whether you are
+in a linked worktree, compare `git rev-parse --git-dir` with `git rev-parse --git-common-dir` —
+they differ in a linked worktree. Do not proceed until confirmed.
 
 Branch naming convention: `feat/<short-description>`.
 
@@ -90,8 +95,8 @@ It **overrides Step 3 and Step 4 above**.
   ```
   python tools/factory_event.py --issue <N> --kind decision --field "text=<risk and how it was resolved>"
   ```
-- **Step 3 (Worktree Check):** the worktree already exists — PLAN created
-  `.claude/worktrees/factory-issue-<N>` on branch `factory-issue-<N>`. Do not create another and
+- **Step 3 (Worktree Check):** the worktree already exists — PLAN created it through Orca
+  (under `~\orca\workspaces\<repo>\`) on branch `factory-issue-<N>`. Do not create another and
   do not rename the branch.
 - **Step 4:** the abbreviated sequence's steps 1-3 are unchanged (edit, fetch+merge, clean
   build). Step 4's Emulicious launch is replaced by

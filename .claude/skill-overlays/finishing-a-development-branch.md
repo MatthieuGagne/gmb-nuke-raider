@@ -27,9 +27,10 @@ recovery` below defers to it.
 - **Never commit directly to `master`.**
   **Why:** project branch policy; the baseline's Option 1 would otherwise write to it.
 - **The worktree-cleanup reference now lives at `.claude/skill-overlays/references/cleanup.md`** — not under the skill's own `references/` directory. It holds the full cleanup fallback ladders and per-option triggers.
-  **Why:** this project's worktrees live under `.claude/worktrees/`, outside the `.worktrees/` /
-  `worktrees/` paths the baseline is willing to clean, and the Windows removal failures in that
-  reference have no upstream equivalent.
+  **Why:** this project's worktrees are Orca-managed and live under
+  `~\orca\workspaces\<repo>\<name>`, outside the `.worktrees/` / `worktrees/` paths the baseline
+  is willing to clean, and the Windows removal failures in that reference have no upstream
+  equivalent.
 
 ## Project additions
 
@@ -150,7 +151,8 @@ Full ladders are in `.claude/skill-overlays/references/cleanup.md`. The three re
 all **mechanical** failures, distinct from the baseline's `contains modified or untracked files`
 refusal, which is a *content* refusal and is handled by the baseline's ask-first block, not here:
 
-- Bash blocked with "Path does not exist" after merge → the session is inside an active `EnterWorktree`; use `ExitWorktree(action="remove", discard_changes=true)` first.
+- Orca-managed worktrees (under `~\orca\workspaces\`) are removed via the Orca CLI — invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags), not `git worktree remove`.
+- **Legacy fallback:** Bash blocked with "Path does not exist" after merge → the session is inside an active `EnterWorktree` (pre-Orca worktree); use `ExitWorktree(action="remove", discard_changes=true)` first.
 - `git worktree remove` fails with "Unable to read current working directory" → `cd C:/Code/nuke-raider` before any `git worktree remove`.
 - `git worktree remove --force` fails with "is not a working tree" → the directory is already gone; fall back to `rm -rf <path> && git worktree prune`.
 
@@ -158,11 +160,17 @@ refusal, which is a *content* refusal and is handled by the baseline's ask-first
 the user has already typed `discard` and authorized the loss. For any other refusal, follow the
 baseline: show the file list and ask.
 
-To discard a branch — **only after the user has typed `discard`**, per the baseline — remove the worktree first, then delete the branch from the main repo:
+To discard a branch — **only after the user has typed `discard`**, per the baseline — remove the
+worktree first via the Orca CLI (invoke the `orca-cli` skill; exact commands come from
+`ORCA skills get orca-cli` — never guess flags), then delete the branch from the main repo:
+```powershell
+cd C:/Code/nuke-raider
+git -C C:/Code/nuke-raider branch -D <feature-branch>
+```
+**Legacy fallback** (pre-Orca worktree only):
 ```powershell
 cd C:/Code/nuke-raider
 GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
-git -C C:/Code/nuke-raider branch -D <feature-branch>
 ```
 
 ### Never

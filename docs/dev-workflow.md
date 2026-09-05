@@ -72,7 +72,10 @@ manual sessions alike (#533).
 
 - **Never commit directly to `master`.** All work goes on a feature branch and merges via PR.
 - **Always work inside a git worktree.** Every file operation — create, edit, delete — must
-  happen in a worktree. Use `EnterWorktree` or the `using-git-worktrees` skill before any write.
+  happen in a worktree. Create it through Orca: invoke the `orca-cli` skill (exact commands come
+  from `ORCA skills get orca-cli` — never guess flags). Orca worktrees live under
+  `~\orca\workspaces\<repo>\<name>`. Never use `git worktree add`, the `EnterWorktree` tool, or
+  `.worktrees/`/`.claude/worktrees/` directories.
 - **Integrate via PR only.** Never merge feature branches to master locally.
 - Use `gh` for all GitHub operations. Run `gh auth setup-git` if push fails.
 - **Settings are tiered.** `~/.claude/settings.json` holds machine values (`GBDK_HOME`, `PYTHONUTF8`, `EMULICIOUS_INI`, `MAKE_PATH_PREPEND`, absolute-path allow rules); `.claude/settings.json` is tracked and holds the curated allowlist, the deny list and all hook wiring; `.claude/settings.local.json` is gitignored scratch and is never committed. New permissions are promoted as generalized wildcard rules into the tracked file, or discarded. Validate with `python tools/allowlist_lint.py`; `make test-tools` enforces it. See [ADR 443](https://github.com/MatthieuGagne/gmb-nuke-raider/issues/466).

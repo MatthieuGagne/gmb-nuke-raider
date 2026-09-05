@@ -26,11 +26,16 @@ stale-`build/` and stale-`make test` traps below are this project's, and both ha
 
 - **Hard gate before reading the plan or touching any file:** confirm you are in a git worktree, not the main repo.
   ```bash
-  git worktree list
+  git rev-parse --git-dir
+  git rev-parse --git-common-dir
   git branch --show-current
   pwd
   ```
-  Expected: current directory under `.claude/worktrees/`, branch is a feature branch (not `master`). If not, enter one first.
+  Expected: the two `rev-parse` outputs **differ** (a linked worktree — Orca worktrees live under
+  `~\orca\workspaces\<repo>\<name>`), branch is a feature branch (not `master`). If not, create
+  one through Orca: invoke the `orca-cli` skill (exact commands come from
+  `ORCA skills get orca-cli` — never guess flags). Never use `git worktree add`, the
+  `EnterWorktree` tool, or `.worktrees/`/`.claude/worktrees/` directories.
 - **Verify `pwd` before every `make` or emulator launch.** Never launch the ROM from the main repo's `build/` — it may be stale.
 - **`make test` must be run from the worktree directory.** Running it from the main repo root tests stale compiled binaries and silently masks real failures.
 - After confirming the worktree, sync: `git fetch origin && git merge origin/master`. Never `git merge master` alone — the local master ref may be stale.
