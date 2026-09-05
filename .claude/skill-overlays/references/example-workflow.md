@@ -24,7 +24,8 @@ Implementer: [Follows TDD; the bank-pre-write hook fires on the src/ write; writ
 
 [Verify the commit landed: git log --oneline -1]
 [Controller dispatches gb-c-optimizer on Task 1's committed diff — C task; any edits it makes are committed before the review]
-[Run scripts/review-package PLAN_FILE BASE HEAD; dispatch ONE task reviewer with the printed path]
+[Run the baseline's scripts/review-package PLAN_FILE BASE HEAD (path relative to the superpowers
+ skill dir, not this repo); dispatch ONE task reviewer with the printed path]
 Task reviewer: Spec compliant. Task quality: Approved.
 
 [Mark Task 1 complete]

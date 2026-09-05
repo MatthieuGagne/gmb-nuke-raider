@@ -7,9 +7,7 @@ Project (Nuke Raider) additions and overrides for the baseline dispatching-paral
 skill. On conflict, this overlay wins — but an override earns that only by stating what the
 baseline cannot know. Every section carries a `**Why:**` line (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
-6.3.0's `SKILL.md` is **byte-identical** to 6.2.0's, so every section below was re-checked
-against unchanged text and none was absorbed upstream.
+*Baseline audit provenance: `references/baseline-audits.md`.*
 
 ## Project additions
 
@@ -26,6 +24,9 @@ known file paths.
 
 **Rule:** if you are about to call Read, Glob, or Grep more than twice in a row to explore
 unfamiliar territory, STOP and dispatch an Explore agent instead.
+
+**Harness fallback:** omp dispatches only the 7 project agents in `.omp/agents/` — no `Explore`,
+no `Plan`. Under omp, explore inline or dispatch a project agent instead.
 
 ### Always offload (never run inline)
 

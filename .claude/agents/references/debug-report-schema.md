@@ -55,3 +55,23 @@ empty string — automation distinguishes "unknown" from "empty"/"not applicable
   "hypothesis": "HL points into WRAM at 0xC042 which is likely an uninitialized enemy pointer; enemy_update dereferences it unconditionally"
 }
 ```
+
+## Example — pyboy-debug report
+
+The same schema plus the `pyboy-debug` deltas (`bank`, `registers` and `stack_trace` always empty;
+four extra fields).
+
+```json
+{
+  "bank": null,
+  "address": "0xC327",
+  "symptom": "race ends after 1 lap instead of 3; finish tile triggers immediately on lap 1",
+  "registers": [],
+  "stack_trace": null,
+  "hypothesis": "Unit test passes but ROM behavior wrong. _rs_cp_next reads 0 when the finish tile fires on lap 1 — the finish handler accepts cp_next=0 as valid because CP3 was never triggered on the low race line.",
+  "memory_snapshot": { "_active_lap_count": 1, "_rs_cp_next": 0, "_hp": 3 },
+  "screenshots_taken": ["build/pyboy-debug-001.png"],
+  "unit_tests_run": ["test_race_state"],
+  "confidence": "high"
+}
+```

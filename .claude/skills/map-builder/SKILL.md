@@ -21,8 +21,11 @@ that a bare invocation omits, and the omission silently produces a half-generate
 
 ## Facts that survive outside the agent
 
-- **Source of truth:** `assets/maps/*.tmx`. Never hand-edit `src/*_map.c` or `src/*_tiles.c` —
-  they are generated and are overwritten on the next `make`.
+- **Source of truth:** `assets/maps/*.tmx` — `assets/maps/track.tmx` and `assets/maps/overmap.tmx`
+  are the authoritative sources for all map tile data. Never hand-edit the generated files
+  (`src/track_map.c`, `src/overmap_map.c`, `src/*_tiles.c`) and never patch tile values directly
+  into them — hand-edits are silently overwritten on the next `make`. If a tile must be placed
+  (e.g. `TILE_BOOST`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate.
 - **Map dimensions are per-map and runtime**, read from the TMX by the generator and consumed
   at runtime as `active_map_w` / `active_map_h` (set by `load_track_header()`, `src/track.h`).
   There are no `MAP_TILES_W` / `MAP_TILES_H` compile-time constants. `MAX_MAP_TILES_W`

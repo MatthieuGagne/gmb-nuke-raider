@@ -51,14 +51,34 @@ class RenderTests(unittest.TestCase):
             'Skill, TodoWrite',
             'cyan'))
         self.assertIn('tools: read, write, edit, grep, glob, bash', rendered)
+        # Scoped to the frontmatter block: the appended omp adjustments
+        # legitimately name the Skill and PowerShell tools in order to tell the
+        # omp subagent what to do instead of using them.
+        frontmatter = rendered.split('---')[1]
         for dropped in ('PowerShell', 'WebFetch', 'Skill', 'TodoWrite'):
-            self.assertNotIn(dropped, rendered)
+            self.assertNotIn(dropped, frontmatter)
 
     def test_description_and_body_are_verbatim(self):
         rendered = sync_agents.render(_fixture('sonnet', 'Read, WebSearch', 'x'))
         self.assertIn('description: "a: demo agent with a colon"', rendered)
         self.assertIn('> **Model tier:** sonnet', rendered)
         self.assertIn('Body text, verbatim.', rendered)
+
+    def test_body_gains_the_omp_adjustment_block_exactly_once(self):
+        rendered = sync_agents.render(_fixture('opus', 'Read, Skill', 'cyan'))
+        self.assertEqual(rendered.count(sync_agents.OMP_ADJUSTMENT_HEADING), 1)
+        self.assertTrue(rendered.endswith(sync_agents.OMP_ADJUSTMENTS))
+        # It must actually re-map the three Claude-Code-only assumptions.
+        self.assertIn('.claude/skills/<name>/SKILL.md', rendered)
+        self.assertIn('Git Bash', rendered)
+        self.assertIn("Ignore the body's `tools:` frontmatter line", rendered)
+
+    def test_every_canonical_agent_mirror_carries_the_adjustments(self):
+        for name in AGENTS:
+            rendered = sync_agents.render(
+                _read(os.path.join(SRC_DIR, '%s.md' % name)))
+            self.assertEqual(
+                rendered.count(sync_agents.OMP_ADJUSTMENT_HEADING), 1, name)
 
     def test_websearch_maps_to_web_search(self):
         rendered = sync_agents.render(_fixture('sonnet', 'Read, WebSearch', 'x'))
@@ -130,8 +150,10 @@ class MirrorTests(unittest.TestCase):
             with open(b, 'w', encoding='utf-8') as fh:
                 fh.write("---\nname: b\nmodel: opus\ntools: Read, Write\n---\nbody b\n")
             self.assertEqual(sorted(sync_agents.sync(d)), ['a.md', 'b.md'])
-            self.assertEqual(_read(os.path.join(dst, 'a.md')),
-                             '---\nname: a\nmodel: "@smol"\ntools: read\n---\nbody a\n')
+            self.assertEqual(
+                _read(os.path.join(dst, 'a.md')),
+                '---\nname: a\nmodel: "@smol"\ntools: read\n---\nbody a\n\n'
+                + sync_agents.OMP_ADJUSTMENTS)
             os.remove(a)  # canonical deleted -> mirror removed
             sync_agents.sync(d)
             self.assertFalse(os.path.isfile(os.path.join(dst, 'a.md')))

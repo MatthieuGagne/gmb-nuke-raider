@@ -97,3 +97,20 @@ element of every response — read that file for the schema, the field table and
 **This agent's delta:** you have a real debugger attached, so `registers` and `stack_trace` are
 expected to be **populated**, not `[]`/`null`. Empty values here mean you did not look; if the
 debugger genuinely could not produce them, say so in `hypothesis`.
+
+---
+
+## omp harness adjustments
+
+Everything above is the canonical Claude Code agent file, copied verbatim. Three
+adjustments apply when you follow it under omp:
+
+- **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
+  project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
+  read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
+- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
+  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
+  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
+  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
+  names; your tools are the omp ones in this file's frontmatter above.

@@ -9,6 +9,11 @@ Use `timeout 30` every time — without it, a test binary that spins in an
 infinite loop (e.g. a loader double-load assert) will never exit and `make`
 will hang forever. The timeout turns a silent spin into a visible failure.
 
+**Early-exit behavior:** the Makefile uses `|| exit 1` — it stops at the first
+failing test binary (alphabetical order). Test binaries after the first failure
+do NOT run. Fix all failures starting from the earliest binary; re-run
+`make test` after each fix to reveal the next hidden failure.
+
 On success: report "Tests OK — N passed".
 
 On failure: list each failing test with name, file:line, and expected vs

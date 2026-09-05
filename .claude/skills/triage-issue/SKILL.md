@@ -24,6 +24,8 @@ If the user has already described the bug, skip questions that are already answe
 
 Before proposing a root cause, dispatch a **single Explore agent** (Agent tool, `subagent_type: "Explore"`) to investigate. Do NOT perform inline Read/Glob/Grep calls — offload the entire exploration to the agent.
 
+**Harness fallback:** omp dispatches only the 7 project agents in `.omp/agents/` — no `Explore`, no `Plan`. Under omp, do this exploration inline or dispatch a project agent instead.
+
 The agent prompt MUST request all four fields in a structured return:
 
 ```

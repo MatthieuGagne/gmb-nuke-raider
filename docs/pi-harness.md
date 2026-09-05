@@ -3,6 +3,13 @@
 Imported by [`CLAUDE.md`](../CLAUDE.md). Relevant only when running the Pi coding agent (`pi`);
 under Claude Code none of this applies.
 
+`.pi/AGENTS.md` carries the project ruleset into a Pi session through an `@../CLAUDE.md` import —
+Pi does not load a repo-root `CLAUDE.md` on its own, so without that file a Pi session runs with
+no worktree policy, no smoketest gate and no branch policy while the hooks below still fire and
+block. It also lists the deltas a Pi session cannot discover (including that `src/CLAUDE.md` is
+never auto-loaded and must be read by hand before any `src/*.c` / `src/*.h` edit). Keep that file
+minimal; the detail belongs here.
+
 `.pi/settings.json` exposes the same project skills and agents to the Pi coding agent
 (`pi`), so a session started there is not flying blind. It wires `skills: ["../.claude/skills"]`
 (the whole project skills directory), the `pi-subagents` and `@hsingjui/pi-hooks` packages, and the four

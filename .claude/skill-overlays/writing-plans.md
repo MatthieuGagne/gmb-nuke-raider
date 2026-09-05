@@ -7,16 +7,19 @@ Project (Nuke Raider) additions and overrides for the baseline writing-plans ski
 this overlay wins — but an override earns that only by stating what the baseline cannot know
 (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
-6.3.0's only change here: a `**Spec:**` field added to the plan header. See
-`references/plan-structure.md` — `**Issue:** #N` fills that role in this project.
+*Baseline audit provenance: `references/baseline-audits.md`.*
+
+**Plan header:** the baseline's `**Spec:**` field is filled by `**Issue:** #N` in this project —
+see `references/plan-structure.md`.
 
 ## Overrides (do NOT follow the baseline here)
 
 - **Save plans to `docs/plans/YYYY-MM-DD-issue<N>-<slug>.md`** — NOT `docs/superpowers/plans/`
   or any other baseline location, and NOT the issue-less `YYYY-MM-DD-<feature-name>.md` form.
-  `<N>` is the GitHub issue number the plan implements; `<slug>` is lowercase, hyphen-separated
-  (e.g. `docs/plans/2026-07-26-issue435-traceability.md`).
+  `<N>` is the GitHub issue number the plan implements; `<slug>` is lowercase, hyphen-separated.
+  `docs/plans/` holds the plan files currently on disk (e.g.
+  `docs/plans/2026-04-11-tile-manager-inc3-migration.md`, written before the `issue<N>` form was
+  required); every **new** plan must use the `issue<N>` form.
   **Why:** the baseline's own line says user preferences override the default location, and
   `tools/trace.py --check` parses this exact filename to link a plan to its spec issue.
 

@@ -1,6 +1,6 @@
 ---
 name: map-expert
-description: "Map pipeline expert for Nuke Raider — Tiled TMX format, GID decoding, the tmx_to_c / png_to_tiles / overmap_to_c pipeline, and GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes). Consultation mode by default: answers and points at the right file without editing. Implementation mode: dispatch with \"implement this task: <task text>\" to create or edit a map and run the conversion pipeline end-to-end."
+description: "Map pipeline expert for Nuke Raider — Tiled TMX format, GID decoding, the tmx_to_c / png_to_tiles / overmap_to_c pipeline, and GB background tilemap hardware (BG tile maps, SCX/SCY, VRAM layout, CGB attributes). Consultation mode by default: answers and points at the right file without editing. Implementation mode: dispatch with \"implement this task: <task text>\" to create or edit a map and run the conversion pipeline end-to-end. DO NOT TRIGGER when: the problem is a compile error or a ROM banking / bank-manifest question (use gbdk-expert)."
 model: "@default"
 tools: read, write, edit, grep, glob, bash
 ---
@@ -49,26 +49,10 @@ Tiles are defined in `assets/maps/track.tsx` (Tiled tileset file); types assigne
 
 ## Pipeline Overview
 
-**Track pipeline (3-step, driven by Makefile):**
-```
-assets/maps/tileset.png  ─┐
-assets/maps/track.tsx     ├─→ png_to_tiles.py → src/track_tiles.c + build/track_tile_id_map.json + src/track_tileset_meta.h
-assets/maps/track*.tmx   ─┤
-                           └─→ tmx_to_c.py (--id-map) → src/track*_map.c
-```
-
-Step 1: `tmx_to_c.py --emit-rotation-manifest` scans all track TMXs for rotated tiles → `build/track_rotation_manifest.json`
-Step 2: `png_to_tiles.py` encodes tileset + rotation variants → `src/track_tiles.c`, `build/track_tile_id_map.json`, `src/track_tileset_meta.h`
-Step 3: `tmx_to_c.py --id-map` converts each TMX → `src/track*_map.c` using the id map
-
-**Overmap pipeline (separate converter):**
-```
-assets/maps/overmap_tiles.aseprite  →  (Aseprite export)  →  assets/maps/overmap_tiles.png
-assets/maps/overmap_tiles.png  →  tools/png_to_tiles.py --bank 255  →  src/overmap_tiles.c  (array `overmap_tile_data`)
-assets/maps/overmap.tmx  →  tools/overmap_to_c.py  →  src/overmap_map.c
-```
-
-Both outputs are checked into git; `make` regenerates them when sources change (Makefile rules `src/overmap_tiles.c`, `src/overmap_map.c`).
+The full data flow for both converters — the 3-step track pipeline (rotation manifest →
+`png_to_tiles.py` → `tmx_to_c.py --id-map`) and the separate overmap pipeline
+(`png_to_tiles.py --bank 255` + `overmap_to_c.py`):
+`.claude/agents/references/map-pipeline.md` — read it before running or debugging a conversion.
 
 ---
 
@@ -82,7 +66,7 @@ confined to the converter, called out per step.
    - *overmap:* `assets/maps/overmap_tiles.aseprite` → `aseprite -b assets/maps/overmap_tiles.aseprite --save-as assets/maps/overmap_tiles.png`
 2. **Paint the map in Tiled** — open `assets/maps/track*.tmx` or `assets/maps/overmap.tmx`, paint the layer (CSV encoding). For a track, tile types come from `track.tsx` and an `<objectgroup name="start">` with exactly one spawn object must exist.
 3. **Convert** — run `make`; it drives the right converter for you.
-   - *track:* the 3-step pipeline above (rotation manifest → `png_to_tiles.py` → `tmx_to_c.py` per track). Inspect `src/track_tileset_meta.h` to verify tile types.
+   - *track:* the 3-step pipeline in `references/map-pipeline.md` (rotation manifest → `png_to_tiles.py` → `tmx_to_c.py` per track). Inspect `src/track_tileset_meta.h` to verify tile types.
    - *overmap:* a **different converter** — `make src/overmap_tiles.c` runs `png_to_tiles.py --bank 255`, `make src/overmap_map.c` runs `tools/overmap_to_c.py` (not `tmx_to_c.py`).
 4. **Wire into game** — `extern`-declare the generated symbols in the relevant `.c`; load tile data first, then the tilemap, during VBlank.
 5. **OAM sprites on the map** — if the map needs new OAM sprites (obstacles, icons, overlays), delegate to the **`sprite-expert`** agent.
@@ -115,3 +99,20 @@ confined to the converter, called out per step.
 ## Cross-References
 
 - **`sprite-expert` agent** — OAM sprite asset pipeline, sprite pool, sprite tile loading; use for anything involving sprites rather than background/window tiles
+
+---
+
+## omp harness adjustments
+
+Everything above is the canonical Claude Code agent file, copied verbatim. Three
+adjustments apply when you follow it under omp:
+
+- **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
+  project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
+  read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
+- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
+  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
+  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
+  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
+  names; your tools are the omp ones in this file's frontmatter above.

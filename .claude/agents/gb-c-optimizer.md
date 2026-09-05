@@ -1,6 +1,6 @@
 ---
 name: gb-c-optimizer
-description: "Reviews C for Game Boy performance, ROM/RAM size, and GBDK anti-patterns — and owns the project's canonical GB C anti-pattern list. Dispatch with \"review only: <target>\" to get a report with no edits, or \"review and fix: <target>\" to apply the fixes in place. With neither phrase it reports only. Use on ROM size questions, code using malloc/stdlib, hot-path optimization, or a post-implementation diff review. Examples: \"review only: src/main.c\", \"review and fix: the diff in HEAD\", \"why is my ROM too large\"."
+description: "Reviews C for Game Boy performance, ROM/RAM size, and GBDK anti-patterns — and owns the project's canonical GB C anti-pattern list. Dispatch with \"review only: <target>\" to get a report with no edits, or \"review and fix: <target>\" to apply the fixes in place. With neither phrase it reports only. Use on ROM size questions, code using malloc/stdlib, hot-path optimization, or a post-implementation diff review. Examples: \"review only: src/main.c\", \"review and fix: the diff in HEAD\", \"why is my ROM too large\". DO NOT TRIGGER when: writing a new module from a task or plan, or answering a GBDK-2020 API, hardware-register or compile-error question (use gbdk-expert)."
 model: sonnet
 tools: Read, Grep, Glob, Edit, Bash, Skill
 color: yellow

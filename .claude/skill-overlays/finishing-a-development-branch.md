@@ -7,11 +7,12 @@ Project (Nuke Raider) additions and overrides for the baseline finishing-a-devel
 skill. On conflict, this overlay wins — but an override earns that only by stating what the
 baseline cannot know (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
-6.3.0's only change here: a new block on **refused worktree removal** — when
-`git worktree remove` reports `contains modified or untracked files`, never `--force` on your
-own initiative; show the `git status --porcelain -uall` output and offer commit / move / delete.
-`### Cleanup failure recovery` below now defers to it.
+*Baseline audit provenance: `references/baseline-audits.md`.*
+
+**From the baseline — refused worktree removal:** when `git worktree remove` reports `contains
+modified or untracked files`, never `--force` on your own initiative; show the
+`git status --porcelain -uall` output and offer commit / move / delete. `### Cleanup failure
+recovery` below defers to it.
 
 ## Overrides (do NOT follow the baseline here)
 

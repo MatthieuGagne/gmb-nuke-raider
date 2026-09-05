@@ -24,7 +24,7 @@ every word earns its place.
 
 ## Git & GitHub
 
-Always use `gh` for git push/pull and GitHub operations. Run `gh auth setup-git` if push fails due to missing credentials.
+Always use `gh` for git push/pull and GitHub operations.
 
 **Settings tiers:** machine (`~/.claude/settings.json`) / repo (`.claude/settings.json`, tracked)
 / scratch (`.claude/settings.local.json`, gitignored, never committed). A session approval is
@@ -41,28 +41,10 @@ negation. When a PR is merged, verify the linked issue is closed; if not, `gh is
 
 ## Skills & Agents
 
-Agents live in `.claude/agents/`, skills in `.claude/skills/` — each file's frontmatter
-(`description` / when-to-use) is the authoritative trigger and is surfaced automatically; don't
-duplicate those descriptions here. `docs/dev-workflow.md` is co-authoritative and maps each one
-to its workflow step.
+Agents live in `.claude/agents/`, skills in `.claude/skills/`; overlay, factory and
+reachability mechanics are in the import below.
 
-Two things not obvious from frontmatter alone:
-- The superpowers workflow skills (brainstorming, writing-plans, executing-plans,
-  subagent-driven-development, finishing-a-development-branch, dispatching-parallel-agents)
-  run from their auto-updating baselines; project deltas live in
-  `.claude/skill-overlays/<name>.md` and are injected automatically by
-  `tools/skill_overlay_hook.py` (PostToolUse on Skill + UserPromptSubmit hooks in
-  `.claude/settings.json`). On conflict, the overlay wins. Each overlay's `baseline:`
-  frontmatter pins the superpowers version it was written against; the hook warns when
-  the installed version has moved (re-sync the overlay when it fires). `grill-with-docs` also
-  has an overlay, but its baseline is a local skill pinned by date, which the hook cannot
-  version-check.
-- `grill-with-docs` carries `disable-model-invocation: true`, so a model-driven session can never
-  reach it. When a decision needs an ADR, ask the user to run it.
-- `factory` (`.claude/skills/factory/`) is the unattended orchestrator. It is invoked
-  explicitly as `/factory <issue#>` and never fires automatically. It writes run state only
-  through `tools/factory_event.py` and publishes to GitHub only through
-  `tools/factory_publish.py` — never directly.
+@docs/skill-wiring.md
 
 ### Pi harness
 
@@ -81,12 +63,10 @@ weaker than either other harness. Read [`docs/omp-harness.md`](docs/omp-harness.
 
 ## Workflow
 
-This project uses [Superpowers](https://github.com/obra/superpowers), installed as a marketplace
-plugin.
+**Outer loop:** brainstorming → PRD (the `prd` skill) → [separate session] writing-plans → subagent-driven-development
 
-**Outer loop:** brainstorming → PRD (`/prd`) → [separate session] writing-plans → subagent-driven-development
-
-**Factory loop (unattended):** `/factory <issue#>` drives a lint-passing PRD issue through
+**Factory loop (unattended):** the `factory` skill, invoked explicitly with an issue number,
+drives a lint-passing PRD issue through
 GATE → PLAN → BUILD → VERIFY → SHIP with no interactive input, ending at a reviewable PR.
 Flags: `--stage <NAME>`, `--resume`, `--dry-run`. Run state lives in `.factory/runs/issue-<N>/`
 at the **main** repo root, so any session locates a run from the issue number alone
@@ -95,15 +75,12 @@ force-pushes, never passes `--no-verify`, and never deletes a worktree or branch
 `.claude/skills/factory/SKILL.md` and its `references/stages.md`.
 
 **GitHub issue links:** When the user pastes a GitHub issue URL (e.g. `https://github.com/.../issues/N`), first fetch the issue and check its **Files Impacted** or **Out of Scope** sections. If ALL touched files qualify as doc-only (`.md`, `.txt`, `.json` except `bank-manifest.json`, files under `.claude/skills/` or `.claude/agents/`), invoke the `doc-review` skill. Otherwise invoke `writing-plans`. Do not ask for confirmation.
-**TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use `/test` skill). **Early-exit behavior:** the Makefile uses `|| exit 1` — it stops at the first failing test binary (alphabetical order). Test binaries after the first failure do NOT run. Fix all failures starting from the earliest binary; re-run `make test` after each fix to reveal the next hidden failure.
-**Bank manifest maintenance:** Every new `src/*.c` file must have an entry in `bank-manifest.json` before it is written. `bank-pre-write` hook (`tools/bank_check_hook.py`) and `tools/bank_check.py` (Makefile dependency) both enforce this. Every banking-related PR must update ALL artifacts: `bank-manifest.json`, the `bank-pre-write` and `post-build-gates` skills, `tools/bank_check.py`, the `gbdk-expert` agent, and this file.
-**Build verification:** `make` (use `/build` skill)
-**Map source of truth:** `assets/maps/track.tmx` (and `assets/maps/overmap.tmx`) are the authoritative sources for all map tile data. Never patch tile values directly into generated files (`src/track_map.c`, `src/overmap_map.c`). If a tile must be placed (e.g. `TILE_BOOST`), add it to the TMX in Tiled, then re-run `make clean && make` to regenerate. Hand-edits to generated files are silently overwritten on the next build.
+**TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use the `test` skill).
 
 **PRDs, ADRs & the document board:** GitHub issues only — no local files; `CONTEXT.md` is the sole
 in-repo exception. Routing, sub-issue wiring, the ADR key/lifecycle/citation rules, the `Type`
 table and the `Idea` swimlane: [`docs/document-conventions.md`](docs/document-conventions.md) —
-read it before filing, typing or wiring any document issue. The `/prd` skill loads it for you.
+read it before filing, typing or wiring any document issue. The `prd` skill loads it for you.
 
 **Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, create the worktree through Orca: invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags). Orca worktrees live under `~\orca\workspaces\<repo>\<name>`. Never use `git worktree add`, the `EnterWorktree` tool, or `.worktrees/`/`.claude/worktrees/` directories. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree (check: `git rev-parse --git-dir` differs from `git rev-parse --git-common-dir`), STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 
@@ -111,7 +88,7 @@ read it before filing, typing or wiring any document issue. The `/prd` skill loa
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.
 2. Always do a clean build: `make clean && make`. Never assume a prior build is still valid — this
    matters most when testing historical PRs or comparing versions.
-3. `make memory-check` fires automatically via PostToolUse hook after step 2 — check the hook output; if any budget is FAIL or ERROR, stop and fix before continuing.
+3. `make memory-check` fires automatically after step 2 — check the gate output; if any budget is FAIL or ERROR, stop and fix before continuing. If your harness reports no such output, run `make memory-check` yourself.
 4. Ask the user for confirmation before launching the ROM. If they confirm, launch in the background from the worktree directory (NEVER from the main repo's `build/` — it may be stale), using the emulator launch command in `CLAUDE.local.md`.
 5. Ask them to confirm it looks correct before proceeding.
 6. Only after the user confirms: update `README.md` if the feature adds or changes any
@@ -122,9 +99,9 @@ read it before filing, typing or wiring any document issue. The `/prd` skill loa
 The `factory` skill defines the one exception to steps 4-5, for unattended runs only.
 
 **GB skill gates:**
-- Before writing any `src/*.c` or `src/*.h` file → `bank-pre-write` fires **automatically** via PreToolUse hook; invoke the `gbdk-expert` agent (its frontmatter defines consultation vs implementation mode)
-- After a successful build → the post-build gate (bank check + `make memory-check`) fires **automatically** via PostToolUse hook; no manual invocation needed
-- When debugging any runtime issue → invoke the `emulicious-debug` agent (interactive, needs a GUI) or `pyboy-debug` (headless/unattended — required under `NUKE_FACTORY_RUN`, where no GUI or human gate exists)
+- Before writing any `src/*.c` or `src/*.h` file → the `bank-pre-write` gate fires **automatically**; dispatch the `gbdk-expert` agent (its frontmatter defines consultation vs implementation mode)
+- After a successful build → the post-build gate (bank check + `make memory-check`) fires **automatically**; no manual invocation needed
+- When debugging any runtime issue → dispatch the `emulicious-debug` agent (interactive, needs a GUI) or `pyboy-debug` (headless/unattended — required under `NUKE_FACTORY_RUN`, where no GUI or human gate exists)
 
 **Branch policy:** NEVER commit directly to `master`. All work goes on a feature branch and merges via PR.
 
