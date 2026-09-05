@@ -178,5 +178,28 @@ class MirrorTests(unittest.TestCase):
                 self.assertNotIn(b'\r\n', fh.read())
 
 
+class ParityTests(unittest.TestCase):
+    """AC1/AC3: on a synced tree the on-disk mirror matches what sync would write.
+
+    Runs against the real repo tree, so it fails exactly when .omp/agents/
+    drifts from .claude/agents/ — the state the pre-commit hook's sync step
+    exists to prevent.
+    """
+
+    def test_omp_mirror_matches_canonical_sources(self):
+        expected = {}
+        for name in sorted(os.listdir(SRC_DIR)):
+            if name.endswith('.md'):
+                expected[name] = sync_agents.render(_read(os.path.join(SRC_DIR, name)))
+        self.assertTrue(expected, 'no canonical agents under .claude/agents/')
+        actual = {}
+        dst = os.path.join(ROOT, '.omp', 'agents')
+        if os.path.isdir(dst):
+            for name in sorted(os.listdir(dst)):
+                if name.endswith('.md'):
+                    actual[name] = _read(os.path.join(dst, name))
+        self.assertEqual(actual, expected)
+
+
 if __name__ == '__main__':
     unittest.main()
