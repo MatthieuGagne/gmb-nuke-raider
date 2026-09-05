@@ -161,6 +161,22 @@ class MirrorTests(unittest.TestCase):
             sync_agents.sync(d)
             self.assertEqual(_read(dst_file), first)  # byte-identical after 2nd run
 
+    def test_mirror_rewrites_crlf_to_lf(self):
+        # A Windows checkout can put CRLF bytes on disk; the sync must rewrite
+        # them to LF rather than skip (the read-back must not translate \r\n).
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, '.claude', 'agents')
+            os.makedirs(src)
+            with open(os.path.join(src, 'x.md'), 'w', encoding='utf-8') as fh:
+                fh.write("---\nname: x\nmodel: opus\ntools: Read\n---\nbody\n")
+            sync_agents.sync(d)
+            dst_file = os.path.join(d, '.omp', 'agents', 'x.md')
+            with open(dst_file, 'w', encoding='utf-8', newline='') as fh:
+                fh.write(_read(dst_file).replace('\n', '\r\n'))
+            sync_agents.sync(d)
+            with open(dst_file, 'rb') as fh:
+                self.assertNotIn(b'\r\n', fh.read())
+
 
 if __name__ == '__main__':
     unittest.main()

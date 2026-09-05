@@ -127,7 +127,10 @@ def write_if_changed(path, content):
     generated files stay byte-stable on Windows and in the git index.
     """
     if os.path.isfile(path):
-        with open(path, encoding="utf-8") as fh:
+        # newline="" reads raw bytes (no \r\n -> \n translation), so a mirror
+        # that landed on disk with CRLF endings compares unequal and is rewritten
+        # with LF — matching the newline="\n" write path below (#729 review).
+        with open(path, encoding="utf-8", newline="") as fh:
             if fh.read() == content:
                 return False
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
