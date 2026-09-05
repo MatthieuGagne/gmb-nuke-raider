@@ -5,33 +5,18 @@ baseline: superpowers@6.3.0
 
 Project (Nuke Raider) additions and overrides for the baseline subagent-driven-development
 skill. On conflict, this overlay wins — but an override earns that only by stating what the
-baseline cannot know. Every section below carries a `**Why:**` line; a section that could not
-state one was removed rather than kept (#527 R7).
+baseline cannot know. Every section below has a `**Why:**` in `references/sdd-rationale.md`,
+keyed by the same heading; a section that could not state one was removed rather than kept
+(#527 R7). Read that file before relaxing or deleting an override.
 
-**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22, not merely
-the version pin (#527 R6). 6.3.0 is a substantial rewrite of the controller's authority — see
-`### The fifth stop` immediately below, which is the one place it now collides with this project.
+*Baseline audit provenance: `references/baseline-audits.md`.*
 
 ## Overrides (do NOT follow the baseline here)
 
 ### The fifth stop — the batch-boundary smoketest pause
 
-**Why:** 6.3.0's **"Rulings, not stalls"** stops the controller asking a human about conflicts,
-ambiguities or plan defects, and names exactly four things that may stop a run: an irreversible
-or destructive operation; a security-sensitive action; a side effect outside this worktree (a
-merge, a push, a publish); a plan so broken every path forward is a guess. Read literally, that
-list deletes this project's batch-boundary Emulicious pause — "a human looks at the screen" is
-none of the four.
-
 **This overlay adds a fifth stop, and only this one:** the batch-boundary smoketest confirmation
 in `### Batch boundaries are smoketest checkpoints` below.
-
-**Why it earns the exception:** the deliverable is a ROM, and its most common failure — black
-screen, or ~1–2 FPS — is invisible to `make test`, to the reviewer, and to any diff. There is no
-artifact the controller can rule *from*; the evidence exists only on a screen a human is
-watching. That is a measurement the controller cannot take, not a decision it is deferring — so
-it is not what "Rulings, not stalls" exists to prevent. The baseline cannot know the deliverable
-is a ROM.
 
 Everything else in "Rulings, not stalls" is **adopted in full**: preflight conflicts,
 plan-mandated findings, breaker adjudications and plan defects are the controller's to rule on
@@ -45,14 +30,18 @@ These belong to the baseline and this overlay deliberately adds nothing to them.
 here in weaker form is how an overlay silently reverts an upstream improvement.
 
 - **The workspace and ledger system**, and its fix loop — use them as written. Note only that
-  its helper scripts are POSIX `sh` and run under Git Bash on this machine; if
-  `scripts/sdd-workspace` fails on Windows, fall back to computing
+  its helper scripts are POSIX `sh`, live in the superpowers skill directory (they are **not**
+  repo-local — this repo has no `scripts/`), and run under Git Bash on this machine; if the
+  baseline's `scripts/sdd-workspace` fails on Windows, fall back to computing
   `<repo-root>/.superpowers/sdd/<plan-basename>/` by hand — same contract, same layout.
 - **One task review per task**, covering spec compliance AND code quality in a single dispatch.
   Never split it into two dispatches, and never accept a report missing either verdict.
-- **The diff handoff.** Hand the reviewer its diff as a file — `scripts/review-package PLAN_FILE
-  BASE HEAD` prints the path — and pass that path. The diff never enters the orchestrator's
-  context.
+- **The diff handoff.** Hand the reviewer its diff as a file — the baseline's
+  `scripts/review-package PLAN_FILE BASE HEAD` (in the superpowers skill directory, **not**
+  repo-local) prints the path — and pass that path. If that script fails on Windows, write the
+  diff by hand to `<repo-root>/.superpowers/sdd/<plan-basename>/review-<task>.diff`
+  (`git diff BASE HEAD > <that path>`) and pass that path — same contract. The diff never enters
+  the orchestrator's context.
 - **The review range.** BASE is the commit recorded with `git rev-parse HEAD` *before*
   dispatching the implementer — never `HEAD~1`, which silently truncates a multi-commit task to
   its last commit.
@@ -69,10 +58,6 @@ here in weaker form is how an overlay silently reverts an upstream improvement.
 
 ### Task-review model tier
 
-**Why:** the baseline mandates an explicit model on every dispatch but cannot know which tier
-this project wants for its own reviewer; without a declared value the review inherits the
-session model, which is the failure the accepted bullet above warns about.
-
 Dispatch the per-task review with **`model: sonnet`** — the mid tier, not the session default.
 Its charter is checking a diff against a fixed constraints block, and a reviewer miss is caught
 downstream by `make test`, `make memory-check`, the blocking smoketest and human PR review; the
@@ -81,13 +66,6 @@ specify a model — stays with the baseline bullet under *Accepted from the base
 section supplies only the value.
 
 ### Adversarial charter for the final whole-branch review
-
-**Why:** the baseline's reviewer charter has no falsification step and asks for no evidence,
-because it cannot assume the repo can produce any. This one can: `make test` is a one-command
-host suite (gcc + Unity, no hardware) and `tools/smoketest_headless.py` runs a scripted ROM
-headlessly for a machine-readable verdict — which makes "demonstrate it" a fair ask here. Second
-thing upstream cannot know: reviewer and reviewed are the same model here, so the observed
-failure mode is a confident finding nobody can reproduce (epic #531 R8, #533 R7).
 
 **The charter block, and its precedence over the baseline charter, are in
 `.claude/skill-overlays/references/adversarial-review-charter.md`.** Append it to the final
@@ -99,9 +77,6 @@ invoked directly is a different dispatch with no overlay of its own.
 
 ### Verify subagent claims against version control
 
-**Why:** the baseline treats the implementer's report as the record of what happened; this
-project has seen reports name commits that did not exist.
-
 - A subagent's report is never proof that a build, a test, or a commit happened. After every
   implementer dispatch, verify against version-control state: `git log --oneline -1`. A missing
   commit means re-dispatch the task from scratch.
@@ -110,23 +85,15 @@ project has seen reports name commits that did not exist.
 
 ### Workspace hygiene
 
-**Why:** the baseline assumes its workspace is git-ignored; whether that is true is a fact about
-*this* repo's `.gitignore`.
-
 `.superpowers/` is gitignored here. Never commit it, never `git add -A` it into a feature commit.
 
 ### Commits
-
-**Why:** the `pre-commit` repository hook and its tool suite are this project's, and their cost
-shapes how commits are batched.
 
 Tool choice is free — repository hooks fire for every actor (#441 voided the earlier
 commit-routing premise). The `pre-commit` hook runs the tool suite on every commit and
 serializes them: one commit per tool call, never chained. **Never `--no-verify`.**
 
 ### C task routing (include in every implementer brief)
-
-**Why:** which agent owns a file type is project-specific routing the baseline cannot know.
 
 All three route with the same dispatch phrasing: `implement this task: <full task text from plan>`.
 
@@ -144,10 +111,6 @@ subagent never reads the whole plan file.
 
 ### Who dispatches `gb-c-optimizer`
 
-**Why:** the baseline has no notion of this agent. The overlay used to assign it to the
-`gbdk-expert` implementer — impossible, and 6.3.0 now says so outright via the no-subagents
-contract. Upstream has caught up with the R5 correction; the routing is still ours.
-
 **The controller dispatches it.** After the implementer's commit lands, the controller dispatches
 `gb-c-optimizer` on the committed diff. R5 changed **who dispatches the gate, not what it does**:
 post-implementation the agent's charter has fix mode on, so it may edit in place. Those edits are
@@ -160,14 +123,6 @@ documents is the same defect wearing a different file name. A self-applied check
 gate; run #590 proved it (`references/sdd-provenance.md`).
 
 ### Dispatch order
-
-**Why:** the baseline forbids concurrent implementers and gives one reason; this project has
-a second the baseline cannot know — the `pre-commit` repository hook runs the whole tool
-suite on every commit, so concurrent committers on one branch collide on `index.lock` and are
-serialized by the hook anyway. What this section overrides is not the concurrency ban but the
-baseline's assumption that task order is fixed: this project's plans carry a
-`#### Parallel Execution Groups` table computed at plan time from file-level dependency
-analysis, and that table is what licenses free ordering.
 
 The plan's group table is the **authoritative source** — do not re-analyze file dependencies
 at runtime.
@@ -205,10 +160,6 @@ At each batch boundary from the plan: pause dispatching, run the checkpoint sequ
 Emulicious from the worktree, wait for visual confirmation), then continue.
 
 ### Factory mode
-
-**Why:** the factory runs unattended, so every human-confirmation step must have a headless
-replacement, and the run-level retry budget comes from the factory contract
-(`.claude/skills/factory/SKILL.md`), which the baseline knows nothing about.
 
 Active when `NUKE_FACTORY_RUN` is set — i.e. the BUILD stage of a `/factory` run. It **overrides
 `### Batch boundaries are smoketest checkpoints` and `### The fifth stop` above**, and nothing
@@ -256,8 +207,6 @@ Outside a factory run the batch-boundary Emulicious pause fires exactly as writt
 
 ### Pre-PR Gate (HARD STOP)
 
-**Why:** checks 2-4 are GB/SDCC-specific failure modes the baseline has no reason to know about.
-
 Run after the smoketest is confirmed and before pushing or creating a PR. All four must pass.
 
 | # | Check | How to verify | On failure |
@@ -272,16 +221,10 @@ Any failure → fix and re-run this gate from check 1. Only then call
 
 ### Example workflow
 
-**Why:** the baseline's own example is upstream-shaped; this one shows the project's agent
-routing and its dispatch-order override in one place.
-
 See `.claude/skill-overlays/references/example-workflow.md` for a worked end-to-end walkthrough,
 including a `(parallel)` group dispatched one implementer at a time.
 
 ### Red flags — never
-
-**Why:** each names a project-specific trap — the worktree policy, the stale-`build/` trap, and
-the brief discipline this project's plans depend on.
 
 - Start implementation on `master`, or skip the worktree gate.
 - Launch the smoketest from the main repo's `build/` (use the worktree's).

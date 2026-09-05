@@ -67,6 +67,7 @@ CLAUDE.local.md
 .pi/*
 !.pi/settings.json
 !.pi/agents/
+!.pi/AGENTS.md
 
 # pi-subagents run artifacts (transcripts, per-agent input/output at repo root)
 .pi-subagents/
@@ -88,3 +89,7 @@ knowledge/.understand-anything/
 *.gcno
 *.gcov
 *.gcov.json.gz
+
+# Claude Code memory stores are machine-local (keyed by encoded cwd) and must
+# never be committed — a store keyed to another machine's path is dead weight.
+.claude/projects/

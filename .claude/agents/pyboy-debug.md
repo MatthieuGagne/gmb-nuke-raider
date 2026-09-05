@@ -114,7 +114,8 @@ Record what you ran in `unit_tests_run`. Always include one of these statements 
 - `{WORKTREE_ROOT}/build/nuke-raider.map` **truncates symbol names to 9 characters** — `_rs_cp_next`
   appears as `_rs_cp_ne`. Account for that when grepping it.
 - To interpret a raw value (enum, state constant), read `src/<module>.c` / `src/<module>.h`. Example:
-  if `_rs_cp_next` reads 3 but the track has 2 checkpoints, read `src/race.h` for the checkpoint count.
+  if `_rs_cp_next` reads 3 but the track has 2 checkpoints, read `track_checkpoint_count` in
+  `src/track.h` for the checkpoint count.
 
 ## Structured Output
 
@@ -130,19 +131,5 @@ semantics.
   (string[] — binaries or make targets), and `confidence` (`"high"` = memory + visual evidence is
   unambiguous, `"medium"` = partial, `"low"` = speculative).
 
-### Example
-
-```json
-{
-  "bank": null,
-  "address": "0xC327",
-  "symptom": "race ends after 1 lap instead of 3; finish tile triggers immediately on lap 1",
-  "registers": [],
-  "stack_trace": null,
-  "hypothesis": "Unit test passes but ROM behavior wrong. _rs_cp_next reads 0 when the finish tile fires on lap 1 — the finish handler accepts cp_next=0 as valid because CP3 was never triggered on the low race line.",
-  "memory_snapshot": { "_active_lap_count": 1, "_rs_cp_next": 0, "_hp": 3 },
-  "screenshots_taken": ["build/pyboy-debug-001.png"],
-  "unit_tests_run": ["test_race_state"],
-  "confidence": "high"
-}
-```
+A worked example of this agent's report shape is at the end of
+`.claude/agents/references/debug-report-schema.md` (§ Example — pyboy-debug report).

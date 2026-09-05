@@ -7,9 +7,7 @@ Project (Nuke Raider) additions and overrides for the baseline executing-plans s
 conflict, this overlay wins — but an override earns that only by stating what the baseline
 cannot know (#527 R7).
 
-**Baseline audit:** content of `superpowers@6.3.0` read and compared on 2026-08-22 (#527 R6).
-6.3.0's `SKILL.md` is **byte-identical** to 6.2.0's, so every section below was re-checked
-against unchanged text and none was absorbed upstream.
+*Baseline audit provenance: `references/baseline-audits.md`.*
 
 ## Overrides (do NOT follow the baseline here)
 

@@ -153,3 +153,27 @@ Safe procedure for re-triggering CH3:
 2. Write new Wave RAM data (FF30–FF3F)
 3. Re-enable DAC: `NR30_REG = 0x80`
 4. Trigger: write trigger bit to NR34
+
+---
+
+## Debugging Audio
+
+**Diagnose in order:**
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| No sound at all | APU not enabled | Verify `NR52_REG = 0x80` is called before `hUGE_init` in `music_init()` |
+| Music doesn't loop | Wrong order table end marker in hUGETracker | Re-export with correct order count |
+| Crash after audio starts | `music_tick()` called from the VBL ISR | Move it to the main loop — see Banking Rules |
+| Wrong song plays | `SET_BANK()` references wrong song name | Run `python tools/music_wire_check.py` |
+| Music glitches on state transition | `SWITCH_ROM` called from an ISR during a song switch | Call `music_start()` from the main loop only |
+| Song loops at half its intended length | `order_cnt` set to pattern count instead of byte count — see the rule below | Fix and run `make test`; `test_music_data_order_cnt_is_136` catches it |
+| Audible catch-up burst after a transition | Backlog drained on resume | Call `music_resync()` — see Playback Control |
+| Silent channels after SFX | Channel left muted | Call `hUGE_mute_channel(HT_CHx, HT_CH_PLAY)` after the SFX completes |
+| Ticking/popping on CH3 | Wave RAM corrupted on DMG re-trigger | Follow the CH3 Wave RAM safe access procedure |
+| Gradual music freeze after ~5–8s, no crash | A `static` local inside `music_tick()` landed on hUGEDriver's WRAM (0xC3CE–0xC3D6, `ticks_per_row`) | Never use `static` locals in `music_tick()`; put persistent debug state at the fixed `DEBUG_*` addresses in `config.h` (high WRAM, 0xDFC0+) |
+
+**Runtime inspection in Emulicious:**
+- Open Audio tab → see channel waveforms and register values live
+- Set a breakpoint at `music_tick` → confirm it is called once per frame
+- Watch panel: `hUGE_mute_mask` (which channels are muted), `current_song_bank`, `music_ticks_owed`

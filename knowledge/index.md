@@ -4,6 +4,7 @@
 
 - [[sdcc-banking-rules]] — recurring SDCC/GBDK banking hazards: the ternary
   register-corruption bug, BANKED qualifier rules, data placement, codegen gotchas
+  including int8_t zero-store casts
 - [[autobank-symbol-placement]] — autobank packing, `___bank_*` co-location checks,
   clean-build authority, sdld whole-module linking, HOME-bank ordering
 - [[config-h-patterns]] — table macros vs compound literals, `#if`/`#error` range
@@ -55,6 +56,10 @@
 - [[verification-techniques]] — prove-it-bites: gcc `-Wconversion` audit, neutered
   functions, flip-header tests, bytearray mutation, two-ROM differential runtime test
   (with the #390 Track-2 lap-counting case)
+- [[verification-antipatterns]] — checks that check nothing: self-defeating asserts,
+  wrapper-shape asserts, commands that were never run
 - [[trace-py-stdlib-shadow]] — `tools/trace.py` shadows the stdlib `trace` module
 - [[test-tools-gate-history]] — the months-red unenforced `make test-tools` gate and
   its #441 fix (discovery over enumeration)
+- [[gate-runnability-461]] — a gate whose tool is missing from PATH cannot fail;
+  romusage/lizard/gcc PATH setup and why #461 hid for months

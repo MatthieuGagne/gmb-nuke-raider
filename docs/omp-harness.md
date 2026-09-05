@@ -7,10 +7,13 @@ in [`pi-harness.md`](pi-harness.md) carries over — read this file, not that on
 
 ## What omp discovers on its own
 
-Unlike Pi, omp needs no `skills:` wiring. All 18 project skills in `.claude/skills/` load
-natively via `skills.enableClaudeProject`, and `.claude/commands/` via
-`commands.enableClaudeProject` — both default to `true`. Invoke a skill as `/skill:<name>`, or
+Unlike Pi, omp needs no `skills:` wiring. The project skills in `.claude/skills/` load natively
+via `skills.enableClaudeProject`, which defaults to `true`. Invoke a skill as `/skill:<name>`, or
 read `skill://<name>` with the `read` tool. There is no `Skill` tool.
+
+What omp does **not** discover is a nested instruction file: `src/CLAUDE.md` is never
+auto-loaded, so read it yourself before editing any `src/*.c` / `src/*.h` — the bank-check hook
+is ported and enforces rules whose text omp never showed you.
 
 Most of what `.pi/settings.json` installs as packages is built into omp and must **not** be
 re-added: `task` (subagents), `todo`, `web_search` / `fetch`, `ask`, native MCP, and
@@ -33,13 +36,16 @@ deliberately **not** imported: it is machine-local and gitignored.
 An `@` import that cannot resolve leaves its literal token in the text rather than erroring, so
 a broken path fails silently. If a session seems ignorant of the project, check that import first.
 
-### `.omp/agents/*.md` — re-declared, not discovered
+### `.omp/agents/*.md` — generated mirrors, not discovered
 
 omp **intentionally skips** `.claude/agents` and `.pi/agents`; their frontmatter is not omp's
-task-agent contract. The seven agents are therefore re-declared here. Frontmatter carries `name`
-and `description` (both required) plus `tools`; the **body becomes the system prompt**. Each body
-is a thin wrapper pointing at `.claude/agents/<name>.md`, so persona text still lives in exactly
-one place.
+task-agent contract. The agents are therefore mirrored here by `tools/sync_agents.py`, which
+`.githooks/pre-commit` runs on every commit (staging the result). Frontmatter is translated to
+omp's dialect (`model` as `@default`/`@smol`, lowercase tool names) and carries `name` and
+`description` (both required) plus `tools`; the **body becomes the system prompt** and is copied
+verbatim from `.claude/agents/<name>.md`. Mirrors whose canonical source is gone are deleted, so
+persona text lives in exactly one place. **Do not hand-edit `.omp/agents/*.md`** — edit the
+canonical `.claude/agents/<name>.md` and the mirror regenerates on commit.
 
 Tool names differ from Claude Code's: `glob` not `Glob`, `bash` covers both `Bash` and
 `PowerShell`, and there is no `ls`. Dispatch with the `task` tool.

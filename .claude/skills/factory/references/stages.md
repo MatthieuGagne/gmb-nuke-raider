@@ -407,6 +407,27 @@ of them and the other links to it. Plan-review findings sit on the run issue alo
 
 ---
 
+## Decisions
+
+Moved from `SKILL.md`.
+
+R5 of the epic: mid-run ambiguities are resolved **conservatively** and logged. Conservative
+means: prefer the interpretation that changes least, keeps existing behaviour, and stays inside
+the spec's stated scope. When the spec itself asks you to choose (e.g. "decide which side is
+wrong"), pick the option with the smaller blast radius, record the reasoning, and move on.
+
+Every such call becomes a `decision` event immediately — not at the end. The record goes to one
+surface per run. A run that opens a pull request puts it in the PR body's *Decisions made*
+section, which is the human's entry point at review, and the run issue links to the PR. A run
+that fails opens no pull request, so the run issue keeps the record.
+
+Add `--field finding=true` when the ruling names a defect in the draft plan that you corrected
+before writing code. The run issue then renders it under *Plan review findings* and the PR body
+omits it. A finding shows that plan review works. It is not a fact about the code under review.
+An unmarked ruling stays a decision, so a forgotten marker costs nothing.
+
+---
+
 ## How to write a decision, a failure, and a PR summary
 
 Plain English: short sentences, active voice, simple tense, concrete verbs. Use the term

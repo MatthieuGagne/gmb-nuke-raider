@@ -1,6 +1,6 @@
 ---
 name: sprite-expert
-description: "Sprite pipeline expert for Nuke Raider — Aseprite pipeline, png_to_tiles, OAM slot allocation, CGB palettes. Consultation mode by default: answers, reviews and points at the right file without editing. Implementation mode: dispatch with \"implement this task: <task text>\" to run the pipeline and write files end-to-end. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments."
+description: "Sprite pipeline expert for Nuke Raider — Aseprite pipeline, png_to_tiles, OAM slot allocation, CGB palettes. Consultation mode by default: answers, reviews and points at the right file without editing. Implementation mode: dispatch with \"implement this task: <task text>\" to run the pipeline and write files end-to-end. Use when adding a new sprite type, editing sprite assets, changing how sprites are loaded or rendered, modifying the sprite pool, or changing OAM slot assignments. DO NOT TRIGGER when: the problem is a compile error or a ROM banking / bank-manifest question (use gbdk-expert)."
 model: "@smol"
 tools: read, write, edit, grep, glob, bash
 ---
@@ -32,32 +32,10 @@ Hardware/API detail (sprite API signatures, OAM registers, PPU modes, CGB palett
 
 ## Coordinate System
 
-OAM stores raw hardware coordinates. `move_sprite(slot, oam_x, oam_y)`:
-
-```
-screen_x = oam_x - 8    (DEVICE_SPRITE_PX_OFFSET_X = 8)
-screen_y = oam_y - 16   (DEVICE_SPRITE_PX_OFFSET_Y = 16)
-```
-
-**To place a sprite at screen pixel (sx, sy):**
-```c
-move_sprite(slot, (uint8_t)(sx + 8), (uint8_t)(sy + 16));
-```
-
-**Fully visible range (8×8 sprite):**
-- `oam_x` ∈ [8, 167] → screen x ∈ [0, 159]
-- `oam_y` ∈ [16, 159] → screen y ∈ [0, 143]
-
-**Hide a sprite:** `move_sprite(slot, 0, 0)` — OAM y=0 is always off-screen.
-
-**Common mistake:** using 152 or 136 as max oam_x/oam_y — these cut off ~15px of valid screen area.
-
-**Player render pattern:** the player is a **16×16 quad of four 8×8 sprites**, not a two-slot
-stack. `src/player.c` declares `DBG_STATIC uint8_t player_sprite_slot[4];  /* 0=TL, 1=BL, 2=TR, 3=BR */`,
-populated by four `get_sprite()` calls in `player_init()`. Rendering sets
-per-slot tiles from the `DIR_TILE_TL/BL/TR/BR` tables plus a shared `set_sprite_prop(slot, flip)`
-from `DIR_FLIP[player_dir]`, then camera-adjusts one `hw_x`/`hw_y` origin. Read the sequence
-around the `hw_x`/`hw_y` assignment in `player.c` for the canonical order rather than copying a paraphrase.
+OAM/screen coordinate conversion (`move_sprite` offsets, fully-visible ranges, hiding a sprite)
+and the player's 16×16 four-slot quad render pattern:
+`.claude/agents/references/sprite-coordinates.md` — read it before positioning or rendering any
+sprite. It also carries the sprite-flip mock-stub check to run before writing a flip test.
 
 ---
 
@@ -80,18 +58,6 @@ clear_sprites_from(slot);        /* clear slot..MAX_SPRITES-1 */
 - The rest of the pool is shared by projectiles (≤8), turrets (≤8), the lazy racer pool (≤8) and
   patrol (4). `src/config.h:8-9` is the authoritative budget comment — read it before changing
   any capacity constant.
-
----
-
-### Mock Header — Sprite Flip Stubs
-
-Before writing any sprite-flip feature or test, confirm the mock stubs exist:
-
-```bash
-grep "S_FLIPX\|set_sprite_prop" tests/mocks/gb/gb.h
-```
-
-If either is absent, add it to the mock header before writing tests or implementation code.
 
 ---
 
@@ -158,3 +124,20 @@ sprite work: **directional art must cover all 8 directions the player can face.*
 - **`aseprite`** skill — full Aseprite CLI reference: flags, sprite sheet options, scripting, layer/tag filtering
 - **`gbdk-expert`** agent — OAM hardware registers, PPU modes, CGB palette registers, VBlank timing
 - **`map-expert`** agent — Tiled map/tileset format; background tile pipeline (not sprites)
+
+---
+
+## omp harness adjustments
+
+Everything above is the canonical Claude Code agent file, copied verbatim. Three
+adjustments apply when you follow it under omp:
+
+- **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
+  project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
+  read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
+- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
+  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
+  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
+  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
+  names; your tools are the omp ones in this file's frontmatter above.
