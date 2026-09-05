@@ -201,5 +201,19 @@ class ParityTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
 
+class HookWiringTests(unittest.TestCase):
+    """R3: the pre-commit hook syncs and stages before the test suite."""
+
+    def test_hook_runs_sync_before_the_discovery_command(self):
+        hook = _read(os.path.join(ROOT, '.githooks', 'pre-commit'))
+        sync_idx = hook.index('tools/sync_agents.py')
+        discovery = "-m unittest discover -s tests -p 'test_*.py'"
+        self.assertLess(sync_idx, hook.index(discovery))
+
+    def test_hook_stages_the_omp_mirror(self):
+        self.assertIn('git add .omp/agents/',
+                      _read(os.path.join(ROOT, '.githooks', 'pre-commit')))
+
+
 if __name__ == '__main__':
     unittest.main()
