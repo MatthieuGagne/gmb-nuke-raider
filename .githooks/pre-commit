@@ -33,6 +33,17 @@ else
     exit 0
 fi
 
+# Sync the OMP agent mirror before the suite runs, so the parity test in
+# tests/test_sync_agents.py sees fresh output. Staging the regenerated files
+# here makes a .claude/agents/ edit and its .omp/agents/ mirror one commit.
+# sync_agents.py is idempotent, so an unchanged mirror stages nothing.
+if ! "$PY" tools/sync_agents.py; then
+    echo "" >&2
+    echo "pre-commit: tools/sync_agents.py failed — commit blocked." >&2
+    exit 1
+fi
+git add .omp/agents/
+
 if ! "$PY" -m unittest discover -s tests -p 'test_*.py'; then
     echo "" >&2
     echo "pre-commit: tool suite failed — commit blocked. Fix it, or re-run" >&2
