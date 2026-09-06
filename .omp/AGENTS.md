@@ -25,6 +25,7 @@ gitignored. Read it yourself when you need the toolchain paths.
   silently missing — read it yourself.
 - **`tools/factory_permission_hook.py` is not ported.** Factory's
   permission-escalation path is unguarded here.
+- Worktrees: every worktree is an Orca worktree — create and remove via the `orca` CLI. Never raw `git worktree add`; Orca worktrees live under `~\orca\workspaces\<repo>\<name>`.
 
 Everything else about this harness — what omp discovers, how `.omp/agents/` and
 `.omp/hooks/` are wired, which gates report but cannot block, approval mode, and
