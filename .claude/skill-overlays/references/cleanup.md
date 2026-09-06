@@ -35,6 +35,11 @@ Otherwise (not Orca-managed, no active `EnterWorktree` context), continue to Ste
 
 **Step 6c: cd to main repo root and remove the worktree**
 
+> **Legacy-only ladder.** Steps 6c–6d apply ONLY to legacy non-Orca worktrees (`.worktrees/`,
+> `.claude/worktrees/`). A worktree under `~\orca\workspaces\` is removed via
+> `orca worktree rm --worktree path:<absolutePath> --force --json` from the repo root
+> (Step 6b) — never with the raw `git worktree` commands below.
+
 Always `cd` first — if the session CWD is inside the worktree and the directory is already deleted, `git` will panic with "Unable to read current working directory":
 ```bash
 cd C:/Code/nuke-raider

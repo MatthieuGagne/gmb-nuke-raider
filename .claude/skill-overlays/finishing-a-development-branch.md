@@ -9,7 +9,9 @@ baseline cannot know (#527 R7).
 
 *Baseline audit provenance: `references/baseline-audits.md`.*
 
-**From the baseline — refused worktree removal:** when `git worktree remove` reports `contains
+**From the baseline — refused worktree removal** (legacy non-Orca worktrees only — Orca worktrees
+under `~\orca\workspaces\` are removed via the Orca CLI, never raw `git worktree`): when
+`git worktree remove` reports `contains
 modified or untracked files`, never `--force` on your own initiative; show the
 `git status --porcelain -uall` output and offer commit / move / delete. `### Cleanup failure
 recovery` below defers to it.
@@ -153,8 +155,8 @@ refusal, which is a *content* refusal and is handled by the baseline's ask-first
 
 - Orca-managed worktrees (under `~\orca\workspaces\`) are removed via the Orca CLI — invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags), not `git worktree remove`.
 - **Legacy fallback:** Bash blocked with "Path does not exist" after merge → the session is inside an active `EnterWorktree` (pre-Orca worktree); use `ExitWorktree(action="remove", discard_changes=true)` first.
-- `git worktree remove` fails with "Unable to read current working directory" → `cd C:/Code/nuke-raider` before any `git worktree remove`.
-- `git worktree remove --force` fails with "is not a working tree" → the directory is already gone; fall back to `rm -rf <path> && git worktree prune`.
+- (Legacy non-Orca worktrees only) `git worktree remove` fails with "Unable to read current working directory" → `cd C:/Code/nuke-raider` before any `git worktree remove`.
+- (Legacy non-Orca worktrees only) `git worktree remove --force` fails with "is not a working tree" → the directory is already gone; fall back to `rm -rf <path> && git worktree prune`.
 
 **`--force` is never this overlay's idea.** The only `--force` below is the discard path, where
 the user has already typed `discard` and authorized the loss. For any other refusal, follow the
@@ -167,7 +169,8 @@ worktree first via the Orca CLI (invoke the `orca-cli` skill; exact commands com
 cd C:/Code/nuke-raider
 git -C C:/Code/nuke-raider branch -D <feature-branch>
 ```
-**Legacy fallback** (pre-Orca worktree only):
+**Legacy fallback** (pre-Orca worktree under `.worktrees/` / `.claude/worktrees/` only — never
+for a path under `~\orca\workspaces\`):
 ```powershell
 cd C:/Code/nuke-raider
 GIT_DIR=C:/Code/nuke-raider/.git GIT_WORK_TREE=C:/Code/nuke-raider git worktree remove --force <worktree-path>
