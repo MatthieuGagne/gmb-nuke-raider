@@ -1,6 +1,6 @@
 ---
 name: bank-pre-write
-description: "Reference for the pre-write bank gate — bank manifest entry, `#pragma bank`, SET_BANK/SWITCH_ROM safety, BANKED placement. IT NORMALLY FIRES AUTOMATICALLY: tools/bank_check_hook.py runs it as a PreToolUse `Write|Edit` hook on `src/*`. Read this to understand or fix a block it reported, or when writing `src/*.c` / `src/*.h` somewhere the hook does not fire (e.g. a Pi `pwsh-*` background job)."
+description: "Reference for the pre-write bank gate — bank manifest entry, `#pragma bank`, SET_BANK/SWITCH_ROM safety, BANKED placement. IT NORMALLY FIRES AUTOMATICALLY: tools/bank_check_hook.py runs it as a PreToolUse `Write|Edit` hook on `src/*`. Read this to understand or fix a block it reported, or when writing `src/*.c` / `src/*.h` somewhere the hook does not fire."
 ---
 
 # Bank Pre-Write Gate

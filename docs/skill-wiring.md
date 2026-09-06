@@ -19,7 +19,7 @@ Three things not obvious from frontmatter alone:
   frontmatter pins the superpowers version it was written against; the hook warns when
   the installed version has moved (re-sync the overlay when it fires). `grill-with-docs` also
   has an overlay, but its baseline is a local skill pinned by date, which the hook cannot
-  version-check. **The overlay hook is not ported to Pi or omp** — under those harnesses
+  version-check. **The overlay hook is not ported to omp** — under omp
   overlays never inject, so read `.claude/skill-overlays/<name>.md` yourself.
 - `grill-with-docs` carries `disable-model-invocation: true`, so a model-driven session can never
   reach it. When a decision needs an ADR, ask the user to run it.

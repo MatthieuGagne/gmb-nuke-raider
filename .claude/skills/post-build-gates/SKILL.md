@@ -1,6 +1,6 @@
 ---
 name: post-build-gates
-description: "Fallback reference for the two post-build hard gates — `make bank-post-build` (ROM bank budgets) and `make memory-check` (WRAM/VRAM/OAM budgets). BOTH NORMALLY FIRE AUTOMATICALLY: tools/post_build_hook.py runs them, in that order, as a PostToolUse hook after any non-clean `make`. Read the hook output instead of re-running them. Invoke this skill only to interpret a result, or when a build ran somewhere the hook did not fire (e.g. a Pi `pwsh-*` background job)."
+description: "Fallback reference for the two post-build hard gates — `make bank-post-build` (ROM bank budgets) and `make memory-check` (WRAM/VRAM/OAM budgets). BOTH NORMALLY FIRE AUTOMATICALLY: tools/post_build_hook.py runs them, in that order, as a PostToolUse hook after any non-clean `make`. Read the hook output instead of re-running them. Invoke this skill only to interpret a result, or when a build ran somewhere the hook did not fire."
 ---
 
 # Post-Build Gates — bank budgets + memory budgets

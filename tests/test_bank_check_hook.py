@@ -1,9 +1,10 @@
 """Tests for tools/bank_check_hook.py — the bank pre-write gate.
 
-Two payload shapes reach this hook. Claude Code's Write/Edit tools send
-``file_path``; Pi's ``write``/``edit`` tools send ``path`` (#497). Before the
-port the hook read ``file_path`` only, so a Pi write of an unmanifested
-src/*.c file read an empty string, returned early, and was allowed — silently.
+Two payload keys reach this hook. Claude Code's Write/Edit tools send
+``file_path``; omp's ``write``/``edit`` tools may send ``path``. Before the
+port the hook read ``file_path`` only, so a ``path``-keyed write of an
+unmanifested src/*.c file read an empty string, returned early, and was allowed
+— silently.
 
 The probe path below is deliberately absent from bank-manifest.json AND from
 disk: bank_check.check_file reports the missing manifest entry either way, so
@@ -36,24 +37,24 @@ def run(tool_input, tool='write'):
     return p.returncode, p.stdout, p.stderr
 
 
-class PiPayloadTests(unittest.TestCase):
-    """AC4: a Pi-shaped write of an unmanifested src file is blocked."""
+class PathKeyPayloadTests(unittest.TestCase):
+    """AC4: a path-keyed write of an unmanifested src file is blocked."""
 
-    def test_pi_write_of_unmanifested_src_file_is_blocked(self):
+    def test_path_write_of_unmanifested_src_file_is_blocked(self):
         code, _, err = run({'path': UNMANIFESTED, 'content': 'int x;\n'})
         self.assertEqual(code, 2)
         self.assertIn('not in bank-manifest.json', err)
 
-    def test_pi_edit_of_unmanifested_src_file_is_blocked(self):
+    def test_path_edit_of_unmanifested_src_file_is_blocked(self):
         code, _, err = run({'path': UNMANIFESTED, 'old_string': 'a',
                             'new_string': 'b'}, tool='edit')
         self.assertEqual(code, 2)
         self.assertIn('not in bank-manifest.json', err)
 
-    def test_pi_write_outside_src_is_allowed(self):
+    def test_path_write_outside_src_is_allowed(self):
         self.assertEqual(run({'path': 'tools/scratch.c'})[0], 0)
 
-    def test_pi_write_of_non_c_file_is_allowed(self):
+    def test_path_write_of_non_c_file_is_allowed(self):
         self.assertEqual(run({'path': 'README.md'})[0], 0)
 
 

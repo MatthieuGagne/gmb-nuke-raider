@@ -21,8 +21,7 @@ Body translation:
     end of every mirror. The canonical bodies are written for Claude Code and
     name tools omp does not have ("invoke the `bank-pre-write` skill", "use the
     PowerShell tool"); the appended block tells the omp subagent how to read
-    those instructions with the tools it actually has, in the same wording the
-    hand-written .pi/agents/*.md wrappers use.
+    those instructions with the tools it actually has.
 
 Exit codes:
     0  sync completed
@@ -55,8 +54,7 @@ DROPPED_KEYS = {"color"}
 
 # Appended verbatim to the end of every generated .omp/agents/*.md body. The
 # canonical bodies are written for Claude Code, so they issue instructions omp
-# cannot follow literally; this block re-maps them onto omp's tool set. Wording
-# follows the hand-written .pi/agents/*.md wrappers.
+# cannot follow literally; this block re-maps them onto omp's tool set.
 OMP_ADJUSTMENT_HEADING = "## omp harness adjustments"
 OMP_ADJUSTMENTS = """---
 

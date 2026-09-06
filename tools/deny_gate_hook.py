@@ -6,9 +6,9 @@ raw string rather than tokenising is deliberate: it catches wrapper forms such
 as ``bash -c "git push --force"`` with the same pattern that catches the bare
 command, which prefix-matched deny rules cannot do.
 
-Exit 2 blocks the call and returns stderr to the agent; exit 0 allows it. Both
-harnesses gate on 2 specifically — under Pi, any other non-zero code is
-reported but does not block (@hsingjui/pi-hooks, src/hooks/tool-hooks.ts).
+Exit 2 blocks the call and returns stderr to the agent; exit 0 allows it. The
+hook bridge gates on 2 specifically — any other non-zero code is reported but
+does not block.
 
 Two rule sets:
   UNCONDITIONAL  never legitimate here.
@@ -31,9 +31,9 @@ import hook_common
 
 SHELL_TOOLS = ('Bash', 'PowerShell')
 
-# Matched case-insensitively: Claude Code sends `Bash`/`PowerShell`, Pi sends
-# its raw lowercase tool name `bash` (#497 R5). Comparing on the lowered name
-# admits the Pi spelling without widening the set of gated tools.
+# Matched case-insensitively: Claude Code sends `Bash`/`PowerShell`, omp sends
+# its raw lowercase tool name `bash`. Comparing on the lowered name admits the
+# lowercase spelling without widening the set of gated tools.
 _SHELL_TOOLS_FOLDED = frozenset(t.lower() for t in SHELL_TOOLS)
 
 
