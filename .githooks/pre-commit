@@ -44,9 +44,17 @@ if ! "$PY" tools/sync_agents.py; then
 fi
 git add .omp/agents/
 
-if ! "$PY" -m unittest discover -s tests -p 'test_*.py'; then
+# Capture the suite's full output so a failure names the failing test instead
+# of scrolling past it (#739). Redirect, never a pipe: the discovery command
+# must stay byte-identical to the Makefile's test-tools recipe, which
+# tests/test_repo_hooks.py enforces, and a pipe would swallow the suite's exit
+# code (POSIX sh has no pipefail).
+LOG="${TMPDIR:-/tmp}/nuke-raider-precommit.log"
+
+if ! "$PY" -m unittest discover -s tests -p 'test_*.py' > "$LOG" 2>&1; then
     echo "" >&2
     echo "pre-commit: tool suite failed — commit blocked. Fix it, or re-run" >&2
     echo "            'make test-tools' to reproduce." >&2
+    echo "            Full output: $LOG" >&2
     exit 1
 fi
