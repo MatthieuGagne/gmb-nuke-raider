@@ -47,6 +47,22 @@ class DiscoveryAgreementTests(unittest.TestCase):
         self.assertNotRegex(read(PRE_COMMIT), r'(?m)^\s*make\b')
 
 
+class CaptureTests(unittest.TestCase):
+    """#739: a failed hook run must name the failing test, not scroll past it."""
+
+    def test_pre_commit_redirects_suite_output_to_a_log(self):
+        # Anchored to the executable `if ! "$PY"` line, so a redirect moved
+        # into a comment would not satisfy this.
+        self.assertRegex(
+            read(PRE_COMMIT),
+            r"(?m)^\s*if\s*!\s*\"\$PY\"\s+-m unittest discover -s tests -p 'test_\*\.py'\s*>\s*\"\$LOG\"\s*2>&1",
+        )
+
+    def test_pre_commit_names_the_log_on_failure(self):
+        # The failure branch must print the log path so the traceback is findable.
+        self.assertRegex(read(PRE_COMMIT), r"Full output:\s*\$LOG")
+
+
 class HookScriptTests(unittest.TestCase):
     def test_pre_commit_has_a_posix_shebang(self):
         self.assertTrue(read(PRE_COMMIT).startswith('#!/bin/sh'))
