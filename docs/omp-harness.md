@@ -1,13 +1,13 @@
 # omp harness
 
 Linked from [`CLAUDE.md`](../CLAUDE.md). Relevant only when running the omp coding agent
-(`omp`, [oh-my-pi](https://github.com/can1357/oh-my-pi)); under Claude Code or Pi none of this
-applies. omp is a fork of Pi, but its extension model is different enough that almost nothing
-in [`pi-harness.md`](pi-harness.md) carries over — read this file, not that one.
+(`omp`, [oh-my-pi](https://github.com/can1357/oh-my-pi)); under Claude Code none of this
+applies. omp is a fork of Pi, but its extension model is different enough that this file
+documents it on its own.
 
 ## What omp discovers on its own
 
-Unlike Pi, omp needs no `skills:` wiring. The project skills in `.claude/skills/` load natively
+omp needs no `skills:` wiring. The project skills in `.claude/skills/` load natively
 via `skills.enableClaudeProject`, which defaults to `true`. Invoke a skill as `/skill:<name>`, or
 read `skill://<name>` with the `read` tool. There is no `Skill` tool.
 
@@ -15,8 +15,8 @@ What omp does **not** discover is a nested instruction file: `src/CLAUDE.md` is 
 auto-loaded, so read it yourself before editing any `src/*.c` / `src/*.h` — the bank-check hook
 is ported and enforces rules whose text omp never showed you.
 
-Most of what `.pi/settings.json` installs as packages is built into omp and must **not** be
-re-added: `task` (subagents), `todo`, `web_search` / `fetch`, `ask`, native MCP, and
+The following capabilities are built into omp and must **not** be re-added as packages:
+`task` (subagents), `todo`, `web_search` / `fetch`, `ask`, native MCP, and
 `plan`. A skill that says "dispatch a subagent" or "use TodoWrite" means those tools.
 
 ## What `.omp/` wires, and why
@@ -38,7 +38,7 @@ a broken path fails silently. If a session seems ignorant of the project, check 
 
 ### `.omp/agents/*.md` — generated mirrors, not discovered
 
-omp **intentionally skips** `.claude/agents` and `.pi/agents`; their frontmatter is not omp's
+omp **intentionally skips** `.claude/agents`; its frontmatter is not omp's
 task-agent contract. The agents are therefore mirrored here by `tools/sync_agents.py`, which
 `.githooks/pre-commit` runs on every commit (staging the result). Frontmatter is translated to
 omp's dialect (`model` as `@default`/`@smol`, lowercase tool names) and carries `name` and
@@ -83,18 +83,17 @@ however, fails closed — omp blocks the tool call — so keep the wrappers free
   `.claude/skill-overlays/` is silently missing — read it yourself.
 - **`tools/factory_permission_hook.py` — not ported.** It is a `Notification` hook and omp's
   event surface has no equivalent, so factory's permission-escalation path is unguarded.
-- **`tools.approvalMode` is the entire permission mechanism.** There is no equivalent of Pi's
-  `@gotgenes/pi-permission-system`. omp ships `yolo` (every tool call auto-approved) as the
-  **default**, which is strictly weaker than either other harness — a fresh machine must set
+- **`tools.approvalMode` is the entire permission mechanism.** There is no separate permission
+  system. omp ships `yolo` (every tool call auto-approved) as the
+  **default**, which is strictly weaker than Claude Code's — a fresh machine must set
   `tools.approvalMode` to `write` or `always-ask` before the repo's gates mean anything.
 
 ## Shell
 
-omp's `bash` tool runs Git Bash through the user-level `shellPath`, so use POSIX syntax — the
-same inversion that applies under Pi. Build setup stays **machine-local and uncommitted**: the
+omp's `bash` tool runs Git Bash through the user-level `shellPath`, so use POSIX syntax — Git
+Bash, not PowerShell. Build setup stays **machine-local and uncommitted**: the
 build needs PowerShell, `GBDK_HOME`, and Git's `bin`/`usr\bin` on `PATH`, which takes absolute
 paths. Configure that in `~/.omp/agent/config.yml`, not here.
 
-Note there is no `pwsh-*` background-job escape hatch under omp — the ungated-job hole that
-affects Pi (#572) does not exist here, because omp exposes one shell tool and every hook
-matches on it.
+Note there is no `pwsh-*` background-job escape hatch under omp — the ungated-job hole (#572)
+does not exist here, because omp exposes one shell tool and every hook matches on it.

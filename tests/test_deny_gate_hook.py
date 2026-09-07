@@ -158,22 +158,23 @@ class NoVerifyTests(unittest.TestCase):
                 factory=True)[0], 2)
 
 
-class PiHarnessTests(unittest.TestCase):
-    """Pi registers its shell tool as `bash`, not Claude's `Bash` (#497 R5).
+class LowercaseToolTests(unittest.TestCase):
+    """omp registers its shell tool as `bash`, not Claude's `Bash`.
 
     Matched case-insensitively, so the gate holds whichever harness is
-    driving. Without this the hook silently allows every command under Pi.
+    driving. Without this the hook silently allows every lowercase shell
+    command.
     """
 
-    def test_pi_bash_force_push_is_refused(self):
+    def test_lowercase_bash_force_push_is_refused(self):
         code, err = run('git push --force origin feat', tool='bash')
         self.assertEqual(code, 2)
         self.assertIn('force push', err)
 
-    def test_pi_bash_pr_merge_is_refused(self):
+    def test_lowercase_bash_pr_merge_is_refused(self):
         self.assertEqual(run('gh pr merge 497 --squash', tool='bash')[0], 2)
 
-    def test_pi_bash_push_to_master_is_refused(self):
+    def test_lowercase_bash_push_to_master_is_refused(self):
         self.assertEqual(run('git push origin master', tool='bash')[0], 2)
 
     def test_pi_bash_factory_rules_still_gated(self):

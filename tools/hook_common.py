@@ -3,9 +3,7 @@
 
 Hook commands are registered with a project-root-anchored script path, so the
 interpreter finds the script whatever the working directory is (#526): Claude
-Code's ``.claude/settings.json`` uses its ``${CLAUDE_PROJECT_DIR}`` placeholder,
-Pi's ``.pi/settings.json`` uses ``$(git rev-parse --show-toplevel)`` because
-pi-hooks substitutes no placeholders and runs the command under ``bash -c``.
+Code's ``.claude/settings.json`` uses its ``${CLAUDE_PROJECT_DIR}`` placeholder.
 
 That anchor only locates the *script*. The *working directory* a hook inherits
 is still whatever the session last used, which can be a subdirectory or a path

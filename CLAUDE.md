@@ -46,12 +46,6 @@ reachability mechanics are in the import below.
 
 @docs/skill-wiring.md
 
-### Pi harness
-
-Running under Pi instead of Claude Code? **The `pwsh-*` background-job tools bypass every
-hook** (#572) — run builds and pushes through the shell tool, not a job. Read
-[`docs/pi-harness.md`](docs/pi-harness.md) for the rest.
-
 ### omp harness
 
 Running under omp (the oh-my-pi fork of Pi)? **`tools.approvalMode` defaults to `yolo`** —

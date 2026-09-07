@@ -2,11 +2,11 @@
 """PreToolUse hook: run bank_check for any src/*.c or src/*.h write/edit.
 
 Reads tool-use JSON from stdin. Exits 2 — the blocking PreToolUse exit code in
-both Claude Code and pi-hooks — if bank_check fails. Exits 0 silently for
+both Claude Code and the omp hook bridge — if bank_check fails. Exits 0 silently for
 files outside src/, non-C/H files, or parse errors.
 
-Two payload shapes are accepted: Claude Code's Write/Edit send ``file_path``,
-Pi's write/edit send ``path`` (#497).
+Two payload keys are accepted: ``file_path`` (Claude Code) with a ``path``
+fallback, since omp's edit tool key is not pinned.
 """
 import os
 import subprocess
@@ -23,8 +23,8 @@ def main():
     hook_common.reroot(data)
 
     tool_input = data.get('tool_input', {})
-    # Claude Code sends file_path; Pi sends path. Claude's key wins when its
-    # value is truthy; an empty file_path falls through to path.
+    # Claude Code sends file_path; omp may send path. file_path wins when
+    # truthy; an empty file_path falls through to path.
     file_path = tool_input.get('file_path') or tool_input.get('path') or ''
 
     if not file_path:
@@ -52,10 +52,9 @@ def main():
     if result.stderr:
         print(result.stderr, end='', file=sys.stderr)
 
-    # bank_check exits 1 on failure, but 1 is a *non-blocking* hook error in
-    # both harnesses: pi-hooks only aborts the tool call on exit 2
-    # (@hsingjui/pi-hooks src/hooks/tool-hooks.ts), and Claude Code documents
-    # the same. Exit 1 is why this gate reported but never blocked.
+    # bank_check exits 1 on failure, but 1 is a *non-blocking* hook error: the
+    # hook bridge only aborts the tool call on exit 2, and Claude Code
+    # documents the same. Exit 1 is why this gate reported but never blocked.
     sys.exit(2 if result.returncode != 0 else 0)
 
 
