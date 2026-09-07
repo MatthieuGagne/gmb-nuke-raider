@@ -1,6 +1,6 @@
 ---
 name: compare-prs
-description: Use when debugging a regression against a known-good historical PR — builds the current branch and one or more historical PRs in parallel worktrees for side-by-side ROM comparison. Also useful for narrowing down which PR introduced a bug by comparing ROMs.
+description: Use when debugging a regression against a known-good historical PR — builds the current branch and one or more historical PRs in parallel temporary checkouts for side-by-side ROM comparison. Also useful for narrowing down which PR introduced a bug by comparing ROMs.
 ---
 
 # compare-prs — Parallel PR Build Comparison
@@ -49,19 +49,19 @@ Wait for all subagents to complete, then display:
 
 Ask the user: "Which PR's ROM would you like to launch first?"
 
-Then open it in Emulicious **from the worktree directory** so the path resolves correctly. Use the **PowerShell tool** (Bash exits silently on Windows):
+Then open it in Emulicious **from the checkout directory** so the path resolves correctly. Use the **PowerShell tool** (Bash exits silently on Windows):
 
-Use the emulator launch command in `CLAUDE.local.md` (`Set-Location` to the worktree directory first if needed).
+Use the emulator launch command in `CLAUDE.local.md` (`Set-Location` to the checkout directory first if needed).
 
 Repeat for any additional ROMs the user wants to test.
 
 ### Step 4: Clean up
 
-After the user is done comparing, remove all worktrees created during this session:
+After the user is done comparing, remove all temporary checkouts created during this session.
+They are shared clones (not git worktrees), so a plain directory delete is the whole cleanup:
 
 ```bash
 # For each PR N that was checked out:
-git worktree remove --force /tmp/pr-compare-<N>
 rm -rf /tmp/pr-compare-<N>
 ```
 
@@ -70,6 +70,7 @@ rm -rf /tmp/pr-compare-<N>
 ## Notes
 
 - Parallelism is skill-side (subagents), not shell-side (`&` background processes)
-- The script handles stale worktree cleanup automatically on re-run
+- Checkouts are `git clone --shared` copies, never `git worktree add` (raw `git worktree` is denied on this machine and reserved for Orca)
+- The script handles stale checkout cleanup automatically on re-run
 - If a PR branch is gone (merged/deleted), the script exits 1 with a clear error — report it in the table and skip that ROM
-- Always launch Emulicious **from the worktree directory** (`cd /tmp/pr-compare-<N>` first)
+- Always launch Emulicious **from the checkout directory** (`cd /tmp/pr-compare-<N>` first)
