@@ -4,7 +4,10 @@ Mutates functions touched by a diff, rebuilds the host test suite against
 each mutant using a per-invocation object cache, and reports survivors.
 
 Exit codes:
-    0  every tested mutant was killed (or nothing was in scope)
+    0  every tested mutant was killed (or nothing was in scope) — this
+       means no survivor among the mutants actually tested; gate callers
+       must also read `skipped_over_budget` and `excluded` from the JSON
+       report to know whether the run was actually thorough
     1  at least one mutant survived
     2  operational or usage error (bad flags, missing gcc, red baseline)
 """
@@ -243,8 +246,8 @@ def generate_candidates(root, scope):
         with open(abs_path, 'r', encoding='utf-8', errors='replace') as fh:
             text = fh.read()
         masked = mask_source(text)
-        lines = text.splitlines()
-        masked_lines = masked.splitlines()
+        lines = text.split('\n')
+        masked_lines = masked.split('\n')
         for start, end in touched_functions(path, text, scope[path]):
             for ln in range(start, min(end, len(lines)) + 1):
                 for frag in iter_line_mutants(masked_lines[ln - 1],
@@ -255,9 +258,14 @@ def generate_candidates(root, scope):
                     candidates.append(mut)
     # Overlapping lizard spans could emit duplicates, and function order is
     # lizard's, not ours: de-dup and impose the documented order explicitly.
-    unique = {(c['file'], c['line'], c['col'], c['op']): c
-              for c in candidates}
-    return [unique[key] for key in sorted(unique)]
+    # Two different operators (e.g. 'constant' and 'return') can produce the
+    # identical mutant at the same site; de-dup on content, not just op.
+    unique = {}
+    for c in candidates:
+        key = (c['file'], c['line'], c['col'], c['original'], c['mutated'])
+        unique.setdefault(key, c)
+    return sorted(unique.values(),
+                  key=lambda c: (c['file'], c['line'], c['col'], c['op']))
 
 
 def apply_mutant(text, mutant):
@@ -440,10 +448,9 @@ def test_mutant(project, lib_objs, support_objs, binaries, mutant, run):
     with open(mutated_src, 'w', encoding='utf-8') as fh:
         fh.write(apply_mutant(text, mutant))
 
-    result = {'compiles': 0, 'binaries_run': 0}
+    result = {'binaries_run': 0}
     mutated_obj = os.path.join(mdir, module + '.o')
     rc, out = _compile(project, run, mutated_src, mutated_obj)
-    result['compiles'] += 1  # counted from the actual call, not asserted
     if rc:
         result.update(status='invalid',
                       detail=out.strip().splitlines()[-1] if out.strip()
@@ -540,7 +547,13 @@ def run_mutation(project, candidates, budget, timeout_seconds, run,
             else:
                 killed += 1
     finally:
-        shutil.rmtree(project.mutants_dir(), ignore_errors=True)
+        try:
+            shutil.rmtree(project.mutants_dir())
+        except FileNotFoundError:
+            pass
+        except OSError as err:
+            sys.stderr.write('mutate: WARNING: could not remove %s: %s\n'
+                             % (project.mutants_dir(), err))
     valid = killed + len(survivors)
     return {
         'budget': budget,
@@ -562,7 +575,6 @@ def run_mutation(project, candidates, budget, timeout_seconds, run,
             'per_mutant': [
                 {'file': r['file'], 'line': r['line'], 'op': r['op'],
                  'status': r['status'], 'seconds': round(r['seconds'], 2),
-                 'compiles': r['compiles'],
                  'binaries_run': r['binaries_run']}
                 for r in tested],
         },
@@ -631,12 +643,19 @@ def main(argv=None, run=run_subprocess, project_factory=host_project):
     try:
         scope, exempt_skipped = resolve_scope(args.files,
                                               args.commit_range, root)
+        if args.files is not None and not scope:
+            sys.stderr.write('mutate: none of the --files paths are '
+                             'mutable (see excluded reasons)\n')
+            return 2
         candidates = generate_candidates(root, scope)
         project = project_factory(root)
         report = run_mutation(project, candidates, args.budget,
                               args.timeout_seconds, run)
     except (MutationError, crap_score.ToolMissing) as err:
         sys.stderr.write('mutate: %s\n' % err)
+        return 2
+    except Exception as err:
+        sys.stderr.write('mutate: internal error: %r\n' % err)
         return 2
     report['files'] = sorted(scope)
     report['excluded'] = exempt_skipped

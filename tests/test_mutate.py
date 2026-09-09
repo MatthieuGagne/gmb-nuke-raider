@@ -173,6 +173,25 @@ class ScopeTests(unittest.TestCase):
         keys = [(c['line'], c['col'], c['op']) for c in cands]
         self.assertEqual(keys, sorted(keys))
 
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_form_feed_in_comment_does_not_desync_lines(self):
+        src = ('int f(int v) {\n'
+              '    /* page\x0cbreak */\n'
+              '    if (v > 3) { return 1; }\n'
+              '    return 0;\n'
+              '}\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            path = os.path.join(tmp, 'src', 'ff.c')
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(src)
+            cands = mutate.generate_candidates(tmp, {'src/ff.c': None})
+        self.assertTrue(cands)
+        text_lines = src.split('\n')
+        for mutant in cands:
+            self.assertIn(mutant['original'],
+                          text_lines[mutant['line'] - 1])
+
 
 class ApplyMutantTests(unittest.TestCase):
     def test_apply_replaces_only_the_fragment(self):
@@ -544,6 +563,23 @@ class CliTests(unittest.TestCase):
                     'survivors', 'timings', 'files', 'excluded'):
             self.assertIn(key, data)
         self.assertEqual(rc, 1)
+
+    def test_all_files_excluded_is_operational_error(self):
+        # src/main.c is exempt, so scope resolves empty. main() must not
+        # exit 0 without ever testing a mutant.
+        rc, _ = self._main(['--files', 'src/main.c'], FakeRun())
+        self.assertEqual(rc, 2)
+
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_unexpected_exception_exits_two(self):
+        import contextlib
+        import io
+        from unittest import mock
+        with mock.patch.object(mutate, 'run_mutation',
+                               side_effect=RuntimeError('boom')):
+            with contextlib.redirect_stderr(io.StringIO()):
+                rc, _ = self._main(['--files', 'src/calc.c'], FakeRun())
+        self.assertEqual(rc, 2)
 
     def test_missing_scope_flag_is_usage_error(self):
         import contextlib
