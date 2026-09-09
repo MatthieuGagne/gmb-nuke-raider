@@ -194,5 +194,175 @@ class ApplyMutantTests(unittest.TestCase):
         self.assertIn('v <= 3', mutated)
 
 
+class FakeRun(object):
+    """Scripted runner. Records every command; answers by predicate."""
+
+    def __init__(self, failing_binaries=(), failing_compiles=()):
+        self.commands = []
+        self.failing_binaries = set(failing_binaries)
+        self.failing_compiles = set(failing_compiles)
+
+    def __call__(self, cmd, cwd, timeout):
+        self.commands.append(list(cmd))
+        if cmd[0] == 'gcc':
+            src = next((a for a in cmd if a.endswith('.c')), '')
+            if os.path.basename(src) in self.failing_compiles:
+                return 1, 'error: scripted compile failure'
+            return 0, ''
+        name = os.path.basename(cmd[0]).replace('.exe', '')
+        return (1, 'FAIL') if name in self.failing_binaries else (0, 'OK')
+
+    def compiles_of(self, basename):
+        return [c for c in self.commands
+                if c[:2] == ['gcc', '-c']
+                and any(os.path.basename(a) == basename for a in c)]
+
+
+def _fixture_project(tmp, extra_test=None):
+    """Two-module miniature project matching the engine's expectations."""
+    src = os.path.join(tmp, 'src')
+    tst = os.path.join(tmp, 'tests')
+    os.makedirs(src)
+    os.makedirs(tst)
+    with open(os.path.join(src, 'calc.c'), 'w', encoding='utf-8') as fh:
+        fh.write('int clamp(int v) {\n'
+                 '    if (v > 10) { return 10; }\n'
+                 '    return v;\n'
+                 '}\n')
+    with open(os.path.join(src, 'other.c'), 'w', encoding='utf-8') as fh:
+        fh.write('int other_id(int v) { return v; }\n')
+    with open(os.path.join(tst, 'test_calc.c'), 'w',
+              encoding='utf-8') as fh:
+        fh.write(extra_test or (
+            'extern int clamp(int);\n'
+            'int main(void) {\n'
+            '    if (clamp(5) != 5) { return 1; }\n'
+            '    if (clamp(11) != 10) { return 1; }\n'
+            '    if (clamp(10) != 10) { return 1; }\n'
+            '    if (clamp(-3) != -3) { return 1; }\n'
+            '    return 0;\n'
+            '}\n'))
+    with open(os.path.join(tst, 'test_other.c'), 'w',
+              encoding='utf-8') as fh:
+        fh.write('extern int other_id(int);\n'
+                 'int main(void) { return other_id(7) == 7 ? 0 : 1; }\n')
+    return mutate.Project(tmp, [], ['src/calc.c', 'src/other.c'],
+                          ['tests/test_calc.c', 'tests/test_other.c'], [],
+                          os.path.join(tmp, 'build', 'mutation'))
+
+
+class EngineFakeRunTests(unittest.TestCase):
+    def _project_and_baseline(self, run):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        project = _fixture_project(self.tmp.name)
+        baseline = mutate.build_baseline(project, run)
+        return project, baseline
+
+    def _mutant(self):
+        return {'file': 'src/calc.c', 'line': 2, 'col': 10,
+                'op': 'comparison', 'original': '>', 'mutated': '<='}
+
+    def test_own_module_binary_runs_first_and_kill_stops_suite(self):
+        # The baseline must be green, so it gets a clean runner; only the
+        # mutant phase sees the failing binary.
+        project, (lib, sup, bins) = self._project_and_baseline(FakeRun())
+        run = FakeRun(failing_binaries={'test_calc'})
+        res = mutate.test_mutant(project, lib, sup, bins,
+                                 self._mutant(), run)
+        self.assertEqual(res['status'], 'killed')
+        self.assertEqual(res['killed_by'], 'test_calc')
+        self.assertEqual(res['binaries_run'], 1)  # test_other never ran
+
+    def test_survivor_escalates_to_full_suite(self):
+        run = FakeRun()
+        project, (lib, sup, bins) = self._project_and_baseline(run)
+        res = mutate.test_mutant(project, lib, sup, bins,
+                                 self._mutant(), run)
+        self.assertEqual(res['status'], 'survived')
+        self.assertEqual(res['binaries_run'], 2)
+
+    def test_compile_failure_is_invalid_not_killed(self):
+        # Baseline compiles with a clean runner; the mutant copy (same
+        # basename calc.c, under build/mutation/mutants/) then fails.
+        project, (lib, sup, bins) = self._project_and_baseline(FakeRun())
+        run = FakeRun(failing_compiles={'calc.c'})
+        res = mutate.test_mutant(project, lib, sup, bins,
+                                 self._mutant(), run)
+        self.assertEqual(res['status'], 'invalid')
+
+    def test_second_mutant_recompiles_only_the_mutated_file(self):
+        """AC8 at unit level: the object cache is not rebuilt per mutant."""
+        run = FakeRun()
+        project, (lib, sup, bins) = self._project_and_baseline(run)
+        mutate.test_mutant(project, lib, sup, bins, self._mutant(), run)
+        run.commands = []
+        mutate.test_mutant(project, lib, sup, bins, self._mutant(), run)
+        self.assertEqual(len(run.compiles_of('calc.c')), 1)
+        self.assertEqual(len(run.compiles_of('other.c')), 0)
+        self.assertEqual(len(run.compiles_of('test_calc.c')), 0)
+
+    def test_red_baseline_raises(self):
+        run = FakeRun(failing_binaries={'test_other'})
+        with self.assertRaises(mutate.MutationError):
+            self._project_and_baseline(run)
+
+
+@unittest.skipUnless(
+    os.environ.get('NUKE_MUTATE_GCC_TESTS') == '1'
+    and shutil.which('gcc'),
+    'set NUKE_MUTATE_GCC_TESTS=1 with gcc on PATH (opt-in: ~90 gcc '
+    'spawns is too slow for the per-commit pre-commit hook)')
+class GccFixtureIntegrationTests(unittest.TestCase):
+    """AC1/AC2 shape, end to end against real gcc on a 2-file fixture.
+
+    Env-gated: the pre-commit hook runs the whole discovery on every
+    commit and must stay fast; these tests run when a task's verify step
+    (and Task 4) sets NUKE_MUTATE_GCC_TESTS=1 explicitly.
+    """
+
+    def test_thoroughly_tested_function_yields_zero_survivors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = _fixture_project(tmp)
+            lib, sup, bins = mutate.build_baseline(
+                project, mutate.run_subprocess)
+            cands = mutate.generate_candidates(tmp, {'src/calc.c': None})
+            statuses = [mutate.test_mutant(project, lib, sup, bins, m,
+                                           mutate.run_subprocess)['status']
+                        for m in cands]
+            self.assertNotIn('survived', statuses)
+            self.assertIn('killed', statuses)
+
+    def test_weak_test_yields_survivor_with_line_and_operator(self):
+        weak = ('extern int clamp(int);\n'
+                'int main(void) { clamp(5); return 0; }\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            project = _fixture_project(tmp, extra_test=weak)
+            lib, sup, bins = mutate.build_baseline(
+                project, mutate.run_subprocess)
+            cands = mutate.generate_candidates(tmp, {'src/calc.c': None})
+            survivors = [m for m in cands
+                         if mutate.test_mutant(project, lib, sup, bins, m,
+                                               mutate.run_subprocess
+                                               )['status'] == 'survived']
+            self.assertTrue(survivors)
+            self.assertTrue(all(s['line'] >= 1 and s['op']
+                                for s in survivors))
+
+    def test_mutation_never_touches_the_source_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = _fixture_project(tmp)
+            src_path = os.path.join(tmp, 'src', 'calc.c')
+            with open(src_path, encoding='utf-8') as fh:
+                before = fh.read()
+            lib, sup, bins = mutate.build_baseline(
+                project, mutate.run_subprocess)
+            cands = mutate.generate_candidates(tmp, {'src/calc.c': None})
+            mutate.test_mutant(project, lib, sup, bins, cands[0],
+                               mutate.run_subprocess)
+            with open(src_path, encoding='utf-8') as fh:
+                self.assertEqual(fh.read(), before)
+
+
 if __name__ == '__main__':
     unittest.main()

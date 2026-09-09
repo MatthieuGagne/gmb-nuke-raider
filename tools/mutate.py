@@ -269,3 +269,208 @@ def apply_mutant(text, mutant):
     lines[i] = (line[:col] + mutant['mutated']
                 + line[col + len(mutant['original']):])
     return ''.join(lines)
+
+
+# --------------------------------------------------------------------------
+# Build/run engine
+# --------------------------------------------------------------------------
+
+def run_subprocess(cmd, cwd, timeout):
+    """Run one command. Returns (returncode, combined output).
+
+    A hung child is returncode 124, mirroring coreutils timeout. clean_env
+    strips GIT_DIR and friends so the engine behaves identically under the
+    pre-commit hook and a plain shell.
+    """
+    try:
+        proc = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, timeout=timeout,
+                              env=install_hooks.clean_env())
+        return proc.returncode, proc.stdout.decode('utf-8', 'replace')
+    except subprocess.TimeoutExpired:
+        return 124, 'timeout after %ds: %s' % (timeout, ' '.join(cmd))
+    except FileNotFoundError as err:
+        raise MutationError('cannot spawn %r: %s' % (cmd[0], err))
+
+
+def exe(path):
+    """Binary path as gcc will actually name it on this platform."""
+    return path + '.exe' if os.name == 'nt' else path
+
+
+def module_of(path):
+    """src/foo.c -> foo; tests/test_foo.c -> test_foo."""
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+class Project(object):
+    """Everything the engine needs to know about a buildable test suite."""
+
+    def __init__(self, root, flags, lib_sources, test_sources,
+                 support_sources, workdir):
+        self.root = os.path.abspath(root)
+        self.flags = list(flags)
+        self.lib_sources = sorted(lib_sources)
+        self.test_sources = sorted(test_sources)
+        self.support_sources = sorted(support_sources)
+        self.workdir = workdir  # absolute
+
+    def mutants_dir(self):
+        return os.path.join(self.workdir, 'mutants')
+
+
+def host_project(root):
+    """The repo's real host suite, mirroring the Makefile `test` recipe."""
+    root = os.path.abspath(root)
+
+    def rel(pattern_dir, suffix):
+        d = os.path.join(root, pattern_dir)
+        if not os.path.isdir(d):
+            return []
+        return [pattern_dir + '/' + f for f in os.listdir(d)
+                if f.endswith(suffix)]
+
+    lib = [p for p in rel('src', '.c') if p != 'src/main.c']
+    tests = [p for p in rel('tests', '.c')
+             if os.path.basename(p).startswith('test_')]
+    support = ['tests/unity/src/unity.c'] + rel('tests/mocks', '.c')
+    flags = ['-Itests/mocks', '-Itests/unity/src', '-Isrc',
+             '-Ilib/hUGEDriver/include', '-Wall', '-Wextra',
+             '-DDEBUG_MAILBOX']
+    return Project(root, flags, lib, tests, support,
+                   os.path.join(root, 'build', 'mutation'))
+
+
+def _compile(project, run, src_rel_or_abs, out_obj):
+    cmd = ['gcc', '-c'] + project.flags + [src_rel_or_abs, '-o', out_obj]
+    return run(cmd, project.root, COMPILE_TIMEOUT)
+
+
+def _link(project, run, objs, out_bin):
+    return run(['gcc'] + objs + ['-o', out_bin], project.root,
+               COMPILE_TIMEOUT)
+
+
+def _check_deadline(deadline, phase, clock=time.monotonic):
+    if deadline is not None and clock() > deadline:
+        raise MutationError('%s exceeded --timeout-seconds' % phase)
+
+
+def build_baseline(project, run, deadline=None, clock=time.monotonic):
+    """Compile every pristine source once, link and run every test binary.
+
+    Object caching (R4a): these objects are compiled exactly once per
+    invocation. Raises MutationError if anything fails — mutation results
+    are meaningless against a red baseline. The deadline (R4) covers this
+    phase too: the baseline is the expensive part of an invocation and
+    must not escape the wall clock.
+    """
+    obj_dir = os.path.join(project.workdir, 'obj')
+    sup_dir = os.path.join(project.workdir, 'support')
+    tobj_dir = os.path.join(project.workdir, 'testobj')
+    bin_dir = os.path.join(project.workdir, 'bin')
+    for d in (obj_dir, sup_dir, tobj_dir, bin_dir):
+        os.makedirs(d, exist_ok=True)
+
+    lib_objs = {}
+    for src in project.lib_sources:
+        _check_deadline(deadline, 'baseline compile', clock)
+        out = os.path.join(obj_dir, module_of(src) + '.o')
+        rc, text = _compile(project, run, src, out)
+        if rc:
+            raise MutationError('baseline compile failed: %s\n%s'
+                                % (src, text))
+        lib_objs[module_of(src)] = out
+
+    support_objs = []
+    for src in project.support_sources:
+        _check_deadline(deadline, 'baseline compile', clock)
+        out = os.path.join(sup_dir, module_of(src) + '.o')
+        rc, text = _compile(project, run, src, out)
+        if rc:
+            raise MutationError('baseline compile failed: %s\n%s'
+                                % (src, text))
+        support_objs.append(out)
+
+    binaries = []  # (name, test_obj, baseline_bin)
+    for src in project.test_sources:
+        _check_deadline(deadline, 'baseline link', clock)
+        name = module_of(src)
+        tobj = os.path.join(tobj_dir, name + '.o')
+        rc, text = _compile(project, run, src, tobj)
+        if rc:
+            raise MutationError('baseline compile failed: %s\n%s'
+                                % (src, text))
+        bin_path = exe(os.path.join(bin_dir, name))
+        rc, text = _link(project, run,
+                         [tobj] + support_objs + sorted(lib_objs.values()),
+                         bin_path)
+        if rc:
+            raise MutationError('baseline link failed: %s\n%s'
+                                % (name, text))
+        binaries.append((name, tobj, bin_path))
+
+    for name, _tobj, bin_path in binaries:
+        _check_deadline(deadline, 'baseline run', clock)
+        rc, text = run([bin_path], project.root, RUN_TIMEOUT)
+        if rc:
+            raise MutationError(
+                'baseline test %s failed (rc %d) — fix the suite before '
+                'mutating:\n%s' % (name, rc, text))
+    return lib_objs, support_objs, binaries
+
+
+def test_mutant(project, lib_objs, support_objs, binaries, mutant, run):
+    """Compile one mutant, link and run tests in relevance order (R4b).
+
+    The mutated source is written only under project.mutants_dir(); the
+    tracked file is read, never written (R8). The pristine object in
+    lib_objs is never overwritten — the mutant object is substituted at
+    link time only.
+    """
+    started = time.monotonic()
+    module = module_of(mutant['file'])
+    mdir = project.mutants_dir()
+    os.makedirs(mdir, exist_ok=True)
+
+    with open(os.path.join(project.root, mutant['file']),
+              'r', encoding='utf-8', errors='replace') as fh:
+        text = fh.read()
+    mutated_src = os.path.join(mdir, module + '.c')
+    with open(mutated_src, 'w', encoding='utf-8') as fh:
+        fh.write(apply_mutant(text, mutant))
+
+    result = {'compiles': 0, 'binaries_run': 0}
+    mutated_obj = os.path.join(mdir, module + '.o')
+    rc, out = _compile(project, run, mutated_src, mutated_obj)
+    result['compiles'] += 1  # counted from the actual call, not asserted
+    if rc:
+        result.update(status='invalid',
+                      detail=out.strip().splitlines()[-1] if out.strip()
+                      else 'compile failed',
+                      seconds=time.monotonic() - started)
+        return result
+
+    linked_objs = dict(lib_objs)
+    linked_objs[module] = mutated_obj
+    own = 'test_' + module
+    ordered = ([b for b in binaries if b[0] == own]
+               + [b for b in binaries if b[0] != own])
+    for name, tobj, _bin in ordered:
+        mbin = exe(os.path.join(mdir, name))
+        rc, out = _link(project, run,
+                        [tobj] + support_objs
+                        + sorted(linked_objs.values()), mbin)
+        if rc:
+            result.update(status='invalid',
+                          detail='link failed for %s' % name,
+                          seconds=time.monotonic() - started)
+            return result
+        rc, out = run([mbin], project.root, RUN_TIMEOUT)
+        result['binaries_run'] += 1
+        if rc:
+            result.update(status='killed', killed_by=name,
+                          seconds=time.monotonic() - started)
+            return result
+    result.update(status='survived', seconds=time.monotonic() - started)
+    return result
