@@ -23,7 +23,7 @@
 #define GEAR_DOWNSHIFT_FRAMES  8u   /* consecutive frames below threshold before downshift */
 #define PLAYER_FRICTION   1u
 
-/* Player vehicle stats — reserved for future systems; values are tunable placeholders */
+/* Player vehicle stats — reserved for future systems; value is a tunable placeholder */
 
 /* PLAYER_HANDLING — turning responsiveness (#628). Legal range 0-7: 0 is the heaviest
  * car, 7 the sharpest. The value indexes PLAYER_TURN_FRAMES_TABLE to get the number of
@@ -42,7 +42,6 @@
 #endif
 
 #define PLAYER_ARMOR     5   /* Damage system: reduces incoming damage before it applies to HP */
-#define PLAYER_FUEL      20  /* Fuel depletion system (not yet implemented) */
 
 /* Damage system */
 #define PLAYER_MAX_HP              100u  /* max HP pool; 0 = dead */
