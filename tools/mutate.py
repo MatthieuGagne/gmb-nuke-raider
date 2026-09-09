@@ -474,3 +474,186 @@ def test_mutant(project, lib_objs, support_objs, binaries, mutant, run):
             return result
     result.update(status='survived', seconds=time.monotonic() - started)
     return result
+
+
+# --------------------------------------------------------------------------
+# CLI
+# --------------------------------------------------------------------------
+
+def resolve_scope(files, commit_range, root):
+    """(scope dict, exempt_skipped list). Scope maps path -> lines|None.
+
+    Keeps only existing src/*.c files that are not exempt (R7). Exempt or
+    non-C paths are returned in the second list so the report can show
+    what was excluded and why nothing silently vanished.
+    """
+    if commit_range:
+        raw = crap_score.scope_from_commit_range(commit_range,
+                                                 repo_root=root)
+    else:
+        raw = {f.replace('\\', '/'): None for f in files}
+    scope, skipped = {}, []
+    for path in sorted(raw):
+        if not (path.startswith('src/') and path.endswith('.c')):
+            skipped.append({'file': path, 'reason': 'not a src/*.c file'})
+        elif path in EXEMPT_FILES:
+            skipped.append({'file': path, 'reason': 'exempt (R7)'})
+        elif not os.path.exists(os.path.join(root, path)):
+            skipped.append({'file': path, 'reason': 'missing on disk'})
+        else:
+            scope[path] = raw[path]
+    return scope, skipped
+
+
+def run_mutation(project, candidates, budget, timeout_seconds, run,
+                 clock=time.monotonic):
+    """Test candidates under budget and wall clock. Always cleans up (R8).
+
+    clock is injectable so the timeout paths are testable without real
+    waiting; production callers never pass it.
+    """
+    started = clock()
+    deadline = started + timeout_seconds
+    tested, survivors, invalid = [], [], []
+    killed = 0
+    skipped_timeout = 0
+    in_budget = candidates[:budget]
+    skipped_over_budget = len(candidates) - len(in_budget)
+    try:
+        baseline_start = clock()
+        lib_objs, support_objs, binaries = build_baseline(project, run,
+                                                          deadline, clock)
+        baseline_seconds = clock() - baseline_start
+        for idx, mutant in enumerate(in_budget):
+            if clock() > deadline:
+                skipped_timeout = len(in_budget) - idx
+                break
+            res = test_mutant(project, lib_objs, support_objs, binaries,
+                              mutant, run)
+            record = dict(mutant)
+            record.update(res)
+            tested.append(record)
+            if res['status'] == 'survived':
+                survivors.append(record)
+            elif res['status'] == 'invalid':
+                invalid.append(record)
+            else:
+                killed += 1
+    finally:
+        shutil.rmtree(project.mutants_dir(), ignore_errors=True)
+    valid = killed + len(survivors)
+    return {
+        'budget': budget,
+        'timeout_seconds': timeout_seconds,
+        'candidates': len(candidates),
+        'tested': len(tested),
+        'killed': killed,
+        'survived': len(survivors),
+        'invalid': len(invalid),
+        'skipped_over_budget': skipped_over_budget,
+        'skipped_timeout': skipped_timeout,
+        'first_pass_survival_rate':
+            (len(survivors) / valid) if valid else None,
+        'survivors': survivors,
+        'invalid_mutants': invalid,
+        'timings': {
+            'baseline_seconds': round(baseline_seconds, 2),
+            'total_seconds': round(clock() - started, 2),
+            'per_mutant': [
+                {'file': r['file'], 'line': r['line'], 'op': r['op'],
+                 'status': r['status'], 'seconds': round(r['seconds'], 2),
+                 'compiles': r['compiles'],
+                 'binaries_run': r['binaries_run']}
+                for r in tested],
+        },
+    }
+
+
+def render(report, exempt_skipped):
+    lines = ['mutate: %d candidate(s), %d tested, %d killed, '
+             '%d survived, %d invalid'
+             % (report['candidates'], report['tested'], report['killed'],
+                report['survived'], report['invalid'])]
+    rate = report['first_pass_survival_rate']
+    lines.append('mutate: first-pass survival rate: %s'
+                 % ('n/a' if rate is None else '%.0f%%' % (rate * 100)))
+    if report['skipped_over_budget']:
+        lines.append('mutate: %d candidate(s) skipped: over the %d-mutant '
+                     'budget' % (report['skipped_over_budget'],
+                                 report['budget']))
+    if report['skipped_timeout']:
+        lines.append('mutate: %d in-budget mutant(s) skipped: %ds '
+                     'wall-clock timeout reached'
+                     % (report['skipped_timeout'],
+                        report['timeout_seconds']))
+    for s in exempt_skipped:
+        lines.append('mutate: excluded %s (%s)' % (s['file'], s['reason']))
+    for m in report['invalid_mutants']:
+        lines.append('INVALID %s:%d [%s] %r -> %r (%s)'
+                     % (m['file'], m['line'], m['op'], m['original'],
+                        m['mutated'], m.get('detail', '')))
+    for m in report['survivors']:
+        lines.append('SURVIVOR %s:%d [%s] %r -> %r'
+                     % (m['file'], m['line'], m['op'], m['original'],
+                        m['mutated']))
+    if not report['survivors']:
+        lines.append('mutate: no survivors')
+    return '\n'.join(lines)
+
+
+def main(argv=None, run=run_subprocess, project_factory=host_project):
+    parser = argparse.ArgumentParser(
+        description='Diff-scoped mutation testing over the host suite.')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--files', nargs='+',
+                       help='repo-relative src/*.c paths to mutate')
+    group.add_argument('--commit-range',
+                       help="git range, e.g. origin/master...HEAD")
+    parser.add_argument('--budget', type=int, default=DEFAULT_BUDGET,
+                        help='max mutants tested (default %d)'
+                             % DEFAULT_BUDGET)
+    parser.add_argument('--timeout-seconds', type=int,
+                        default=DEFAULT_TIMEOUT_SECONDS,
+                        help='wall-clock ceiling (default %d)'
+                             % DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument('--repo-root', default='.')
+    parser.add_argument('--json', action='store_true', dest='as_json')
+    args = parser.parse_args(argv)
+    if args.budget < 1 or args.timeout_seconds < 1:
+        sys.stderr.write('mutate: --budget and --timeout-seconds must be '
+                         'positive\n')
+        return 2
+    if args.commit_range is not None and not args.commit_range.strip():
+        sys.stderr.write('mutate: --commit-range must not be empty\n')
+        return 2
+
+    root = os.path.abspath(args.repo_root)
+    try:
+        scope, exempt_skipped = resolve_scope(args.files,
+                                              args.commit_range, root)
+        candidates = generate_candidates(root, scope)
+        project = project_factory(root)
+        report = run_mutation(project, candidates, args.budget,
+                              args.timeout_seconds, run)
+    except (MutationError, crap_score.ToolMissing) as err:
+        sys.stderr.write('mutate: %s\n' % err)
+        return 2
+    report['files'] = sorted(scope)
+    report['excluded'] = exempt_skipped
+    if args.as_json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(render(report, exempt_skipped))
+    if report['survived']:
+        return 1
+    if report['skipped_timeout']:
+        # In-budget mutants went untested: the gate is inconclusive, and an
+        # inconclusive gate must not read as green (R4).
+        sys.stderr.write('mutate: timed out before testing every in-budget '
+                         'mutant — inconclusive, not a pass\n')
+        return 2
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

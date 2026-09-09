@@ -364,5 +364,227 @@ class GccFixtureIntegrationTests(unittest.TestCase):
                 self.assertEqual(fh.read(), before)
 
 
+class ResolveScopeTests(unittest.TestCase):
+    def test_exempt_file_is_excluded_with_reason(self):
+        scope, skipped = mutate.resolve_scope(['src/main.c'], None, ROOT)
+        self.assertEqual(scope, {})
+        self.assertEqual(skipped[0]['reason'], 'exempt (R7)')
+
+    def test_non_src_file_is_excluded(self):
+        scope, skipped = mutate.resolve_scope(['tools/mutate.py'], None,
+                                              ROOT)
+        self.assertEqual(scope, {})
+        self.assertIn('not a src', skipped[0]['reason'])
+
+    def test_existing_src_file_is_in_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w',
+                      encoding='utf-8') as fh:
+                fh.write('int f(void) { return 1; }\n')
+            scope, skipped = mutate.resolve_scope(['src/foo.c'], None, tmp)
+        self.assertEqual(list(scope), ['src/foo.c'])
+        self.assertIsNone(scope['src/foo.c'])
+        self.assertEqual(skipped, [])
+
+
+class RunMutationTests(unittest.TestCase):
+    # Static mutants: keeps these tests lizard-free (test_crap_score.py
+    # keeps the suite runnable without lizard; so must this file). Columns
+    # verified against the fixture calc.c text.
+    CANDS = [
+        {'file': 'src/calc.c', 'line': 2, 'col': 10,
+         'op': 'comparison', 'original': '>', 'mutated': '<='},
+        {'file': 'src/calc.c', 'line': 2, 'col': 12,
+         'op': 'constant', 'original': '10', 'mutated': '11'},
+        {'file': 'src/calc.c', 'line': 2, 'col': 8,
+         'op': 'negate-condition', 'original': 'v > 10',
+         'mutated': '!(v > 10)'},
+        {'file': 'src/calc.c', 'line': 3, 'col': 11,
+         'op': 'return', 'original': 'v', 'mutated': '0'},
+    ]
+
+    def _setup(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        project = _fixture_project(tmp.name)
+        return project, [dict(c) for c in self.CANDS]
+
+    def test_budget_overflow_is_counted_not_silent(self):
+        """AC4: over-budget candidates are reported by count."""
+        run = FakeRun()
+        project, cands = self._setup()
+        report = mutate.run_mutation(project, cands, 2, 600, run)
+        self.assertEqual(report['tested'], 2)
+        self.assertEqual(report['skipped_over_budget'], len(cands) - 2)
+
+    def test_invalid_mutants_excluded_from_survival_rate(self):
+        """AC5: rate uses killed+survived only."""
+        project, cands = self._setup()
+        run = _BaselineThenMutant(
+            FakeRun(), FakeRun(failing_compiles={'calc.c'}))
+        report = mutate.run_mutation(project, cands[:3], 3, 600, run)
+        self.assertEqual(report['invalid'], 3)
+        self.assertIsNone(report['first_pass_survival_rate'])
+
+    def test_timeout_skips_and_reports_remaining(self):
+        run = FakeRun()
+        project, cands = self._setup()
+        state = {'t': 0.0}
+
+        def clock():
+            state['t'] += 1.0
+            return state['t']
+
+        # With the fixture (2 lib, 0 support, 2 test sources) the baseline
+        # makes exactly 8 clock calls after `started`: baseline_start,
+        # 2 lib checks, 2 link checks, 2 run checks, baseline_seconds.
+        # timeout 8 puts the deadline at t=9, so the baseline finishes in
+        # time and the first mutant-loop check (t=10) is past it.
+        report = mutate.run_mutation(project, cands, len(cands), 8, run,
+                                     clock=clock)
+        self.assertEqual(report['tested'], 0)
+        self.assertEqual(report['skipped_timeout'], len(cands))
+
+    def test_baseline_overrunning_the_deadline_is_operational_error(self):
+        run = FakeRun()
+        project, cands = self._setup()
+        with self.assertRaises(mutate.MutationError):
+            # Deadline t=2 expires on the first baseline check (t=3).
+            state = {'t': 0.0}
+
+            def clock():
+                state['t'] += 1.0
+                return state['t']
+
+            mutate.run_mutation(project, cands, len(cands), 1, run,
+                                clock=clock)
+        self.assertFalse(os.path.exists(project.mutants_dir()))
+
+    def test_induced_crash_still_removes_mutants_dir(self):
+        """AC3: cleanup holds under a crash mid-run, not only happy path."""
+        class Boom(Exception):
+            pass
+
+        run = FakeRun()
+        project, cands = self._setup()
+
+        calls = {'n': 0}
+        # 2 lib compiles + (2 test compiles + 2 links) + 2 runs = 8 for
+        # the fixture. Fragile by design: if the fixture ever gains
+        # support sources, update this arithmetic alongside it.
+        baseline_calls = (len(project.lib_sources)
+                          + len(project.test_sources) * 2  # compile+link
+                          + len(project.test_sources))     # runs
+
+        def crashing_run(cmd, cwd, timeout):
+            calls['n'] += 1
+            if calls['n'] > baseline_calls + 1:
+                raise Boom()
+            return run(cmd, cwd, timeout)
+
+        with self.assertRaises(Boom):
+            mutate.run_mutation(project, cands, len(cands), 600,
+                                crashing_run)
+        self.assertFalse(os.path.exists(project.mutants_dir()))
+
+
+class _BaselineThenMutant(object):
+    """Route baseline commands to one FakeRun, mutant-phase to another."""
+
+    def __init__(self, baseline_run, mutant_run):
+        self.baseline_run = baseline_run
+        self.mutant_run = mutant_run
+
+    def __call__(self, cmd, cwd, timeout):
+        text = ' '.join(cmd)
+        if os.path.join('build', 'mutation', 'mutants') in text or \
+                'mutants' in text:
+            return self.mutant_run(cmd, cwd, timeout)
+        return self.baseline_run(cmd, cwd, timeout)
+
+
+class CliTests(unittest.TestCase):
+    def _main(self, argv, run):
+        import contextlib
+        import io
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        _fixture_project(tmp.name)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = mutate.main(argv + ['--repo-root', tmp.name], run=run,
+                             project_factory=_fixture_project_factory)
+        return rc, buf.getvalue()
+
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_all_killed_exits_zero(self):
+        # Clean baseline, then every calc.c mutant dies in its own binary.
+        run = _BaselineThenMutant(
+            FakeRun(), FakeRun(failing_binaries={'test_calc'}))
+        rc, out = self._main(['--files', 'src/calc.c'], run)
+        self.assertEqual(rc, 0)
+        self.assertIn('no survivors', out)
+
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_survivor_exits_one_and_names_site(self):
+        rc, out = self._main(['--files', 'src/calc.c'], FakeRun())
+        self.assertEqual(rc, 1)
+        self.assertIn('SURVIVOR src/calc.c:', out)
+
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_json_shape(self):
+        import json as _json
+        rc, out = self._main(['--files', 'src/calc.c', '--json'],
+                             FakeRun())
+        data = _json.loads(out)
+        for key in ('budget', 'timeout_seconds', 'candidates', 'tested',
+                    'killed', 'survived', 'invalid', 'skipped_over_budget',
+                    'skipped_timeout', 'first_pass_survival_rate',
+                    'survivors', 'timings', 'files', 'excluded'):
+            self.assertIn(key, data)
+        self.assertEqual(rc, 1)
+
+    def test_missing_scope_flag_is_usage_error(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as ctx:
+                mutate.main([], run=FakeRun())
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_nonpositive_budget_is_usage_error(self):
+        rc, _ = self._main(['--files', 'src/calc.c', '--budget', '0'],
+                           FakeRun())
+        self.assertEqual(rc, 2)
+
+    def test_empty_commit_range_is_usage_error(self):
+        rc, _ = self._main(['--commit-range', ''], FakeRun())
+        self.assertEqual(rc, 2)
+
+    @unittest.skipUnless(HAVE_LIZARD, 'lizard not installed')
+    def test_timed_out_run_exits_two_not_zero(self):
+        """R4: an inconclusive (timed-out) run must not read as green."""
+        from unittest import mock
+        report = {'survived': 0, 'skipped_timeout': 3,
+                  'skipped_over_budget': 0, 'tested': 1, 'killed': 1,
+                  'invalid': 0, 'candidates': 4, 'budget': 4,
+                  'timeout_seconds': 600,
+                  'first_pass_survival_rate': 0.0, 'survivors': [],
+                  'invalid_mutants': [],
+                  'timings': {'baseline_seconds': 0, 'total_seconds': 0,
+                              'per_mutant': []}}
+        with mock.patch.object(mutate, 'run_mutation',
+                               return_value=report):
+            rc, _ = self._main(['--files', 'src/calc.c'], FakeRun())
+        self.assertEqual(rc, 2)
+
+
+def _fixture_project_factory(root):
+    return mutate.Project(root, [], ['src/calc.c', 'src/other.c'],
+                          ['tests/test_calc.c', 'tests/test_other.c'], [],
+                          os.path.join(root, 'build', 'mutation'))
+
+
 if __name__ == '__main__':
     unittest.main()
