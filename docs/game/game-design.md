@@ -205,7 +205,6 @@ Speed — maximum velocity
 Acceleration — speed buildup  
 Handling — turning responsiveness  
 Armor — durability  
-Fuel — endurance
 
 ---
 
