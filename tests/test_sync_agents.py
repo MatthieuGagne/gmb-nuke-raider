@@ -70,7 +70,7 @@ class RenderTests(unittest.TestCase):
         self.assertTrue(rendered.endswith(sync_agents.OMP_ADJUSTMENTS))
         # It must actually re-map the three Claude-Code-only assumptions.
         self.assertIn('.claude/skills/<name>/SKILL.md', rendered)
-        self.assertIn('Git Bash', rendered)
+        self.assertIn('pwsh', rendered)
         self.assertIn("Ignore the body's `tools:` frontmatter line", rendered)
 
     def test_every_canonical_agent_mirror_carries_the_adjustments(self):

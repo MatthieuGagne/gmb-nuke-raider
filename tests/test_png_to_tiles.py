@@ -7,7 +7,7 @@ import zlib
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c, apply_transform, rasterize_polygon
+from tools.png_to_tiles import load_png_pixels, encode_2bpp, png_to_c, apply_transform, rasterize_polygon, parse_tsx_collisions
 
 
 # ── Minimal PNG helpers ────────────────────────────────────────────────────
@@ -296,6 +296,57 @@ class TestRasterizePolygon(unittest.TestCase):
                 self.assertEqual(rows[oy], 1 << 3)
             else:
                 self.assertEqual(rows[oy], 0x00)
+
+
+class TestParseTsxCollisions(unittest.TestCase):
+    """parse_tsx_collisions: polygon vs polyline vs bounding-box fallback."""
+
+    def _write_tsx(self, dirpath, object_xml):
+        """Write a one-tile TSX whose objectgroup holds exactly `object_xml`."""
+        content = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<tileset version="1.8" name="track" tilewidth="8" tileheight="8" '
+            'tilecount="1" columns="1">\n'
+            ' <tile id="0">\n'
+            '  <objectgroup draworder="index" id="1">\n'
+            '   %s\n'
+            '  </objectgroup>\n'
+            ' </tile>\n'
+            '</tileset>\n' % object_xml
+        )
+        path = os.path.join(dirpath, 't.tsx')
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def test_polygon_yields_polygon_points_not_bounding_box(self):
+        """A <polygon> has zero children, so the old `or` chain treated it as
+        falsy and fell back to the object's bounding box. The fixed code must
+        return the polygon's own points, not the width/height rectangle."""
+        with tempfile.TemporaryDirectory() as d:
+            path = self._write_tsx(
+                d, '<object id="1" x="0" y="0"><polygon points="0,0 4,0 4,8 0,8"/></object>')
+            collisions = parse_tsx_collisions(path)
+        self.assertEqual(collisions[0],
+                         [(0.0, 0.0), (4.0, 0.0), (4.0, 8.0), (0.0, 8.0)])
+
+    def test_polyline_yields_polyline_points(self):
+        """A <polyline> still yields its points (no regression on track.tsx)."""
+        with tempfile.TemporaryDirectory() as d:
+            path = self._write_tsx(
+                d, '<object id="1" x="0" y="0"><polyline points="0,0 4,0 4,8"/></object>')
+            collisions = parse_tsx_collisions(path)
+        self.assertEqual(collisions[0],
+                         [(0.0, 0.0), (4.0, 0.0), (4.0, 8.0)])
+
+    def test_neither_yields_bounding_box(self):
+        """Neither polygon nor polyline falls back to the width/height rectangle."""
+        with tempfile.TemporaryDirectory() as d:
+            path = self._write_tsx(
+                d, '<object id="1" x="0" y="0" width="4" height="8"/>')
+            collisions = parse_tsx_collisions(path)
+        self.assertEqual(collisions[0],
+                         [(0.0, 0.0), (4.0, 0.0), (4.0, 8.0), (0.0, 8.0)])
 
 
 class TestMetaHeaderCollisionMask(unittest.TestCase):
