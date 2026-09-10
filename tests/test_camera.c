@@ -484,6 +484,45 @@ void test_stream_col_splits_at_the_bg_ring_boundary(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(19u * 32u) + 3u]);
 }
 
+/* ---- stream_row_direct: the camera_init display-off path (#752) -------- */
+
+/* camera_init() preloads 18 rows through stream_row_direct(). The tile base
+ * must be set BEFORE init, because init is the only caller of that path.
+ * cam_x = 0 -> vram_x = 0, so no row is split here. */
+void test_stream_row_direct_adds_the_tile_base(void) {
+    big_map_install();
+    mock_vram_clear();
+    camera_set_tile_base(STREAM_TILE_BASE);
+    camera_init(80, 72);            /* cam_x = 0, cam_y = 0 -> preloads rows 0..17 */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(0u, 0u) + STREAM_TILE_BASE),
+                            mock_vram[(0u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(21u, 0u) + STREAM_TILE_BASE),
+                            mock_vram[(0u * 32u) + 21u]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(7u, 17u) + STREAM_TILE_BASE),
+                            mock_vram[(17u * 32u) + 7u]);
+    /* One past the 22-column window: no row was split. */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(0u * 32u) + 22u]);
+}
+
+/* Camera at cam_x = 160 -> vram_x = 20 for every preloaded row, so each of the
+ * 18 rows stream_row_direct() writes is split at the ring boundary. */
+void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
+    big_map_install();
+    mock_vram_clear();
+    camera_init(240, 72);           /* cam_x = 160, cam_y = 0 -> preloads rows 0..17 */
+    /* First half — the end of the BG row. */
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 3u), mock_vram[(3u * 32u) + 20u]);
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(31u, 3u), mock_vram[(3u * 32u) + 31u]);
+    /* Second half — wrapped to VRAM x = 0. */
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(32u, 3u), mock_vram[(3u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(41u, 3u), mock_vram[(3u * 32u) + 9u]);
+    /* The gap between the two halves must stay untouched. */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(3u * 32u) + 10u]);
+    /* A second preloaded row is split the same way. */
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 12u), mock_vram[(12u * 32u) + 20u]);
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(32u, 12u), mock_vram[(12u * 32u) + 0u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -524,5 +563,7 @@ int main(void) {
     RUN_TEST(test_stream_row_splits_at_the_bg_ring_boundary);
     RUN_TEST(test_stream_col_adds_the_tile_base);
     RUN_TEST(test_stream_col_splits_at_the_bg_ring_boundary);
+    RUN_TEST(test_stream_row_direct_adds_the_tile_base);
+    RUN_TEST(test_stream_row_direct_splits_at_the_bg_ring_boundary);
     return UNITY_END();
 }
