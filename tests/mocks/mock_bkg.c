@@ -22,6 +22,12 @@ int     mock_set_bkg_tile_xy_call_count = 0;
 uint8_t mock_bkg_last_x = 0u, mock_bkg_last_y = 0u;
 uint8_t mock_bkg_last_w = 0u, mock_bkg_last_h = 0u;
 
+/* Counts set_bkg_tiles calls whose rectangle leaves the 32x32 map — past
+ * column 31 or past the last row. Reset by mock_vram_clear(). A raised count
+ * means a caller wrote outside the map it asked for, which on hardware is
+ * either the next BG row or the second map at 0x9C00. */
+int mock_bkg_out_of_range_count = 0;
+
 void mock_set_bkg_tile_xy_reset(void) {
     mock_set_bkg_tile_xy_max_row    = 0u;
     mock_set_bkg_tile_xy_call_count = 0;
@@ -38,6 +44,7 @@ void mock_vram_clear(void) {
     mock_bkg_last_y = 0u;
     mock_bkg_last_w = 0u;
     mock_bkg_last_h = 0u;
+    mock_bkg_out_of_range_count = 0;
     for (i = 0u; i < 32u * 32u; i++) mock_vram[i] = 0u;
 }
 
@@ -57,7 +64,11 @@ void move_bkg(uint8_t x, uint8_t y) {
     mock_move_bkg_last_y = y;
 }
 
-/* Writes a w×h rectangle of tiles into mock_vram, wrapping mod 32 */
+/* Writes a w x h rectangle of tiles at GBDK's flat BG-map offsets: row-major
+ * into the 1 KiB map at 0x9800, so a rectangle that runs past column 31 spills
+ * into the FOLLOWING map row. The flat offset wraps mod 1024, but that is this
+ * mock's own bound, not hardware fidelity: on real hardware the overrun lands
+ * in the second map at 0x9C00, which is why mock_bkg_out_of_range_count exists. */
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles) {
     uint8_t dy, dx;
@@ -66,11 +77,15 @@ void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
     mock_bkg_last_w = w;
     mock_bkg_last_h = h;
     mock_set_bkg_tiles_call_count++;
+    if ((uint16_t)x + (uint16_t)w > 32u ||
+        (uint16_t)y + (uint16_t)h > 32u) {
+        mock_bkg_out_of_range_count++;
+    }
     for (dy = 0u; dy < h; dy++) {
         for (dx = 0u; dx < w; dx++) {
-            uint8_t vx = (uint8_t)((x + dx) & 31u);
-            uint8_t vy = (uint8_t)((y + dy) & 31u);
-            mock_vram[(uint16_t)vy * 32u + vx] = *tiles++;
+            uint16_t off = (uint16_t)(((uint16_t)(y + dy) * 32u +
+                                       (uint16_t)x + (uint16_t)dx) % 1024u);
+            mock_vram[off] = *tiles++;
         }
     }
 }

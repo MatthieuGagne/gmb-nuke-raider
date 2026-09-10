@@ -421,6 +421,85 @@ void test_a_long_pulse_that_dies_on_a_wall_repairs_one_frame_later(void) {
     TEST_ASSERT_EQUAL_UINT8(1u,     mock_vram[(9u * 32u) + 10u]);
 }
 
+/* ---- beam_paint: the BG ring-boundary split (#761) --------------------- */
+
+/* A 40-column map, so the beam's span can cross BG column 31. Its own map,
+ * installed by this test only; setUp() reinstalls the 20x16 map afterwards. */
+static uint8_t s_wide_map[40 * 16];
+
+static void map_wide_all_road(void) {
+    uint16_t i;
+    for (i = 0u; i < 40u * 16u; i++) s_wide_map[i] = 1u;
+    track_test_set_map(s_wide_map, 40u, 16u);
+    track_test_set_collision_mask(1u, k_open);
+    track_test_set_collision_mask(0u, k_solid);
+}
+
+/* Car top-left (224,64) -> centre (232,72) = tile (29,9). Firing right, the
+ * raycast starts at cx+8 = 240 = tile 30 and runs to the camera's right clip
+ * (cam_x + 159), so the span starts at BG column 30 and is wider than the two
+ * columns left in that row. src/beam.c:121-124 must split it into
+ * columns 30-31 and columns 0..n of the SAME BG row. An unsplit call would put
+ * the tail on BG row 10. */
+void test_beam_render_splits_at_the_bg_ring_boundary(void) {
+    uint8_t tx;
+    map_wide_all_road();
+    camera_init(232, 64);            /* cam_x clamps to 152, cam_y to 0 */
+    camera_flush_vram();
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(224, 64, DIR_R));
+    beam_render();
+    /* Head of the span — the end of BG row 9. */
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 30u]);
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 31u]);
+    /* Tail — wrapped to column 0 of the SAME row, not spilled onto row 10. */
+    TEST_ASSERT_EQUAL_UINT8(0x40u, mock_vram[(9u * 32u) + 0u]);
+    for (tx = 0u; tx <= 2u; tx++) {
+        TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(10u * 32u) + tx]);
+    }
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    /* Pinned separately from the cells, exactly as #752 pins the camera split.
+     * LAST on purpose: Unity aborts at the first failure, and AC4 requires the
+     * unsplit probe to name a mock_vram cell assertion, not a call count. */
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
+}
+
+/* A tall map, so a downward beam's span can cross the last BG row. The lane
+ * starts at BG row >= 17, so vy + s_count > 32 and src/beam.c:129-132 must
+ * split. Cells cannot see this split — a vertical crossing writes the same
+ * bytes either way (see the plan's ruling) — so the call count and the
+ * out-of-range record are what prove it. */
+static uint8_t s_tall_map[20 * 48];
+
+static void map_tall_all_road(void) {
+    uint16_t i;
+    for (i = 0u; i < 20u * 48u; i++) s_tall_map[i] = 1u;
+    track_test_set_map(s_tall_map, 20u, 48u);
+    track_test_set_collision_mask(1u, k_open);
+    track_test_set_collision_mask(0u, k_solid);
+}
+
+void test_beam_render_splits_at_the_bg_ring_boundary_vertically(void) {
+    map_tall_all_road();
+    /* cam_max_y = 48*8 - 128 = 256; camera_init(64,208) -> cam_y = 208-72 = 136.
+     * beam_fire(64,120,DIR_B) -> cy = 128, nose = cy+8 = 136 = lo_tile 17*8.
+     * vis_hi = cam_y+127 = 263, so the raycast runs nose..256 (BEAM_MAX_CELLS=22
+     * never binds), giving s_count = 16 and s_lo_tile = 17: 17+16 = 33 > 32, so
+     * src/beam.c:129-132 must split (15 rows then 1). Derived, not measured —
+     * see the task-3 report for the derivation. */
+    camera_init(64, 208);
+    camera_flush_vram();
+    beam_init(0x40u);
+    beam_set_equipped(1u);
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_UINT8(1, beam_fire(64, 120, DIR_B));
+    beam_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_diagonal_press_does_not_fire);
@@ -440,6 +519,8 @@ int main(void) {
     RUN_TEST(test_cannon_loadout_never_fires_a_beam);
     RUN_TEST(test_render_draws_the_whole_lane);
     RUN_TEST(test_left_beam_paints_the_cells_left_of_the_car);
+    RUN_TEST(test_beam_render_splits_at_the_bg_ring_boundary);
+    RUN_TEST(test_beam_render_splits_at_the_bg_ring_boundary_vertically);
     RUN_TEST(test_up_beam_paints_the_cells_above_the_car);
     RUN_TEST(test_render_draws_nothing_once_the_pulse_expires);
     RUN_TEST(test_expiry_queues_the_restore);

@@ -433,10 +433,6 @@ void test_stream_row_splits_at_the_bg_ring_boundary(void) {
     mock_vram_clear();
     TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_row(5u));
     camera_flush_vram();
-    /* Pin that the row was actually split into two set_bkg_tiles calls: the
-     * mock's own mod-32 wrap makes one unsplit 22-wide call write the same
-     * cells as two split calls, so cell assertions alone can't see the split. */
-    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
     /* First half — the end of the BG row. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 5u), mock_vram[(5u * 32u) + 20u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(31u, 5u), mock_vram[(5u * 32u) + 31u]);
@@ -446,6 +442,15 @@ void test_stream_row_splits_at_the_bg_ring_boundary(void) {
     /* The gap between the two halves must stay untouched. */
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(5u * 32u) + 10u]);
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(5u * 32u) + 19u]);
+    /* Neither half may leave the map: an unsplit 22-wide call at vram_x = 20
+     * would run to column 41 and spill into BG row 6. */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(6u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(6u * 32u) + 9u]);
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    /* Pin that the row was actually split into two set_bkg_tiles calls: this
+     * check pins that the split happened, while the cell assertions above pin
+     * that it was required — the two are not redundant (#761 R6). (#752) */
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
 }
 
 /* ---- stream_col: tile base and ring-wrap split (#752) ------------------ */
@@ -481,10 +486,6 @@ void test_stream_col_splits_at_the_bg_ring_boundary(void) {
     mock_vram_clear();
     TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_col(3u));
     camera_flush_vram();
-    /* Pin that the column was actually split into two set_bkg_tiles calls: the
-     * mock's own mod-32 wrap makes one unsplit 19-tall call write the same
-     * cells as two split calls, so cell assertions alone can't see the split. */
-    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
     /* First half — the bottom of the BG column. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 20u), mock_vram[(20u * 32u) + 3u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 31u), mock_vram[(31u * 32u) + 3u]);
@@ -494,6 +495,14 @@ void test_stream_col_splits_at_the_bg_ring_boundary(void) {
     /* The gap between the two halves must stay untouched. */
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(7u * 32u) + 3u]);
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(19u * 32u) + 3u]);
+    /* A column crossing the ring boundary is the one case cell assertions
+     * cannot see: under GBDK's flat layout an unsplit 19-tall call writes the
+     * SAME cells as the split pair, because the only wrap involved is the map's
+     * own 1 KiB wrap. What separates them is that the unsplit call runs past
+     * the last row of the map. */
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    /* Pin that the column was actually split into two set_bkg_tiles calls. (#752) */
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
 }
 
 /* ---- stream_row_direct: the camera_init display-off path (#752) -------- */
@@ -522,11 +531,6 @@ void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
     big_map_install();
     mock_vram_clear();
     camera_init(240, 72);           /* cam_x = 160, cam_y = 0 -> preloads rows 0..17 */
-    /* Pin that each of the 18 preloaded rows was actually split into two
-     * set_bkg_tiles calls (18 * 2 = 36): the mock's own mod-32 wrap makes an
-     * unsplit call write the same cells as a split one, so cell assertions
-     * alone can't see the split. */
-    TEST_ASSERT_EQUAL_INT(36, mock_set_bkg_tiles_call_count);
     /* First half — the end of the BG row. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 3u), mock_vram[(3u * 32u) + 20u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(31u, 3u), mock_vram[(3u * 32u) + 31u]);
@@ -538,6 +542,46 @@ void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
     /* A second preloaded row is split the same way. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 12u), mock_vram[(12u * 32u) + 20u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(32u, 12u), mock_vram[(12u * 32u) + 0u]);
+    /* No preloaded row ran past column 31. */
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    /* Pin that each of the 18 preloaded rows was actually split into two
+     * set_bkg_tiles calls (18 * 2 = 36): this check pins that the split
+     * happened, while the cell assertions above pin that it was required —
+     * the two are not redundant (#761 R6). (#752) */
+    TEST_ASSERT_EQUAL_INT(36, mock_set_bkg_tiles_call_count);
+}
+
+/* ---- the mock itself: GBDK's flat BG-map layout (#761) ----------------- */
+
+/* GBDK writes row-major into the flat 1 KiB map at 0x9800. A rectangle wider
+ * than the columns left in the row spills into the FOLLOWING row — it does not
+ * wrap back to column 0 of the same row. */
+void test_mock_set_bkg_tiles_spills_into_the_next_map_row(void) {
+    static const uint8_t tiles[4] = {0xA1u, 0xA2u, 0xA3u, 0xA4u};
+    mock_vram_clear();
+    set_bkg_tiles(30u, 5u, 4u, 1u, tiles);
+    TEST_ASSERT_EQUAL_UINT8(0xA1u, mock_vram[(5u * 32u) + 30u]);
+    TEST_ASSERT_EQUAL_UINT8(0xA2u, mock_vram[(5u * 32u) + 31u]);
+    /* The spill lands on row 6, NOT on row 5 columns 0-1. */
+    TEST_ASSERT_EQUAL_UINT8(0xA3u, mock_vram[(6u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(0xA4u, mock_vram[(6u * 32u) + 1u]);
+    TEST_ASSERT_EQUAL_UINT8(0u,    mock_vram[(5u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(0u,    mock_vram[(5u * 32u) + 1u]);
+}
+
+/* The out-of-range record: a rectangle that stays inside the map leaves the
+ * counter at zero; one that runs past a map edge raises it. */
+void test_mock_records_rectangles_that_leave_the_map(void) {
+    static const uint8_t tiles[4] = {1u, 2u, 3u, 4u};
+    mock_vram_clear();
+    set_bkg_tiles(4u, 5u, 4u, 1u, tiles);
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    set_bkg_tiles(30u, 5u, 4u, 1u, tiles);          /* past column 31 */
+    TEST_ASSERT_EQUAL_INT(1, mock_bkg_out_of_range_count);
+    set_bkg_tiles(4u, 30u, 1u, 4u, tiles);          /* past row 31 */
+    TEST_ASSERT_EQUAL_INT(2, mock_bkg_out_of_range_count);
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
 }
 
 int main(void) {
@@ -582,5 +626,7 @@ int main(void) {
     RUN_TEST(test_stream_col_splits_at_the_bg_ring_boundary);
     RUN_TEST(test_stream_row_direct_adds_the_tile_base);
     RUN_TEST(test_stream_row_direct_splits_at_the_bg_ring_boundary);
+    RUN_TEST(test_mock_set_bkg_tiles_spills_into_the_next_map_row);
+    RUN_TEST(test_mock_records_rectangles_that_leave_the_map);
     return UNITY_END();
 }

@@ -123,6 +123,7 @@ extern int mock_load_bkg_row_call_count;
  * h=1) apart from a column stream (w=1, h=VIS_ROWS). */
 extern uint8_t mock_bkg_last_x, mock_bkg_last_y;
 extern uint8_t mock_bkg_last_w, mock_bkg_last_h;
+extern int mock_bkg_out_of_range_count;
 void mock_vram_clear(void);
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles);
