@@ -374,7 +374,11 @@ static uint8_t big_map_tile(uint8_t tx, uint8_t ty) {
 }
 
 /* Installs the 48x40 map. Does NOT call camera_init() — the direct-write tests
- * need the tile base set before init, the streaming tests need it set after. */
+ * need the tile base set before init, the streaming tests need it set after.
+ * Leaves track.c pointing at s_big_map with a 48-wide stride; setUp() restores
+ * active_map_w/active_map_h but not the map pointer, so any test added AFTER
+ * these must call track_test_set_map() itself before camera_init() (same
+ * hazard as repair_map_init() above). */
 static void big_map_install(void) {
     uint16_t tx, ty;
     for (ty = 0u; ty < BIGMAP_H; ty++) {
@@ -429,6 +433,10 @@ void test_stream_row_splits_at_the_bg_ring_boundary(void) {
     mock_vram_clear();
     TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_row(5u));
     camera_flush_vram();
+    /* Pin that the row was actually split into two set_bkg_tiles calls: the
+     * mock's own mod-32 wrap makes one unsplit 22-wide call write the same
+     * cells as two split calls, so cell assertions alone can't see the split. */
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
     /* First half — the end of the BG row. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 5u), mock_vram[(5u * 32u) + 20u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(31u, 5u), mock_vram[(5u * 32u) + 31u]);
@@ -473,6 +481,10 @@ void test_stream_col_splits_at_the_bg_ring_boundary(void) {
     mock_vram_clear();
     TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_col(3u));
     camera_flush_vram();
+    /* Pin that the column was actually split into two set_bkg_tiles calls: the
+     * mock's own mod-32 wrap makes one unsplit 19-tall call write the same
+     * cells as two split calls, so cell assertions alone can't see the split. */
+    TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
     /* First half — the bottom of the BG column. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 20u), mock_vram[(20u * 32u) + 3u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 31u), mock_vram[(31u * 32u) + 3u]);
@@ -510,6 +522,11 @@ void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
     big_map_install();
     mock_vram_clear();
     camera_init(240, 72);           /* cam_x = 160, cam_y = 0 -> preloads rows 0..17 */
+    /* Pin that each of the 18 preloaded rows was actually split into two
+     * set_bkg_tiles calls (18 * 2 = 36): the mock's own mod-32 wrap makes an
+     * unsplit call write the same cells as a split one, so cell assertions
+     * alone can't see the split. */
+    TEST_ASSERT_EQUAL_INT(36, mock_set_bkg_tiles_call_count);
     /* First half — the end of the BG row. */
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(20u, 3u), mock_vram[(3u * 32u) + 20u]);
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(31u, 3u), mock_vram[(3u * 32u) + 31u]);
