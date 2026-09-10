@@ -447,9 +447,9 @@ void test_stream_row_splits_at_the_bg_ring_boundary(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(6u * 32u) + 0u]);
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(6u * 32u) + 9u]);
     TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
-    /* Pin that the row was actually split into two set_bkg_tiles calls: the
-     * mock's own mod-32 wrap makes one unsplit 22-wide call write the same
-     * cells as two split calls, so cell assertions alone can't see the split. (#752) */
+    /* Pin that the row was actually split into two set_bkg_tiles calls: this
+     * check pins that the split happened, while the cell assertions above pin
+     * that it was required — the two are not redundant (#761 R6). (#752) */
     TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
 }
 
@@ -501,9 +501,7 @@ void test_stream_col_splits_at_the_bg_ring_boundary(void) {
      * own 1 KiB wrap. What separates them is that the unsplit call runs past
      * the last row of the map. */
     TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
-    /* Pin that the column was actually split into two set_bkg_tiles calls: the
-     * mock's own mod-32 wrap makes one unsplit 19-tall call write the same
-     * cells as two split calls, so cell assertions alone can't see the split. (#752) */
+    /* Pin that the column was actually split into two set_bkg_tiles calls. (#752) */
     TEST_ASSERT_EQUAL_INT(2, mock_set_bkg_tiles_call_count);
 }
 
@@ -547,9 +545,9 @@ void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
     /* No preloaded row ran past column 31. */
     TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
     /* Pin that each of the 18 preloaded rows was actually split into two
-     * set_bkg_tiles calls (18 * 2 = 36): the mock's own mod-32 wrap makes an
-     * unsplit call write the same cells as a split one, so cell assertions
-     * alone can't see the split. (#752) */
+     * set_bkg_tiles calls (18 * 2 = 36): this check pins that the split
+     * happened, while the cell assertions above pin that it was required —
+     * the two are not redundant (#761 R6). (#752) */
     TEST_ASSERT_EQUAL_INT(36, mock_set_bkg_tiles_call_count);
 }
 

@@ -66,8 +66,9 @@ void move_bkg(uint8_t x, uint8_t y) {
 
 /* Writes a w x h rectangle of tiles at GBDK's flat BG-map offsets: row-major
  * into the 1 KiB map at 0x9800, so a rectangle that runs past column 31 spills
- * into the FOLLOWING map row. Only the flat offset wraps (mod 1024), which is
- * what the real 1 KiB map does at its end. */
+ * into the FOLLOWING map row. The flat offset wraps mod 1024, but that is this
+ * mock's own bound, not hardware fidelity: on real hardware the overrun lands
+ * in the second map at 0x9C00, which is why mock_bkg_out_of_range_count exists. */
 void set_bkg_tiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h,
                    const uint8_t *tiles) {
     uint8_t dy, dx;
