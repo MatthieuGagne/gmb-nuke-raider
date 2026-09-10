@@ -540,6 +540,39 @@ void test_stream_row_direct_splits_at_the_bg_ring_boundary(void) {
     TEST_ASSERT_EQUAL_UINT8(big_map_tile(32u, 12u), mock_vram[(12u * 32u) + 0u]);
 }
 
+/* ---- the mock itself: GBDK's flat BG-map layout (#761) ----------------- */
+
+/* GBDK writes row-major into the flat 1 KiB map at 0x9800. A rectangle wider
+ * than the columns left in the row spills into the FOLLOWING row — it does not
+ * wrap back to column 0 of the same row. */
+void test_mock_set_bkg_tiles_spills_into_the_next_map_row(void) {
+    static const uint8_t tiles[4] = {0xA1u, 0xA2u, 0xA3u, 0xA4u};
+    mock_vram_clear();
+    set_bkg_tiles(30u, 5u, 4u, 1u, tiles);
+    TEST_ASSERT_EQUAL_UINT8(0xA1u, mock_vram[(5u * 32u) + 30u]);
+    TEST_ASSERT_EQUAL_UINT8(0xA2u, mock_vram[(5u * 32u) + 31u]);
+    /* The spill lands on row 6, NOT on row 5 columns 0-1. */
+    TEST_ASSERT_EQUAL_UINT8(0xA3u, mock_vram[(6u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(0xA4u, mock_vram[(6u * 32u) + 1u]);
+    TEST_ASSERT_EQUAL_UINT8(0u,    mock_vram[(5u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_UINT8(0u,    mock_vram[(5u * 32u) + 1u]);
+}
+
+/* The out-of-range record: a rectangle that stays inside the map leaves the
+ * counter at zero; one that runs past a map edge raises it. */
+void test_mock_records_rectangles_that_leave_the_map(void) {
+    static const uint8_t tiles[4] = {1u, 2u, 3u, 4u};
+    mock_vram_clear();
+    set_bkg_tiles(4u, 5u, 4u, 1u, tiles);
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+    set_bkg_tiles(30u, 5u, 4u, 1u, tiles);          /* past column 31 */
+    TEST_ASSERT_EQUAL_INT(1, mock_bkg_out_of_range_count);
+    set_bkg_tiles(4u, 30u, 1u, 4u, tiles);          /* past row 31 */
+    TEST_ASSERT_EQUAL_INT(2, mock_bkg_out_of_range_count);
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -582,5 +615,7 @@ int main(void) {
     RUN_TEST(test_stream_col_splits_at_the_bg_ring_boundary);
     RUN_TEST(test_stream_row_direct_adds_the_tile_base);
     RUN_TEST(test_stream_row_direct_splits_at_the_bg_ring_boundary);
+    RUN_TEST(test_mock_set_bkg_tiles_spills_into_the_next_map_row);
+    RUN_TEST(test_mock_records_rectangles_that_leave_the_map);
     return UNITY_END();
 }
