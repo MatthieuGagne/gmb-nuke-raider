@@ -135,9 +135,10 @@ adjustments apply when you follow it under omp:
 - **There is no `Skill` tool.** Where the body tells you to invoke, use or run a
   project skill (`bank-pre-write`, `build`, `test`, `aseprite`, `screenshot`, …),
   read that skill's `.claude/skills/<name>/SKILL.md` and follow it directly.
-- **`bash` is your only shell.** It subsumes both Claude Code's `Bash` and its
-  `PowerShell` tool, and it is Git Bash (POSIX `sh`) — so run commands with Unix
-  syntax. Where the body says to use the PowerShell tool, `Start-Process`, or
-  PowerShell syntax (`$env:VAR`, `2>$null`), use the bash equivalent instead.
+- **`bash` is your only shell tool, and it runs PowerShell 7 (`pwsh`).** It
+  subsumes both Claude Code's `Bash` and its `PowerShell` tool, so run commands
+  with PowerShell syntax (`$env:VAR`, `2>$null`). Where the body says to use the
+  PowerShell tool or `Start-Process`, use the bash tool with the PowerShell
+  equivalent instead.
 - **Ignore the body's `tools:` frontmatter line.** Those are Claude Code tool
   names; your tools are the omp ones in this file's frontmatter above.

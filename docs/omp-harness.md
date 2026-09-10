@@ -90,8 +90,8 @@ however, fails closed — omp blocks the tool call — so keep the wrappers free
 
 ## Shell
 
-omp's `bash` tool runs Git Bash through the user-level `shellPath`, so use POSIX syntax — Git
-Bash, not PowerShell. Build setup stays **machine-local and uncommitted**: the
+omp's `bash` tool runs PowerShell 7 (`pwsh`) through the user-level `shellPath`, so use
+PowerShell syntax, not POSIX. Build setup stays **machine-local and uncommitted**: the
 build needs PowerShell, `GBDK_HOME`, and Git's `bin`/`usr\bin` on `PATH`, which takes absolute
 paths. Configure that in `~/.omp/agent/config.yml`, not here.
 
