@@ -303,7 +303,9 @@ def parse_tsx_collisions(tsx_path):
             continue
         obj_x = float(obj.get("x", 0))
         obj_y = float(obj.get("y", 0))
-        poly_elem = obj.find("polygon") or obj.find("polyline")
+        poly_elem = obj.find("polygon")
+        if poly_elem is None:
+            poly_elem = obj.find("polyline")
         if poly_elem is None:
             w = float(obj.get("width", 8))
             h = float(obj.get("height", 8))
