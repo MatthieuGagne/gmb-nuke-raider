@@ -440,6 +440,50 @@ void test_stream_row_splits_at_the_bg_ring_boundary(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(5u * 32u) + 19u]);
 }
 
+/* ---- stream_col: tile base and ring-wrap split (#752) ------------------ */
+
+/* Camera at cam_y = 0 -> vram_y = 0, so the 19-row window does NOT cross the
+ * ring boundary. With a non-zero tile base every written cell must carry the
+ * offset, and cells past the window must stay untouched. */
+void test_stream_col_adds_the_tile_base(void) {
+    big_map_install();
+    camera_init(80, 72);            /* cam_x = 0, cam_y = 0 */
+    camera_flush_vram();
+    mock_vram_clear();
+    camera_set_tile_base(STREAM_TILE_BASE);
+    TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_col(3u));
+    camera_flush_vram();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(3u, 0u) + STREAM_TILE_BASE),
+                            mock_vram[(0u * 32u) + 3u]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(3u, 9u) + STREAM_TILE_BASE),
+                            mock_vram[(9u * 32u) + 3u]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(big_map_tile(3u, 18u) + STREAM_TILE_BASE),
+                            mock_vram[(18u * 32u) + 3u]);
+    /* One past the 19-row window: the column must not have been split. */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(19u * 32u) + 3u]);
+}
+
+/* Camera at cam_y = 160 -> cam_tile_y = 20, vram_y = 20, 20 + 19 = 39 > 32.
+ * first_count = 12: cells y = 20..31 come from map rows 20..31, and the wrapped
+ * cells y = 0..6 come from map rows 32..38. */
+void test_stream_col_splits_at_the_bg_ring_boundary(void) {
+    big_map_install();
+    camera_init(80, 232);           /* cam_x = 0, cam_y = 160 */
+    camera_flush_vram();
+    mock_vram_clear();
+    TEST_ASSERT_EQUAL_UINT8(1u, camera_invalidate_col(3u));
+    camera_flush_vram();
+    /* First half — the bottom of the BG column. */
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 20u), mock_vram[(20u * 32u) + 3u]);
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 31u), mock_vram[(31u * 32u) + 3u]);
+    /* Second half — wrapped to VRAM y = 0. */
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 32u), mock_vram[(0u * 32u) + 3u]);
+    TEST_ASSERT_EQUAL_UINT8(big_map_tile(3u, 38u), mock_vram[(6u * 32u) + 3u]);
+    /* The gap between the two halves must stay untouched. */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(7u * 32u) + 3u]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_vram[(19u * 32u) + 3u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -478,5 +522,7 @@ int main(void) {
     RUN_TEST(test_big_map_fixture_tiles_are_distinct);
     RUN_TEST(test_stream_row_adds_the_tile_base);
     RUN_TEST(test_stream_row_splits_at_the_bg_ring_boundary);
+    RUN_TEST(test_stream_col_adds_the_tile_base);
+    RUN_TEST(test_stream_col_splits_at_the_bg_ring_boundary);
     return UNITY_END();
 }
