@@ -168,6 +168,10 @@ void track_test_set_collision_mask(uint8_t tile_idx, const uint8_t *rows8);
 void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count);
 /* Test-only seam: set active_track_id without a full track_select() (avoids ROM load). */
 void track_test_set_id(uint8_t id);
+/* Test-only seam: set the race start position (enter() derives cam_x = x - 80).
+ * Lets a host test reach cam_tile_x values no shipped track produces, e.g. 22
+ * where cd_bg_col == 31. Never compiled into the GB ROM. */
+void track_test_set_start(int16_t x, int16_t y);
 #endif
 
 #endif /* TRACK_H */

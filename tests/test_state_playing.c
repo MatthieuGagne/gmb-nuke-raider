@@ -3,6 +3,9 @@
 #include "state_playing.h" /* finish_eval, cd_advance */
 #include "../src/config.h"
 #include "player.h"
+#include <gb/gb.h>   /* mock_vram, mock_bkg_out_of_range_count, mock_vram_clear */
+#include "loader.h"  /* loader_reset_bitmap_for_test */
+#include "input.h"   /* input, prev_input */
 
 /* Frame counts derive from the config.h table, never from a hardcoded number (#628). */
 static const uint8_t TURN_FRAMES_T[8] = PLAYER_TURN_FRAMES_TABLE;
@@ -257,6 +260,29 @@ void test_finish_eval_notch_step_matches_the_facing_player_c_turns_to(void) {
     }
 }
 
+/* Wide synthetic map: active_map_w = 48 > 20, so cam_max_x = 48*8 - 160 = 224,
+ * which admits cam_x = 176 (cam_tile_x = 22, cd_bg_col = 31). */
+#define CD_MAP_W 48u
+#define CD_MAP_H 40u
+static uint8_t s_cd_map[CD_MAP_W * CD_MAP_H];
+
+void test_countdown_pair_splits_at_ring_boundary(void) {
+    uint16_t i;
+    for (i = 0u; i < CD_MAP_W * CD_MAP_H; i++) s_cd_map[i] = 1u;
+    track_select(0u);                          /* sane baseline scalars (lap count, map type) */
+    track_test_set_start(256, 80);             /* cam_x = 256 - 80 = 176 → cam_tile_x = 22 */
+    track_test_set_map(s_cd_map, CD_MAP_W, CD_MAP_H);
+    loader_reset_bitmap_for_test();
+    input = 0u; prev_input = 0u;
+    mock_vram_clear();
+    state_playing.enter();
+    /* cd_bg_col = ((176 >> 3) + 9) & 0x1F = 31; cd_bg_row = ((8 >> 3) + 8) & 0x1F = 9.
+     * Phase 0 draws '03' → tiles { '0' - ' ', '3' - ' ' }. */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)('0' - ' '), mock_vram[(9u * 32u) + 31u]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)('3' - ' '), mock_vram[(9u * 32u) + 0u]);
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);   /* R3 / AC4 */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_finish_eval_race_all_conditions_met);
@@ -293,5 +319,6 @@ int main(void) {
     RUN_TEST(test_finish_eval_one_notch_short_still_needs_checkpoints);
     RUN_TEST(test_finish_eval_one_notch_short_still_needs_arming);
     RUN_TEST(test_finish_eval_notch_step_matches_the_facing_player_c_turns_to);
+    RUN_TEST(test_countdown_pair_splits_at_ring_boundary);
     return UNITY_END();
 }

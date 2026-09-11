@@ -168,4 +168,10 @@ void track_test_set_checkpoints(const CheckpointDef *cpdefs, uint8_t count) {
 void track_test_set_id(uint8_t id) {
     active_track_id = id;
 }
+
+/* Test-only seam — inject the race start position without a full track_select(). */
+void track_test_set_start(int16_t x, int16_t y) {
+    active_start_x = x;
+    active_start_y = y;
+}
 #endif

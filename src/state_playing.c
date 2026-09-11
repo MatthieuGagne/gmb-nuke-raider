@@ -50,6 +50,18 @@ static const uint8_t cd_hi[4] = {
     (uint8_t)('3'-' '), (uint8_t)('2'-' '), (uint8_t)('1'-' '), (uint8_t)('O'-' ')
 };
 
+/* Write the two countdown digits at bg_col, splitting the write at the BG ring
+ * boundary (bg_col == 31) so the right-hand digit never wraps onto the next BG
+ * row. Mirrors src/camera.c stream_row. */
+static void cd_draw_pair(uint8_t bg_col, uint8_t bg_row, const uint8_t *tiles) {
+    if (bg_col == 31u) {
+        set_bkg_tiles(31u, bg_row, 1u, 1u, tiles);
+        set_bkg_tiles(0u,  bg_row, 1u, 1u, tiles + 1);
+    } else {
+        set_bkg_tiles(bg_col, bg_row, 2u, 1u, tiles);
+    }
+}
+
 
 /* Facings that admit a crossing, one bitmask per CHECKPOINT_DIR_*, bit k = DIR k.
  * The same three-of-eight sets the if-chain held before #646, unchanged. An
@@ -181,7 +193,7 @@ static void enter(void) {
         static uint8_t cd_init_tiles[2];
         cd_init_tiles[0] = cd_lo[0];
         cd_init_tiles[1] = cd_hi[0];
-        set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_init_tiles);
+        cd_draw_pair(cd_bg_col, cd_bg_row, cd_init_tiles);
     }
     DISPLAY_ON;
     music_resync();   /* zero catch-up backlog so the race start does not burp */
@@ -200,7 +212,7 @@ static void update(void) {
                     static uint8_t cd_t[2];
                     cd_t[0] = cd_lo[cd_phase];
                     cd_t[1] = cd_hi[cd_phase];
-                    set_bkg_tiles(cd_bg_col, cd_bg_row, 2u, 1u, cd_t);
+                    cd_draw_pair(cd_bg_col, cd_bg_row, cd_t);
                 } else {
                     /* Countdown done: restore underlying track tiles via stream. */
                     camera_invalidate_row(cd_world_row);
