@@ -1,0 +1,14 @@
+{
+  "name": "issue-765-countdown-renders",
+  "blocking": false,
+  "watch": ["_hp", "_px", "_py"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "advance", "frames": 30},
+    {"action": "screenshot", "out": "countdown.png"},
+    {"action": "advance", "frames": 225},
+    {"action": "screenshot", "out": "post-countdown.png"},
+    {"action": "press", "buttons": ["down"], "delay": 240},
+    {"action": "assert_live", "symbols": ["_py"], "screen": true, "frames": 60}
+  ]
+}
