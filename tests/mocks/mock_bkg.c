@@ -53,9 +53,11 @@ void set_bkg_tile_xy(uint8_t x, uint8_t y, uint8_t tile) {
     if (y > mock_set_bkg_tile_xy_max_row) {
         mock_set_bkg_tile_xy_max_row = y;
     }
-    uint8_t vx = x & 31u;
-    uint8_t vy = y & 31u;
-    mock_vram[(uint16_t)vy * 32u + vx] = tile;
+    if (x > 31u || y > 31u) {
+        mock_bkg_out_of_range_count++;
+    }
+    uint16_t off = (uint16_t)(((uint16_t)y * 32u + (uint16_t)x) % 1024u);
+    mock_vram[off] = tile;
 }
 
 void move_bkg(uint8_t x, uint8_t y) {
