@@ -229,13 +229,91 @@ def write_marker(coverage_dir, ran, repo_root='.', expected=None):
     return path
 
 
+def read_marker(coverage_dir, repo_root='.'):
+    """The provenance marker `make coverage` wrote, or ToolMissing (R2)."""
+    path = marker_path(coverage_dir, repo_root)
+    if not os.path.isfile(path):
+        raise ToolMissing(
+            f"crap_score: no coverage provenance marker at {path}. The coverage data "
+            "under this directory cannot be trusted — it may predate the current "
+            "sources. Run: make coverage"
+        )
+    try:
+        with open(path) as fh:
+            marker = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ToolMissing(
+            f"crap_score: the coverage provenance marker at {path} is unreadable "
+            f"({exc}). Run: make coverage"
+        )
+    if not isinstance(marker, dict) or 'sources' not in marker or 'ran' not in marker:
+        raise ToolMissing(
+            f"crap_score: the coverage provenance marker at {path} has no sources/ran "
+            "record. Run: make coverage"
+        )
+    return marker
+
+
+def check_freshness(marker, scoped, repo_root='.'):
+    """Refuse when the data is stale, or when the run lost a binary (R3).
+
+    Three verdicts, deliberately worded apart: *stale* (a scoped source changed
+    since coverage was built), *incomplete* (a binary the run expected never
+    finished), and *genuinely uncovered* — which is not an error at all and is
+    what a file with no test of its own falls through to after a complete run
+    (AC4)."""
+    sources = marker.get('sources', {})
+    ran = set(marker.get('ran', []))
+    expected = set(marker.get('expected', []))
+    stale = []
+    for rel in scoped:
+        abs_path = os.path.join(repo_root, rel)
+        recorded = sources.get(rel)
+        if recorded is None:
+            stale.append(f"{rel} (absent from the coverage run)")
+        elif os.path.isfile(abs_path) and _sha256_file(abs_path) != recorded:
+            stale.append(f"{rel} (edited since coverage was built)")
+    if stale:
+        raise ToolMissing(
+            "crap_score: stale coverage data — " + ", ".join(stale) + ". The coverage "
+            "under this directory was built from different sources, so every score "
+            "would be computed against the wrong branches. Run: make coverage"
+        )
+
+    # A scoped file's own binary first — the most specific message — then any
+    # other missing binary, because the cross-cutting ones carry other files'
+    # coverage and a run that lost one understates every score (#728 A2).
+    own = []
+    for rel in scoped:
+        binary = 'test_' + os.path.basename(rel)[:-2]
+        test_source = os.path.join(repo_root, 'tests', binary + '.c')
+        if os.path.isfile(test_source) and binary not in ran:
+            own.append(f"{rel} (its binary {binary} did not run)")
+    missing = sorted(expected - ran)
+    if own or missing:
+        detail = ", ".join(own) if own else ""
+        if missing:
+            detail += ("; " if detail else "") + "binaries that did not run: " + ", ".join(missing)
+        raise ToolMissing(
+            "crap_score: incomplete coverage run — " + detail + ". The affected "
+            "functions would read as 0% coverage, which is indistinguishable from "
+            "genuinely untested code. Run: make coverage"
+        )
+    return None
+
+
 def collect_coverage(coverage_dir, repo_root='.', expected=None):
     """Run gcov over every .gcda under `coverage_dir` and merge the results.
 
     `expected` is the list of scoped files. Any of them absent from the merged
     map raises rather than scoring its functions at 0.0 coverage — an absent
     file means the join broke or the file was never instrumented, and silently
-    reporting it as untested would fire the gate for the wrong reason."""
+    reporting it as untested would fire the gate for the wrong reason. The
+    provenance marker is read and checked for freshness before any gcov work,
+    so a gate that cannot trust its inputs never reports a verdict (#728
+    R2-R4)."""
+    marker = read_marker(coverage_dir, repo_root)
+    check_freshness(marker, expected or (), repo_root)
     root = coverage_dir if os.path.isabs(coverage_dir) else os.path.join(repo_root, coverage_dir)
     gcda = sorted(glob.glob(os.path.join(root, '**', '*.gcda'), recursive=True))
     if not gcda:
