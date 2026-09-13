@@ -394,5 +394,53 @@ class CommitRangeTests(unittest.TestCase):
         self.assertIn('git diff', str(ctx.exception))
 
 
+class MarkerWriteTests(unittest.TestCase):
+    """R1: the marker records the commit, a hash per src/*.c, and what ran."""
+
+    def test_write_marker_records_sources_expected_and_ran(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(void) { return 1; }\n')
+            path = crap_score.write_marker('cov', ['test_foo'], repo_root=tmp,
+                                           expected=['test_foo', 'test_bar'])
+            self.assertTrue(os.path.isfile(path))
+            with open(path) as fh:
+                marker = json.load(fh)
+        self.assertEqual(marker['version'], 1)
+        self.assertEqual(marker['ran'], ['test_foo'])
+        self.assertEqual(marker['expected'], ['test_bar', 'test_foo'])
+        self.assertIn('src/foo.c', marker['sources'])
+        self.assertEqual(len(marker['sources']['src/foo.c']), 64)
+        self.assertIn('commit', marker)
+
+    def test_expected_defaults_to_ran(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            path = crap_score.write_marker('cov', ['test_foo'], repo_root=tmp)
+            with open(path) as fh:
+                marker = json.load(fh)
+        self.assertEqual(marker['expected'], ['test_foo'])
+
+    def test_write_marker_cli_writes_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(void) { return 1; }\n')
+            rc = crap_score.main(['--write-marker', '--repo-root', tmp,
+                                  '--coverage-dir', 'cov', '--ran', 'test_foo',
+                                  '--expected', 'test_foo'])
+            self.assertEqual(rc, 0)
+            self.assertTrue(os.path.isfile(os.path.join(tmp, 'cov', 'COMPLETE')))
+
+    def test_write_marker_cli_accepts_an_empty_ran_list(self):
+        """`--ran $$ran` with an empty shell variable passes zero values."""
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            rc = crap_score.main(['--write-marker', '--repo-root', tmp,
+                                  '--coverage-dir', 'cov', '--ran'])
+            self.assertEqual(rc, 0)
+
+
 if __name__ == '__main__':
     unittest.main()

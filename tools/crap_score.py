@@ -22,6 +22,7 @@ Exit codes:
     2  operational or usage error (missing tool, no coverage data, no scope)
 """
 import glob
+import hashlib
 import importlib.util
 import json
 import os
@@ -31,6 +32,9 @@ import sys
 
 DEFAULT_THRESHOLD = 8
 DEFAULT_COVERAGE_DIR = os.path.join('build', 'coverage')
+
+MARKER_NAME = 'COMPLETE'
+MARKER_VERSION = 1
 
 # Exemptions are declared, never inferred (R5). A file leaves the gate only by
 # appearing here, and tests/test_crap_score.py asserts every path still exists
@@ -177,6 +181,52 @@ def _json_documents(text):
         idx = end
         while idx < len(text) and text[idx] in ' \r\n\t':
             idx += 1
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(65536), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _head_commit(repo_root='.'):
+    """The commit coverage was built from, or '' when git cannot answer.
+
+    Provenance only — the freshness test is the per-file hash, because a scratch
+    fixture directory is not a repository and still has to be scoreable."""
+    try:
+        proc = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo_root,
+                              capture_output=True, text=True,
+                              env=install_hooks.clean_env())
+    except OSError:
+        return ''
+    return proc.stdout.strip() if proc.returncode == 0 else ''
+
+
+def marker_path(coverage_dir, repo_root='.'):
+    root = coverage_dir if os.path.isabs(coverage_dir) else os.path.join(repo_root, coverage_dir)
+    return os.path.join(root, MARKER_NAME)
+
+
+def write_marker(coverage_dir, ran, repo_root='.', expected=None):
+    """Record what `make coverage` built, expected to run, and actually ran (R1)."""
+    ran = sorted(ran)
+    sources = {}
+    for path in sorted(glob.glob(os.path.join(repo_root, 'src', '*.c'))):
+        sources['src/' + os.path.basename(path)] = _sha256_file(path)
+    path = marker_path(coverage_dir, repo_root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as fh:
+        json.dump({
+            'version': MARKER_VERSION,
+            'commit': _head_commit(repo_root),
+            'sources': sources,
+            'expected': sorted(expected) if expected is not None else list(ran),
+            'ran': ran,
+        }, fh, indent=2)
+    return path
 
 
 def collect_coverage(coverage_dir, repo_root='.', expected=None):
@@ -348,7 +398,18 @@ def main(argv=None):
     parser.add_argument('--coverage-dir', default=DEFAULT_COVERAGE_DIR)
     parser.add_argument('--repo-root', default='.')
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--write-marker', action='store_true',
+                        help='write the coverage provenance marker and exit (called by '
+                             'the Makefile coverage target, #728)')
+    parser.add_argument('--ran', nargs='*', default=[],
+                        help='basenames of the coverage test binaries that ran to completion')
+    parser.add_argument('--expected', nargs='*', default=None,
+                        help='basenames of every coverage test binary the run intended to build')
     args = parser.parse_args(argv)
+
+    if args.write_marker:
+        print(write_marker(args.coverage_dir, args.ran, args.repo_root, args.expected))
+        return 0
 
     if bool(args.files) == bool(args.commit_range):
         sys.stderr.write(
