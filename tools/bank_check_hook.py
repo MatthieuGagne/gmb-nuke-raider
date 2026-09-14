@@ -121,7 +121,10 @@ def main():
     checker = os.path.join(base, 'tools', 'bank_check.py')
     if not os.path.isfile(checker):
         # The matched base is not a checkout (e.g. CLAUDE_PROJECT_DIR names a
-        # bare parent directory). Nothing to run against — fail open.
+        # bare parent directory). Nothing to run against — fail open, but say
+        # so: a gate that cannot run must not read as a silent pass (#781 R1).
+        print('bank-check hook: skipping bank gate — no tools/bank_check.py under %s'
+              % base, file=sys.stderr)
         sys.exit(0)
     result = subprocess.run(
         [sys.executable, checker, rel],
