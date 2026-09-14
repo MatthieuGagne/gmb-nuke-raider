@@ -38,6 +38,23 @@ def run(tool_input, tool='write'):
     return p.returncode, p.stdout, p.stderr
 
 
+def run_declared(tool_input, project_dir, tool='Write'):
+    """Invoke the hook with CLAUDE_PROJECT_DIR set to *project_dir* (#728).
+
+    The payload cwd stays at REPO_ROOT — the straddle this project actually
+    runs in, where the session root and the worktree being written differ."""
+    payload = json.dumps({
+        'cwd': REPO_ROOT,
+        'tool_name': tool,
+        'tool_input': tool_input,
+    })
+    env = dict(os.environ)
+    env['CLAUDE_PROJECT_DIR'] = project_dir
+    p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                       capture_output=True, text=True, cwd=REPO_ROOT, env=env)
+    return p.returncode, p.stdout, p.stderr
+
+
 class PathKeyPayloadTests(unittest.TestCase):
     """AC4: a path-keyed write of an unmanifested src file is blocked."""
 
@@ -114,19 +131,45 @@ class RepoMembershipTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn('not in bank-manifest.json', err)
 
-    def test_claude_project_dir_overrides_the_payload_root(self):
-        """With CLAUDE_PROJECT_DIR pointed elsewhere, an in-repo src path is
-        outside the declared project and is ignored rather than refused.
+    def test_worktree_write_is_gated_when_project_dir_is_another_repo(self):
+        """The straddle this project mandates: the session is rooted at the main
+        repo (C:\\Code\\nuke-raider) while every write lands in an Orca worktree.
 
-        The relative path is anchored on the payload root, so it resolves into
-        the repo; membership is then judged against the declared project dir."""
-        payload = json.dumps({'cwd': REPO_ROOT, 'tool_name': 'Write',
-                              'tool_input': {'file_path': UNMANIFESTED}})
-        env = dict(os.environ)
-        env['CLAUDE_PROJECT_DIR'] = tempfile.gettempdir()
-        p = subprocess.run([sys.executable, SCRIPT], input=payload,
-                           capture_output=True, text=True, cwd=REPO_ROOT, env=env)
-        self.assertEqual(p.returncode, 0)
+        The declared project dir then contains none of the worktree's files. If
+        membership were judged against CLAUDE_PROJECT_DIR alone the hard bank
+        gate would exit 0 on an unmanifested src/*.c — a check that cannot run
+        reading as a pass, which is the defect #728 exists to eliminate. The
+        payload's repo root is an equally valid base, so the path is gated."""
+        with tempfile.TemporaryDirectory() as elsewhere:
+            code, _, err = run_declared({'file_path': UNMANIFESTED}, elsewhere)
+        self.assertEqual(code, 2)
+        self.assertIn('not in bank-manifest.json', err)
+
+    def test_scratch_fixture_stays_ignored_under_a_foreign_project_dir(self):
+        """R5/AC5 must not regress: a fixture outside BOTH bases is ignored."""
+        with tempfile.TemporaryDirectory() as elsewhere:
+            outside = os.path.join(tempfile.gettempdir(), 'scratch', 'src', 'fixture.c')
+            self.assertEqual(run_declared({'file_path': outside}, elsewhere)[0], 0)
+
+    def test_project_dir_above_the_repo_reports_the_repo_relative_path(self):
+        """An ancestor CLAUDE_PROJECT_DIR keeps the path nominally 'inside' it,
+        so relativising against it leaves a leading worktree-name component and
+        bank_check looks up a manifest key that cannot exist. The path handed to
+        bank_check must be relative to the directory it actually runs in."""
+        parent = os.path.dirname(REPO_ROOT)
+        code, _, err = run_declared({'file_path': UNMANIFESTED}, parent)
+        self.assertEqual(code, 2)
+        self.assertIn('ERROR: %s is not in bank-manifest.json' % UNMANIFESTED, err)
+        self.assertNotIn(os.path.basename(REPO_ROOT) + '/', err)
+
+    def test_reported_path_keeps_the_spelling_the_developer_typed(self):
+        """normcase belongs to the containment comparison only. Folding it into
+        the returned path makes the manifest key — and the message a developer
+        reads — a lowercased impostor of what they wrote."""
+        mixed = 'src/PiGateProbe_NotInManifest.c'
+        code, _, err = run({'file_path': mixed}, tool='Write')
+        self.assertEqual(code, 2)
+        self.assertIn(mixed, err)
 
     def test_case_differing_project_dir_still_gates(self):
         """Path comparison is normcase/realpath, not lexical: a drive-letter or

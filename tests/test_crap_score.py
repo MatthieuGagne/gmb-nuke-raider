@@ -495,6 +495,21 @@ class MarkerFreshnessTests(unittest.TestCase):
         self.assertIn('incomplete coverage run', message)
         self.assertIn('test_foo', message)
 
+    def test_own_binary_alone_is_incomplete_with_nothing_expected(self):
+        """Isolates the `own` branch (#728). The case above trips `own` AND
+        `missing` together, so it would still raise if `own` were deleted. With
+        `expected` empty, `expected - ran` is empty and only the own-binary
+        check can fire — and it must, because src/foo.c has tests/test_foo.c on
+        disk while the run never produced test_foo."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp, ran=(), expected=())
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp)
+        message = str(ctx.exception)
+        self.assertIn('incomplete coverage run', message)
+        self.assertIn('its binary test_foo did not run', message)
+
     def test_unrelated_binary_that_did_not_run_is_incomplete(self):
         """The A2 shape: cross-cutting binaries carry other files' coverage, so
         a run missing ANY expected binary cannot be scored."""
