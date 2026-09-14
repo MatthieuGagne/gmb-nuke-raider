@@ -272,15 +272,22 @@ coverage:
 		echo "  CC  $$s"; \
 		gcc $(TEST_FLAGS) -c $$s -o $(COV_SUP)/$$name.o || exit 1; \
 	done
-	@fail=0; \
+# The marker is written whatever `fail` is (#728 R1): a run that lost a binary is
+# exactly the case crap_score must be able to see. `all` is every binary the run
+# intended, `ran` only those that exited 0, so a lost binary reads as incomplete
+# rather than as 0% coverage. A failed marker write fails the recipe — a coverage
+# run with no marker is unusable and must not report success.
+	@fail=0; ran=""; all=""; \
 	for f in $(TEST_SRCS); do \
 		name=$$(basename $$f .c); \
+		all="$$all $$name"; \
 		echo "  CC  $$f"; \
 		gcc $(TEST_FLAGS) -c $$f -o $(COV_DIR)/$$name.o || { fail=1; continue; }; \
 		gcc --coverage $(COV_DIR)/$$name.o $(COV_SUP)/*.o $(COV_OBJ)/*.o -o $(COV_DIR)/$$name || { fail=1; continue; }; \
 		echo "  RUN $(COV_DIR)/$$name"; \
-		./$(COV_DIR)/$$name || fail=1; \
+		if ./$(COV_DIR)/$$name; then ran="$$ran $$name"; else fail=1; fi; \
 	done; \
+	python tools/crap_score.py --write-marker --coverage-dir $(COV_DIR) --expected $$all --ran $$ran || fail=1; \
 	exit $$fail
 
 # src/overmap_tiles.c is checked into git so CI works without Python/Aseprite.

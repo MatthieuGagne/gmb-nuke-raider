@@ -580,5 +580,35 @@ class RefusalExitCodeTests(unittest.TestCase):
         self.assertIn('incomplete coverage run', err)
 
 
+class CoverageRecipeTests(unittest.TestCase):
+    """AC2: the marker is written even when a binary failed, or an aborted run
+    would leave no marker and every later score would refuse as unmarked."""
+
+    def setUp(self):
+        with open(os.path.join(ROOT, 'Makefile')) as fh:
+            self.makefile = fh.read()
+        start = self.makefile.index('\ncoverage:')
+        self.recipe = self.makefile[start:self.makefile.index('\n\n', start)]
+
+    def test_recipe_writes_the_marker(self):
+        self.assertIn('--write-marker', self.recipe)
+
+    def test_recipe_records_only_binaries_that_ran(self):
+        self.assertIn('ran="$$ran $$name"', self.recipe)
+
+    def test_recipe_records_every_expected_binary(self):
+        self.assertIn('--expected', self.recipe)
+        self.assertIn('all="$$all $$name"', self.recipe)
+
+    def test_marker_is_written_before_the_failure_exit(self):
+        self.assertLess(self.recipe.index('--write-marker'),
+                        self.recipe.index('exit $$fail'))
+
+    def test_a_failed_marker_write_fails_the_recipe(self):
+        marker_line_end = self.recipe.index('\n', self.recipe.index('--write-marker'))
+        marker_line = self.recipe[self.recipe.index('--write-marker'):marker_line_end]
+        self.assertIn('|| fail=1', marker_line)
+
+
 if __name__ == '__main__':
     unittest.main()
