@@ -3,7 +3,8 @@
 
 Reads tool-use JSON from stdin. Exits 2 — the blocking PreToolUse exit code in
 both Claude Code and the omp hook bridge — if bank_check fails. Exits 0 silently for
-files outside src/, non-C/H files, or parse errors.
+files outside src/, non-C/H files, parse errors, or paths that resolve outside
+CLAUDE_PROJECT_DIR (or, absent it, outside the payload's repo root).
 
 Two payload keys are accepted: ``file_path`` (Claude Code) with a ``path``
 fallback, since omp's edit tool key is not pinned.
@@ -16,11 +17,45 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hook_common
 
 
+def project_dir(payload_root):
+    """The directory a path must resolve inside to be gated (#728 R5).
+
+    CLAUDE_PROJECT_DIR when the harness sets it; otherwise the repo root the
+    payload's cwd implies, which is what every existing test relies on."""
+    declared = os.environ.get('CLAUDE_PROJECT_DIR', '')
+    if declared and os.path.isdir(declared):
+        return os.path.normcase(os.path.realpath(declared))
+    if payload_root:
+        return os.path.normcase(os.path.realpath(payload_root))
+    return None
+
+
+def repo_relative(file_path, root, base):
+    """The path relative to *base*, or None when it resolves outside it.
+
+    Relative paths are anchored on *root* — the repo root the payload's cwd
+    implies — never on *base*, so a declared CLAUDE_PROJECT_DIR elsewhere makes
+    an in-repo relative path read as outside, which is the point.
+    normcase+realpath on both sides: a case, junction or 8.3 difference must not
+    silently disable the gate."""
+    anchor = root or base
+    candidate = file_path if os.path.isabs(file_path) else os.path.join(anchor, file_path)
+    candidate = os.path.normcase(os.path.realpath(candidate))
+    try:
+        rel = os.path.relpath(candidate, base)
+    except ValueError:                      # different drive on Windows
+        return None
+    rel = rel.replace('\\', '/')
+    if rel == '..' or rel.startswith('../'):
+        return None
+    return rel
+
+
 def main():
     data = hook_common.read_payload()
     if data is None:
         sys.exit(0)  # Can't parse stdin — don't block
-    hook_common.reroot(data)
+    root = hook_common.reroot(data)
 
     tool_input = data.get('tool_input', {})
     # Claude Code sends file_path; omp may send path. file_path wins when
@@ -40,9 +75,20 @@ def main():
     if '/src/' not in norm and not norm.startswith('src/'):
         sys.exit(0)
 
+    # Repository membership (#728 R5). The pattern test above matched on the
+    # src/*.c shape alone, so a scratch fixture five directory levels outside
+    # the repo was refused with a ../../../../../ path — the relativised path
+    # escaping the root was the tell. Resolve, then gate only what stays inside.
+    base = project_dir(root)
+    if base is None:
+        sys.exit(0)                         # no root to judge against — fail open
+    rel = repo_relative(file_path, root, base)
+    if rel is None:
+        sys.exit(0)
+
     # Run single-file check. CWD = worktree/repo root.
     result = subprocess.run(
-        [sys.executable, 'tools/bank_check.py', file_path],
+        [sys.executable, 'tools/bank_check.py', rel],
         capture_output=True,
         text=True,
     )

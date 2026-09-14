@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'tools',
@@ -93,6 +94,54 @@ class FailOpenTests(unittest.TestCase):
 
     def test_neither_path_nor_file_path_is_allowed(self):
         self.assertEqual(run({'content': 'int x;\n'})[0], 0)
+
+
+class RepoMembershipTests(unittest.TestCase):
+    """R5/AC5: only paths resolving inside the project dir are gated."""
+
+    def test_absolute_outside_path_is_allowed(self):
+        outside = os.path.join(tempfile.gettempdir(), 'scratch', 'src', 'fixture.c')
+        self.assertEqual(run({'file_path': outside}, tool='Write')[0], 0)
+
+    def test_dot_dot_escape_is_allowed(self):
+        """#728's reproduction verbatim: a scratch fixture five levels out."""
+        escape = '../../../../../scratchpad/ac4/src/fixture.c'
+        self.assertEqual(run({'file_path': escape}, tool='Write')[0], 0)
+
+    def test_absolute_in_repo_path_is_still_blocked(self):
+        inside = os.path.join(REPO_ROOT, UNMANIFESTED.replace('/', os.sep))
+        code, _, err = run({'file_path': inside}, tool='Write')
+        self.assertEqual(code, 2)
+        self.assertIn('not in bank-manifest.json', err)
+
+    def test_claude_project_dir_overrides_the_payload_root(self):
+        """With CLAUDE_PROJECT_DIR pointed elsewhere, an in-repo src path is
+        outside the declared project and is ignored rather than refused.
+
+        The relative path is anchored on the payload root, so it resolves into
+        the repo; membership is then judged against the declared project dir."""
+        payload = json.dumps({'cwd': REPO_ROOT, 'tool_name': 'Write',
+                              'tool_input': {'file_path': UNMANIFESTED}})
+        env = dict(os.environ)
+        env['CLAUDE_PROJECT_DIR'] = tempfile.gettempdir()
+        p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                           capture_output=True, text=True, cwd=REPO_ROOT, env=env)
+        self.assertEqual(p.returncode, 0)
+
+    def test_case_differing_project_dir_still_gates(self):
+        """Path comparison is normcase/realpath, not lexical: a drive-letter or
+        case difference must not silently disable the gate (a gate that cannot
+        run reading as a pass is the #728 defect class itself)."""
+        payload = json.dumps({'cwd': REPO_ROOT, 'tool_name': 'Write',
+                              'tool_input': {'file_path': UNMANIFESTED}})
+        env = dict(os.environ)
+        env['CLAUDE_PROJECT_DIR'] = REPO_ROOT.upper()
+        p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                           capture_output=True, text=True, cwd=REPO_ROOT, env=env)
+        if os.name != 'nt':
+            self.skipTest('case-insensitive path comparison is a Windows behaviour')
+        self.assertEqual(p.returncode, 2)
+        self.assertIn('not in bank-manifest.json', p.stderr)
 
 
 if __name__ == '__main__':
