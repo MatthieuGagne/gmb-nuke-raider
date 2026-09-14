@@ -22,6 +22,7 @@ Exit codes:
     2  operational or usage error (missing tool, no coverage data, no scope)
 """
 import glob
+import hashlib
 import importlib.util
 import json
 import os
@@ -31,6 +32,9 @@ import sys
 
 DEFAULT_THRESHOLD = 8
 DEFAULT_COVERAGE_DIR = os.path.join('build', 'coverage')
+
+MARKER_NAME = 'COMPLETE'
+MARKER_VERSION = 1
 
 # Exemptions are declared, never inferred (R5). A file leaves the gate only by
 # appearing here, and tests/test_crap_score.py asserts every path still exists
@@ -179,13 +183,137 @@ def _json_documents(text):
             idx += 1
 
 
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(65536), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _head_commit(repo_root='.'):
+    """The commit coverage was built from, or '' when git cannot answer.
+
+    Provenance only — the freshness test is the per-file hash, because a scratch
+    fixture directory is not a repository and still has to be scoreable."""
+    try:
+        proc = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo_root,
+                              capture_output=True, text=True,
+                              env=install_hooks.clean_env())
+    except OSError:
+        return ''
+    return proc.stdout.strip() if proc.returncode == 0 else ''
+
+
+def marker_path(coverage_dir, repo_root='.'):
+    root = coverage_dir if os.path.isabs(coverage_dir) else os.path.join(repo_root, coverage_dir)
+    return os.path.join(root, MARKER_NAME)
+
+
+def write_marker(coverage_dir, ran, repo_root='.', expected=None):
+    """Record what `make coverage` built, expected to run, and actually ran (R1)."""
+    ran = sorted(ran)
+    sources = {}
+    for path in sorted(glob.glob(os.path.join(repo_root, 'src', '*.c'))):
+        sources['src/' + os.path.basename(path)] = _sha256_file(path)
+    path = marker_path(coverage_dir, repo_root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as fh:
+        json.dump({
+            'version': MARKER_VERSION,
+            'commit': _head_commit(repo_root),
+            'sources': sources,
+            'expected': sorted(expected) if expected is not None else list(ran),
+            'ran': ran,
+        }, fh, indent=2)
+    return path
+
+
+def read_marker(coverage_dir, repo_root='.'):
+    """The provenance marker `make coverage` wrote, or ToolMissing (R2)."""
+    path = marker_path(coverage_dir, repo_root)
+    if not os.path.isfile(path):
+        raise ToolMissing(
+            f"crap_score: no coverage provenance marker at {path}. The coverage data "
+            "under this directory cannot be trusted — it may predate the current "
+            "sources. Run: make coverage"
+        )
+    try:
+        with open(path) as fh:
+            marker = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ToolMissing(
+            f"crap_score: the coverage provenance marker at {path} is unreadable "
+            f"({exc}). Run: make coverage"
+        )
+    if not isinstance(marker, dict) or 'sources' not in marker or 'ran' not in marker:
+        raise ToolMissing(
+            f"crap_score: the coverage provenance marker at {path} has no sources/ran "
+            "record. Run: make coverage"
+        )
+    return marker
+
+
+def check_freshness(marker, scoped, repo_root='.'):
+    """Refuse when the data is stale, or when the run lost a binary (R3).
+
+    Three verdicts, deliberately worded apart: *stale* (a scoped source changed
+    since coverage was built), *incomplete* (a binary the run expected never
+    finished), and *genuinely uncovered* — which is not an error at all and is
+    what a file with no test of its own falls through to after a complete run
+    (AC4)."""
+    sources = marker.get('sources', {})
+    ran = set(marker.get('ran', []))
+    expected = set(marker.get('expected', []))
+    stale = []
+    for rel in scoped:
+        abs_path = os.path.join(repo_root, rel)
+        recorded = sources.get(rel)
+        if recorded is None:
+            stale.append(f"{rel} (absent from the coverage run)")
+        elif os.path.isfile(abs_path) and _sha256_file(abs_path) != recorded:
+            stale.append(f"{rel} (edited since coverage was built)")
+    if stale:
+        raise ToolMissing(
+            "crap_score: stale coverage data — " + ", ".join(stale) + ". The coverage "
+            "under this directory was built from different sources, so every score "
+            "would be computed against the wrong branches. Run: make coverage"
+        )
+
+    # A scoped file's own binary first — the most specific message — then any
+    # other missing binary, because the cross-cutting ones carry other files'
+    # coverage and a run that lost one understates every score (#728 A2).
+    own = []
+    for rel in scoped:
+        binary = 'test_' + os.path.basename(rel)[:-2]
+        test_source = os.path.join(repo_root, 'tests', binary + '.c')
+        if os.path.isfile(test_source) and binary not in ran:
+            own.append(f"{rel} (its binary {binary} did not run)")
+    missing = sorted(expected - ran)
+    if own or missing:
+        detail = ", ".join(own) if own else ""
+        if missing:
+            detail += ("; " if detail else "") + "binaries that did not run: " + ", ".join(missing)
+        raise ToolMissing(
+            "crap_score: incomplete coverage run — " + detail + ". The affected "
+            "functions would read as 0% coverage, which is indistinguishable from "
+            "genuinely untested code. Run: make coverage"
+        )
+    return None
+
+
 def collect_coverage(coverage_dir, repo_root='.', expected=None):
     """Run gcov over every .gcda under `coverage_dir` and merge the results.
 
     `expected` is the list of scoped files. Any of them absent from the merged
     map raises rather than scoring its functions at 0.0 coverage — an absent
     file means the join broke or the file was never instrumented, and silently
-    reporting it as untested would fire the gate for the wrong reason."""
+    reporting it as untested would fire the gate for the wrong reason. The
+    provenance marker is read and checked for freshness before any gcov work,
+    so a gate that cannot trust its inputs never reports a verdict (#728
+    R2-R4)."""
+    marker = read_marker(coverage_dir, repo_root)
+    check_freshness(marker, expected or (), repo_root)
     root = coverage_dir if os.path.isabs(coverage_dir) else os.path.join(repo_root, coverage_dir)
     gcda = sorted(glob.glob(os.path.join(root, '**', '*.gcda'), recursive=True))
     if not gcda:
@@ -348,7 +476,18 @@ def main(argv=None):
     parser.add_argument('--coverage-dir', default=DEFAULT_COVERAGE_DIR)
     parser.add_argument('--repo-root', default='.')
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--write-marker', action='store_true',
+                        help='write the coverage provenance marker and exit (called by '
+                             'the Makefile coverage target, #728)')
+    parser.add_argument('--ran', nargs='*', default=[],
+                        help='basenames of the coverage test binaries that ran to completion')
+    parser.add_argument('--expected', nargs='*', default=None,
+                        help='basenames of every coverage test binary the run intended to build')
     args = parser.parse_args(argv)
+
+    if args.write_marker:
+        print(write_marker(args.coverage_dir, args.ran, args.repo_root, args.expected))
+        return 0
 
     if bool(args.files) == bool(args.commit_range):
         sys.stderr.write(

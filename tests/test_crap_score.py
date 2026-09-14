@@ -394,5 +394,236 @@ class CommitRangeTests(unittest.TestCase):
         self.assertIn('git diff', str(ctx.exception))
 
 
+class MarkerWriteTests(unittest.TestCase):
+    """R1: the marker records the commit, a hash per src/*.c, and what ran."""
+
+    def test_write_marker_records_sources_expected_and_ran(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(void) { return 1; }\n')
+            path = crap_score.write_marker('cov', ['test_foo'], repo_root=tmp,
+                                           expected=['test_foo', 'test_bar'])
+            self.assertTrue(os.path.isfile(path))
+            with open(path) as fh:
+                marker = json.load(fh)
+        self.assertEqual(marker['version'], 1)
+        self.assertEqual(marker['ran'], ['test_foo'])
+        self.assertEqual(marker['expected'], ['test_bar', 'test_foo'])
+        self.assertIn('src/foo.c', marker['sources'])
+        self.assertEqual(len(marker['sources']['src/foo.c']), 64)
+        self.assertIn('commit', marker)
+
+    def test_expected_defaults_to_ran(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            path = crap_score.write_marker('cov', ['test_foo'], repo_root=tmp)
+            with open(path) as fh:
+                marker = json.load(fh)
+        self.assertEqual(marker['expected'], ['test_foo'])
+
+    def test_write_marker_cli_writes_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(void) { return 1; }\n')
+            rc = crap_score.main(['--write-marker', '--repo-root', tmp,
+                                  '--coverage-dir', 'cov', '--ran', 'test_foo',
+                                  '--expected', 'test_foo'])
+            self.assertEqual(rc, 0)
+            self.assertTrue(os.path.isfile(os.path.join(tmp, 'cov', 'COMPLETE')))
+
+    def test_write_marker_cli_accepts_an_empty_ran_list(self):
+        """`--ran $$ran` with an empty shell variable passes zero values."""
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'src'))
+            rc = crap_score.main(['--write-marker', '--repo-root', tmp,
+                                  '--coverage-dir', 'cov', '--ran'])
+            self.assertEqual(rc, 0)
+
+
+class MarkerFreshnessTests(unittest.TestCase):
+    """AC1-AC4: stale, incomplete and genuinely-uncovered are three verdicts."""
+
+    def _fixture(self, tmp, body='int foo(int a) { return a; }\n',
+                 ran=('test_foo',), expected=('test_foo',), with_test_source=True):
+        os.makedirs(os.path.join(tmp, 'src'), exist_ok=True)
+        os.makedirs(os.path.join(tmp, 'tests'), exist_ok=True)
+        with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+            fh.write(body)
+        if with_test_source:
+            with open(os.path.join(tmp, 'tests', 'test_foo.c'), 'w') as fh:
+                fh.write('int main(void) { return 0; }\n')
+        crap_score.write_marker('cov', list(ran), repo_root=tmp, expected=list(expected))
+
+    def test_missing_marker_is_refused_and_names_make_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'cov'))
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.read_marker('cov', repo_root=tmp)
+        self.assertIn('make coverage', str(ctx.exception))
+
+    def test_unreadable_marker_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, 'cov'))
+            with open(os.path.join(tmp, 'cov', 'COMPLETE'), 'w') as fh:
+                fh.write('{not json')
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.read_marker('cov', repo_root=tmp)
+        self.assertIn('make coverage', str(ctx.exception))
+
+    def test_edited_source_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(int a) { if (a) return 1; return a; }\n')
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp)
+        message = str(ctx.exception)
+        self.assertIn('stale coverage data', message)
+        self.assertIn('src/foo.c', message)
+        self.assertIn('make coverage', message)
+
+    def test_own_binary_that_did_not_run_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp, ran=(), expected=('test_foo',))
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp)
+        message = str(ctx.exception)
+        self.assertIn('incomplete coverage run', message)
+        self.assertIn('test_foo', message)
+
+    def test_own_binary_alone_is_incomplete_with_nothing_expected(self):
+        """Isolates the `own` branch (#728). The case above trips `own` AND
+        `missing` together, so it would still raise if `own` were deleted. With
+        `expected` empty, `expected - ran` is empty and only the own-binary
+        check can fire — and it must, because src/foo.c has tests/test_foo.c on
+        disk while the run never produced test_foo."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp, ran=(), expected=())
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp)
+        message = str(ctx.exception)
+        self.assertIn('incomplete coverage run', message)
+        self.assertIn('its binary test_foo did not run', message)
+
+    def test_unrelated_binary_that_did_not_run_is_incomplete(self):
+        """The A2 shape: cross-cutting binaries carry other files' coverage, so
+        a run missing ANY expected binary cannot be scored."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp, ran=('test_foo',),
+                          expected=('test_foo', 'test_player_physics'))
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp)
+        message = str(ctx.exception)
+        self.assertIn('incomplete coverage run', message)
+        self.assertIn('test_player_physics', message)
+
+    def test_fresh_and_complete_raises_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            self.assertIsNone(crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp))
+
+    def test_file_without_a_test_source_is_not_incomplete(self):
+        """AC4: no tests/test_<stem>.c and a complete run means genuinely
+        untested, not incomplete. It passes the guard and scores at 0%."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp, ran=('test_bar',), expected=('test_bar',),
+                          with_test_source=False)
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            self.assertIsNone(crap_score.check_freshness(marker, ['src/foo.c'], repo_root=tmp))
+
+    def test_file_absent_from_the_marker_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            marker = crap_score.read_marker('cov', repo_root=tmp)
+            with open(os.path.join(tmp, 'src', 'bar.c'), 'w') as fh:
+                fh.write('int bar(void) { return 0; }\n')
+            with self.assertRaises(crap_score.ToolMissing) as ctx:
+                crap_score.check_freshness(marker, ['src/bar.c'], repo_root=tmp)
+        self.assertIn('stale coverage data', str(ctx.exception))
+
+
+class RefusalExitCodeTests(unittest.TestCase):
+    """R4/AC1: the refusal reaches the CLI as exit 2 — through the real code.
+
+    No monkeypatching: main -> collect_coverage -> read_marker/check_freshness
+    runs for real against a scratch repo root, and short-circuits before
+    collect_complexity, so neither lizard nor gcov is needed."""
+
+    def _fixture(self, tmp):
+        os.makedirs(os.path.join(tmp, 'src'), exist_ok=True)
+        with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+            fh.write('int foo(int a) { return a; }\n')
+        crap_score.write_marker('cov', ['test_foo'], repo_root=tmp, expected=['test_foo'])
+
+    def _run(self, tmp):
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            rc = crap_score.main(['--threshold', '8', '--files', 'src/foo.c',
+                                  '--repo-root', tmp, '--coverage-dir', 'cov'])
+        return rc, err.getvalue()
+
+    def test_stale_data_exits_two_through_the_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            with open(os.path.join(tmp, 'src', 'foo.c'), 'w') as fh:
+                fh.write('int foo(int a) { if (a) return 1; return a; }\n')
+            rc, err = self._run(tmp)
+        self.assertEqual(rc, 2)
+        self.assertIn('stale coverage data', err)
+
+    def test_missing_marker_exits_two_through_the_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            os.remove(os.path.join(tmp, 'cov', 'COMPLETE'))
+            rc, err = self._run(tmp)
+        self.assertEqual(rc, 2)
+        self.assertIn('provenance marker', err)
+
+    def test_incomplete_run_exits_two_through_the_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._fixture(tmp)
+            crap_score.write_marker('cov', [], repo_root=tmp, expected=['test_foo'])
+            rc, err = self._run(tmp)
+        self.assertEqual(rc, 2)
+        self.assertIn('incomplete coverage run', err)
+
+
+class CoverageRecipeTests(unittest.TestCase):
+    """AC2: the marker is written even when a binary failed, or an aborted run
+    would leave no marker and every later score would refuse as unmarked."""
+
+    def setUp(self):
+        with open(os.path.join(ROOT, 'Makefile')) as fh:
+            self.makefile = fh.read()
+        start = self.makefile.index('\ncoverage:')
+        self.recipe = self.makefile[start:self.makefile.index('\n\n', start)]
+
+    def test_recipe_writes_the_marker(self):
+        self.assertIn('--write-marker', self.recipe)
+
+    def test_recipe_records_only_binaries_that_ran(self):
+        self.assertIn('ran="$$ran $$name"', self.recipe)
+
+    def test_recipe_records_every_expected_binary(self):
+        self.assertIn('--expected', self.recipe)
+        self.assertIn('all="$$all $$name"', self.recipe)
+
+    def test_marker_is_written_before_the_failure_exit(self):
+        self.assertLess(self.recipe.index('--write-marker'),
+                        self.recipe.index('exit $$fail'))
+
+    def test_a_failed_marker_write_fails_the_recipe(self):
+        marker_line_end = self.recipe.index('\n', self.recipe.index('--write-marker'))
+        marker_line = self.recipe[self.recipe.index('--write-marker'):marker_line_end]
+        self.assertIn('|| fail=1', marker_line)
+
+
 if __name__ == '__main__':
     unittest.main()

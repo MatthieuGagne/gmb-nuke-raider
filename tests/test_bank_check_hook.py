@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'tools',
@@ -34,6 +35,23 @@ def run(tool_input, tool='write'):
     })
     p = subprocess.run([sys.executable, SCRIPT], input=payload,
                        capture_output=True, text=True, cwd=REPO_ROOT)
+    return p.returncode, p.stdout, p.stderr
+
+
+def run_declared(tool_input, project_dir, tool='Write'):
+    """Invoke the hook with CLAUDE_PROJECT_DIR set to *project_dir* (#728).
+
+    The payload cwd stays at REPO_ROOT — the straddle this project actually
+    runs in, where the session root and the worktree being written differ."""
+    payload = json.dumps({
+        'cwd': REPO_ROOT,
+        'tool_name': tool,
+        'tool_input': tool_input,
+    })
+    env = dict(os.environ)
+    env['CLAUDE_PROJECT_DIR'] = project_dir
+    p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                       capture_output=True, text=True, cwd=REPO_ROOT, env=env)
     return p.returncode, p.stdout, p.stderr
 
 
@@ -93,6 +111,80 @@ class FailOpenTests(unittest.TestCase):
 
     def test_neither_path_nor_file_path_is_allowed(self):
         self.assertEqual(run({'content': 'int x;\n'})[0], 0)
+
+
+class RepoMembershipTests(unittest.TestCase):
+    """R5/AC5: only paths resolving inside the project dir are gated."""
+
+    def test_absolute_outside_path_is_allowed(self):
+        outside = os.path.join(tempfile.gettempdir(), 'scratch', 'src', 'fixture.c')
+        self.assertEqual(run({'file_path': outside}, tool='Write')[0], 0)
+
+    def test_dot_dot_escape_is_allowed(self):
+        """#728's reproduction verbatim: a scratch fixture five levels out."""
+        escape = '../../../../../scratchpad/ac4/src/fixture.c'
+        self.assertEqual(run({'file_path': escape}, tool='Write')[0], 0)
+
+    def test_absolute_in_repo_path_is_still_blocked(self):
+        inside = os.path.join(REPO_ROOT, UNMANIFESTED.replace('/', os.sep))
+        code, _, err = run({'file_path': inside}, tool='Write')
+        self.assertEqual(code, 2)
+        self.assertIn('not in bank-manifest.json', err)
+
+    def test_worktree_write_is_gated_when_project_dir_is_another_repo(self):
+        """The straddle this project mandates: the session is rooted at the main
+        repo (C:\\Code\\nuke-raider) while every write lands in an Orca worktree.
+
+        The declared project dir then contains none of the worktree's files. If
+        membership were judged against CLAUDE_PROJECT_DIR alone the hard bank
+        gate would exit 0 on an unmanifested src/*.c — a check that cannot run
+        reading as a pass, which is the defect #728 exists to eliminate. The
+        payload's repo root is an equally valid base, so the path is gated."""
+        with tempfile.TemporaryDirectory() as elsewhere:
+            code, _, err = run_declared({'file_path': UNMANIFESTED}, elsewhere)
+        self.assertEqual(code, 2)
+        self.assertIn('not in bank-manifest.json', err)
+
+    def test_scratch_fixture_stays_ignored_under_a_foreign_project_dir(self):
+        """R5/AC5 must not regress: a fixture outside BOTH bases is ignored."""
+        with tempfile.TemporaryDirectory() as elsewhere:
+            outside = os.path.join(tempfile.gettempdir(), 'scratch', 'src', 'fixture.c')
+            self.assertEqual(run_declared({'file_path': outside}, elsewhere)[0], 0)
+
+    def test_project_dir_above_the_repo_reports_the_repo_relative_path(self):
+        """An ancestor CLAUDE_PROJECT_DIR keeps the path nominally 'inside' it,
+        so relativising against it leaves a leading worktree-name component and
+        bank_check looks up a manifest key that cannot exist. The path handed to
+        bank_check must be relative to the directory it actually runs in."""
+        parent = os.path.dirname(REPO_ROOT)
+        code, _, err = run_declared({'file_path': UNMANIFESTED}, parent)
+        self.assertEqual(code, 2)
+        self.assertIn('ERROR: %s is not in bank-manifest.json' % UNMANIFESTED, err)
+        self.assertNotIn(os.path.basename(REPO_ROOT) + '/', err)
+
+    def test_reported_path_keeps_the_spelling_the_developer_typed(self):
+        """normcase belongs to the containment comparison only. Folding it into
+        the returned path makes the manifest key — and the message a developer
+        reads — a lowercased impostor of what they wrote."""
+        mixed = 'src/PiGateProbe_NotInManifest.c'
+        code, _, err = run({'file_path': mixed}, tool='Write')
+        self.assertEqual(code, 2)
+        self.assertIn(mixed, err)
+
+    def test_case_differing_project_dir_still_gates(self):
+        """Path comparison is normcase/realpath, not lexical: a drive-letter or
+        case difference must not silently disable the gate (a gate that cannot
+        run reading as a pass is the #728 defect class itself)."""
+        payload = json.dumps({'cwd': REPO_ROOT, 'tool_name': 'Write',
+                              'tool_input': {'file_path': UNMANIFESTED}})
+        env = dict(os.environ)
+        env['CLAUDE_PROJECT_DIR'] = REPO_ROOT.upper()
+        p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                           capture_output=True, text=True, cwd=REPO_ROOT, env=env)
+        if os.name != 'nt':
+            self.skipTest('case-insensitive path comparison is a Windows behaviour')
+        self.assertEqual(p.returncode, 2)
+        self.assertIn('not in bank-manifest.json', p.stderr)
 
 
 if __name__ == '__main__':
