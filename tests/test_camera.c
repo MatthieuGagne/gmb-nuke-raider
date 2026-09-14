@@ -584,6 +584,23 @@ void test_mock_records_rectangles_that_leave_the_map(void) {
     TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
 }
 
+/* GBDK's set_bkg_tile_xy writes a single tile at the flat BG-map offset
+ * y*32+x. An x past column 31 must spill into the following map row — not
+ * wrap to column 0 of the same row — and must raise the out-of-range record. */
+void test_mock_set_bkg_tile_xy_flat_offset_and_out_of_range(void) {
+    /* In-range write at (31,31): offset 31*32+31 = 1023, the last cell. */
+    set_bkg_tile_xy(31u, 31u, 0xABu);
+    TEST_ASSERT_EQUAL_UINT8(0xABu, mock_vram[(31u * 32u) + 31u]);
+    TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);
+
+    /* Out-of-range write at (33,5): flat offset 5*32+33 = 193 = row 6 col 1.
+     * The old `x & 31` mask wrote row 5 col 1 (5*32+1 = 161). */
+    set_bkg_tile_xy(33u, 5u, 0xCDu);
+    TEST_ASSERT_EQUAL_UINT8(0xCDu, mock_vram[(6u * 32u) + 1u]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, mock_vram[(5u * 32u) + 1u]); /* must NOT be row 5 col 1 */
+    TEST_ASSERT_EQUAL_INT(1, mock_bkg_out_of_range_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_camera_init_sets_cam_y);
@@ -628,5 +645,6 @@ int main(void) {
     RUN_TEST(test_stream_row_direct_splits_at_the_bg_ring_boundary);
     RUN_TEST(test_mock_set_bkg_tiles_spills_into_the_next_map_row);
     RUN_TEST(test_mock_records_rectangles_that_leave_the_map);
+    RUN_TEST(test_mock_set_bkg_tile_xy_flat_offset_and_out_of_range);
     return UNITY_END();
 }
