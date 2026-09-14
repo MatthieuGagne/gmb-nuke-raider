@@ -604,6 +604,13 @@ class CoverageRecipeTests(unittest.TestCase):
             self.makefile = fh.read()
         start = self.makefile.index('\ncoverage:')
         self.recipe = self.makefile[start:self.makefile.index('\n\n', start)]
+        # The slice ends at the first blank line, so a blank line inserted
+        # *inside* the recipe truncates it — which would silently narrow what
+        # the five assertions below verify instead of making them fail. Pin the
+        # slice's line count so that truncation fails setUp (#781 R2). Bump 30
+        # if the recipe legitimately grows a line.
+        self.assertEqual(self.recipe.count('\n'), 30,
+                         'coverage: recipe gained or lost a line — check for an inserted blank line')
 
     def test_recipe_writes_the_marker(self):
         self.assertIn('--write-marker', self.recipe)
