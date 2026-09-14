@@ -93,6 +93,11 @@ Everything the factory does on behalf of one spec issue, spanning every pass it
 makes at that issue.
 _Avoid_: job, session, build
 
+**Lane**:
+Which factory performed a run. A run belongs to exactly one lane — one factory
+runs a given spec issue, and the lane names the factory that did.
+_Avoid_: pipeline, track, mode
+
 **Attempt**:
 A single pass through the stages within a run. A run that failed and was
 restarted has one run and several attempts.
