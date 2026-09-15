@@ -17,6 +17,9 @@ import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
+import bank_check_hook
+
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'tools',
                       'bank_check_hook.py')
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -112,6 +115,25 @@ class FailOpenTests(unittest.TestCase):
     def test_neither_path_nor_file_path_is_allowed(self):
         self.assertEqual(run({'content': 'int x;\n'})[0], 0)
 
+    def test_no_checker_in_any_base_prints_a_note_and_stays_fail_open(self):
+        """R1/AC1: a matched base with no tools/bank_check.py exits 0 but names
+        why it declined to gate, instead of a silent pass."""
+        with tempfile.TemporaryDirectory() as payload_dir:
+            with tempfile.TemporaryDirectory() as declared_dir:
+                payload = json.dumps({
+                    'cwd': payload_dir,
+                    'tool_name': 'Write',
+                    'tool_input': {'file_path': UNMANIFESTED},
+                })
+                env = dict(os.environ)
+                env['CLAUDE_PROJECT_DIR'] = declared_dir
+                p = subprocess.run([sys.executable, SCRIPT], input=payload,
+                                   capture_output=True, text=True,
+                                   cwd=REPO_ROOT, env=env)
+        self.assertEqual(p.returncode, 0)
+        self.assertIn('skipping bank gate', p.stderr)
+        self.assertIn('tools/bank_check.py', p.stderr)
+
 
 class RepoMembershipTests(unittest.TestCase):
     """R5/AC5: only paths resolving inside the project dir are gated."""
@@ -185,6 +207,15 @@ class RepoMembershipTests(unittest.TestCase):
             self.skipTest('case-insensitive path comparison is a Windows behaviour')
         self.assertEqual(p.returncode, 2)
         self.assertIn('not in bank-manifest.json', p.stderr)
+
+
+class RepoRelativeTests(unittest.TestCase):
+    """R3/AC3: repo_relative's `root or bases[0]` fallback is exercised, not dead."""
+
+    def test_root_none_anchors_relative_path_on_the_first_base(self):
+        with tempfile.TemporaryDirectory() as base:
+            got = bank_check_hook.repo_relative('src/foo.c', None, [base])
+        self.assertEqual(got, (base, 'src/foo.c'))
 
 
 if __name__ == '__main__':
