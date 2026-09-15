@@ -241,6 +241,7 @@ $(BUILD_DIR):
 endif
 
 test: $(TEST_SRCS) | build
+	@if [ -z "$(TEST_SRCS)" ]; then echo "error: TEST_SRCS is empty — no tests/test_*.c files found"; exit 1; fi
 	@for f in $(TEST_SRCS); do \
 		name=$$(basename $$f .c); \
 		echo "  CC  $$f"; \
@@ -260,6 +261,7 @@ COV_OBJ := $(COV_DIR)/obj
 COV_SUP := $(COV_DIR)/support
 
 coverage:
+	@if [ -z "$(TEST_SRCS)" ]; then echo "error: TEST_SRCS is empty — no tests/test_*.c files found"; exit 1; fi
 	rm -rf $(COV_DIR)
 	mkdir -p $(COV_OBJ) $(COV_SUP)
 	@for s in $(TEST_LIB_SRC); do \
