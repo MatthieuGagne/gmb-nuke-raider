@@ -3,6 +3,7 @@
 #include "state_playing.h" /* finish_eval, cd_advance */
 #include "../src/config.h"
 #include "player.h"
+#include "damage.h"  /* damage_init */
 #include <gb/gb.h>   /* mock_vram, mock_bkg_out_of_range_count, mock_vram_clear */
 #include "loader.h"  /* loader_reset_bitmap_for_test */
 #include "input.h"   /* input, prev_input */
@@ -283,6 +284,33 @@ void test_countdown_pair_splits_at_ring_boundary(void) {
     TEST_ASSERT_EQUAL_INT(0, mock_bkg_out_of_range_count);   /* R3 / AC4 */
 }
 
+void test_update_runs_countdown_then_full_frames(void) {
+    uint16_t i;
+    int     sprites_before;
+    for (i = 0u; i < CD_MAP_W * CD_MAP_H; i++) s_cd_map[i] = 1u;
+    track_select(0u);                          /* sane baseline scalars */
+    track_test_set_start(256, 80);
+    track_test_set_map(s_cd_map, CD_MAP_W, CD_MAP_H);
+    loader_reset_bitmap_for_test();
+    damage_init();                             /* full HP: death path stays closed */
+    player_init(0u);                           /* player renders on the full frame */
+    input = 0u; prev_input = 0u;
+    mock_vram_clear();
+    mock_move_sprite_reset();
+    state_playing.enter();
+    /* Countdown phase 0 -> 1 at 60 frames: the RIGHT digit (col 0) redraws
+     * '3' -> '2' (cd_hi). The LEFT digit (col 31, cd_lo) stays '0' both phases. */
+    for (i = 0u; i < 60u; i++) state_playing.update();
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)('2' - ' '), mock_vram[(9u * 32u) + 0u]);
+    /* Run through the remaining countdown phases and well past phase 4
+     * (60 + 45 + 45 + 45 = 195 frames to phase 4). */
+    for (i = 0u; i < 240u; i++) state_playing.update();
+    /* Full-frame path is live: player_render moves sprites every frame. */
+    sprites_before = mock_move_sprite_call_count;
+    state_playing.update();
+    TEST_ASSERT_TRUE(mock_move_sprite_call_count > sprites_before);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_finish_eval_race_all_conditions_met);
@@ -320,5 +348,6 @@ int main(void) {
     RUN_TEST(test_finish_eval_one_notch_short_still_needs_arming);
     RUN_TEST(test_finish_eval_notch_step_matches_the_facing_player_c_turns_to);
     RUN_TEST(test_countdown_pair_splits_at_ring_boundary);
+    RUN_TEST(test_update_runs_countdown_then_full_frames);
     return UNITY_END();
 }
