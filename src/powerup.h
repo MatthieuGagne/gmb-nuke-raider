@@ -29,6 +29,7 @@ uint8_t powerup_get_active(uint8_t i);
 uint8_t powerup_get_type(uint8_t i);
 uint8_t powerup_get_tx(uint8_t i);
 uint8_t powerup_get_ty(uint8_t i);
+void    powerup_set_oam_for_test(uint8_t i, uint8_t oam);
 #endif
 
 #endif /* POWERUP_H */
