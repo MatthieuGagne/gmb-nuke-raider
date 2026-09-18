@@ -303,6 +303,25 @@ void test_patrol_outside_the_lane_is_untouched_by_the_pulse(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)PATROL_HP, patrol_get_hp(0u));
 }
 
+void test_patrol_hide_moves_all_four_slots_offscreen(void) {
+    static uint8_t wtx[1] = {11u};
+    static uint8_t wty[1] = {2u};
+    cam_x = 0;
+    cam_y = 0;
+    mock_move_sprite_reset();
+    patrol_spawn_for_test(88, 16, wtx, wty, 1u);
+    patrol_render();                       /* place the 4 slots on-screen */
+    /* spawn assigns all four slots handle 0; render's four writes land on
+     * handle 0, so the final write wins: hw_x+8, hw_y+8 (px=88, py=16). */
+    TEST_ASSERT_EQUAL_UINT8(104u, mock_sprite_x[0u]);
+    TEST_ASSERT_EQUAL_UINT8(40u, mock_sprite_y[0u]);
+    TEST_ASSERT_EQUAL_INT(4, mock_move_sprite_call_count);
+    patrol_hide();
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[0u]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0u]);
+    TEST_ASSERT_EQUAL_INT(8, mock_move_sprite_call_count);  /* 4 render + 4 hide */
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_fsm_enters_chase_when_inside_detect);
@@ -312,6 +331,7 @@ int main(void) {
     RUN_TEST(test_fsm_handles_negative_deltas);
     RUN_TEST(test_pool_empty_after_init_empty);
     RUN_TEST(test_spawn_for_test_activates_one);
+    RUN_TEST(test_patrol_hide_moves_all_four_slots_offscreen);
     RUN_TEST(test_wp_advances_when_reached_then_wraps);
     RUN_TEST(test_no_fire_when_off_screen);
     RUN_TEST(test_fires_when_on_screen_chasing_in_range);
