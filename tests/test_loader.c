@@ -107,6 +107,12 @@ void test_alloc_region_boundary_enforced(void) {
     TEST_ASSERT_EQUAL_UINT8(0xFFu, slot);
 }
 
+void test_init_allocator_resets_the_bitmap(void) {
+    TEST_ASSERT_EQUAL_UINT8(40u, loader_alloc_slots(40u, 47u, 2u));   /* occupies 40-41 */
+    loader_init_allocator();
+    TEST_ASSERT_EQUAL_UINT8(40u, loader_alloc_slots(40u, 47u, 2u));   /* region free again */
+}
+
 void test_get_asset_slot_returns_sentinel_initially(void) {
     TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_PLAYER));
     TEST_ASSERT_EQUAL_UINT8(0xFFu, loader_get_asset_slot(TILE_ASSET_DIALOG_BORDER));
@@ -366,6 +372,7 @@ int main(void) {
     RUN_TEST(test_alloc_region_fills_completely);
     RUN_TEST(test_free_clears_bits_allowing_realloc);
     RUN_TEST(test_alloc_region_boundary_enforced);
+    RUN_TEST(test_init_allocator_resets_the_bitmap);
     RUN_TEST(test_get_asset_slot_returns_sentinel_initially);
     RUN_TEST(test_tile_asset_count_is_correct);
     RUN_TEST(test_registry_player_is_sprite);
