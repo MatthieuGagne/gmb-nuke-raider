@@ -1007,6 +1007,74 @@ void test_racer_rank_with_two_enemies_player_last(void) {
     TEST_ASSERT_EQUAL_UINT8(3u, race_state_rank_player());
 }
 
+void test_waypoint_getters_return_spawned_route(void) {
+    uint8_t wp_tx[2] = { 10u, 20u };
+    uint8_t wp_ty[2] = { 10u, 30u };
+    racer_spawn_for_test(84u, 84u, wp_tx, wp_ty, 2u, CHECKPOINT_DIR_S, 1u);
+    TEST_ASSERT_EQUAL_UINT8(2u, racer_get_wp_count(1u));
+    TEST_ASSERT_EQUAL_UINT8(10u, racer_get_wp_tx(1u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(30u, racer_get_wp_ty(1u, 1u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_tx(1u, 2u));    /* idx past count */
+}
+
+void test_waypoint_getters_guard_invalid_slots(void) {
+    uint8_t wp_tx[1] = { 5u };
+    uint8_t wp_ty[1] = { 5u };
+    racer_spawn_for_test(84u, 84u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_count(0u));     /* player slot */
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_count((uint8_t)(MAX_ENEMY_RACERS + 1u)));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_tx(0u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, racer_get_wp_ty((uint8_t)(MAX_ENEMY_RACERS + 1u), 0u));
+}
+
+void test_render_places_active_racer_at_screen_position(void) {
+    uint8_t wp_tx[1] = { 20u };
+    uint8_t wp_ty[1] = { 20u };
+    cam_y = 0;
+    mock_move_sprite_reset();
+    racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(1u, 0u, 1u, 2u, 3u);   /* distinct handles: spawn leaves all at 0 */
+    racer_render();
+    TEST_ASSERT_EQUAL_UINT8(96u, mock_sprite_x[0u]);    /* px+8 */
+    TEST_ASSERT_EQUAL_UINT8(32u, mock_sprite_y[0u]);    /* py-cam_y+16 */
+    TEST_ASSERT_EQUAL_UINT8(104u, mock_sprite_x[3u]);   /* px+8+8 */
+    TEST_ASSERT_EQUAL_UINT8(40u, mock_sprite_y[3u]);    /* py+16+8 */
+}
+
+void test_render_hides_racer_offscreen(void) {
+    uint8_t wp_tx[1] = { 20u };
+    uint8_t wp_ty[1] = { 20u };
+    cam_y = 0;
+    mock_move_sprite_reset();
+    racer_spawn_for_test(3000, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_render();                       /* scr_x = 3008 >= 168 */
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[0u]);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0u]);
+}
+
+void test_render_skips_unallocated_slots(void) {
+    uint8_t wp_tx[1] = { 20u };
+    uint8_t wp_ty[1] = { 20u };
+    cam_y = 0;
+    mock_move_sprite_reset();
+    racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(1u, SPRITE_POOL_INVALID, 0u, 0u, 0u);
+    racer_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+void test_render_hides_inactive_racer_with_handles(void) {
+    uint8_t wp_tx[1] = { 20u };
+    uint8_t wp_ty[1] = { 20u };
+    cam_y = 0;
+    mock_move_sprite_reset();
+    racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_active[1] = 0u;                 /* inactive but OAM handles still claimed */
+    racer_render();
+    TEST_ASSERT_EQUAL_INT(4, mock_move_sprite_call_count);
+    TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[0u]);
+}
+
 int main(void) {
     UNITY_BEGIN();
     /* The two beam tests MUST run before ANY test that calls track_test_set_map()
@@ -1073,6 +1141,12 @@ int main(void) {
     RUN_TEST(test_racer_init_allocates_four_per_active_racer);
     RUN_TEST(test_racer_hide_skips_invalid_slots);
     RUN_TEST(test_racer_render_skips_invalid_slots);
+    RUN_TEST(test_waypoint_getters_return_spawned_route);
+    RUN_TEST(test_waypoint_getters_guard_invalid_slots);
+    RUN_TEST(test_render_places_active_racer_at_screen_position);
+    RUN_TEST(test_render_hides_racer_offscreen);
+    RUN_TEST(test_render_skips_unallocated_slots);
+    RUN_TEST(test_render_hides_inactive_racer_with_handles);
     RUN_TEST(test_racer_rank_with_two_enemies_player_first);
     RUN_TEST(test_racer_rank_with_two_enemies_player_last);
     return UNITY_END();
