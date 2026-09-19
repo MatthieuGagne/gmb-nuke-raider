@@ -144,19 +144,23 @@ static uint8_t racer_corners_passable(int16_t wx, int16_t wy, uint8_t dir) {
 }
 
 /* ---- Finish direction check ---- */
+static uint8_t finish_match_n(uint8_t dir) {
+    return (dir == DIR_T || dir == DIR_LT || dir == DIR_RT) ? 1u : 0u;
+}
+static uint8_t finish_match_s(uint8_t dir) {
+    return (dir == DIR_B || dir == DIR_LB || dir == DIR_RB) ? 1u : 0u;
+}
+static uint8_t finish_match_e(uint8_t dir) {
+    return (dir == DIR_R || dir == DIR_RT || dir == DIR_RB) ? 1u : 0u;
+}
+static uint8_t finish_match_w(uint8_t dir) {
+    return (dir == DIR_L || dir == DIR_LT || dir == DIR_LB) ? 1u : 0u;
+}
 static uint8_t racer_dir_matches_finish(uint8_t dir, uint8_t finish_dir) {
-    if (finish_dir == CHECKPOINT_DIR_N) {
-        return (dir == DIR_T || dir == DIR_LT || dir == DIR_RT) ? 1u : 0u;
-    }
-    if (finish_dir == CHECKPOINT_DIR_S) {
-        return (dir == DIR_B || dir == DIR_LB || dir == DIR_RB) ? 1u : 0u;
-    }
-    if (finish_dir == CHECKPOINT_DIR_E) {
-        return (dir == DIR_R || dir == DIR_RT || dir == DIR_RB) ? 1u : 0u;
-    }
-    if (finish_dir == CHECKPOINT_DIR_W) {
-        return (dir == DIR_L || dir == DIR_LT || dir == DIR_LB) ? 1u : 0u;
-    }
+    if (finish_dir == CHECKPOINT_DIR_N) return finish_match_n(dir);
+    if (finish_dir == CHECKPOINT_DIR_S) return finish_match_s(dir);
+    if (finish_dir == CHECKPOINT_DIR_E) return finish_match_e(dir);
+    if (finish_dir == CHECKPOINT_DIR_W) return finish_match_w(dir);
     return 0u;
 }
 
@@ -276,6 +280,136 @@ void racer_hide(void) BANKED {
 }
 
 
+/* Extracted from racer_update — per-step helpers (#790). All static, same-bank. */
+
+/* Dying: freeze while the blast plays; returns 1 when the caller must skip. */
+static uint8_t racer_update_dying(uint8_t i) {
+    if (racer_dying[i]) {
+        if (racer_death_timer[i] != 0u) {
+            racer_death_timer[i]--;
+            if (racer_death_timer[i] == 0u) {
+                racer_dying[i] = 0u;
+            }
+        }
+        return 1u;
+    }
+    return 0u;
+}
+
+/* Finish line detection — returns 1 when a lap completes (caller returns 1u). */
+static uint8_t racer_update_finish(uint8_t i, uint8_t dir, TileType tile_type) {
+    if (tile_type == TILE_FINISH) {
+        if (racer_dir_matches_finish(dir, s_finish_dir)) {
+            if (race_state_all_cp_cleared(i) && racer_finish_armed[i]) {
+                racer_finish_armed[i] = 0u;
+                if (race_state_advance_lap(i)) {
+                    return 1u;
+                }
+            }
+        }
+    } else {
+        racer_finish_armed[i] = 1u;
+    }
+    return 0u;
+}
+
+/* Gear physics (mirrors player_apply_physics, always full throttle). Moves the
+ * whole gear/friction/thrust/boost/upshift/downshift block verbatim. */
+static void racer_update_gear_physics(uint8_t i, TileType tile_type, uint8_t dir) {
+    uint8_t gas;
+    uint8_t max_speed;
+    uint8_t spd_x;
+    uint8_t spd_y;
+    uint8_t speed;
+
+    gas = (tile_type != TILE_OIL) ? 1u : 0u;
+
+    if (tile_type == TILE_OIL) {
+        racer_gear[i] = 0u;
+        racer_downshift_timer[i] = 0u;
+    }
+
+    vehicle_apply_friction(&racer_vx[i], &racer_vy[i], tile_type, gas, dir);
+
+    if (gas) {
+        racer_vx[i] = (int8_t)(racer_vx[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DX[dir]));
+        racer_vy[i] = (int8_t)(racer_vy[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DY[dir]));
+    }
+
+    max_speed = (tile_type == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : RACER_GEAR_MAX_SPD[racer_gear[i]];
+    vehicle_apply_boost_clamp(&racer_vx[i], &racer_vy[i], tile_type, max_speed);
+
+    spd_x = (racer_vx[i] < 0) ? (uint8_t)(-racer_vx[i]) : (uint8_t)racer_vx[i];
+    spd_y = (racer_vy[i] < 0) ? (uint8_t)(-racer_vy[i]) : (uint8_t)racer_vy[i];
+    speed = (spd_x > spd_y) ? spd_x : spd_y;
+
+    if (racer_gear[i] < 2u && speed >= RACER_GEAR_MAX_SPD[racer_gear[i]]) {
+        racer_gear[i]++;
+        racer_downshift_timer[i] = 0u;
+    } else if (racer_gear[i] > 0u) {
+        if (speed < RACER_GEAR_MAX_SPD[racer_gear[i] - 1u]) {
+            racer_downshift_timer[i]++;
+            if (racer_downshift_timer[i] >= RACER_GEAR_DOWNSHIFT_FRAMES) {
+                racer_gear[i]--;
+                racer_downshift_timer[i] = 0u;
+            }
+        } else {
+            racer_downshift_timer[i] = 0u;
+        }
+    }
+}
+
+/* Axis-split collision (shared helper + dir-specific hitbox gate). */
+static void racer_update_collision(uint8_t i, uint8_t dir) {
+    int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
+    int16_t new_py;
+
+    if (vehicle_step_axis_x(racer_px[i], racer_py[i], racer_vx[i]) == new_px &&
+        racer_corners_passable(new_px, racer_py[i], dir)) {
+        racer_px[i] = new_px;
+    } else {
+        racer_vx[i] = (int8_t)0;
+        racer_gear[i] = 0u;
+        racer_downshift_timer[i] = 0u;
+    }
+
+    new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
+    if (vehicle_step_axis_y(racer_px[i], racer_py[i], racer_vy[i]) == new_py &&
+        racer_corners_passable(racer_px[i], new_py, dir)) {
+        racer_py[i] = new_py;
+    } else {
+        racer_vy[i] = (int8_t)0;
+        racer_gear[i] = 0u;
+        racer_downshift_timer[i] = 0u;
+    }
+}
+
+/* Bullet hit detection (screen-space, skipped if off-screen). */
+static void racer_update_bullets(uint8_t i) {
+    int16_t scr_cx = racer_px[i] + 16;
+    int16_t scr_cy = racer_py[i] - cam_y + 24;
+    if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
+        uint8_t dmg = projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy, RACER_HIT_RADIUS);
+        if (dmg) {
+            racer_hp[i] = enemy_apply_damage(racer_hp[i], dmg);
+            racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+            if (racer_hp[i] == 0u) {
+                racer_kill(i);
+            }
+        }
+    }
+}
+
+/* Hitscan beam — pierces; works in world space. */
+static void racer_update_beam(uint8_t i) {
+    uint8_t bdmg = beam_hit_damage(racer_px[i], racer_py[i], 16u);
+    if (bdmg) {
+        racer_hp[i] = enemy_apply_damage(racer_hp[i], bdmg);
+        racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+        if (racer_hp[i] == 0u) { racer_kill(i); }
+    }
+}
+
 uint8_t racer_update(void) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_RACERS; i++) {
@@ -291,17 +425,7 @@ uint8_t racer_update(void) BANKED {
         uint8_t raw_tile;
         TileType tile_type;
 
-        /* Dying: frozen while the death blast plays. No AI, physics, or finish
-         * detection. When the timer expires, drop fully inactive (#411). */
-        if (racer_dying[i]) {
-            if (racer_death_timer[i] != 0u) {
-                racer_death_timer[i]--;
-                if (racer_death_timer[i] == 0u) {
-                    racer_dying[i] = 0u;
-                }
-            }
-            continue;
-        }
+        if (racer_update_dying(i)) continue;
 
         if (!racer_active[i]) continue;
 
@@ -329,140 +453,26 @@ uint8_t racer_update(void) BANKED {
 
         race_state_update_cp(i, racer_px[i], racer_py[i], dir);
 
-        /* Finish line detection — check current position before applying velocity.
-         * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
         tx = (uint8_t)(((uint16_t)racer_px[i] + 8u) >> 3u);
         ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
         raw_tile  = track_get_raw_tile(tx, ty);
         tile_type = track_tile_type_from_index(raw_tile);
-        if (tile_type == TILE_FINISH) {
-            if (racer_dir_matches_finish(dir, s_finish_dir)) {
-                if (race_state_all_cp_cleared(i) && racer_finish_armed[i]) {
-                    racer_finish_armed[i] = 0u;
-                    if (race_state_advance_lap(i)) {
-                        return 1u;
-                    }
-                }
-            }
-        } else {
-            racer_finish_armed[i] = 1u;
-        }
 
-        /* ---- Gear physics (mirrors player_apply_physics, always full throttle) ---- */
-        {
-            uint8_t gas;
-            uint8_t max_speed;
-            uint8_t spd_x;
-            uint8_t spd_y;
-            uint8_t speed;
+        if (racer_update_finish(i, dir, tile_type)) return 1u;
 
-            gas = (tile_type != TILE_OIL) ? 1u : 0u;
+        racer_update_gear_physics(i, tile_type, dir);
+        racer_update_collision(i, dir);
 
-            /* Gear-reset-on-oil stays here (gear state is the caller's). */
-            if (tile_type == TILE_OIL) {
-                racer_gear[i] = 0u;
-                racer_downshift_timer[i] = 0u;
-            }
-
-            /* Friction (pre-accel) via the shared helper. */
-            vehicle_apply_friction(&racer_vx[i], &racer_vy[i], tile_type, gas, dir);
-
-            /* Racer gear accel stays inline — caller-specific, between friction and boost. */
-            if (gas) {
-                racer_vx[i] = (int8_t)(racer_vx[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DX[dir]));
-                racer_vy[i] = (int8_t)(racer_vy[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DY[dir]));
-            }
-
-            /* Boost-delta + clamp (post-accel) via the shared helper. */
-            max_speed = (tile_type == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : RACER_GEAR_MAX_SPD[racer_gear[i]];
-            vehicle_apply_boost_clamp(&racer_vx[i], &racer_vy[i], tile_type, max_speed);
-
-            spd_x = (racer_vx[i] < 0) ? (uint8_t)(-racer_vx[i]) : (uint8_t)racer_vx[i];
-            spd_y = (racer_vy[i] < 0) ? (uint8_t)(-racer_vy[i]) : (uint8_t)racer_vy[i];
-            speed = (spd_x > spd_y) ? spd_x : spd_y;
-
-            if (racer_gear[i] < 2u && speed >= RACER_GEAR_MAX_SPD[racer_gear[i]]) {
-                racer_gear[i]++;
-                racer_downshift_timer[i] = 0u;
-            } else if (racer_gear[i] > 0u) {
-                if (speed < RACER_GEAR_MAX_SPD[racer_gear[i] - 1u]) {
-                    racer_downshift_timer[i]++;
-                    if (racer_downshift_timer[i] >= RACER_GEAR_DOWNSHIFT_FRAMES) {
-                        racer_gear[i]--;
-                        racer_downshift_timer[i] = 0u;
-                    }
-                } else {
-                    racer_downshift_timer[i] = 0u;
-                }
-            }
-        }
-
-        /* ---- Axis-split collision (shared helper + dir-specific gate) ---- */
-        {
-            int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
-            int16_t new_py;
-
-            /* X: shared in-bounds+static-terrain step AND the racer's dir hitbox. */
-            if (vehicle_step_axis_x(racer_px[i], racer_py[i], racer_vx[i]) == new_px &&
-                racer_corners_passable(new_px, racer_py[i], dir)) {
-                racer_px[i] = new_px;
-            } else {
-                racer_vx[i] = (int8_t)0;
-                racer_gear[i] = 0u;
-                racer_downshift_timer[i] = 0u;
-            }
-
-            /* Y uses the post-X racer_px[i] (slide), matching the original. */
-            new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
-            if (vehicle_step_axis_y(racer_px[i], racer_py[i], racer_vy[i]) == new_py &&
-                racer_corners_passable(racer_px[i], new_py, dir)) {
-                racer_py[i] = new_py;
-            } else {
-                racer_vy[i] = (int8_t)0;
-                racer_gear[i] = 0u;
-                racer_downshift_timer[i] = 0u;
-            }
-        }
-
-        /* ---- Flash timer tick ---- */
         if (racer_hit_flash[i] > 0u) {
             racer_hit_flash[i] = (uint8_t)(racer_hit_flash[i] - 1u);
         }
 
-        /* ---- Ram cooldown tick (#417) ---- */
         if (racer_ram_cd[i] > 0u) {
             racer_ram_cd[i] = (uint8_t)(racer_ram_cd[i] - 1u);
         }
 
-        /* ---- Bullet hit detection (screen-space, skipped if off-screen) ---- */
-        {
-            int16_t scr_cx = racer_px[i] + 16;
-            int16_t scr_cy = racer_py[i] - cam_y + 24;
-            if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
-                uint8_t dmg = projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy, RACER_HIT_RADIUS);
-                if (dmg) {
-                    racer_hp[i] = enemy_apply_damage(racer_hp[i], dmg);
-                    racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
-                    if (racer_hp[i] == 0u) {
-                        racer_kill(i);
-                    }
-                }
-            }
-        }
-
-        /* #430: hitscan beam — pierces, so this never consumes anything.
-         * Deliberately OUTSIDE the scr_cx/scr_cy on-screen guard above: that
-         * guard computes scr_cx WITHOUT subtracting cam_x (a latent bug on
-         * horizontally scrolling tracks). The beam works in world space and
-         * clips itself to the screen, so it must not inherit that. */
-        {
-            uint8_t bdmg = beam_hit_damage(racer_px[i], racer_py[i], 16u);
-            if (bdmg) {
-                racer_hp[i] = enemy_apply_damage(racer_hp[i], bdmg);
-                racer_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
-                if (racer_hp[i] == 0u) { racer_kill(i); }
-            }
-        }
+        racer_update_bullets(i);
+        racer_update_beam(i);
     }
     return 0u;
 }
