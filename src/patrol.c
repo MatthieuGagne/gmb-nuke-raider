@@ -182,8 +182,11 @@ static void patrol_update_waypoint(uint8_t i, int8_t dx, int8_t dy) {
     }
 }
 
-/* Shared vehicle physics: friction (pre-accel) → per-axis homing thrust →
- * boost+clamp. Moves the whole friction/thrust/clamp block verbatim. */
+/* Shared vehicle physics (R10): friction (pre-accel) → per-axis homing thrust
+ * → boost+clamp. Thrust is applied independently on each axis toward the target
+ * (NOT along the 8-way facing dir): dominant-axis-only thrust stalls against
+ * walls and corner-camps; per-axis thrust closes both deltas at once and slides
+ * along walls. ±2px deadzone avoids jitter at the target. */
 static void patrol_apply_thrust(uint8_t i, int8_t dx, int8_t dy, TileType tt, uint8_t dir) {
     uint8_t gas;
     uint8_t terrain;
@@ -218,13 +221,20 @@ static void patrol_apply_motion(uint8_t i) {
     }
 }
 
-/* Ram contact: returns 1 when the patrol was destroyed (caller `continue`s). */
+/* Ram contact via the SHARED enemy_ram_overlap test (identical logic to racer.c,
+ * ENEMY_RAM_REACH margin so a flush contact rams from any side): the player
+ * takes RACER_RAM_DAMAGE on every overlap (damage.c i-frames debounce it), the
+ * patrol takes ENEMY_RAM_DAMAGE behind its own 30-frame cooldown.
+ * Returns 1 when the patrol was destroyed (caller `continue`s). */
 static uint8_t patrol_update_ram(uint8_t i, int16_t px, int16_t py) {
     if (enemy_ram_overlap(px, py, patrol_px[i], patrol_py[i])) {
         damage_apply(RACER_RAM_DAMAGE);
         if (patrol_ram_cd[i] == 0u) {
             patrol_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
             patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+            /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
+             * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
+             * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
             patrol_hp[i]        = (uint8_t)(patrol_hp[i] - ENEMY_RAM_DAMAGE);
             if (patrol_hp[i] == 0u) {
                 patrol_kill(i);
@@ -276,7 +286,10 @@ static uint8_t patrol_update_onscreen(uint8_t i, int16_t px, int16_t py,
     return 0u;
 }
 
-/* Hitscan beam: returns 1 when destroyed. */
+/* #430: hitscan beam — pierces, so this never consumes anything. Runs after the
+ * on-screen block closes, still inside the per-patrol loop, so all three enemy
+ * modules poll in world space; the beam clips itself to the screen already.
+ * Returns 1 when destroyed. */
 static uint8_t patrol_update_beam(uint8_t i) {
     uint8_t bdmg = beam_hit_damage(patrol_px[i], patrol_py[i], 16u);
     if (bdmg) {
