@@ -282,7 +282,9 @@ void racer_hide(void) BANKED {
 
 /* Extracted from racer_update — per-step helpers (#790). All static, same-bank. */
 
-/* Dying: freeze while the blast plays; returns 1 when the caller must skip. */
+/* Dying: frozen while the death blast plays — no AI, physics, or finish
+ * detection. When the timer expires the racer drops fully inactive (#411).
+ * Returns 1 when the caller must skip. */
 static uint8_t racer_update_dying(uint8_t i) {
     if (racer_dying[i]) {
         if (racer_death_timer[i] != 0u) {
@@ -296,7 +298,10 @@ static uint8_t racer_update_dying(uint8_t i) {
     return 0u;
 }
 
-/* Finish line detection — returns 1 when a lap completes (caller returns 1u). */
+/* Finish line detection — returns 1 when a lap completes (caller returns 1u).
+ * The caller samples the tile BEFORE this runs (i.e. before velocity moves the
+ * racer) and the finished-tile on/off arming is stateful across frames: the
+ * else-branch re-arms so a racer must leave and re-enter the line. */
 static uint8_t racer_update_finish(uint8_t i, uint8_t dir, TileType tile_type) {
     if (tile_type == TILE_FINISH) {
         if (racer_dir_matches_finish(dir, s_finish_dir)) {
@@ -324,18 +329,22 @@ static void racer_update_gear_physics(uint8_t i, TileType tile_type, uint8_t dir
 
     gas = (tile_type != TILE_OIL) ? 1u : 0u;
 
+    /* Gear-reset-on-oil stays here (gear state is the caller's). */
     if (tile_type == TILE_OIL) {
         racer_gear[i] = 0u;
         racer_downshift_timer[i] = 0u;
     }
 
+    /* Friction (pre-accel) via the shared helper. */
     vehicle_apply_friction(&racer_vx[i], &racer_vy[i], tile_type, gas, dir);
 
+    /* Racer gear accel stays inline — caller-specific, between friction and boost. */
     if (gas) {
         racer_vx[i] = (int8_t)(racer_vx[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DX[dir]));
         racer_vy[i] = (int8_t)(racer_vy[i] + (int8_t)((int8_t)RACER_GEAR_ACCEL_TBL[racer_gear[i]] * RACER_DIR_DY[dir]));
     }
 
+    /* Boost-delta + clamp (post-accel) via the shared helper. */
     max_speed = (tile_type == TILE_BOOST) ? TERRAIN_BOOST_MAX_SPEED : RACER_GEAR_MAX_SPD[racer_gear[i]];
     vehicle_apply_boost_clamp(&racer_vx[i], &racer_vy[i], tile_type, max_speed);
 
@@ -373,6 +382,7 @@ static void racer_update_collision(uint8_t i, uint8_t dir) {
         racer_downshift_timer[i] = 0u;
     }
 
+    /* Y uses the post-X racer_px[i] (slide), matching the original. */
     new_py = (int16_t)(racer_py[i] + (int16_t)racer_vy[i]);
     if (vehicle_step_axis_y(racer_px[i], racer_py[i], racer_vy[i]) == new_py &&
         racer_corners_passable(racer_px[i], new_py, dir)) {
@@ -400,7 +410,11 @@ static void racer_update_bullets(uint8_t i) {
     }
 }
 
-/* Hitscan beam — pierces; works in world space. */
+/* #430: hitscan beam — pierces, so this never consumes anything.
+ * Deliberately OUTSIDE the scr_cx/scr_cy on-screen guard in racer_update_bullets():
+ * that guard computes scr_cx WITHOUT subtracting cam_x (a latent bug on horizontally
+ * scrolling tracks). The beam works in world space and clips itself to the screen,
+ * so it must not inherit that — keep this call separate. */
 static void racer_update_beam(uint8_t i) {
     uint8_t bdmg = beam_hit_damage(racer_px[i], racer_py[i], 16u);
     if (bdmg) {
@@ -453,6 +467,8 @@ uint8_t racer_update(void) BANKED {
 
         race_state_update_cp(i, racer_px[i], racer_py[i], dir);
 
+        /* Finish line detection — check current position before applying velocity.
+         * Avoids chained BANKED calls: store raw tile before passing to type LUT. */
         tx = (uint8_t)(((uint16_t)racer_px[i] + 8u) >> 3u);
         ty = (uint8_t)((uint16_t)racer_py[i] >> 3u);
         raw_tile  = track_get_raw_tile(tx, ty);
@@ -463,14 +479,18 @@ uint8_t racer_update(void) BANKED {
         racer_update_gear_physics(i, tile_type, dir);
         racer_update_collision(i, dir);
 
+        /* Flash timer tick */
         if (racer_hit_flash[i] > 0u) {
             racer_hit_flash[i] = (uint8_t)(racer_hit_flash[i] - 1u);
         }
 
+        /* Ram cooldown tick (#417) */
         if (racer_ram_cd[i] > 0u) {
             racer_ram_cd[i] = (uint8_t)(racer_ram_cd[i] - 1u);
         }
 
+        /* Order is load-bearing: hit detection runs AFTER the move above, and the
+         * beam must stay outside the bullet helper's on-screen guard (#430). */
         racer_update_bullets(i);
         racer_update_beam(i);
     }
