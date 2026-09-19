@@ -303,7 +303,7 @@ void test_update_runs_countdown_then_full_frames(void) {
     for (i = 0u; i < 60u; i++) state_playing.update();
     TEST_ASSERT_EQUAL_UINT8((uint8_t)('2' - ' '), mock_vram[(9u * 32u) + 0u]);
     /* Run through the remaining countdown phases and well past phase 4
-     * (60 + 45 + 45 + 45 = 195 frames to phase 4). */
+     * (60 + 60 + 60 + 45 = 225 frames to phase 4). */
     for (i = 0u; i < 240u; i++) state_playing.update();
     /* Full-frame path is live: player_render moves sprites every frame. */
     sprites_before = mock_move_sprite_call_count;

@@ -373,6 +373,7 @@ static void racer_update_collision(uint8_t i, uint8_t dir) {
     int16_t new_px = (int16_t)(racer_px[i] + (int16_t)racer_vx[i]);
     int16_t new_py;
 
+    /* X: shared in-bounds+static-terrain step AND the racer's dir hitbox. */
     if (vehicle_step_axis_x(racer_px[i], racer_py[i], racer_vx[i]) == new_px &&
         racer_corners_passable(new_px, racer_py[i], dir)) {
         racer_px[i] = new_px;

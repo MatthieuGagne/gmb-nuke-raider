@@ -1033,6 +1033,8 @@ void test_render_places_active_racer_at_screen_position(void) {
     cam_y = 0;
     mock_move_sprite_reset();
     racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(0u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
+    racer_set_oam_for_test(2u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
     racer_set_oam_for_test(1u, 0u, 1u, 2u, 3u);   /* distinct handles: spawn leaves all at 0 */
     racer_render();
     TEST_ASSERT_EQUAL_UINT8(96u, mock_sprite_x[0u]);    /* px+8 */
@@ -1047,6 +1049,8 @@ void test_render_hides_racer_offscreen(void) {
     cam_y = 0;
     mock_move_sprite_reset();
     racer_spawn_for_test(3000, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(0u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
+    racer_set_oam_for_test(2u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
     racer_render();                       /* scr_x = 3008 >= 168 */
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_x[0u]);
     TEST_ASSERT_EQUAL_UINT8(0u, mock_sprite_y[0u]);
@@ -1058,6 +1062,8 @@ void test_render_skips_unallocated_slots(void) {
     cam_y = 0;
     mock_move_sprite_reset();
     racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(0u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
+    racer_set_oam_for_test(2u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
     racer_set_oam_for_test(1u, SPRITE_POOL_INVALID, 0u, 0u, 0u);
     racer_render();
     TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
@@ -1069,6 +1075,8 @@ void test_render_hides_inactive_racer_with_handles(void) {
     cam_y = 0;
     mock_move_sprite_reset();
     racer_spawn_for_test(88u, 16u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_S, 1u);
+    racer_set_oam_for_test(0u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
+    racer_set_oam_for_test(2u, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID, SPRITE_POOL_INVALID);
     racer_active[1] = 0u;                 /* inactive but OAM handles still claimed */
     racer_render();
     TEST_ASSERT_EQUAL_INT(4, mock_move_sprite_call_count);
