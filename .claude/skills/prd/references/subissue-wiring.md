@@ -2,7 +2,12 @@
 
 Per `docs/document-conventions.md`'s **Sub-issues.** rule, a body-text `Refines #<epic>` line
 does not populate the board's `Parent issue` field — only native wiring does, and the Epics view
-groups on it. The API takes the child's numeric REST `id` — not its `node_id` and not its issue
+groups on it. When the epic number is known at filing time, `gh issue create --parent <epic>`
+wires the child natively in one step — no separate `gh api` POST needed (verified:
+`sub_issues_summary.total` increments and the child appears in the epic's sub-issue list). Use the
+`gh api` POST below only when wiring a child that already exists.
+
+The API takes the child's numeric REST `id` — not its `node_id` and not its issue
 number:
 
 ```sh
