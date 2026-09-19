@@ -29,7 +29,12 @@ class CrapFormulaTests(unittest.TestCase):
         self.assertAlmostEqual(crap_score.crap(12, 0.5), 30.0)
 
     def test_simple_uncovered_function_stays_under_the_default_threshold(self):
-        self.assertLess(crap_score.crap(2, 0.0), 8)
+        self.assertLess(crap_score.crap(2, 0.0), crap_score.DEFAULT_THRESHOLD)
+
+    def test_default_threshold_is_24(self):
+        # R2/R3 pin: the calibrated production default (#790). The score fixtures
+        # below keep their explicit threshold=8 — this test pins the default only.
+        self.assertEqual(crap_score.DEFAULT_THRESHOLD, 24)
 
 
 class ExemptionTests(unittest.TestCase):
