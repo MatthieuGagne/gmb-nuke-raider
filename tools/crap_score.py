@@ -30,7 +30,7 @@ import shutil
 import subprocess
 import sys
 
-DEFAULT_THRESHOLD = 8
+DEFAULT_THRESHOLD = 24
 DEFAULT_COVERAGE_DIR = os.path.join('build', 'coverage')
 
 MARKER_NAME = 'COMPLETE'

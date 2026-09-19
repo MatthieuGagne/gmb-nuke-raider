@@ -4,6 +4,8 @@
 #include "config.h"
 #include "input.h"
 #include "music.h"
+#include "economy.h"
+#include "loadout.h"
 
 static void tick(uint8_t btn) {
     prev_input = 0; input = btn;
@@ -56,6 +58,74 @@ void test_a_on_leave_does_not_enter_dialog(void) {
     for (i = 0u; i < MAX_HUB_NPCS; i++) tick(J_DOWN);
     tick(J_A);
     TEST_ASSERT_NOT_EQUAL(1u, hub_get_sub_state());
+}
+
+void test_dialog_advances_through_pages_and_back_to_menu(void) {
+    /* NPC 0 (mechanic): node 0 narration overflows the width-12 box to 2 pages;
+     * node 1 next = {2, 3, DIALOG_END}; node 3 choices = {DIALOG_SHOP, DIALOG_END}. */
+    tick(J_A);                       /* enter DIALOG sub-state (1), node 0 page 1 */
+    TEST_ASSERT_EQUAL_UINT8(1u, hub_get_sub_state());
+    tick(J_A);                       /* node 0 page 2 ("Caps.") */
+    TEST_ASSERT_EQUAL_UINT8(1u, hub_get_sub_state());
+    tick(J_A);                       /* node 0 -> node 1 */
+    TEST_ASSERT_EQUAL_UINT8(1u, hub_get_sub_state());   /* still talking */
+    tick(J_DOWN);                    /* cursor to choice 1 */
+    tick(J_A);                       /* node 1 choice 1 -> node 3 */
+    tick(J_DOWN);                    /* cursor to choice 1 = DIALOG_END */
+    tick(J_A);                       /* advance to END -> back to menu */
+    TEST_ASSERT_EQUAL_UINT8(0u, hub_get_sub_state());
+}
+
+void test_dialog_choice_cursor_moves_and_clamps(void) {
+    tick(J_A);                       /* node 0 page 1 */
+    tick(J_A);                       /* node 0 page 2 */
+    tick(J_A);                       /* node 1: 3 choices */
+    tick(J_UP);                      /* cursor already 0: guard refuses, no move */
+    tick(J_DOWN);                    /* cursor 1 */
+    tick(J_DOWN);                    /* cursor 2 */
+    tick(J_DOWN);                    /* clamped at num_choices-1 */
+    TEST_ASSERT_EQUAL_UINT8(1u, hub_get_sub_state());   /* no crash, still in dialog */
+}
+
+void test_dialog_shop_choice_enters_shop(void) {
+    tick(J_A);                       /* node 0 page 1 */
+    tick(J_A);                       /* node 0 page 2 */
+    tick(J_A);                       /* node 1 */
+    tick(J_DOWN);                    /* choice 1 */
+    tick(J_A);                       /* -> node 3 */
+    tick(J_A);                       /* choice 0 = DIALOG_SHOP -> hub_enter_shop */
+    TEST_ASSERT_EQUAL_UINT8(2u, hub_get_sub_state());
+}
+
+void test_shop_buys_when_scrap_sufficient(void) {
+    economy_init();
+    loadout_init();
+    tick(J_A); tick(J_A); tick(J_A); /* node 0 (2 pages) -> node 1 */
+    tick(J_DOWN); tick(J_A);         /* -> node 3 */
+    tick(J_A);                       /* -> SHOP */
+    TEST_ASSERT_EQUAL_UINT8(2u, hub_get_sub_state());
+    economy_add_scrap(999u);
+    tick(J_A);                       /* buy: spend + unlock */
+    TEST_ASSERT_TRUE(economy_get_scrap() < 999u);
+}
+
+void test_shop_ignores_purchase_without_funds(void) {
+    economy_init();
+    loadout_init();
+    tick(J_A); tick(J_A); tick(J_A);
+    tick(J_DOWN); tick(J_A);
+    tick(J_A);                       /* -> SHOP */
+    tick(J_A);                       /* no scrap: no-op */
+    TEST_ASSERT_EQUAL_UINT8(0u, economy_get_scrap());
+    TEST_ASSERT_EQUAL_UINT8(2u, hub_get_sub_state());
+}
+
+void test_shop_b_returns_to_menu(void) {
+    tick(J_A); tick(J_A); tick(J_A);
+    tick(J_DOWN); tick(J_A);
+    tick(J_A);                       /* -> SHOP */
+    tick(J_B);
+    TEST_ASSERT_EQUAL_UINT8(0u, hub_get_sub_state());
 }
 
 void test_render_wrapped_returns_zero_when_text_fits(void) {
@@ -112,6 +182,12 @@ int main(void) {
     RUN_TEST(test_cursor_down_clamped_at_leave);
     RUN_TEST(test_a_on_npc_enters_dialog_substate);
     RUN_TEST(test_a_on_leave_does_not_enter_dialog);
+    RUN_TEST(test_dialog_advances_through_pages_and_back_to_menu);
+    RUN_TEST(test_dialog_choice_cursor_moves_and_clamps);
+    RUN_TEST(test_dialog_shop_choice_enters_shop);
+    RUN_TEST(test_shop_buys_when_scrap_sufficient);
+    RUN_TEST(test_shop_ignores_purchase_without_funds);
+    RUN_TEST(test_shop_b_returns_to_menu);
     RUN_TEST(test_render_wrapped_returns_zero_when_text_fits);
     RUN_TEST(test_render_wrapped_returns_nonzero_offset_on_overflow);
     RUN_TEST(test_hub_clear_does_not_write_rows_18_to_31);

@@ -6,6 +6,7 @@
 #include "projectile.h"
 #include "explosion.h"
 #include "beam.h"     /* beam_init/beam_fire — LASER hitscan (#430) */
+#include "sprite_pool.h"
 
 void setUp(void) {
     turret_init_empty();
@@ -241,11 +242,79 @@ void test_turret_despawn_frees_the_slot_and_reports_it(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, turret_despawn(MAX_ENEMIES));  /* out of range */
 }
 
+void test_render_moves_sprite_to_screen_position(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    sprite_pool_init();            /* free the whole pool: spawn's get_sprite() -> handle 0 */
+    mock_move_sprite_reset();      /* discard sprite_pool_init's 32 move_sprite calls */
+    turret_spawn(10u, 10u);
+    turret_render();
+    /* oam_x = tx*8+8 = 88; oam_y = ty*8 - cam_y + 16 = 96. Handle 0 after pool reset. */
+    TEST_ASSERT_EQUAL_UINT8(88u, mock_sprite_x[0u]);
+    TEST_ASSERT_EQUAL_UINT8(96u, mock_sprite_y[0u]);
+    TEST_ASSERT_EQUAL_INT(1, mock_move_sprite_call_count);
+}
+
+void test_render_skips_culled_turret_above_screen(void) {
+    cam_x = 0u;
+    cam_y = 200u;              /* oam_y = 0*8 - 200 + 16 < 0 */
+    mock_move_sprite_reset();
+    turret_spawn(0u, 0u);
+    turret_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+void test_render_skips_turret_offscreen_right(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    mock_move_sprite_reset();
+    turret_spawn(30u, 0u);     /* oam_x = 30*8+8 = 248 > 167 */
+    turret_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+void test_render_skips_turret_below_screen(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    mock_move_sprite_reset();
+    turret_spawn(0u, 30u);     /* oam_y = 30*8+16 = 256 > 175 */
+    turret_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+void test_render_skips_turret_left_of_screen(void) {
+    cam_x = 200u;
+    cam_y = 0u;
+    mock_move_sprite_reset();
+    turret_spawn(0u, 0u);      /* oam_x = 8 - 200 < 0 */
+    turret_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
+void test_render_ignores_inactive_and_despawned_slots(void) {
+    cam_x = 0u;
+    cam_y = 0u;
+    mock_move_sprite_reset();
+    turret_render();                      /* empty pool: nothing moves */
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+    turret_spawn(5u, 5u);
+    TEST_ASSERT_TRUE(turret_despawn(0u) == 1u);   /* sets OAM back to SPRITE_POOL_INVALID */
+    mock_move_sprite_reset();             /* discard despawn's clear_sprite call */
+    turret_render();
+    TEST_ASSERT_EQUAL_INT(0, mock_move_sprite_call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_npc_type_constants_defined);
     RUN_TEST(test_turret_pool_empty_after_init);
     RUN_TEST(test_turret_spawn_and_active);
+    RUN_TEST(test_render_moves_sprite_to_screen_position);
+    RUN_TEST(test_render_skips_culled_turret_above_screen);
+    RUN_TEST(test_render_skips_turret_offscreen_right);
+    RUN_TEST(test_render_skips_turret_below_screen);
+    RUN_TEST(test_render_skips_turret_left_of_screen);
+    RUN_TEST(test_render_ignores_inactive_and_despawned_slots);
     RUN_TEST(test_turret_blocks_tile_active);
     RUN_TEST(test_turret_blocks_tile_inactive);
     RUN_TEST(test_turret_blocks_tile_wrong_position);

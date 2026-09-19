@@ -103,6 +103,21 @@ void test_vbl_display_off_accounts_one_tick(void) {
     TEST_ASSERT_EQUAL_INT(1, hUGE_dosound_call_count);
     TEST_ASSERT_EQUAL_UINT8(1u, music_ticks_owed_peek());
 }
+
+void test_vbl_sync_consumes_the_frame_and_ticks(void) {
+    frame_ready = 1u;
+    hUGE_dosound_call_count = 0;
+    vbl_sync();
+    TEST_ASSERT_EQUAL_UINT8(0u, frame_ready);
+    TEST_ASSERT_EQUAL_INT(1, hUGE_dosound_call_count);
+}
+
+void test_vbl_sync_accounts_one_owed_tick(void) {
+    frame_ready = 1u;
+    music_notify_vblank();           /* owed = 1 */
+    vbl_sync();                      /* music_tick() then owed-- */
+    TEST_ASSERT_EQUAL_UINT8(0u, music_ticks_owed_peek());
+}
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_vbl_display_off_consumes_frame_ready);
@@ -114,5 +129,7 @@ int main(void) {
     RUN_TEST(test_music_notify_saturates_at_255);
     RUN_TEST(test_music_resync_zeroes_counter);
     RUN_TEST(test_vbl_display_off_accounts_one_tick);
+    RUN_TEST(test_vbl_sync_consumes_the_frame_and_ticks);
+    RUN_TEST(test_vbl_sync_accounts_one_owed_tick);
     return UNITY_END();
 }

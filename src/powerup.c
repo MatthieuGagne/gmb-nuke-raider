@@ -104,6 +104,8 @@ void powerup_test_spawn(uint8_t tx, uint8_t ty, uint8_t type) {
     }
 }
 
+void powerup_set_oam_for_test(uint8_t i, uint8_t oam) { powerup_oam[i] = oam; }
+
 uint8_t powerup_get_active(uint8_t i) { return powerup_active[i]; }
 uint8_t powerup_get_type(uint8_t i)   { return powerup_type[i]; }
 uint8_t powerup_get_tx(uint8_t i)     { return powerup_tx[i]; }

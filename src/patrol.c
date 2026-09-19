@@ -165,6 +165,141 @@ static void patrol_kill(uint8_t i) {
     move_sprite(patrol_oam[i * 4u + 3u], 0u, 0u);
 }
 
+/* Extracted from patrol_update — per-step helpers (#790). All static, same-bank. */
+
+/* Per-frame timers: ram cooldown + hit-flash. */
+static void patrol_update_timers(uint8_t i) {
+    if (patrol_ram_cd[i] > 0u)    patrol_ram_cd[i]--;
+    if (patrol_hit_flash[i] > 0u) patrol_hit_flash[i]--;
+}
+
+/* Waypoint advance (PATROL mode only). */
+static void patrol_update_waypoint(uint8_t i, int8_t dx, int8_t dy) {
+    if (patrol_mode[i] == PATROL_MODE_PATROL) {
+        uint8_t reached = enemy_wp_reached(dx, dy, (uint8_t)PATROL_WP_THRESHOLD);
+        patrol_wp_idx[i] = enemy_wp_advance(patrol_wp_idx[i],
+                                            patrol_wp_count[i], reached);
+    }
+}
+
+/* Shared vehicle physics (R10): friction (pre-accel) → per-axis homing thrust
+ * → boost+clamp. Thrust is applied independently on each axis toward the target
+ * (NOT along the 8-way facing dir): dominant-axis-only thrust stalls against
+ * walls and corner-camps; per-axis thrust closes both deltas at once and slides
+ * along walls. ±2px deadzone avoids jitter at the target. */
+static void patrol_apply_thrust(uint8_t i, int8_t dx, int8_t dy, TileType tt, uint8_t dir) {
+    uint8_t gas;
+    uint8_t terrain;
+    gas = (tt != TILE_OIL) ? 1u : 0u;
+    terrain = (uint8_t)tt;
+    vehicle_apply_friction(&patrol_vx[i], &patrol_vy[i], terrain, gas, dir);
+    if (gas) {
+        if      (dx >  2) patrol_vx[i] = (int8_t)(patrol_vx[i] + (int8_t)PATROL_SPEED);
+        else if (dx < -2) patrol_vx[i] = (int8_t)(patrol_vx[i] - (int8_t)PATROL_SPEED);
+        if      (dy >  2) patrol_vy[i] = (int8_t)(patrol_vy[i] + (int8_t)PATROL_SPEED);
+        else if (dy < -2) patrol_vy[i] = (int8_t)(patrol_vy[i] - (int8_t)PATROL_SPEED);
+    }
+    {
+        uint8_t max_speed = (tt == TILE_BOOST)
+                            ? (uint8_t)TERRAIN_BOOST_MAX_SPEED
+                            : (uint8_t)PATROL_SPEED;
+        vehicle_apply_boost_clamp(&patrol_vx[i], &patrol_vy[i], terrain, max_speed);
+    }
+}
+
+/* Axis-separated slide; a blocked axis zeroes its velocity. */
+static void patrol_apply_motion(uint8_t i) {
+    int16_t old_p = patrol_px[i];
+    patrol_px[i] = vehicle_step_axis_x(old_p, patrol_py[i], patrol_vx[i]);
+    if (patrol_px[i] == old_p && patrol_vx[i] != 0) {
+        patrol_vx[i] = (int8_t)0;
+    }
+    old_p = patrol_py[i];
+    patrol_py[i] = vehicle_step_axis_y(patrol_px[i], old_p, patrol_vy[i]);
+    if (patrol_py[i] == old_p && patrol_vy[i] != 0) {
+        patrol_vy[i] = (int8_t)0;
+    }
+}
+
+/* Ram contact via the SHARED enemy_ram_overlap test (identical logic to racer.c,
+ * ENEMY_RAM_REACH margin so a flush contact rams from any side): the player
+ * takes RACER_RAM_DAMAGE on every overlap (damage.c i-frames debounce it), the
+ * patrol takes ENEMY_RAM_DAMAGE behind its own 30-frame cooldown.
+ * Returns 1 when the patrol was destroyed (caller `continue`s). */
+static uint8_t patrol_update_ram(uint8_t i, int16_t px, int16_t py) {
+    if (enemy_ram_overlap(px, py, patrol_px[i], patrol_py[i])) {
+        damage_apply(RACER_RAM_DAMAGE);
+        if (patrol_ram_cd[i] == 0u) {
+            patrol_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
+            patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+            /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
+             * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
+             * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
+            patrol_hp[i]        = (uint8_t)(patrol_hp[i] - ENEMY_RAM_DAMAGE);
+            if (patrol_hp[i] == 0u) {
+                patrol_kill(i);
+                return 1u;
+            }
+        }
+    }
+    return 0u;
+}
+
+/* On-screen gating: bullet hits + fire cadence. Returns 1 when destroyed. */
+static uint8_t patrol_update_onscreen(uint8_t i, int16_t px, int16_t py,
+                                      uint8_t tx, uint8_t ty) {
+    int16_t scr_cx = patrol_px[i] + 16;          /* center x, OAM space */
+    int16_t scr_cy = patrol_py[i] - cam_y + 24;  /* center y, OAM space */
+    int16_t scr_x  = patrol_px[i] + 8  - cam_x;  /* sprite top-left x */
+    int16_t scr_y  = patrol_py[i] - cam_y + 16;  /* sprite top-left y */
+    uint8_t on_screen =
+        (scr_x >= 0 && scr_x < 168 && scr_y >= 0 && scr_y < 160) ? 1u : 0u;
+    if (on_screen) {
+        if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
+            uint8_t dmg = projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy,
+                                                     (uint8_t)PATROL_HIT_RADIUS);
+            if (dmg) {
+                patrol_hp[i] = enemy_apply_damage(patrol_hp[i], dmg);
+                patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+                if (patrol_hp[i] == 0u) {
+                    patrol_kill(i);
+                    return 1u;
+                }
+            }
+        }
+        if (patrol_mode[i] == PATROL_MODE_CHASE &&
+            _manhattan((int16_t)(px - patrol_px[i]),
+                       (int16_t)(py - patrol_py[i]))
+                < (uint16_t)PATROL_FIRE_RADIUS) {
+            if (patrol_timer[i] > 0u) {
+                patrol_timer[i]--;
+            } else {
+                player_dir_t fdir = enemy_aim_dir(tx, ty, px, py);
+                projectile_fire((uint8_t)scr_cx, (uint8_t)scr_cy,
+                                fdir, PROJ_OWNER_ENEMY);
+                patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
+            }
+        } else {
+            patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
+        }
+    }
+    return 0u;
+}
+
+/* #430: hitscan beam — pierces, so this never consumes anything. Runs after the
+ * on-screen block closes, still inside the per-patrol loop, so all three enemy
+ * modules poll in world space; the beam clips itself to the screen already.
+ * Returns 1 when destroyed. */
+static uint8_t patrol_update_beam(uint8_t i) {
+    uint8_t bdmg = beam_hit_damage(patrol_px[i], patrol_py[i], 16u);
+    if (bdmg) {
+        patrol_hp[i] = enemy_apply_damage(patrol_hp[i], bdmg);
+        patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
+        if (patrol_hp[i] == 0u) { patrol_kill(i); return 1u; }
+    }
+    return 0u;
+}
+
 void patrol_update(int16_t px, int16_t py) BANKED {
     uint8_t i;
     for (i = 0u; i < MAX_PATROLS; i++) {
@@ -172,23 +307,17 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         int16_t target_px, target_py;
         int8_t  dx, dy;
         uint8_t dir;
-        uint8_t terrain;
-        uint8_t gas;
         uint8_t tx, ty;
         TileType tt;
 
         if (!patrol_active[i]) continue;
 
-        /* --- Per-frame timers: ram cooldown + hit-flash (#417) --- */
-        if (patrol_ram_cd[i] > 0u)    patrol_ram_cd[i]--;
-        if (patrol_hit_flash[i] > 0u) patrol_hit_flash[i]--;
+        patrol_update_timers(i);
 
-        /* --- FSM: choose mode from player delta (Manhattan hysteresis) --- */
         dx16 = px - patrol_px[i];
         dy16 = py - patrol_py[i];
         patrol_mode[i] = patrol_fsm_next(patrol_mode[i], dx16, dy16);
 
-        /* --- Select movement target --- */
         if (patrol_mode[i] == PATROL_MODE_CHASE) {
             target_px = px;
             target_py = py;
@@ -206,137 +335,21 @@ void patrol_update(int16_t px, int16_t py) BANKED {
         dx = (int8_t)dx16;
         dy = (int8_t)dy16;
 
-        /* --- Waypoint advance (PATROL only) --- */
-        if (patrol_mode[i] == PATROL_MODE_PATROL) {
-            uint8_t reached = enemy_wp_reached(dx, dy, (uint8_t)PATROL_WP_THRESHOLD);
-            patrol_wp_idx[i] = enemy_wp_advance(patrol_wp_idx[i],
-                                                patrol_wp_count[i], reached);
-        }
+        patrol_update_waypoint(i, dx, dy);
 
-        /* --- Facing --- */
         dir = enemy_dir_from_delta(dx, dy);
         patrol_dir[i] = dir;
 
-        /* --- Terrain under the patrol's current tile --- */
         tx = (uint8_t)(((uint16_t)patrol_px[i] + 8u) >> 3u);
         ty = (uint8_t)((uint16_t)patrol_py[i] >> 3u);
         tt = track_tile_type_from_index(track_get_raw_tile(tx, ty));
-        gas = (tt != TILE_OIL) ? 1u : 0u;
-        terrain = (uint8_t)tt;
 
-        /* --- Shared vehicle physics + axis-separated slide collision (R10) ---
-         * Split API: friction (pre-accel) → per-axis homing thrust → boost+clamp.
-         * Thrust is applied independently on each axis toward the target (NOT
-         * along the 8-way facing dir): dominant-axis-only thrust stalls against
-         * walls and corner-camps; per-axis thrust closes both deltas at once
-         * and slides along walls. ±2px deadzone avoids jitter at the target. */
-        vehicle_apply_friction(&patrol_vx[i], &patrol_vy[i], terrain, gas, dir);
-        if (gas) {
-            if      (dx >  2) patrol_vx[i] = (int8_t)(patrol_vx[i] + (int8_t)PATROL_SPEED);
-            else if (dx < -2) patrol_vx[i] = (int8_t)(patrol_vx[i] - (int8_t)PATROL_SPEED);
-            if      (dy >  2) patrol_vy[i] = (int8_t)(patrol_vy[i] + (int8_t)PATROL_SPEED);
-            else if (dy < -2) patrol_vy[i] = (int8_t)(patrol_vy[i] - (int8_t)PATROL_SPEED);
-        }
-        {
-            /* Boost pads let the patrol exceed its normal top speed (AC4),
-             * mirroring racer.c; otherwise clamp to PATROL_SPEED. */
-            uint8_t max_speed = (tt == TILE_BOOST)
-                                ? (uint8_t)TERRAIN_BOOST_MAX_SPEED
-                                : (uint8_t)PATROL_SPEED;
-            vehicle_apply_boost_clamp(&patrol_vx[i], &patrol_vy[i], terrain, max_speed);
-        }
-        {
-            /* Axis-separated slide; a blocked axis zeroes its velocity so the
-             * free axis keeps closing (wall slide, no corner pinning). */
-            int16_t old_p = patrol_px[i];
-            patrol_px[i] = vehicle_step_axis_x(old_p, patrol_py[i], patrol_vx[i]);
-            if (patrol_px[i] == old_p && patrol_vx[i] != 0) {
-                patrol_vx[i] = (int8_t)0;
-            }
-            old_p = patrol_py[i];
-            patrol_py[i] = vehicle_step_axis_y(patrol_px[i], old_p, patrol_vy[i]);
-            if (patrol_py[i] == old_p && patrol_vy[i] != 0) {
-                patrol_vy[i] = (int8_t)0;
-            }
-        }
+        patrol_apply_thrust(i, dx, dy, tt, dir);
+        patrol_apply_motion(i);
 
-        /* --- Ram contact: car-vs-car overlap via the SHARED enemy_ram_overlap
-         * test (identical logic to racer.c, ENEMY_RAM_REACH margin so a flush
-         * contact rams from any side). The player takes damage on every overlap
-         * (damage.c i-frames debounce). The patrol takes ENEMY_RAM_DAMAGE behind
-         * its own 30-frame cooldown; a 0-HP result destroys it (#417). --- */
-        {
-            if (enemy_ram_overlap(px, py, patrol_px[i], patrol_py[i])) {
-                damage_apply(RACER_RAM_DAMAGE);
-                if (patrol_ram_cd[i] == 0u) {
-                    patrol_ram_cd[i]    = (uint8_t)ENEMY_RAM_COOLDOWN;
-                    patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
-                    /* Underflow-safe and lethal-exact only while ENEMY_RAM_DAMAGE == 1
-                     * (the == 0u test cannot be stepped over). Mirrors the 1-HP bullet
-                     * path; raising ENEMY_RAM_DAMAGE needs an hp <= DAMAGE guard here. */
-                    patrol_hp[i]        = (uint8_t)(patrol_hp[i] - ENEMY_RAM_DAMAGE);
-                    if (patrol_hp[i] == 0u) {
-                        patrol_kill(i);
-                        continue;
-                    }
-                }
-            }
-        }
-
-        /* --- On-screen gating: fire + hit only when visible --- */
-        {
-            int16_t scr_cx = patrol_px[i] + 16;          /* center x, OAM space */
-            int16_t scr_cy = patrol_py[i] - cam_y + 24;  /* center y, OAM space */
-            int16_t scr_x  = patrol_px[i] + 8  - cam_x;  /* sprite top-left x */
-            int16_t scr_y  = patrol_py[i] - cam_y + 16;  /* sprite top-left y */
-            uint8_t on_screen =
-                (scr_x >= 0 && scr_x < 168 && scr_y >= 0 && scr_y < 160) ? 1u : 0u;
-
-            if (on_screen) {
-                /* Take player bullet hits */
-                if (scr_cx >= 0 && scr_cx < 168 && scr_cy >= 0 && scr_cy < 160) {
-                    uint8_t dmg = projectile_check_hit_enemy((uint8_t)scr_cx, (uint8_t)scr_cy,
-                                                             (uint8_t)PATROL_HIT_RADIUS);
-                    if (dmg) {
-                        patrol_hp[i] = enemy_apply_damage(patrol_hp[i], dmg);
-                        patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
-                        if (patrol_hp[i] == 0u) {
-                            patrol_kill(i);
-                            continue;
-                        }
-                    }
-                }
-                /* Fire: CHASE + within fire radius + cadence */
-                if (patrol_mode[i] == PATROL_MODE_CHASE &&
-                    _manhattan((int16_t)(px - patrol_px[i]),
-                               (int16_t)(py - patrol_py[i]))
-                        < (uint16_t)PATROL_FIRE_RADIUS) {
-                    if (patrol_timer[i] > 0u) {
-                        patrol_timer[i]--;
-                    } else {
-                        player_dir_t fdir = enemy_aim_dir(tx, ty, px, py);
-                        projectile_fire((uint8_t)scr_cx, (uint8_t)scr_cy,
-                                        fdir, PROJ_OWNER_ENEMY);
-                        patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
-                    }
-                } else {
-                    patrol_timer[i] = (uint8_t)PATROL_FIRE_INTERVAL;
-                }
-            }
-        }
-
-        /* #430: hitscan beam — pierces, so this never consumes anything.
-         * Placed AFTER the on_screen block closes, still inside the per-patrol
-         * loop, so all three enemy modules poll in world space; the beam clips
-         * itself to the screen already. */
-        {
-            uint8_t bdmg = beam_hit_damage(patrol_px[i], patrol_py[i], 16u);
-            if (bdmg) {
-                patrol_hp[i] = enemy_apply_damage(patrol_hp[i], bdmg);
-                patrol_hit_flash[i] = (uint8_t)RACER_HIT_FLASH_FRAMES;
-                if (patrol_hp[i] == 0u) { patrol_kill(i); continue; }
-            }
-        }
+        if (patrol_update_ram(i, px, py)) continue;
+        if (patrol_update_onscreen(i, px, py, tx, ty)) continue;
+        if (patrol_update_beam(i)) continue;
     }
 
     /* Enemy bullets hitting the player (OAM-space, mirrors turret_update). */
