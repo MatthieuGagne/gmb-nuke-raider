@@ -19,14 +19,9 @@ You are the map pipeline expert for the Nuke Raider Game Boy Color game. You han
 
 ## Quick Command Reference
 
-The Makefile runs the full track pipeline automatically. Manual invocations for reference:
-
-| Tool | Command | Notes |
-|------|---------|-------|
-| `png_to_tiles.py` | see Makefile | Invoked with `--rotation-manifest`, `--tsx`, `--id-map-out`, `--meta-header-out`; do not invoke manually for tracks |
-| `tmx_to_c.py` | see Makefile | Invoked with `--id-map` for tracks, `--emit-rotation-manifest` first pass |
-| `overmap_to_c.py` | `python tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c` | Overmap only |
-
+The Makefile runs the full track pipeline automatically; manual invocations are in
+`.claude/agents/references/map-pipeline.md`. Overmap only:
+`python tools/overmap_to_c.py assets/maps/overmap.tmx src/overmap_map.c`.
 **Test:** `python -m unittest discover -s tests -p "test_png_to_tiles.py" -v`
 
 ---

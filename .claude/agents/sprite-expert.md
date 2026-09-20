@@ -75,11 +75,10 @@ assets/sprites/<name>.aseprite  →  (make export-sprites)  →  assets/sprites/
 | Convert | `python tools/png_to_tiles.py --bank <N> <in.png> src/<name>_sprite.c <array_name>` | `--bank` is **required**; use `255` for autobank for all assets including portraits; loader.c handles bank switching |
 | Use | `extern` declare in the `.c` that renders it | Generated file — **never edit by hand** |
 
-**Aseprite setup for GBC sprites:**
-- Color mode: Sprite → Color Mode → **Indexed**
-- Palette: exactly 4 entries — index 0 = white `#FFFFFF`, 1 = light grey `#AAAAAA`, 2 = dark grey `#555555`, 3 = black `#000000`
-- Canvas: multiples of 8 in both dimensions (each 8×8 block = one GB tile)
-- **Palette index 0 is always transparent in OBJ mode** — use indices 1–3 for visible sprite pixels
+**Aseprite setup for GBC sprites:** see the `aseprite` skill for indexed color mode and canvas
+(multiples of 8). Project-specific: exactly 4 palette entries — 0 = white `#FFFFFF`, 1 = light
+grey `#AAAAAA`, 2 = dark grey `#555555`, 3 = black `#000000`; **palette index 0 is transparent in
+OBJ mode**, so visible pixels use indices 1–3.
 
 **All assets in the project that use this pipeline:** see the `png_to_tiles.py` rules in the `Makefile` — the authoritative, always-current list. Deliberately not duplicated here — a hand-maintained table rots.
 

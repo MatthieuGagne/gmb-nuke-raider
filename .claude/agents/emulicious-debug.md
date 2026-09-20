@@ -70,19 +70,10 @@ Memory Editor (live WRAM/VRAM/registers) · Tile Viewer (VRAM tile data) · Tile
 
 ## GBC-Specific Diagnostic Hints
 
-**Reading a file-scope `static` WRAM variable:** SDCC does not export `static` symbols to the link
-map, so the old workarounds (adding a throwaway non-static debug global, or disassembling a getter
-to find its `LD A,(nn)`) are obsolete. The project solved this with `DBG_STATIC` (`src/debug.h:4-29`,
-#588 R3): the macro is `static` in a release build and empty in a debug build, and **every mutable
-file-scope declaration in `src/*.c` uses it**. So:
-
-1. `make build-debug`
-2. Read the address from `build/debug/nuke-raider.noi` (or `build/debug/nuke-raider.map`).
-3. If the variable is not there, it still carries a bare `static` — run
-   `python tools/dbg_static_lint.py`, which flags exactly that, and convert it to `DBG_STATIC`.
-
-`DBG_STATIC` does **not** apply to `static` functions (stripping those breaks the link) or to
-`static const` data (it lives in ROM; the symbol readers accept WRAM addresses only).
+**Reading a file-scope `static` WRAM variable:** see `.claude/agents/references/dbg-static.md` —
+`DBG_STATIC` (`src/debug.h:4-29`, #588 R3) exposes every mutable file-scope variable in the debug
+`.noi`; run `python tools/dbg_static_lint.py` to flag any variable that still carries a bare
+`static`.
 
 **"Grey screen, game logic running, text invisible" → check scroll registers first:** The VBL ISR in `main.c` calls `move_bkg(cam_scx_shadow, cam_scy_shadow)` every frame unconditionally. Any state entered after `state_playing` inherits the race's final scroll offset unless `sp_exit()` resets `cam_scx_shadow = 0u; cam_scy_shadow = 0u`. Before assuming a VRAM or palette bug, open the Memory Editor and read `SCY`/`SCX` (0xFF42/0xFF43) — non-zero values mean the tilemap is rendering off-screen.
 

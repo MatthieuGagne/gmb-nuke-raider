@@ -1,6 +1,6 @@
 ---
 name: design-an-interface
-description: "Design It Twice for a module interface: spawns 4 parallel sub-agents each constrained to a different design lens (minimal API, testability, caller ergonomics, GB efficiency). Use when designing any new src/*.c module interface. Invoked automatically by the brainstorming skill's Design-It-Twice step."
+description: "Design It Twice for a module interface: spawns 4 parallel sub-agents each constrained to a different design lens (minimal API, testability, caller ergonomics, GB efficiency). Use when designing any new src/*.c module or its public API — e.g. 'add an enemy module', 'design the projectile interface'. Invoked automatically by the brainstorming skill's Design-It-Twice step."
 ---
 
 # Design an Interface

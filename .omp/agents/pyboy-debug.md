@@ -106,10 +106,8 @@ Record what you ran in `unit_tests_run`. Always include one of these statements 
 
 ## Reading Symbols and Source
 
-- Prefer the manifest. For a file-scope `static`, build `make build-debug` and resolve from
-  `build/debug/nuke-raider.noi` — `DBG_STATIC` (`src/debug.h:4-29`) makes every mutable file-scope
-  variable in `src/*.c` visible there. If one is missing it still carries a bare `static`; run
-  `python tools/dbg_static_lint.py` to confirm.
+- Prefer the manifest. For a file-scope `static`, see `.claude/agents/references/dbg-static.md`:
+  build `make build-debug` and resolve from `build/debug/nuke-raider.noi`.
 - `{WORKTREE_ROOT}/build/nuke-raider.map` **truncates symbol names to 9 characters** — `_rs_cp_next`
   appears as `_rs_cp_ne`. Account for that when grepping it.
 - To interpret a raw value (enum, state constant), read `src/<module>.c` / `src/<module>.h`. Example:
