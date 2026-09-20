@@ -11,7 +11,7 @@ defect. What parity actually requires is defined by `tests/test_rom_parity.py`; 
 changing anything about the debug build.
 
 C coding rules, entity pools, memory budgets, the state machine table and the ROM header live in
-[`src/CLAUDE.md`](src/CLAUDE.md) (loads automatically when editing `src/`), with full rationale in
+[`src/CLAUDE.md`](src/CLAUDE.md) — read it before any `src/` edit. Build-and-gate rationale lives in
 `docs/dev-workflow.md` §4.
 
 ## Game Design & Influences
@@ -59,14 +59,10 @@ weaker than either other harness. Read [`docs/omp-harness.md`](docs/omp-harness.
 
 **Outer loop:** brainstorming → PRD (the `prd` skill) → [separate session] writing-plans → subagent-driven-development
 
-**Factory loop (unattended):** the `factory` skill, invoked explicitly with an issue number,
-drives a lint-passing PRD issue through
-GATE → PLAN → BUILD → VERIFY → SHIP with no interactive input, ending at a reviewable PR.
-Flags: `--stage <NAME>`, `--resume`, `--dry-run`. Run state lives in `.factory/runs/issue-<N>/`
-at the **main** repo root, so any session locates a run from the issue number alone
-(`python tools/factory_status.py`). The factory never merges, never commits to `master`, never
-force-pushes, never passes `--no-verify`, and never deletes a worktree or branch. Full contract:
-`.claude/skills/factory/SKILL.md` and its `references/stages.md`.
+**Factory loop (unattended):** the `factory` skill, invoked explicitly, runs a lint-passing PRD
+issue GATE → PLAN → BUILD → VERIFY → SHIP, ending at a reviewable PR. It never merges, never commits
+to `master`, never force-pushes, never passes `--no-verify`, and never deletes a worktree or branch.
+Full contract: `.claude/skills/factory/SKILL.md` and its `references/stages.md`.
 
 **GitHub issue links:** When the user pastes a GitHub issue URL (e.g. `https://github.com/.../issues/N`), first fetch the issue and check its **Files Impacted** or **Out of Scope** sections. If ALL touched files qualify as doc-only (`.md`, `.txt`, `.json` except `bank-manifest.json`, files under `.claude/skills/` or `.claude/agents/`), invoke the `doc-review` skill. Otherwise invoke `writing-plans`. Do not ask for confirmation.
 **TDD red/green command:** `make test` (gcc + Unity, no hardware needed — use the `test` skill).
@@ -76,7 +72,7 @@ in-repo exception. Routing, sub-issue wiring, the ADR key/lifecycle/citation rul
 table and the `Idea` swimlane: [`docs/document-conventions.md`](docs/document-conventions.md) —
 read it before filing, typing or wiring any document issue. The `prd` skill loads it for you.
 
-**Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, create the worktree through Orca: invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags). Orca worktrees live under `~\orca\workspaces\<repo>\<name>`. Never use `git worktree add`, the `EnterWorktree` tool, or `.worktrees/`/`.claude/worktrees/` directories. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree (check: `git rev-parse --git-dir` differs from `git rev-parse --git-common-dir`), STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
+**Worktree policy:** ALL file operations — creating, editing, or deleting files — MUST happen inside a git worktree. This applies to implementation plans, code, tests, docs, and any other file. Before touching any file, create the worktree through Orca: invoke the `orca-cli` skill (exact commands come from `ORCA skills get orca-cli` — never guess flags). Orca worktrees live under `~\orca\workspaces\<repo>\<name>`. Never use `git worktree add`, or `.worktrees/`/`.claude/worktrees/` directories. Never write, edit, or delete files directly in the main working tree. If you are not currently in a worktree (check: `git rev-parse --git-dir` differs from `git rev-parse --git-common-dir`), STOP and enter one first. **`make test` must also be run from the worktree directory** — running it from the main repo root tests stale compiled binaries and silently masks real failures in the worktree.
 
 **Smoketest gate:** NEVER push or create a PR before running a smoketest in the emulator. Always push AFTER the smoketest passes.
 1. Fetch and merge latest master: `git fetch origin && git merge origin/master` (from the worktree directory). NEVER use `git merge master` alone — the local master ref may be stale.

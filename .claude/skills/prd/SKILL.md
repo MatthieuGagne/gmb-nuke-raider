@@ -46,17 +46,13 @@ One sentence: what this feature does and why it matters for the game.
    `CONTEXT.md` defines (`docs/dev-workflow.md` §10). A PRD is a bound surface — rewriting it after
    it is filed costs an edit and a notification.
 
-2. **Decide which repo the PRD belongs to.** Per `docs/document-conventions.md`'s **Routing.** rule, a PRD is filed
-   in the repo whose tracked files it changes. List the files the implementation will touch:
+2. **Decide which repo the PRD belongs to** — per the **Routing.** rule in
+   `docs/document-conventions.md`, list the files the implementation will touch: all here → file
+   here; all Garage → `-R MatthieuGagne/nuke-raiders-garage`; **both** → write **two** PRDs (one
+   per repo, cross-linked), never one PRD editing two repos.
 
-   - all under this repo → file here, no `-R` flag needed;
-   - all under the Garage tool → file with `-R MatthieuGagne/nuke-raiders-garage`;
-   - **both** → stop and write **two** PRDs, one per repo, each scoped to its own files and
-     cross-linked to the other in its body. Never file one PRD whose implementation edits two
-     repos.
-
-   The chosen repo is fixed for the life of the issue. Record it — every later `gh` command in
-   these steps needs it, and `## Updating an Existing PRD` below needs it too.
+   The chosen repo is fixed for the life of the issue — record it; every later `gh` command and
+   `## Updating an Existing PRD` below need it.
 
 3. **Create a GitHub issue** with the full PRD content as the body, labeled `prd`:
    ```sh

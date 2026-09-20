@@ -1,6 +1,7 @@
 # src/ — C coding rules (loads when editing source)
 
-Authoritative copy with rationale lives in [`docs/dev-workflow.md`](../docs/dev-workflow.md) §4.
+Authoritative copy. Memory-budget, SDCC and scalability rationale lives in
+[`docs/dev-workflow.md`](../docs/dev-workflow.md) §4.
 
 ## Architecture
 

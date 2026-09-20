@@ -59,10 +59,6 @@ Exact command sequences are in `references/stages.md` — follow them literally.
 | VERIFY | fetch+merge, clean build, memory check, blocking smoketest, evidence scenario | memory FAIL aborts immediately; smoketest gets 1 differential-guided fix attempt |
 | SHIP | Push, open the PR with the reporter body, preserve the run's working notes | `pre-push` runs `make clean && make` |
 
-**SHIP preserves the run's working notes** into `.factory/runs/issue-<N>/sdd-workspace/`,
-best-effort. Full mechanics: `references/stages.md` under *SHIP: preserving the run's working
-notes*.
-
 ## Every stage command goes through the stage-log helper
 
 A stage's work commands are wrapped — builds, tests, git operations, scenario runs:

@@ -95,11 +95,8 @@ If the fix requires multiple cycles (multiple functions to change), repeat the R
 
 ## Step 5: Create GitHub Issue
 
-**First, decide the repo.** Per `docs/document-conventions.md`'s **Routing.** rule, a bug is filed in the repo whose
-tracked files the fix changes — the module named in the Root Cause above decides it. A fix under
-the Garage tool files with `-R MatthieuGagne/nuke-raiders-garage`; anything in the game ROM, its
-assets or its tooling files here. A bug that needs a fix in both repos becomes **two** issues,
-one per repo, cross-linked.
+**First, decide the repo** — per the **Routing.** rule in
+`docs/document-conventions.md`; the module named in the Root Cause decides it.
 
 Create the issue using `gh`, with the repo decided above:
 
