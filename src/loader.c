@@ -437,20 +437,33 @@ const tile_registry_entry_t *loader_get_registry(tile_asset_t asset) NONBANKED {
     return &loader_registry_tbl[(uint8_t)asset];
 }
 
-uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
-    switch ((uint8_t)asset) {
+/* Bank for TILE_ASSET_TRACK. All three tracks share BANK(track_tile_data) today; keep the
+ * per-track branches so the split mirrors loader_track_registry_tbl and stays in sync when
+ * per-track banks diverge. */
+static uint8_t loader_track_bank(void) {
+    if (loader_active_track == 1u) return BANK(track_tile_data); /* track 1 — placeholder */
+    if (loader_active_track == 2u) return BANK(track_tile_data); /* track 2 — placeholder */
+    return BANK(track_tile_data); /* track 0 */
+}
+
+/* Assets 0..7 (PLAYER .. HUD_FONT). */
+static uint8_t loader_asset_bank_low(uint8_t asset) {
+    switch (asset) {
         case TILE_ASSET_PLAYER:        return BANK(player_tile_data);
         case TILE_ASSET_BULLET:        return BANK(bullet_tile_data);
         case TILE_ASSET_TURRET:        return BANK(turret_tile_data);
         case TILE_ASSET_OVERMAP_CAR:   return BANK(overmap_car_tile_data);
         case TILE_ASSET_DIALOG_ARROW:  return BANK(dialog_arrow_tile_data);
-        case TILE_ASSET_TRACK:
-            /* Mirror loader_track_registry_tbl — update in sync when per-track banks diverge. */
-            if (loader_active_track == 1u) return BANK(track_tile_data); /* track 1 — placeholder */
-            if (loader_active_track == 2u) return BANK(track_tile_data); /* track 2 — placeholder */
-            return BANK(track_tile_data); /* track 0 */
+        case TILE_ASSET_TRACK:         return loader_track_bank();
         case TILE_ASSET_OVERMAP_BG:    return BANK(overmap_tile_data);
         case TILE_ASSET_HUD_FONT:      return 0u;
+        default:                       return 0u;
+    }
+}
+
+/* Assets 8..13 (NPC_DRIFTER .. BEAM). */
+static uint8_t loader_asset_bank_high(uint8_t asset) {
+    switch (asset) {
         case TILE_ASSET_NPC_DRIFTER:   return BANK(npc_drifter_portrait);
         case TILE_ASSET_NPC_MECHANIC:  return BANK(npc_mechanic_portrait);
         case TILE_ASSET_NPC_TRADER:    return BANK(npc_trader_portrait);
@@ -459,6 +472,11 @@ uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
         case TILE_ASSET_BEAM:          return BANK(beam_tile_data);
         default:                       return 0u;
     }
+}
+
+uint8_t loader_get_asset_bank(tile_asset_t asset) NONBANKED {
+    if ((uint8_t)asset >= (uint8_t)TILE_ASSET_NPC_DRIFTER) return loader_asset_bank_high((uint8_t)asset);
+    return loader_asset_bank_low((uint8_t)asset);
 }
 
 void load_npc_positions(uint8_t id,
