@@ -27,6 +27,24 @@ void race_state_set_active(uint8_t slot, uint8_t active) BANKED {
     rs_active[slot] = active;
 }
 
+/* Returns 1 when `dir` equals any of the three supplied directions. */
+static uint8_t dir_is_any(uint8_t dir, uint8_t d0, uint8_t d1, uint8_t d2) {
+    return (dir == d0 || dir == d1 || dir == d2) ? 1u : 0u;
+}
+
+/* Returns 1 when `dir` is one of the directions a checkpoint of `cp_dir` accepts:
+ * N accepts T/RT/LT, S accepts B/RB/LB, E accepts R/RT/RB, W accepts L/LT/LB.
+ * An unknown cp_dir accepts any dir (preserves the pre-split fall-through). */
+static uint8_t cp_dir_matches(uint8_t cp_dir, uint8_t dir) {
+    switch (cp_dir) {
+        case CHECKPOINT_DIR_N: return dir_is_any(dir, DIR_T,  DIR_RT, DIR_LT);
+        case CHECKPOINT_DIR_S: return dir_is_any(dir, DIR_B,  DIR_RB, DIR_LB);
+        case CHECKPOINT_DIR_E: return dir_is_any(dir, DIR_R,  DIR_RT, DIR_RB);
+        case CHECKPOINT_DIR_W: return dir_is_any(dir, DIR_L,  DIR_LT, DIR_LB);
+        default:               return 1u;
+    }
+}
+
 void race_state_update_cp(uint8_t slot, int16_t x, int16_t y, uint8_t dir) BANKED {
     const CheckpointDef *defs;
     const CheckpointDef *cp;
@@ -43,10 +61,7 @@ void race_state_update_cp(uint8_t slot, int16_t x, int16_t y, uint8_t dir) BANKE
     if (y < cp->y)                                              return;
     if (y >= (int16_t)((uint16_t)cp->y + (uint16_t)cp->h))    return;
 
-    if      (cp->direction == CHECKPOINT_DIR_N) { if (dir != DIR_T  && dir != DIR_RT && dir != DIR_LT) return; }
-    else if (cp->direction == CHECKPOINT_DIR_S) { if (dir != DIR_B  && dir != DIR_RB && dir != DIR_LB) return; }
-    else if (cp->direction == CHECKPOINT_DIR_E) { if (dir != DIR_R  && dir != DIR_RT && dir != DIR_RB) return; }
-    else if (cp->direction == CHECKPOINT_DIR_W) { if (dir != DIR_L  && dir != DIR_LT && dir != DIR_LB) return; }
+    if (!cp_dir_matches(cp->direction, dir)) return;
 
     rs_cp_next[slot]++;
 }
