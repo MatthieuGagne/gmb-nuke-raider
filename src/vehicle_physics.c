@@ -20,32 +20,33 @@ static uint8_t veh_corners_passable(int16_t wx, int16_t wy) {
     return 1u;
 }
 
+/* Per-axis friction step. `delta` is the axis' signed direction component
+ * (VEH_DIR_DX[dir] for X, VEH_DIR_DY[dir] for Y); a gassed axis with a nonzero
+ * component takes no friction. */
+static uint8_t veh_axis_friction(uint8_t terrain, uint8_t gas, int8_t delta) {
+    if (terrain == TILE_SAND) {
+        return (gas && delta != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
+    }
+    if (terrain == TILE_OIL) {
+        return 0u;
+    }
+    return (gas && delta != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
+}
+
+/* Decay *v toward zero by `fric` units, one unit per step. */
+static void veh_decay_axis(int8_t *v, uint8_t fric) {
+    uint8_t i;
+    for (i = 0u; i < fric; i++) {
+        if      (*v > 0) *v = (int8_t)(*v - 1);
+        else if (*v < 0) *v = (int8_t)(*v + 1);
+    }
+}
+
 /* Friction portion (PRE gear-accel) — verbatim from player_apply_physics 317-337. */
 void vehicle_apply_friction(int8_t *vx, int8_t *vy, uint8_t terrain,
                             uint8_t gas, uint8_t dir) BANKED {
-    uint8_t i;
-    uint8_t fric_x;
-    uint8_t fric_y;
-
-    if (terrain == TILE_SAND) {
-        fric_x = (gas && VEH_DIR_DX[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-        fric_y = (gas && VEH_DIR_DY[dir] != 0) ? 0u : (uint8_t)(PLAYER_FRICTION * TERRAIN_SAND_FRICTION_MUL);
-    } else if (terrain == TILE_OIL) {
-        fric_x = 0u;
-        fric_y = 0u;
-    } else {
-        fric_x = (gas && VEH_DIR_DX[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
-        fric_y = (gas && VEH_DIR_DY[dir] != 0) ? 0u : (uint8_t)PLAYER_FRICTION;
-    }
-
-    for (i = 0u; i < fric_x; i++) {
-        if      (*vx > 0) *vx = (int8_t)(*vx - 1);
-        else if (*vx < 0) *vx = (int8_t)(*vx + 1);
-    }
-    for (i = 0u; i < fric_y; i++) {
-        if      (*vy > 0) *vy = (int8_t)(*vy - 1);
-        else if (*vy < 0) *vy = (int8_t)(*vy + 1);
-    }
+    veh_decay_axis(vx, veh_axis_friction(terrain, gas, VEH_DIR_DX[dir]));
+    veh_decay_axis(vy, veh_axis_friction(terrain, gas, VEH_DIR_DY[dir]));
 }
 
 /* Boost-delta + max-speed clamp (POST gear-accel) — verbatim from 344-358. */

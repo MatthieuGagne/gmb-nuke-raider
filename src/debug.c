@@ -199,25 +199,44 @@ static void set_option(uint8_t field, uint8_t option) {
     }
 }
 
-static uint8_t debug_run(const DbgRequest *req, uint8_t *detail) {
-    DbgEnv env;
-    uint8_t verdict;
-    uint8_t hp_before;
-
-    snapshot(req, &env);
-    verdict = debug_decide(req, &env);
-    if (verdict != DBG_OUT_OK) {
-        switch (verdict) {
-            case DBG_OUT_UNKNOWN_OP:
-            case DBG_OUT_UNSUPPORTED: *detail = req->opcode; break;
-            case DBG_OUT_LOCKED:      *detail = req->arg0;   break;
-            case DBG_OUT_STACK_FULL:  *detail = env.depth;   break;
-            default:                  *detail = 0u;          break;
-        }
-        return verdict;
+/* Fill *detail from a non-OK verdict (mirrors the pre-split switch). */
+static void debug_error_detail(uint8_t verdict, const DbgRequest *req,
+                               const DbgEnv *env, uint8_t *detail) {
+    switch (verdict) {
+        case DBG_OUT_UNKNOWN_OP:
+        case DBG_OUT_UNSUPPORTED: *detail = req->opcode; break;
+        case DBG_OUT_LOCKED:      *detail = req->arg0;   break;
+        case DBG_OUT_STACK_FULL:  *detail = env->depth;  break;
+        default:                  *detail = 0u;          break;
     }
+}
 
-    *detail = 0u;
+/* DBG_OP_DAMAGE — returns DBG_OUT_NO_EFFECT when no HP moved (i-frames, or already dead). */
+static uint8_t debug_damage(const DbgRequest *req, uint8_t *detail) {
+    uint8_t hp_before = damage_get_hp();
+    damage_apply(req->arg0);
+    *detail = damage_get_hp();
+    if (req->arg0 > 0u && damage_get_hp() == hp_before) {
+        return DBG_OUT_NO_EFFECT;
+    }
+    return DBG_OUT_OK;
+}
+
+/* DBG_OP_FORCE_STATE — arg1 1=pop, 2=replace, anything else=push. */
+static uint8_t debug_force_state(const DbgRequest *req, uint8_t *detail) {
+    if (req->arg1 == 1u) {
+        state_pop();
+    } else if (req->arg1 == 2u) {
+        state_replace(DBG_STATE(req->arg0), bank_for(req->arg0));
+    } else {
+        state_push(DBG_STATE(req->arg0), bank_for(req->arg0));
+    }
+    *detail = state_manager_depth();
+    return DBG_OUT_OK;
+}
+
+/* Dispatch the opcode after a verdict of DBG_OUT_OK. */
+static uint8_t debug_dispatch(const DbgRequest *req, uint8_t *detail) {
     switch (req->opcode) {
         case DBG_OP_ADD_SCRAP:
             economy_add_scrap((uint16_t)req->arg0 | ((uint16_t)req->arg1 << 8));
@@ -229,27 +248,13 @@ static uint8_t debug_run(const DbgRequest *req, uint8_t *detail) {
             set_option(req->arg0, req->arg1);
             break;
         case DBG_OP_DAMAGE:
-            hp_before = damage_get_hp();
-            damage_apply(req->arg0);
-            *detail = damage_get_hp();
-            if (req->arg0 > 0u && damage_get_hp() == hp_before) {
-                return DBG_OUT_NO_EFFECT;   /* i-frames, or already dead */
-            }
-            break;
+            return debug_damage(req, detail);
         case DBG_OP_HEAL:
             damage_heal(req->arg0);
             *detail = damage_get_hp();
             break;
         case DBG_OP_FORCE_STATE:
-            if (req->arg1 == 1u) {
-                state_pop();
-            } else if (req->arg1 == 2u) {
-                state_replace(DBG_STATE(req->arg0), bank_for(req->arg0));
-            } else {
-                state_push(DBG_STATE(req->arg0), bank_for(req->arg0));
-            }
-            *detail = state_manager_depth();
-            break;
+            return debug_force_state(req, detail);
         case DBG_OP_SPAWN_TURRET:
             if (!DBG_SPAWN(req->arg0, req->arg1)) return DBG_OUT_POOL_FULL;
             break;
@@ -263,6 +268,21 @@ static uint8_t debug_run(const DbgRequest *req, uint8_t *detail) {
             return DBG_OUT_UNKNOWN_OP;
     }
     return DBG_OUT_OK;
+}
+
+static uint8_t debug_run(const DbgRequest *req, uint8_t *detail) {
+    DbgEnv env;
+    uint8_t verdict;
+
+    snapshot(req, &env);
+    verdict = debug_decide(req, &env);
+    if (verdict != DBG_OUT_OK) {
+        debug_error_detail(verdict, req, &env, detail);
+        return verdict;
+    }
+
+    *detail = 0u;
+    return debug_dispatch(req, detail);
 }
 
 #else
