@@ -62,6 +62,42 @@ static const DbgCmdSpec *spec_for(uint8_t opcode) {
     return 0;
 }
 
+/* Guard groups extracted from debug_decide (#807). Each returns the first refusal it
+ * finds, or DBG_OUT_OK, so debug_decide can chain them in the original decision order
+ * with no change to the verdicts it produces. */
+static uint8_t debug_decide_unsupported(uint8_t opcode) {
+    if (opcode == DBG_OP_SPAWN_RACER ||
+        opcode == DBG_OP_SPAWN_PATROL) {
+        return DBG_OUT_UNSUPPORTED;                       /* R17 */
+    }
+    return DBG_OUT_OK;
+}
+
+static uint8_t debug_decide_arg_range(const DbgCmdSpec *spec,
+                                      const DbgRequest *req) {
+    if (spec->argc > 0u && req->arg0 > spec->arg0_max) return DBG_OUT_ARG_RANGE;
+    if (spec->argc > 1u && req->arg1 > spec->arg1_max) return DBG_OUT_ARG_RANGE;
+    return DBG_OUT_OK;
+}
+
+static uint8_t debug_decide_set_option(const DbgRequest *req,
+                                       const DbgEnv *env) {
+    if (req->opcode != DBG_OP_SET_OPTION) return DBG_OUT_OK;
+    if (env->in_race)          return DBG_OUT_IN_RACE;    /* R4 */
+    if (!env->option_unlocked) return DBG_OUT_LOCKED;     /* R4 */
+    return DBG_OUT_OK;
+}
+
+static uint8_t debug_decide_force_state(const DbgRequest *req,
+                                        const DbgEnv *env) {
+    if (req->opcode != DBG_OP_FORCE_STATE) return DBG_OUT_OK;
+    if (req->arg1 == 0u && env->depth >= STACK_MAX) return DBG_OUT_STACK_FULL; /* R5 */
+    /* A pop at depth 1 would empty the stack, a state real play never reaches — the
+     * canonical race path never pops below depth 1 (final review item 2). */
+    if (req->arg1 == 1u && env->depth <= 1u)        return DBG_OUT_STACK_FULL;
+    return DBG_OUT_OK;
+}
+
 /* ---- the decision (R19) ---------------------------------------------------
  * Reads `req`, `env`, and the const argument table in ROM. The table is immutable data
  * generated from src/debug_cmds.def, not module state — R19's "reads no global" is about
@@ -69,25 +105,22 @@ static const DbgCmdSpec *spec_for(uint8_t opcode) {
  */
 uint8_t debug_decide(const DbgRequest *req, const DbgEnv *env) {
     const DbgCmdSpec *spec = spec_for(req->opcode);
+    uint8_t verdict;
+
     if (spec == 0) return DBG_OUT_UNKNOWN_OP;
 
-    if (req->opcode == DBG_OP_SPAWN_RACER ||
-        req->opcode == DBG_OP_SPAWN_PATROL) {
-        return DBG_OUT_UNSUPPORTED;                       /* R17 */
-    }
-    if (spec->argc > 0u && req->arg0 > spec->arg0_max) return DBG_OUT_ARG_RANGE;
-    if (spec->argc > 1u && req->arg1 > spec->arg1_max) return DBG_OUT_ARG_RANGE;
+    verdict = debug_decide_unsupported(req->opcode);
+    if (verdict != DBG_OUT_OK) return verdict;
 
-    if (req->opcode == DBG_OP_SET_OPTION) {
-        if (env->in_race)          return DBG_OUT_IN_RACE;    /* R4 */
-        if (!env->option_unlocked) return DBG_OUT_LOCKED;     /* R4 */
-    }
-    if (req->opcode == DBG_OP_FORCE_STATE) {
-        if (req->arg1 == 0u && env->depth >= STACK_MAX) return DBG_OUT_STACK_FULL; /* R5 */
-        /* A pop at depth 1 would empty the stack, a state real play never reaches — the
-         * canonical race path never pops below depth 1 (final review item 2). */
-        if (req->arg1 == 1u && env->depth <= 1u)        return DBG_OUT_STACK_FULL;
-    }
+    verdict = debug_decide_arg_range(spec, req);
+    if (verdict != DBG_OUT_OK) return verdict;
+
+    verdict = debug_decide_set_option(req, env);
+    if (verdict != DBG_OUT_OK) return verdict;
+
+    verdict = debug_decide_force_state(req, env);
+    if (verdict != DBG_OUT_OK) return verdict;
+
     return DBG_OUT_OK;
 }
 
