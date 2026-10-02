@@ -7,6 +7,7 @@
 #include <gb/gb.h>   /* mock_vram, mock_bkg_out_of_range_count, mock_vram_clear */
 #include "loader.h"  /* loader_reset_bitmap_for_test */
 #include "input.h"   /* input, prev_input */
+#include "state_results.h" /* state_results */
 
 /* Frame counts derive from the config.h table, never from a hardcoded number (#628). */
 static const uint8_t TURN_FRAMES_T[8] = PLAYER_TURN_FRAMES_TABLE;
@@ -311,6 +312,33 @@ void test_update_runs_countdown_then_full_frames(void) {
     TEST_ASSERT_TRUE(mock_move_sprite_call_count > sprites_before);
 }
 
+/* Drive the real update() past the countdown onto a finish tile. Track 0 is a
+ * single-lap south-finish race with no checkpoints, so one crossing completes the
+ * lap and lands on the results screen. */
+void test_update_crossing_finish_reaches_results(void) {
+    uint16_t i;
+    for (i = 0u; i < CD_MAP_W * CD_MAP_H; i++) s_cd_map[i] = 1u;
+    s_cd_map[10u * CD_MAP_W + 10u] = 18u;   /* TILE_FINISH at tile (10,10) */
+    track_select(0u);                       /* single lap, south finish, 0 checkpoints */
+    track_test_set_start(256, 80);
+    track_test_set_map(s_cd_map, CD_MAP_W, CD_MAP_H);
+    loader_reset_bitmap_for_test();
+    damage_init();                          /* full HP: death path stays closed */
+    player_init(0u);
+    input = 0u; prev_input = 0u;
+    mock_vram_clear();
+    mock_move_sprite_reset();
+    state_playing.enter();
+    /* Run well past the countdown (60 + 60 + 60 + 45 = 225 frames to phase 4). */
+    for (i = 0u; i < 240u; i++) state_playing.update();
+    /* Place the player centre (84,84) on the finish tile, facing south. */
+    player_set_pos(80, 80);
+    player_set_dir(DIR_B);
+    state_playing.update();
+    /* Observable: the single-lap race finished and transitioned to results. */
+    TEST_ASSERT_EQUAL_PTR(&state_results, state_manager_top());
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_finish_eval_race_all_conditions_met);
@@ -349,5 +377,6 @@ int main(void) {
     RUN_TEST(test_finish_eval_notch_step_matches_the_facing_player_c_turns_to);
     RUN_TEST(test_countdown_pair_splits_at_ring_boundary);
     RUN_TEST(test_update_runs_countdown_then_full_frames);
+    RUN_TEST(test_update_crossing_finish_reaches_results);
     return UNITY_END();
 }
