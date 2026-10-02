@@ -1,0 +1,11 @@
+{
+  "name": "issue-797-rom-unaffected",
+  "blocking": false,
+  "watch": ["_hp", "_px", "_py"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "assert_live", "symbols": ["_px", "_py"]},
+    {"action": "screenshot", "out": "race-reached.png"}
+  ]
+}
