@@ -1,0 +1,12 @@
+{
+  "name": "issue-807-decision-refusals",
+  "blocking": false,
+  "requires_debug_rom": true,
+  "watch": ["_hp", "_px", "_py"],
+  "steps": [
+    {"action": "advance", "frames": 240},
+    {"action": "command", "cmd": "spawn_racer", "args": {"tx": 1, "ty": 1}, "expect": "unsupported"},
+    {"action": "command", "cmd": "set_option", "args": {"field": "weapon1", "option": "laser"}, "expect": "locked"},
+    {"action": "command", "cmd": "force_state", "args": {"state": "overmap", "mode": "pop"}, "expect": "stack_full"}
+  ]
+}
