@@ -127,6 +127,63 @@ void test_racer_finish_wrong_direction_no_game_over(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, racer_update());
 }
 
+void test_racer_finish_north_triggers_game_over(void) {
+    static const uint8_t finish_map[8*8] = {
+        1,1,1,1,1,1,1,1,  /* row 0 */
+        1,1,1,1,1,1,1,1,  /* row 1 */
+        1,1,1,1,1,1,1,1,  /* row 2 */
+        1,1,1,1,1,1,1,1,  /* row 3 */
+        1,1,1,1,1,1,1,1,  /* row 4 */
+        1,1,1,1,1,1,1,1,  /* row 5 */
+        1,1,1,1,1,18,1,1, /* row 6: TILE_FINISH at col 5 */
+        1,1,1,1,1,1,1,1,  /* row 7 */
+    };
+    uint8_t wp_tx[1] = { 5u };
+    uint8_t wp_ty[1] = { 0u };   /* waypoint north → DIR_T */
+    track_test_set_map(finish_map, 8u, 8u);
+    racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_N, 1u);
+    racer_set_pos_for_test(1u, 36, 52);   /* racer centre at finish tile (5,6) */
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
+}
+
+void test_racer_finish_east_triggers_game_over(void) {
+    static const uint8_t finish_map[8*8] = {
+        1,1,1,1,1,1,1,1,  /* row 0 */
+        1,1,1,1,1,1,1,1,  /* row 1 */
+        1,1,1,1,1,1,1,1,  /* row 2 */
+        1,1,1,1,1,1,1,1,  /* row 3 */
+        1,1,1,1,1,1,1,1,  /* row 4 */
+        1,1,1,1,1,1,1,1,  /* row 5 */
+        1,1,1,1,1,18,1,1, /* row 6: TILE_FINISH at col 5 */
+        1,1,1,1,1,1,1,1,  /* row 7 */
+    };
+    uint8_t wp_tx[1] = { 10u };
+    uint8_t wp_ty[1] = { 6u };  /* waypoint east → DIR_R */
+    track_test_set_map(finish_map, 8u, 8u);
+    racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_E, 1u);
+    racer_set_pos_for_test(1u, 36, 52);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
+}
+
+void test_racer_finish_west_triggers_game_over(void) {
+    static const uint8_t finish_map[8*8] = {
+        1,1,1,1,1,1,1,1,  /* row 0 */
+        1,1,1,1,1,1,1,1,  /* row 1 */
+        1,1,1,1,1,1,1,1,  /* row 2 */
+        1,1,1,1,1,1,1,1,  /* row 3 */
+        1,1,1,1,1,1,1,1,  /* row 4 */
+        1,1,1,1,1,1,1,1,  /* row 5 */
+        1,1,1,1,1,18,1,1, /* row 6: TILE_FINISH at col 5 */
+        1,1,1,1,1,1,1,1,  /* row 7 */
+    };
+    uint8_t wp_tx[1] = { 0u };
+    uint8_t wp_ty[1] = { 6u };  /* waypoint west → DIR_L */
+    track_test_set_map(finish_map, 8u, 8u);
+    racer_spawn_for_test(44u, 44u, wp_tx, wp_ty, 1u, CHECKPOINT_DIR_W, 1u);
+    racer_set_pos_for_test(1u, 36, 52);
+    TEST_ASSERT_EQUAL_UINT8(1u, racer_update());
+}
+
 void test_racer_wraps_waypoints(void) {
     uint8_t wp_tx[2] = { 10u, 20u };
     uint8_t wp_ty[2] = { 10u, 10u };
@@ -1093,6 +1150,9 @@ int main(void) {
     RUN_TEST(test_racer_advances_waypoint_when_close);
     RUN_TEST(test_racer_finish_triggers_game_over);
     RUN_TEST(test_racer_finish_wrong_direction_no_game_over);
+    RUN_TEST(test_racer_finish_north_triggers_game_over);
+    RUN_TEST(test_racer_finish_east_triggers_game_over);
+    RUN_TEST(test_racer_finish_west_triggers_game_over);
     RUN_TEST(test_racer_wraps_waypoints);
     RUN_TEST(test_racer_no_finish_before_all_laps_done);
     RUN_TEST(test_racer_finishes_after_all_laps_done);

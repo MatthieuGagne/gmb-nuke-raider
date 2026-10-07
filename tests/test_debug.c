@@ -330,6 +330,21 @@ void test_a_forced_replace_swaps_the_top_slot_without_changing_the_depth(void) {
     TEST_ASSERT_EQUAL_PTR(FAKE_STATES[DBG_STATE_PLAYING], state_manager_top());
 }
 
+/* bank_for's switch is a 7-way table. Every state id must reach a forced
+ * replace so each case is exercised. The bank value itself is a link-time ROM
+ * bank and unobservable in the host build — the observable is that each forced
+ * replace succeeds and swaps the top slot. */
+void test_forced_replace_reaches_every_state_bank(void) {
+    uint8_t i;
+    mailbox_fixture();
+    for (i = 0u; i < DBG_STATE_COUNT; i++) {
+        TEST_ASSERT_EQUAL_UINT8(DBG_OUT_OK,
+                                run_cmd(DBG_OP_FORCE_STATE, i, 2u));
+    }
+    /* Depth is unchanged after a replace, and the top slot is the last state. */
+    TEST_ASSERT_EQUAL_UINT8(1u, state_manager_depth());
+}
+
 void test_damage_reaches_the_damage_module(void) {
     mailbox_fixture();
     TEST_ASSERT_EQUAL_UINT8(DBG_OUT_OK, run_cmd(DBG_OP_DAMAGE, 10u, 0u));
@@ -412,6 +427,7 @@ int main(void) {
     RUN_TEST(test_a_forced_pop_at_depth_zero_is_refused);
     RUN_TEST(test_a_forced_pop_at_depth_one_is_refused);
     RUN_TEST(test_a_forced_replace_swaps_the_top_slot_without_changing_the_depth);
+    RUN_TEST(test_forced_replace_reaches_every_state_bank);
     RUN_TEST(test_damage_reaches_the_damage_module);
     RUN_TEST(test_damage_during_invincibility_reports_no_effect);
     RUN_TEST(test_heal_reaches_the_damage_module);

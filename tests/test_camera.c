@@ -242,6 +242,21 @@ void test_camera_update_crossing_x_tile_right_buffers_column(void) {
     TEST_ASSERT_GREATER_THAN_INT(col_count_before, mock_set_bkg_tiles_call_count);
 }
 
+/* Crossing X tile boundary left buffers new left column — the ncx < cam_x branch
+ * that the rightward test leaves uncovered. */
+void test_camera_update_crossing_x_tile_left_buffers_column(void) {
+    int col_count_before;
+    active_map_w = 64u;
+    active_map_h = 100u;
+    /* Start at cam_x=16 (tile 2), move left past tile boundary 1 (8px). */
+    camera_init(96, 80);    /* cam_x = 96-80 = 16 */
+    col_count_before = mock_set_bkg_tiles_call_count;
+    camera_update(80, 80);  /* cam_x = 80-80 = 0 — crosses tile boundary at x=8 */
+    camera_flush_vram();
+    /* Must have written at least one new column. */
+    TEST_ASSERT_GREATER_THAN_INT(col_count_before, mock_set_bkg_tiles_call_count);
+}
+
 /* cam_tile_x snapshot is captured at camera_update() time */
 void test_camera_update_snapshots_cam_tile_x(void) {
     active_map_w = 64u;
@@ -627,6 +642,7 @@ int main(void) {
     RUN_TEST(test_camera_init_cam_x_zero_for_narrow_track);
     RUN_TEST(test_camera_update_cam_x_follows_player);
     RUN_TEST(test_camera_update_crossing_x_tile_right_buffers_column);
+    RUN_TEST(test_camera_update_crossing_x_tile_left_buffers_column);
     RUN_TEST(test_camera_update_snapshots_cam_tile_x);
     RUN_TEST(test_camera_apply_scroll_sets_cam_scx_shadow);
     RUN_TEST(test_camera_invalidate_row_queues_a_row_for_flush);

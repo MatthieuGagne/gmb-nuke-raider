@@ -1,0 +1,13 @@
+{
+  "name": "issue-797-rom-unaffected",
+  "blocking": false,
+  "watch": ["_hp", "_px", "_py"],
+  "steps": [
+    {"action": "include", "name": "reach-race"},
+    {"action": "advance", "frames": 240},
+    {"action": "press", "buttons": ["down"], "delay": 120},
+    {"action": "assert_memory", "address": "_hp", "value": 0, "op": "gt"},
+    {"action": "assert_memory", "address": "_py", "value": 50, "op": "gt"},
+    {"action": "screenshot", "out": "race-reached.png"}
+  ]
+}

@@ -54,6 +54,20 @@ void test_load_npc_positions_id2_returns_count(void) {
     TEST_ASSERT_EQUAL_UINT8(0u, count);
 }
 
+void test_load_powerup_positions_id1_returns_count(void) {
+    uint8_t tx[MAX_POWERUPS], ty[MAX_POWERUPS], type[MAX_POWERUPS], count = 99u;
+    load_powerup_positions(1u, tx, ty, type, &count);
+    /* track2 has no powerups (track2_powerup_count == 0) */
+    TEST_ASSERT_EQUAL_UINT8(0u, count);
+}
+
+void test_load_powerup_positions_id2_returns_count(void) {
+    uint8_t tx[MAX_POWERUPS], ty[MAX_POWERUPS], type[MAX_POWERUPS], count = 99u;
+    load_powerup_positions(2u, tx, ty, type, &count);
+    /* track3 has no powerups (track3_powerup_count == 0) */
+    TEST_ASSERT_EQUAL_UINT8(0u, count);
+}
+
 /* ---- Allocator tests ---- */
 
 void test_alloc_returns_region_start_when_empty(void) {
@@ -365,6 +379,8 @@ int main(void) {
     RUN_TEST(test_load_npc_positions_id0_returns_count);
     RUN_TEST(test_load_npc_positions_id1_returns_count);
     RUN_TEST(test_load_npc_positions_id2_returns_count);
+    RUN_TEST(test_load_powerup_positions_id1_returns_count);
+    RUN_TEST(test_load_powerup_positions_id2_returns_count);
     RUN_TEST(test_alloc_returns_region_start_when_empty);
     RUN_TEST(test_alloc_single_slot_region_fills_once);
     RUN_TEST(test_alloc_consecutive_runs_do_not_overlap);
