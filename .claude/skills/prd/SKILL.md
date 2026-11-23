@@ -3,6 +3,11 @@ name: prd
 description: Use when creating a new PRD for a feature — creates a GitHub issue with the PRD content. No local file is created. Can be used with or without a prior brainstorming session.
 ---
 
+# PRD — Nuke Raider
+
+Read `~/.claude/skills/base-prd/SKILL.md` first: it owns the PRD structure, the filing and update commands, and
+the rules about local files and `writing-plans`. Apply the project rules below on top of it.
+
 ## Before You Begin
 
 **Read [`docs/document-conventions.md`](../../../docs/document-conventions.md) first.** It is the
@@ -10,95 +15,64 @@ authoritative source for issue routing between the two repositories, native sub-
 ADR key/lifecycle/citation rules, the project `Type` table and the `Idea` swimlane. It is no
 longer auto-loaded into every session, so this skill is responsible for pulling it in.
 
-The grill step is user-invoked: `grill-with-docs` carries `disable-model-invocation`, so ask the user to run `/grill-with-docs` — it surfaces requirements, acceptance criteria, scope, and GB hardware constraints. Once the grilling is satisfied (or the user skips it), proceed to drafting.
+The grill step is user-invoked: `grill-with-docs` carries `disable-model-invocation`, so ask the
+user to run `/grill-with-docs` — it surfaces requirements, acceptance criteria, scope, and GB
+hardware constraints. Once the grilling is satisfied (or the user skips it), proceed to drafting.
 
----
+## Project content
 
-Create a new PRD as a GitHub issue.
-
-## Steps
-
-1. **Draft the PRD content** from the brainstorming session or the user's description. Use this structure:
+`Files Impacted` lists C sources:
 
 ```
-## Goal
-One sentence: what this feature does and why it matters for the game.
-
-## Requirements
-- R1: ...
-
-## Acceptance Criteria
-- [ ] AC1: ...
-
-## Out of Scope
-- ...
-
-## Files Impacted
 - `src/foo.c` — ...
-
-## Notes
-<!-- Technical context: budget numbers, known constraints, bank assignments, open questions -->
 ```
 
-   **Required in Notes:** include any relevant technical context gathered during design — budget numbers (OAM slots used, WRAM bytes, VRAM tiles), known constraints, bank assignments, and specific files impacted when known. This ensures subsequent sessions start informed.
+`Notes` must cover, when relevant: budget numbers (OAM slots used, WRAM bytes, VRAM tiles), known
+constraints, and bank assignments. Use the terms `CONTEXT.md` defines (`docs/dev-workflow.md` §10).
 
-   **Write it plain:** short sentences, active voice, simple tense, concrete verbs, and the terms
-   `CONTEXT.md` defines (`docs/dev-workflow.md` §10). A PRD is a bound surface — rewriting it after
-   it is filed costs an edit and a notification.
+## Filing
 
-2. **Decide which repo the PRD belongs to** — per the **Routing.** rule in
+1. **Decide which repo the PRD belongs to** — per the **Routing.** rule in
    `docs/document-conventions.md`, list the files the implementation will touch: all here → file
    here; all Garage → `-R MatthieuGagne/nuke-raiders-garage`; **both** → write **two** PRDs (one
    per repo, cross-linked), never one PRD editing two repos.
 
-   The chosen repo is fixed for the life of the issue — record it; every later `gh` command and
-   `## Updating an Existing PRD` below need it.
+   The chosen repo is fixed for the life of the issue — record it; every later `gh` command needs it.
 
-3. **Create a GitHub issue** with the full PRD content as the body, labeled `prd`:
+2. **Create the issue** labeled `prd`:
+
    ```sh
    # same repo:
-   gh issue create --title "feat: <feature name>" --label prd --body "<PRD content>"
+   gh issue create --title "feat: <feature name>" --label prd --body-file <file>
    # Garage:
-   gh issue create -R MatthieuGagne/nuke-raiders-garage --title "feat: <feature name>" --label prd --body "<PRD content>"
+   gh issue create -R MatthieuGagne/nuke-raiders-garage --title "feat: <feature name>" --label prd --body-file <file>
    ```
-   Capture the issue number and URL from the output.
 
-4. **Add the issue to the "Nuke Raider — Documents" board with `Type = PRD` and
-   `Status = Todo`** — run the four-command sequence in `references/board-wiring.md` with those
-   two values. A factory run moves that `Status` to `In Progress` when it starts
-   (`factory_publish.py --run-start`) and back to `Todo` if the run fails.
+3. **Add the issue to the "Nuke Raider — Documents" board with `Type = PRD` and `Status = Todo`** —
+   run the four-command sequence in `references/board-wiring.md` with those two values. A factory
+   run moves that `Status` to `In Progress` when it starts (`factory_publish.py --run-start`) and
+   back to `Todo` if the run fails.
 
-5. **If this PRD refines an epic, wire it as a native sub-issue.** A body-text `Refines #<epic>`
+4. **If this PRD refines an epic, wire it as a native sub-issue.** A body-text `Refines #<epic>`
    line is not enough — see `references/subissue-wiring.md` for the exact commands and
    verification steps. If the PRD refines no epic, skip this step.
 
-6. Report the issue URL to the user.
+Updates use the repo chosen at step 1:
 
-## Updating an Existing PRD
+```sh
+gh issue edit <N> --repo MatthieuGagne/gmb-nuke-raider --body-file <file>
+gh issue edit <N> --repo MatthieuGagne/nuke-raiders-garage --body-file <file>
+```
 
-When updating a PRD (e.g., after a new brainstorming session or scope change):
+## Factory-ready
 
-- **Always use `gh issue edit`** to rewrite the issue body directly — never add a comment:
-  ```sh
-  # same repo:
-  gh issue edit <N> --repo MatthieuGagne/gmb-nuke-raider --body "<full updated PRD content>"
-  # Garage:
-  gh issue edit <N> --repo MatthieuGagne/nuke-raiders-garage --body "<full updated PRD content>"
-  ```
-  Use the repo chosen at step 2 — a PRD never moves repos.
-- The issue body is the single source of truth — it must always reflect the current design.
+A PRD is only runnable by `/factory` if it passes `python tools/spec_lint.py --issue <N>` — all
+five sections (`Goal`, `Requirements`, `Acceptance Criteria`, `Out of Scope`, `Files Impacted`)
+present and non-empty, at least one `- R<n>:` requirement, at least one `- [ ]` acceptance
+criterion, and at least one `- ` bullet under Files Impacted. Run the linter before reporting the
+issue URL.
 
-## Important
-
-- **No local file is created.** The GitHub issue is the single source of truth for the PRD.
-- Do NOT invoke `writing-plans` after this. The implementation plan is written in a separate session when the user is ready to build.
-- **Factory-ready:** a PRD is only runnable by `/factory` if it passes
-  `python tools/spec_lint.py --issue <N>` — all five sections (`Goal`, `Requirements`,
-  `Acceptance Criteria`, `Out of Scope`, `Files Impacted`) present and non-empty, at least one
-  `- R<n>:` requirement, at least one `- [ ]` acceptance criterion, and at least one
-  `- ` bullet under Files Impacted. Run the linter before reporting the issue URL.
-- **Files Impacted decides the route.** The linter classifies a spec doc-only when *every*
-  listed path is `*.md`, `*.txt`, `*.json` (except `bank-manifest.json`), or lives under
-  `.claude/skills/` or `.claude/agents/`. A single stray path — including one annotated "no
-  change needed" — sends the whole spec down the full code workflow. List only files the
-  implementation will actually touch.
+**Files Impacted decides the route.** The linter classifies a spec doc-only when *every* listed
+path is `*.md`, `*.txt`, `*.json` (except `bank-manifest.json`), or lives under `.claude/skills/`
+or `.claude/agents/`. A single stray path — including one annotated "no change needed" — sends the
+whole spec down the full code workflow. List only files the implementation will actually touch.
