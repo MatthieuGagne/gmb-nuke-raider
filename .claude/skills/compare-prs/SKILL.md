@@ -70,7 +70,7 @@ rm -rf /tmp/pr-compare-<N>
 ## Notes
 
 - Parallelism is skill-side (subagents), not shell-side (`&` background processes)
-- Checkouts are `git clone --shared` copies, never `git worktree add` (raw `git worktree` is denied on this machine and reserved for Orca)
+- Checkouts are `git clone --shared` copies, never `git worktree add`: a shared clone gives each PR an independent checkout without touching the repo's worktree list
 - The script handles stale checkout cleanup automatically on re-run
 - If a PR branch is gone (merged/deleted), the script exits 1 with a clear error — report it in the table and skip that ROM
 - Always launch Emulicious **from the checkout directory** (`cd /tmp/pr-compare-<N>` first)

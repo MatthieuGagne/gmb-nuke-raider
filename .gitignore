@@ -38,7 +38,6 @@ desktop.ini
 
 # Git worktrees
 .worktrees/
-.claude/worktrees/
 
 
 # Python
